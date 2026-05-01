@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>Разборка</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f0f1e;
+      --surface: #1a1a2e;
+      --surface2: #16213e;
+      --gold: #d4af37;
+      --gold-dim: #7a6020;
+      --red: #c0392b;
+      --red-dark: #6b0a0a;
+      --purple-dark: #3a0058;
+      --green-dark: #0d3b1e;
+      --slate: #263545;
+      --text: #e8e8f0;
+      --text-dim: #7a7a9a;
+      --hp-bg: #2a0a0a;
+      --mp-bg: #0a0a2a;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system,'Segoe UI',sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 10px 12px;
+      gap: 10px;
+    }
+    .header {
+      text-align: center;
+      font-size: 17px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      color: var(--gold);
+      padding: 4px 0 8px;
+      border-bottom: 1px solid var(--gold-dim);
+    }
+    .fighters {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+    }
+    .fighter {
+      flex: 1;
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 10px;
+      border: 1px solid #2a2a44;
+      min-width: 0;
+    }
+    .fighter.player { border-color: #1e3a5f; }
+    .fighter.enemy  { border-color: #5a1515; }
+    .f-avatar { font-size: 34px; text-align: center; margin-bottom: 3px; }
+    .f-name {
+      font-size: 11px; font-weight: 700; text-align: center;
+      margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis;
+      white-space: nowrap; color: #ccccee;
+    }
+    .bar-row { margin-bottom: 4px; }
+    .bar-lbl {
+      display: flex; justify-content: space-between;
+      font-size: 10px; color: var(--text-dim); margin-bottom: 2px;
+    }
+    .bar-track { height: 7px; border-radius: 4px; overflow: hidden; }
+    .bar-track.hp-t { background: var(--hp-bg); }
+    .bar-track.mp-t { background: var(--mp-bg); }
+    .bar-fill { height: 100%; border-radius: 4px; transition: width .55s ease; }
+    .hp-fill { background: linear-gradient(90deg,#7b0000,#e74c3c); }
+    .mp-fill { background: linear-gradient(90deg,#1a237e,#3498db); }
+    .f-title { font-size: 9px; color: var(--text-dim); text-align: center; margin-top: 4px; }
+    .vs-col {
+      display: flex; align-items: center; justify-content: center;
+      width: 28px; flex-shrink: 0; padding-top: 18px;
+    }
+    .vs-badge {
+      background: var(--red-dark); border: 2px solid var(--red);
+      border-radius: 50%; width: 26px; height: 26px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px; font-weight: 900; color: #fff;
+    }
+    .log-box {
+      background: var(--surface2);
+      border: 1px solid #22224a;
+      border-radius: 10px;
+      padding: 9px 12px;
+      font-size: 13px;
+      line-height: 1.55;
+      min-height: 52px;
+      color: #c8c8de;
+      flex-shrink: 0;
+    }
+    .log-empty { color: var(--text-dim); font-style: italic; }
+    .log-hit   { color: #e74c3c; font-weight: 600; }
+    .log-boss  { color: #e67e22; }
+    .log-heal  { color: #2ecc71; }
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: auto;
+    }
+    .btn {
+      border: none; border-radius: 11px;
+      padding: 13px 6px;
+      cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      transition: transform .1s, filter .1s;
+      -webkit-tap-highlight-color: transparent;
+      position: relative; overflow: hidden;
+    }
+    .btn::after {
+      content:''; position:absolute; inset:0;
+      background: rgba(255,255,255,0);
+      transition: background .15s;
+    }
+    .btn:active { transform: scale(0.94); filter: brightness(0.88); }
+    .btn:disabled { opacity: 0.38; cursor: not-allowed; }
+    .btn:disabled:active { transform: none; filter: none; }
+    .btn-lbl { font-size: 14px; font-weight: 700; color: #fff; }
+    .btn-dmg { font-size: 11px; color: rgba(255,255,255,.75); }
+    .btn-cost{ font-size: 10px; color: rgba(255,255,255,.55); }
+    .btn-atk  { background: linear-gradient(135deg,#7b0000,#c0392b); }
+    .btn-skill{ background: linear-gradient(135deg,#3e0064,#8e44ad); }
+    .btn-pot  { background: linear-gradient(135deg,#0d3b1e,#27ae60); }
+    .btn-flee { background: linear-gradient(135deg,#1e2a36,#546e7a); }
+    .overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.82);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100; padding: 20px;
+    }
+    .confirm-card {
+      background: var(--surface); border: 1px solid var(--gold-dim);
+      border-radius: 14px; padding: 22px 18px;
+      width: 100%; max-width: 290px; text-align: center;
+    }
+    .confirm-card h3 { color: var(--gold); margin-bottom: 8px; font-size: 16px; }
+    .confirm-card p  { color: var(--text-dim); font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
+    .confirm-btns { display: flex; gap: 10px; }
+    .confirm-btns button {
+      flex: 1; padding: 11px; border: none; border-radius: 9px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .c-yes { background: var(--red); color: #fff; }
+    .c-no  { background: #3a4a55; color: #fff; }
+  </style>
+</head>
+<body>
+  <div class="header">💥 РАЗБОРКА</div>
+
+  <div class="fighters">
+    <!-- Player -->
+    <div class="fighter player">
+      <div class="f-avatar">🤵</div>
+      <div class="f-name" id="pname">Игрок</div>
+      <div class="bar-row">
+        <div class="bar-lbl"><span>❤️</span><span id="php-lbl">—</span></div>
+        <div class="bar-track hp-t"><div class="bar-fill hp-fill" id="php-bar" style="width:0%"></div></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-lbl"><span>⚡</span><span id="pmp-lbl">—</span></div>
+        <div class="bar-track mp-t"><div class="bar-fill mp-fill" id="pmp-bar" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <div class="vs-col"><div class="vs-badge">VS</div></div>
+
+    <!-- Enemy -->
+    <div class="fighter enemy">
+      <div class="f-avatar" id="eemoji">😈</div>
+      <div class="f-name" id="ename">Враг</div>
+      <div class="bar-row">
+        <div class="bar-lbl"><span>❤️</span><span id="ehp-lbl">—</span></div>
+        <div class="bar-track hp-t"><div class="bar-fill hp-fill" id="ehp-bar" style="width:0%"></div></div>
+      </div>
+      <div class="f-title" id="etitle"></div>
+    </div>
+  </div>
+
+  <!-- Combat log -->
+  <div class="log-box" id="log-box">
+    <span class="log-empty">Выбери действие...</span>
+  </div>
+
+  <!-- Buttons -->
+  <div class="actions">
+    <button class="btn btn-atk" id="btn-atk" onclick="act('attack')">
+      <span class="btn-lbl" id="atk-lbl">🤜 Бить</span>
+      <span class="btn-dmg" id="atk-dmg"></span>
+      <span class="btn-cost" id="atk-cost">-5⚡</span>
+    </button>
+    <button class="btn btn-skill" id="btn-sk" onclick="act('skill')">
+      <span class="btn-lbl" id="sk-lbl">💥 Приём</span>
+      <span class="btn-dmg" id="sk-dmg"></span>
+      <span class="btn-cost" id="sk-cost"></span>
+    </button>
+    <button class="btn btn-pot" id="btn-pot" onclick="act('potion')">
+      <span class="btn-lbl">🩹 Аптечка</span>
+      <span class="btn-dmg" id="pot-txt">нет</span>
+    </button>
+    <button class="btn btn-flee" onclick="showFlee()">
+      <span class="btn-lbl">🏃 Валить</span>
+      <span class="btn-dmg">50% шанс</span>
+    </button>
+  </div>
+
+  <!-- Flee confirm -->
+  <div class="overlay" id="flee-ov" style="display:none">
+    <div class="confirm-card">
+      <h3>🏃 Сваливаешь?</h3>
+      <p>50% шанс, что враг не даст уйти.<br>При провале бой продолжится.</p>
+      <div class="confirm-btns">
+        <button class="c-yes" onclick="act('flee')">Да, ухожу</button>
+        <button class="c-no"  onclick="hideFlee()">Нет</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+
+    const p   = new URLSearchParams(window.location.search);
+    const get = (k, d='')  => p.has(k) ? decodeURIComponent(p.get(k)) : d;
+    const gn  = (k, d=0)   => parseInt(p.get(k) ?? d, 10);
+
+    // State
+    const php=gn('ph',100), pmhp=gn('pmh',100);
+    const pmp=gn('pm',50),  pmmp=gn('pmm',100);
+    const pname = get('pn','Игрок');
+    const ehp=gn('eh',50),  emhp=gn('emh',50);
+    const ename  = get('en','Враг');
+    const etitle = get('et','');
+    const wt  = gn('wt',0);
+    const atkDmg = get('ad','?-?');
+    const skName = get('sk','Приём');
+    const skDmg  = get('sd','?-?');
+    const skCost = gn('sc',25);
+    const hasPots   = gn('po',0)===1;
+    const hasAtkMp  = pmp >= 5;
+    const hasSkMp   = pmp >= skCost;
+    const log = get('log','');
+
+    // Extract leading emoji from enemy name
+    function firstEmoji(s) {
+      const m = s.match(/^(©|®|[ -㌀]|\ud83c[퀀-\udfff]|\ud83d[퀀-\udfff]|\ud83e[퀀-\udfff])/);
+      return m ? m[0] : '😈';
+    }
+    function stripEmoji(s) { return s.replace(/^[\p{Emoji_Presentation}\s]+/u,''); }
+
+    // Apply to DOM
+    document.getElementById('pname').textContent  = pname;
+    document.getElementById('php-lbl').textContent= php+'/'+pmhp;
+    document.getElementById('pmp-lbl').textContent= pmp+'/'+pmmp;
+    document.getElementById('eemoji').textContent  = firstEmoji(ename);
+    document.getElementById('ename').textContent   = stripEmoji(ename)||ename;
+    document.getElementById('etitle').textContent  = etitle;
+    document.getElementById('ehp-lbl').textContent = ehp+'/'+emhp;
+
+    // Animate bars after short delay
+    setTimeout(()=>{
+      document.getElementById('php-bar').style.width = Math.max(0,php/pmhp*100)+'%';
+      document.getElementById('pmp-bar').style.width = Math.max(0,pmp/pmmp*100)+'%';
+      document.getElementById('ehp-bar').style.width = Math.max(0,ehp/emhp*100)+'%';
+    }, 60);
+
+    // Weapon label
+    const atkLabels = {0:'🤜 Бить',1:'🔪 Колоть',2:'🔫 Стрелять'};
+    document.getElementById('atk-lbl').textContent = atkLabels[wt]||'🤜 Бить';
+    document.getElementById('atk-dmg').textContent = '⚔️ '+atkDmg;
+    if(!hasAtkMp){
+      document.getElementById('btn-atk').disabled=true;
+      document.getElementById('atk-cost').textContent='😮 нет энергии';
+    }
+
+    // Skill
+    document.getElementById('sk-lbl').textContent  = skName;
+    document.getElementById('sk-dmg').textContent  = '⚔️ '+skDmg;
+    document.getElementById('sk-cost').textContent = '-'+skCost+'⚡';
+    if(!hasSkMp) document.getElementById('btn-sk').disabled=true;
+
+    // Potion
+    if(hasPots){
+      document.getElementById('pot-txt').textContent='использовать';
+    }else{
+      document.getElementById('btn-pot').disabled=true;
+      document.getElementById('pot-txt').textContent='нет в наличии';
+    }
+
+    // Log
+    if(log){
+      const box=document.getElementById('log-box');
+      box.innerHTML='';
+      log.split('\n').forEach((line,i)=>{
+        if(i>0) box.appendChild(document.createElement('br'));
+        box.appendChild(document.createTextNode(line));
+      });
+    }
+
+    // Action
+    let sent=false;
+    function act(a){
+      if(sent)return;
+      sent=true;
+      document.querySelectorAll('.btn').forEach(b=>b.disabled=true);
+      tg.sendData(JSON.stringify({a}));
+    }
+    function showFlee(){ document.getElementById('flee-ov').style.display='flex'; }
+    function hideFlee(){ document.getElementById('flee-ov').style.display='none'; }
+  </script>
+</body>
+</html>
