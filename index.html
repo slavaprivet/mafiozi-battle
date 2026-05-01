@@ -97,9 +97,66 @@
       flex-shrink: 0;
     }
     .log-empty { color: var(--text-dim); font-style: italic; }
-    .log-hit   { color: #e74c3c; font-weight: 600; }
-    .log-boss  { color: #e67e22; }
-    .log-heal  { color: #2ecc71; }
+    .party-section {
+      background: var(--surface2);
+      border: 1px solid #2a2a50;
+      border-radius: 12px;
+      padding: 10px;
+    }
+    .party-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--gold);
+      margin-bottom: 8px;
+      text-align: center;
+      letter-spacing: 1px;
+    }
+    .party-members {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .party-member {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface);
+      border-radius: 9px;
+      padding: 7px 9px;
+      border: 1px solid #252545;
+    }
+    .party-member.dead {
+      opacity: 0.4;
+      filter: grayscale(0.8);
+    }
+    .pm-icon { font-size: 20px; flex-shrink: 0; }
+    .pm-info { flex: 1; min-width: 0; }
+    .pm-name {
+      font-size: 11px; font-weight: 700;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      color: #ccccee; margin-bottom: 3px;
+    }
+    .pm-bar-row { display: flex; align-items: center; gap: 5px; }
+    .pm-hp-lbl { font-size: 9px; color: var(--text-dim); flex-shrink: 0; min-width: 44px; }
+    .pm-bar-track { flex: 1; height: 5px; border-radius: 3px; background: var(--hp-bg); overflow: hidden; }
+    .pm-bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg,#7b0000,#e74c3c); transition: width .55s; }
+    .pm-type-badge {
+      font-size: 9px; padding: 2px 5px; border-radius: 5px;
+      font-weight: 600; flex-shrink: 0;
+    }
+    .pm-type-m { background: #2a1a00; color: #e67e22; }
+    .pm-type-f { background: #001a2a; color: #3498db; }
+    .pm-dead-lbl { font-size: 10px; color: #c0392b; font-weight: 700; flex-shrink: 0; }
+    .btn-pm-atk {
+      border: none; border-radius: 8px; padding: 7px 10px;
+      background: linear-gradient(135deg,#7b0000,#c0392b);
+      color: #fff; font-size: 11px; font-weight: 700;
+      cursor: pointer; flex-shrink: 0;
+      transition: transform .1s, filter .1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-pm-atk:active { transform: scale(0.93); filter: brightness(0.85); }
+    .btn-pm-atk:disabled { opacity: 0.35; cursor: not-allowed; }
     .actions {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -114,11 +171,6 @@
       transition: transform .1s, filter .1s;
       -webkit-tap-highlight-color: transparent;
       position: relative; overflow: hidden;
-    }
-    .btn::after {
-      content:''; position:absolute; inset:0;
-      background: rgba(255,255,255,0);
-      transition: background .15s;
     }
     .btn:active { transform: scale(0.94); filter: brightness(0.88); }
     .btn:disabled { opacity: 0.38; cursor: not-allowed; }
@@ -156,7 +208,6 @@
   <div class="header">💥 РАЗБОРКА</div>
 
   <div class="fighters">
-    <!-- Player -->
     <div class="fighter player">
       <div class="f-avatar">🤵</div>
       <div class="f-name" id="pname">Игрок</div>
@@ -169,10 +220,7 @@
         <div class="bar-track mp-t"><div class="bar-fill mp-fill" id="pmp-bar" style="width:0%"></div></div>
       </div>
     </div>
-
     <div class="vs-col"><div class="vs-badge">VS</div></div>
-
-    <!-- Enemy -->
     <div class="fighter enemy">
       <div class="f-avatar" id="eemoji">😈</div>
       <div class="f-name" id="ename">Враг</div>
@@ -184,12 +232,15 @@
     </div>
   </div>
 
-  <!-- Combat log -->
+  <div class="party-section" id="party-section" style="display:none">
+    <div class="party-title">⚔️ ОТРЯД</div>
+    <div class="party-members" id="party-members"></div>
+  </div>
+
   <div class="log-box" id="log-box">
     <span class="log-empty">Выбери действие...</span>
   </div>
 
-  <!-- Buttons -->
   <div class="actions">
     <button class="btn btn-atk" id="btn-atk" onclick="act('attack')">
       <span class="btn-lbl" id="atk-lbl">🤜 Бить</span>
@@ -211,14 +262,13 @@
     </button>
   </div>
 
-  <!-- Flee confirm -->
   <div class="overlay" id="flee-ov" style="display:none">
     <div class="confirm-card">
       <h3>🏃 Сваливаешь?</h3>
       <p>50% шанс, что враг не даст уйти.<br>При провале бой продолжится.</p>
       <div class="confirm-btns">
         <button class="c-yes" onclick="act('flee')">Да, ухожу</button>
-        <button class="c-no"  onclick="hideFlee()">Нет</button>
+        <button class="c-no" onclick="hideFlee()">Нет</button>
       </div>
     </div>
   </div>
@@ -227,94 +277,74 @@
     const tg = window.Telegram.WebApp;
     tg.ready();
     tg.expand();
-
-    const p   = new URLSearchParams(window.location.search);
-    const get = (k, d='')  => p.has(k) ? decodeURIComponent(p.get(k)) : d;
-    const gn  = (k, d=0)   => parseInt(p.get(k) ?? d, 10);
-
-    // State
+    const p = new URLSearchParams(window.location.search);
+    const get = (k, d='') => p.has(k) ? decodeURIComponent(p.get(k)) : d;
+    const gn  = (k, d=0)  => parseInt(p.get(k) ?? d, 10);
     const php=gn('ph',100), pmhp=gn('pmh',100);
     const pmp=gn('pm',50),  pmmp=gn('pmm',100);
-    const pname = get('pn','Игрок');
+    const pname   = get('pn','Игрок');
     const ehp=gn('eh',50),  emhp=gn('emh',50);
-    const ename  = get('en','Враг');
-    const etitle = get('et','');
-    const wt  = gn('wt',0);
-    const atkDmg = get('ad','?-?');
-    const skName = get('sk','Приём');
-    const skDmg  = get('sd','?-?');
-    const skCost = gn('sc',25);
-    const hasPots   = gn('po',0)===1;
-    const hasAtkMp  = pmp >= 5;
-    const hasSkMp   = pmp >= skCost;
-    const log = get('log','');
-
-    // Extract leading emoji from enemy name
+    const ename   = get('en','Враг');
+    const etitle  = get('et','');
+    const wt      = gn('wt',0);
+    const atkDmg  = get('ad','?-?');
+    const skName  = get('sk','Приём');
+    const skDmg   = get('sd','?-?');
+    const skCost  = gn('sc',25);
+    const hasPots = gn('po',0) === 1;
+    const log     = get('log','');
+    const partyCount = gn('pc', 0);
+    const party = [];
+    for (let i = 0; i < partyCount; i++) {
+      const hp = gn('p'+i+'h', 0);
+      const maxHp = gn('p'+i+'m', 50);
+      party.push({ name: get('p'+i+'n','???'), hp, maxHp, type: get('p'+i+'t','m'), alive: hp > 0 });
+    }
     function firstEmoji(s) {
-      const m = s.match(/^(©|®|[ -㌀]|\ud83c[퀀-\udfff]|\ud83d[퀀-\udfff]|\ud83e[퀀-\udfff])/);
+      const m = s.match(/^(\ud83c[\udc00-\udfff]|\ud83d[\udc00-\udfff]|\ud83e[\udc00-\udfff]|[\u2600-\u27bf])/);
       return m ? m[0] : '😈';
     }
-    function stripEmoji(s) { return s.replace(/^[\p{Emoji_Presentation}\s]+/u,''); }
-
-    // Apply to DOM
-    document.getElementById('pname').textContent  = pname;
-    document.getElementById('php-lbl').textContent= php+'/'+pmhp;
-    document.getElementById('pmp-lbl').textContent= pmp+'/'+pmmp;
+    function stripEmoji(s) { return s.replace(/^[\p{Emoji_Presentation}\s]+/u, ''); }
+    document.getElementById('pname').textContent   = pname;
+    document.getElementById('php-lbl').textContent = php+'/'+pmhp;
+    document.getElementById('pmp-lbl').textContent = pmp+'/'+pmmp;
     document.getElementById('eemoji').textContent  = firstEmoji(ename);
     document.getElementById('ename').textContent   = stripEmoji(ename)||ename;
     document.getElementById('etitle').textContent  = etitle;
     document.getElementById('ehp-lbl').textContent = ehp+'/'+emhp;
-
-    // Animate bars after short delay
     setTimeout(()=>{
       document.getElementById('php-bar').style.width = Math.max(0,php/pmhp*100)+'%';
       document.getElementById('pmp-bar').style.width = Math.max(0,pmp/pmmp*100)+'%';
       document.getElementById('ehp-bar').style.width = Math.max(0,ehp/emhp*100)+'%';
-    }, 60);
-
-    // Weapon label
-    const atkLabels = {0:'🤜 Бить',1:'🔪 Колоть',2:'🔫 Стрелять'};
+    },60);
+    const atkLabels={0:'🤜 Бить',1:'🔪 Колоть',2:'🔫 Стрелять'};
     document.getElementById('atk-lbl').textContent = atkLabels[wt]||'🤜 Бить';
     document.getElementById('atk-dmg').textContent = '⚔️ '+atkDmg;
-    if(!hasAtkMp){
-      document.getElementById('btn-atk').disabled=true;
-      document.getElementById('atk-cost').textContent='😮 нет энергии';
-    }
-
-    // Skill
+    if(pmp<5){document.getElementById('btn-atk').disabled=true;document.getElementById('atk-cost').textContent='😮 нет энергии';}
     document.getElementById('sk-lbl').textContent  = skName;
     document.getElementById('sk-dmg').textContent  = '⚔️ '+skDmg;
     document.getElementById('sk-cost').textContent = '-'+skCost+'⚡';
-    if(!hasSkMp) document.getElementById('btn-sk').disabled=true;
-
-    // Potion
-    if(hasPots){
-      document.getElementById('pot-txt').textContent='использовать';
-    }else{
-      document.getElementById('btn-pot').disabled=true;
-      document.getElementById('pot-txt').textContent='нет в наличии';
-    }
-
-    // Log
-    if(log){
-      const box=document.getElementById('log-box');
-      box.innerHTML='';
-      log.split('\n').forEach((line,i)=>{
-        if(i>0) box.appendChild(document.createElement('br'));
-        box.appendChild(document.createTextNode(line));
+    if(pmp<skCost) document.getElementById('btn-sk').disabled=true;
+    if(hasPots){document.getElementById('pot-txt').textContent='использовать';}else{document.getElementById('btn-pot').disabled=true;document.getElementById('pot-txt').textContent='нет в наличии';}
+    if(log){const box=document.getElementById('log-box');box.innerHTML='';log.split('\n').forEach((line,i)=>{if(i>0)box.appendChild(document.createElement('br'));box.appendChild(document.createTextNode(line));});}
+    if(partyCount>0){
+      document.getElementById('party-section').style.display='block';
+      const container=document.getElementById('party-members');
+      party.forEach((member,idx)=>{
+        const isM=member.type==='m';
+        const row=document.createElement('div');
+        row.className='party-member'+(member.alive?'':' dead');
+        row.innerHTML=`<div class="pm-icon">${isM?'🗡️':'🤝'}</div><div class="pm-info"><div class="pm-name">${member.name}</div><div class="pm-bar-row"><span class="pm-hp-lbl">❤️ ${member.hp}/${member.maxHp}</span><div class="pm-bar-track"><div class="pm-bar-fill" id="pmbar-${idx}" style="width:0%"></div></div></div></div><span class="pm-type-badge ${isM?'pm-type-m':'pm-type-f'}">${isM?'Наёмник':'Друг'}</span>${member.alive?`<button class="btn-pm-atk" onclick="partyAct(${idx})">⚔️ Атака</button>`:'<span class="pm-dead-lbl">💀 Выбыл</span>'}`;
+        container.appendChild(row);
       });
+      setTimeout(()=>{party.forEach((m,idx)=>{const b=document.getElementById('pmbar-'+idx);if(b)b.style.width=m.maxHp>0?Math.max(0,m.hp/m.maxHp*100)+'%':'0%';});},80);
     }
-
-    // Action
     let sent=false;
-    function act(a){
-      if(sent)return;
-      sent=true;
-      document.querySelectorAll('.btn').forEach(b=>b.disabled=true);
-      tg.sendData(JSON.stringify({a}));
-    }
-    function showFlee(){ document.getElementById('flee-ov').style.display='flex'; }
-    function hideFlee(){ document.getElementById('flee-ov').style.display='none'; }
+    function disableAll(){document.querySelectorAll('.btn,.btn-pm-atk').forEach(b=>{b.disabled=true;});}
+    function act(a){if(sent)return;sent=true;disableAll();tg.sendData(JSON.stringify({a}));}
+    function partyAct(idx){if(sent)return;sent=true;disableAll();tg.sendData(JSON.stringify({a:'party_attack',idx:idx}));}
+    function showFlee(){document.getElementById('flee-ov').style.display='flex';}
+    function hideFlee(){document.getElementById('flee-ov').style.display='none';}
   </script>
 </body>
 </html>
