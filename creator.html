@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Создай гангстера</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body {
+  background: #0a0a1a;
+  color: #eee;
+  font-family: 'Arial', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 20px;
+  overflow-x: hidden;
+}
+h2 {
+  font-size: 18px;
+  color: #e8c96e;
+  text-align: center;
+  padding: 14px 0 8px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+#preview-wrap {
+  background: linear-gradient(160deg, #1a1a2e 0%, #16213e 100%);
+  border: 2px solid #e8c96e44;
+  border-radius: 16px;
+  padding: 10px;
+  margin: 0 auto 10px;
+  position: relative;
+  box-shadow: 0 0 30px #e8c96e22;
+}
+#preview {
+  display: block;
+  border-radius: 10px;
+}
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 10px;
+  width: 100%;
+  max-width: 380px;
+  margin-bottom: 8px;
+}
+.tab {
+  flex: 1;
+  padding: 7px 2px;
+  background: #1a1a2e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  color: #aaa;
+  font-size: 11px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .15s;
+  user-select: none;
+}
+.tab.active {
+  background: #e8c96e22;
+  border-color: #e8c96e;
+  color: #e8c96e;
+  font-weight: bold;
+}
+.panel {
+  display: none;
+  width: 100%;
+  max-width: 380px;
+  padding: 0 10px;
+}
+.panel.active { display: block; }
+.panel-title {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 8px;
+  text-align: center;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.options-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.opt-btn {
+  aspect-ratio: 1;
+  border-radius: 10px;
+  border: 2px solid #333;
+  background: #111122;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: #ccc;
+  text-align: center;
+  line-height: 1.2;
+  padding: 2px;
+  transition: all .15s;
+  user-select: none;
+  overflow: hidden;
+}
+.opt-btn canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+.opt-btn.selected {
+  border-color: #e8c96e;
+  background: #e8c96e22;
+  box-shadow: 0 0 8px #e8c96e55;
+}
+.opt-btn:active { transform: scale(0.93); }
+
+.skin-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 0 10px;
+}
+.skin-btn {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 3px solid #333;
+  cursor: pointer;
+  transition: all .15s;
+  user-select: none;
+}
+.skin-btn.selected {
+  border-color: #e8c96e;
+  box-shadow: 0 0 10px #e8c96e88;
+  transform: scale(1.1);
+}
+
+#save-btn {
+  margin: 14px auto 0;
+  display: block;
+  width: calc(100% - 20px);
+  max-width: 360px;
+  padding: 14px;
+  background: linear-gradient(135deg, #e8c96e, #c8a030);
+  color: #111;
+  font-size: 16px;
+  font-weight: bold;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  letter-spacing: 1px;
+  box-shadow: 0 4px 15px #e8c96e44;
+}
+#save-btn:active { transform: scale(0.97); }
+
+.randomize-btn {
+  margin: 0 auto 8px;
+  display: block;
+  width: calc(100% - 20px);
+  max-width: 360px;
+  padding: 9px;
+  background: #1a1a2e;
+  color: #e8c96e;
+  font-size: 13px;
+  border: 1px solid #e8c96e55;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.randomize-btn:active { transform: scale(0.97); }
+</style>
+</head>
+<body>
+<h2>🎩 Создай гангстера</h2>
+
+<div id="preview-wrap">
+  <canvas id="preview" width="220" height="280"></canvas>
+</div>
+
+<button class="randomize-btn" onclick="randomize()">🎲 Случайный образ</button>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab(0)">🎨<br>Кожа</div>
+  <div class="tab" onclick="switchTab(1)">💪<br>Тело</div>
+  <div class="tab" onclick="switchTab(2)">😐<br>Лицо</div>
+  <div class="tab" onclick="switchTab(3)">💈<br>Волосы</div>
+  <div class="tab" onclick="switchTab(4)">🎩<br>Убор</div>
+</div>
+
+<!-- TAB 0: Skin -->
+<div class="panel active" id="tab-skin">
+  <div class="panel-title">Цвет кожи</div>
+  <div class="skin-grid" id="skin-grid"></div>
+</div>
+
+<!-- TAB 1: Body -->
+<div class="panel" id="tab-body">
+  <div class="panel-title">Телосложение</div>
+  <div class="options-grid" id="body-grid"></div>
+</div>
+
+<!-- TAB 2: Face -->
+<div class="panel" id="tab-face">
+  <div class="panel-title">Тип лица</div>
+  <div class="options-grid" id="face-grid"></div>
+</div>
+
+<!-- TAB 3: Hair -->
+<div class="panel" id="tab-hair">
+  <div class="panel-title">Причёска</div>
+  <div class="options-grid" id="hair-grid"></div>
+</div>
+
+<!-- TAB 4: Hat -->
+<div class="panel" id="tab-hat">
+  <div class="panel-title">Головной убор</div>
+  <div class="options-grid" id="hat-grid"></div>
+</div>
+
+<button id="save-btn" onclick="saveChar()">💾 Сохранить персонажа</button>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+
+// ── STATE ──────────────────────────────────────────────────────────────────
+const state = { skin: 0, body: 0, face: 0, hair: 0, hat: 0 };
+
+// Load pre-existing params from URL (when user reopens creator)
+const urlP = new URLSearchParams(location.search);
+['skin','body','face','hair','hat'].forEach(k => {
+  if (urlP.has(k)) state[k] = parseInt(urlP.get(k)) || 0;
+});
+
+// ── SKIN COLORS ────────────────────────────────────────────────────────────
+const SKINS = [
+  '#FDDBB4', // светлая
+  '#F0C27F', // пшеничная
+  '#D4935A', // смуглая
+  '#A0622A', // тёмно-смуглая
+  '#7A3B10', // тёмная
+  '#C8A882', // оливковая
+];
+
+// ── BODY NAMES ────────────────────────────────────────────────────────────
+const BODY_NAMES = ['Худой','Средний','Полный','Качок'];
+
+// ── FACE NAMES ────────────────────────────────────────────────────────────
+const FACE_NAMES = [
+  'Серьёзный','Злой','Бородатый','Усатый','Со шрамом',
+  'Грустный','Дерзкий','Боксёр','Курит','Тату'
+];
+
+// ── HAIR NAMES ─────────────────────────────────────────────────────────────
+const HAIR_NAMES = [
+  'Лысый','Назад','Помпадур','Ирокез','Короткий',
+  'Длинные','Кудрявые','Андеркат','Пробор','Бокс'
+];
+
+// ── HAT NAMES ─────────────────────────────────────────────────────────────
+const HAT_NAMES = [
+  'Нет','Федора','Кепка','Бандана','Ковбойская',
+  'Очки','Повязка','Берет','Шляпа мафии','Цепь'
+];
+
+// ── DRAW HELPERS ──────────────────────────────────────────────────────────
+function drawChar(ctx, W, H, s, opts) {
+  const { skin, body, face, hair, hat } = opts;
+  ctx.clearRect(0, 0, W, H);
+
+  // scale helpers
+  const cx = W / 2;
+  const cy = H / 2;
+  const sc = Math.min(W, H) / 220;
+
+  function px(x) { return cx + x * sc; }
+  function py(y) { return H * 0.92 - y * sc; } // bottom-anchored
+
+  const skinCol = SKINS[skin] || SKINS[0];
+
+  // ── Body ────────────────────────────────────────────────────────────────
+  const bodyDefs = [
+    { sw: 34, sh: 80, nw: 14, nh: 22, hw: 26 },  // худой
+    { sw: 44, sh: 85, nw: 16, nh: 22, hw: 30 },  // средний
+    { sw: 58, sh: 82, nw: 18, nh: 20, hw: 36 },  // полный
+    { sw: 52, sh: 92, nw: 16, nh: 24, hw: 32 },  // качок
+  ];
+  const bd = bodyDefs[body] || bodyDefs[1];
+
+  // suit color
+  const suitCol = ['#1a1a2e','#1a2e1a','#2e1a1a','#1a1e2e'][body % 4];
+  const tieCol  = ['#c0392b','#e8c96e','#8e44ad','#2980b9'][face % 4];
+
+  // LEGS
+  ctx.fillStyle = suitCol;
+  const legW = bd.sw * 0.38;
+  const legH = 55 * sc;
+  // left leg
+  ctx.beginPath();
+  ctx.roundRect(px(-bd.sw*0.22), py(legH), legW*sc, legH, 4*sc);
+  ctx.fill();
+  // right leg
+  ctx.beginPath();
+  ctx.roundRect(px(bd.sw*0.22 - legW), py(legH), legW*sc, legH, 4*sc);
+  ctx.fill();
+
+  // SHOES
+  ctx.fillStyle = '#111';
+  [-1,1].forEach(side => {
+    ctx.beginPath();
+    ctx.ellipse(px(side * bd.sw * 0.1), py(2), 10*sc, 5*sc, 0, 0, Math.PI*2);
+    ctx.fill();
+  });
+
+  // BODY / SUIT JACKET
+  ctx.fillStyle = suitCol;
+  ctx.beginPath();
+  ctx.roundRect(px(-bd.sw/2), py(bd.sh), bd.sw*sc, bd.sh*sc, [0,0,6*sc,6*sc]);
+  ctx.fill();
+
+  // SHIRT (white strip)
+  ctx.fillStyle = '#ddd';
+  ctx.beginPath();
+  ctx.roundRect(px(-7), py(bd.sh), 14*sc, bd.sh*0.7*sc, 2*sc);
+  ctx.fill();
+
+  // TIE
+  ctx.fillStyle = tieCol;
+  ctx.beginPath();
+  ctx.moveTo(px(-5), py(bd.sh - 4));
+  ctx.lineTo(px(5),  py(bd.sh - 4));
+  ctx.lineTo(px(3),  py(bd.sh * 0.32));
+  ctx.lineTo(px(0),  py(bd.sh * 0.25));
+  ctx.lineTo(px(-3), py(bd.sh * 0.32));
+  ctx.closePath();
+  ctx.fill();
+
+  // LAPELS
+  ctx.fillStyle = suitCol;
+  // left lapel
+  ctx.beginPath();
+  ctx.moveTo(px(0), py(bd.sh - 2));
+  ctx.lineTo(px(-bd.sw/2), py(bd.sh));
+  ctx.lineTo(px(-bd.sw/2), py(bd.sh - 20));
+  ctx.closePath();
+  ctx.fill();
+  // right lapel
+  ctx.beginPath();
+  ctx.moveTo(px(0), py(bd.sh - 2));
+  ctx.lineTo(px(bd.sw/2), py(bd.sh));
+  ctx.lineTo(px(bd.sw/2), py(bd.sh - 20));
+  ctx.closePath();
+  ctx.fill();
+
+  // ARMS
+  ctx.fillStyle = suitCol;
+  const armLen = body === 3 ? 65 : 60;
+  const armW = body === 3 ? 13 : 10;
+  // left arm
+  ctx.beginPath();
+  ctx.roundRect(px(-bd.sw/2 - armW*sc + 2), py(bd.sh), armW*sc, armLen*sc, 5*sc);
+  ctx.fill();
+  // right arm
+  ctx.beginPath();
+  ctx.roundRect(px(bd.sw/2 - 2), py(bd.sh), armW*sc, armLen*sc, 5*sc);
+  ctx.fill();
+
+  // HANDS
+  ctx.fillStyle = skinCol;
+  [-1,1].forEach((side, i) => {
+    const hx = side === -1 ? px(-bd.sw/2 - armW*sc/2 + 2) : px(bd.sw/2 + armW*sc/2 - 2);
+    ctx.beginPath();
+    ctx.ellipse(hx, py(armLen - 10), 7*sc, 9*sc, 0, 0, Math.PI*2);
+    ctx.fill();
+  });
+
+  // NECK
+  ctx.fillStyle = skinCol;
+  ctx.beginPath();
+  ctx.roundRect(px(-bd.nw/2), py(bd.sh + bd.nh), bd.nw*sc, bd.nh*sc, 4*sc);
+  ctx.fill();
+
+  // HEAD shape (varies by body for proportion)
+  const headH = bd.hw * 1.22;
+  const headY = bd.sh + bd.nh + headH;
+  ctx.fillStyle = skinCol;
+  ctx.beginPath();
+  ctx.ellipse(px(0), py(bd.sh + bd.nh + headH/2), bd.hw/2*sc, headH/2*sc, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // Jaw / chin detail
+  ctx.fillStyle = skinCol;
+  ctx.beginPath();
+  ctx.ellipse(px(0), py(bd.sh + bd.nh + 5), bd.hw/2.2*sc, 10*sc, 0, 0, Math.PI);
+  ctx.fill();
+
+  const eyeY = bd.sh + bd.nh + headH * 0.55;
+  const eyeSpan = bd.hw * 0.22;
+  const mouthY = bd.sh + bd.nh + headH * 0.18;
+
+  // ── Face details ───────────────────────────────────────────────────────
+  drawFace(ctx, face, px, py, eyeY, eyeSpan, mouthY, bd, sc);
+
+  // ── Hair ───────────────────────────────────────────────────────────────
+  if (hair > 0) {
+    drawHair(ctx, hair, px, py, bd, headY, headH, sc);
+  }
+
+  // ── Hat / accessory ────────────────────────────────────────────────────
+  if (hat > 0) {
+    drawHat(ctx, hat, px, py, bd, headY, headH, sc);
+  }
+}
+
+// ── FACE DRAWING ──────────────────────────────────────────────────────────
+function drawFace(ctx, faceId, px, py, eyeY, eyeSpan, mouthY, bd, sc) {
+  const eyeR = 4 * sc;
+
+  // Eyes (whites)
+  ctx.fillStyle = '#fff';
+  [-1,1].forEach(s => {
+    ctx.beginPath();
+    ctx.ellipse(px(s*eyeSpan), py(eyeY), eyeR*1.3, eyeR, 0, 0, Math.PI*2);
+    ctx.fill();
+  });
+
+  // Pupils
+  const pupilCol = ['#1a0a00','#1a0020','#002010','#100020'][faceId % 4];
+  ctx.fillStyle = pupilCol;
+  // expression-based pupil position
+  const lookX = faceId === 1 ? 1.5 : faceId === 5 ? -0.5 : 0;
+  [-1,1].forEach(s => {
+    ctx.beginPath();
+    ctx.arc(px(s*eyeSpan + lookX*sc), py(eyeY), eyeR*0.65, 0, Math.PI*2);
+    ctx.fill();
+  });
+
+  // Eyebrows
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 2.5 * sc;
+  ctx.lineCap = 'round';
+  const browAngles = [0, -0.3, 0, 0.15, 0.2, 0.25, -0.2, -0.15, 0, 0.1];
+  const bAngle = browAngles[faceId] || 0;
+  [-1,1].forEach(s => {
+    ctx.save();
+    ctx.translate(px(s*eyeSpan), py(eyeY + 9));
+    ctx.rotate(s * bAngle);
+    ctx.beginPath();
+    ctx.moveTo(-8*sc, 0);
+    ctx.lineTo(8*sc, 0);
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  // Face 0: серьёзный — straight mouth
+  // Face 1: злой — frown + thick brows
+  // Face 2: бородатый — beard
+  // Face 3: усатый — mustache
+  // Face 4: со шрамом — scar line
+  // Face 5: грустный — sad mouth
+  // Face 6: дерзкий — smirk
+  // Face 7: боксёр — broken nose
+  // Face 8: курит — cigarette
+  // Face 9: тату — face tattoo
+
+  // Mouth
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 2*sc;
+  ctx.fillStyle = '#b03030';
+  if (faceId === 0) { // serious
+    ctx.beginPath();
+    ctx.moveTo(px(-8), py(mouthY));
+    ctx.lineTo(px(8), py(mouthY));
+    ctx.stroke();
+  } else if (faceId === 1) { // злой
+    ctx.beginPath();
+    ctx.moveTo(px(-9), py(mouthY+3));
+    ctx.quadraticCurveTo(px(0), py(mouthY-4), px(9), py(mouthY+3));
+    ctx.stroke();
+  } else if (faceId === 2 || faceId === 3) { // бородатый / усатый
+    ctx.beginPath();
+    ctx.moveTo(px(-7), py(mouthY));
+    ctx.quadraticCurveTo(px(0), py(mouthY+3), px(7), py(mouthY));
+    ctx.stroke();
+  } else if (faceId === 5) { // грустный
+    ctx.beginPath();
+    ctx.moveTo(px(-8), py(mouthY+4));
+    ctx.quadraticCurveTo(px(0), py(mouthY-2), px(8), py(mouthY+4));
+    ctx.stroke();
+  } else if (faceId === 6) { // дерзкий smirk
+    ctx.beginPath();
+    ctx.moveTo(px(-6), py(mouthY));
+    ctx.quadraticCurveTo(px(3), py(mouthY+5), px(9), py(mouthY+2));
+    ctx.stroke();
+  } else { // default
+    ctx.beginPath();
+    ctx.moveTo(px(-7), py(mouthY));
+    ctx.lineTo(px(7), py(mouthY));
+    ctx.stroke();
+  }
+
+  // Beard (face 2)
+  if (faceId === 2) {
+    ctx.fillStyle = '#2a1800';
+    ctx.beginPath();
+    ctx.ellipse(px(0), py(mouthY - 12), 14*sc, 16*sc, 0, 0, Math.PI);
+    ctx.fill();
+    // sideburns
+    [-1,1].forEach(s => {
+      ctx.beginPath();
+      ctx.ellipse(px(s*14), py(mouthY+4), 5*sc, 10*sc, 0, 0, Math.PI*2);
+      ctx.fill();
+    });
+  }
+
+  // Mustache (face 3)
+  if (faceId === 3) {
+    ctx.fillStyle = '#1a0e00';
+    ctx.beginPath();
+    ctx.ellipse(px(-5), py(mouthY+6), 7*sc, 4*sc, 0.3, 0, Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(px(5), py(mouthY+6), 7*sc, 4*sc, -0.3, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // Scar (face 4)
+  if (faceId === 4) {
+    ctx.strokeStyle = '#cc5555';
+    ctx.lineWidth = 2*sc;
+    ctx.beginPath();
+    ctx.moveTo(px(-10), py(eyeY+8));
+    ctx.lineTo(px(-4), py(mouthY+8));
+    ctx.stroke();
+    ctx.strokeStyle = '#ff8888';
+    ctx.lineWidth = 1*sc;
+    ctx.stroke();
+  }
+
+  // Boxer: broken nose bridge (face 7)
+  if (faceId === 7) {
+    ctx.strokeStyle = '#a06060';
+    ctx.lineWidth = 2*sc;
+    ctx.beginPath();
+    ctx.moveTo(px(0), py(eyeY-4));
+    ctx.lineTo(px(3), py(eyeY-10));
+    ctx.lineTo(px(-1), py(eyeY-16));
+    ctx.stroke();
+  }
+
+  // Cigarette (face 8)
+  if (faceId === 8) {
+    ctx.fillStyle = '#eee';
+    ctx.beginPath();
+    ctx.roundRect(px(7), py(mouthY-1), 18*sc, 4*sc, 2*sc);
+    ctx.fill();
+    ctx.fillStyle = '#e8c96e';
+    ctx.beginPath();
+    ctx.roundRect(px(22), py(mouthY-1), 5*sc, 4*sc, 1*sc);
+    ctx.fill();
+    // smoke
+    ctx.strokeStyle = '#88889966';
+    ctx.lineWidth = 2*sc;
+    ctx.beginPath();
+    ctx.moveTo(px(25), py(mouthY+3));
+    ctx.quadraticCurveTo(px(28), py(mouthY+10), px(24), py(mouthY+17));
+    ctx.stroke();
+  }
+
+  // Tattoo (face 9)
+  if (faceId === 9) {
+    ctx.strokeStyle = '#1a40cc99';
+    ctx.lineWidth = 1.5*sc;
+    // teardrop tattoo
+    ctx.beginPath();
+    ctx.moveTo(px(-14), py(eyeY-5));
+    ctx.lineTo(px(-12), py(eyeY));
+    ctx.lineTo(px(-16), py(eyeY));
+    ctx.closePath();
+    ctx.stroke();
+    // star pattern on cheek
+    const starX = px(12), starY = py(mouthY+8);
+    for (let i=0; i<5; i++) {
+      const a = (i*2*Math.PI/5) - Math.PI/2;
+      const a2 = ((i+0.5)*2*Math.PI/5) - Math.PI/2;
+      if (i===0) { ctx.beginPath(); ctx.moveTo(starX + Math.cos(a)*5*sc, starY + Math.sin(a)*5*sc); }
+      else ctx.lineTo(starX + Math.cos(a)*5*sc, starY + Math.sin(a)*5*sc);
+      ctx.lineTo(starX + Math.cos(a2)*2.5*sc, starY + Math.sin(a2)*2.5*sc);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
+}
+
+// ── HAIR DRAWING ──────────────────────────────────────────────────────────
+const HAIR_COLORS = ['#1a0e00','#3d2200','#8b6333','#b8860b','#888','#111'];
+
+function drawHair(ctx, hairId, px, py, bd, headY, headH, sc) {
+  const hc = HAIR_COLORS[hairId % HAIR_COLORS.length];
+  const topY = headY;
+  const hw = bd.hw / 2;
+
+  ctx.fillStyle = hc;
+  ctx.strokeStyle = hc;
+  ctx.lineWidth = 1;
+
+  if (hairId === 1) { // назад (slicked back)
+    ctx.beginPath();
+    ctx.ellipse(px(0), py(topY - 5), hw*sc, 10*sc, 0, Math.PI, Math.PI*2);
+    ctx.fill();
+    // shine
+    ctx.strokeStyle = '#ffffff33';
+    ctx.lineWidth = 2*sc;
+    ctx.beginPath();
+    ctx.moveTo(px(-hw*0.5), py(topY - 8));
+    ctx.quadraticCurveTo(px(0), py(topY - 12), px(hw*0.5), py(topY-8));
+    ctx.stroke();
+
+  } else if (hairId === 2) { // помпадур
+    ctx.beginPath();
+    ctx.ellipse(px(0), py(topY + 2), hw*sc, 9*sc, 0, Math.PI, Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(px(-4*sc), py(topY + 14), hw*0.8*sc, 16*sc, -0.2, Math.PI, Math.PI*2);
+    ctx.fill();
+
+  } else if (hairId === 3) { // ирокез
+    ctx.beginPath();
+    ctx.moveTo(px(-4), py(topY - 2));
+    ctx.lineTo(px(-3), py(topY + 28));
+    ctx.lineTo(px(3),  py(topY + 28));
+    ctx.lineTo(px(4),  py(topY - 2));
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(px(0), py(topY + 28), 3*sc, 4*sc, 0, 0, Math.PI*2);
+    ctx.fill();
+
+  } else if (hairId === 4) { // короткий
+    ctx.beginPath();
+    ctx.ellipse(px(0), py(topY), hw*sc, 10*sc, 0, Math.PI, Math.PI*2);
+    ctx.fill();
+
+  } else if (hairId === 5) { // длинные
+    ctx.beginPath();
+    ctx.ellipse(px(0), py(topY), hw*sc, 10*sc, 0, Math.PI, Math.PI*2);
+    ctx.fill();
+    // flowing sides
+    [-1,1].forEach(s => {
+      ctx.beginPath();
+      ctx.moveTo(px(s*hw), py(topY));
+      ctx.quadraticCurveTo(px(s*(hw+5)), py(topY - 20), px(s*(hw+3)), py(topY - 50));
+      ctx.quadraticCurveTo(px(s*(hw+5)), py(topY - 60), px(s*(hw+1)), py(topY - 70));
+      ctx.lineWidth = 8*sc;
+      ctx.strokeStyle = hc;
+      ctx.stroke();
+    });
+
+  } else if (hairId === 6) { // кудрявые
+    for (let i=-3; i<=3; i++) {
+      ctx.beginPath();
+      ctx.arc(px(i*7), py(topY + 5), 7*sc, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.ellipse(px(0), py(topY), hw*sc, 8*sc, 0, Math.PI, Math.PI*2);
+    ctx.fill();
+
+  } else if (hairId === 7) { // андеркат (undercut)
+    ctx.beginPath();
+    ctx.ellipse(px(-4), py(topY + 4), hw*0.9*sc, 9*sc, -0.2, Math.PI, Math.PI*2);
+    ctx.fill();
+    // side shaved
+    ctx.fillStyle = SKINS[0]; // will be overwritten by proper skin, approximate
+    // just draw thicker top
+    ctx.fillStyle = hc;
+    ctx.beginPath();
+    ctx.roundRect(px(-14), py(topY+5), 14*sc, 8*sc, 3*sc);
+    ctx.fill();
+
+  } else if (hairId === 8) { // пробор
+    ctx.beginPath();
+    ctx.ellipse(px(0), py(topY), hw*sc, 10*sc, 0, Math.PI, Math.PI*2);
+    ctx.fill();
+    // part line
+    ctx.strokeStyle = '#ffffff44';
+    ctx.lineWidth = 1.5*sc;
+    ctx.beginPath();
+    ctx.moveTo(px(-3), py(topY - 2));
+    ctx.lineTo(px(-3), py(topY + 10));
+    ctx.stroke();
+
+  } else if (hairId === 9) { // бокс (buzz cut)
+    ctx.fillStyle = hc;
+    ctx.beginPath();
+    ctx.ellipse(px(0), py(topY + 1), hw*sc, 6*sc, 0, Math.PI, Math.PI*2);
+    ctx.fill();
+    // stubble dots
+    ctx.fillStyle = hc + '99';
+    for (let dx = -hw+2; dx <= hw-2; dx += 5) {
+      ctx.beginPath();
+      ctx.arc(px(dx), py(topY + 3), 2*sc, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+}
+
+// ── HAT DRAWING ──────────────────────────────────────────────────────────
+function drawHat(ctx, hatId, px, py, bd, headY, headH, sc) {
+  const topY = headY;
+  const hw = bd.hw / 2;
+
+  if (hatId === 1) { // Федора
+    ctx.fillStyle = '#1a0e00';
+    // brim
+    ctx.beginPath();
+    ctx.ellipse(px(0), py(topY + 3), (hw+10)*sc, 5*sc, 0, 0, Math.PI*2);
+    ctx.fill();
+    // crown
+    ctx.beginPath();
+    ctx.roundRect(px(-hw+2), py(topY + 3), (hw*2-4)*sc, 28*sc, 4*sc);
+    ctx.fill();
+    // band
+    ctx.fillStyle = '#e8c96e';
+    ctx.fillRect(px(-hw+2), py(topY + 6), (hw*2-4)*sc, 4*sc);
+    // indent on top
+    ctx.fillStyle = '#111';
+    ctx.beginPath();
+    ctx.ellipse(px(0), py(topY + 30), (hw-4)*sc, 4*sc, 0, Math.PI, Math.PI*2);
+    ctx.fill();
+
+  } else if (hatId === 2) { // Кепка
+    ctx.fillStyle = '#1a2e3a';
+    ctx.beginPath();
+    ctx.ellipse(px(0), py(topY + 5), hw*sc, 7*sc, 0, Math.PI, Math.PI*2);
+    ctx.fill();
+    // visor
+    ctx.beginPath();
+    ctx.ellipse(px(hw/2), py(topY + 5), (hw+5)*sc, 4*sc, 0.2, 0, Math.PI);
+    ctx.fill();
+    // button on top
+    ctx.fillStyle = '#e8c96e';
+    ctx.beginPath();
+    ctx.arc(px(0), py(topY + 22), 3*sc, 0, Math.PI*2);
+    ctx.fill();
+
+  } else if (hatId === 3) { // Бандана
+    ctx.fillStyle = '#8b0000';
+    ctx.beginPath();
+    ctx.ellipse(px(0), py(topY + 10), hw*sc, 18*sc, 0, Math.PI*0.6, Math.PI*2.4);
+    ctx.fill();
+    // knot
+    ctx.beginPath();
+    ctx.arc(px(hw-2), py(topY + 5), 5*sc, 0, Math.PI*2);
+    ctx.fill();
+    // pattern
+    ctx.strokeStyle = '#ff444444';
+    ctx.lineWidth = 1*sc;
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(px(-hw + i*8), py(topY + 5));
+      ctx.lineTo(px(-hw + i*8 + 4), py(topY + 20));
+      ctx.stroke();
+    }
+
+  } else if (hatId === 4) { // Ковбойская
+    ctx.fillStyle = '#5c3d11';
+    // brim wide
+    ctx.beginPath();
+    ctx.ellipse(px(0), py(topY + 3), (hw+14)*sc, 5*sc, 0, 0, Math.PI*2);
+    ctx.fill();
+    // tall crown
+    ctx.beginPath();
+    ctx.moveTo(px(-hw+2), py(topY + 3));
+    ctx.lineTo(px(-hw+4), py(topY + 36));
+    ctx.lineTo(px(-3), py(topY + 40));
+    ctx.lineTo(px(3),  py(topY + 40));
+    ctx.lineTo(px(hw-4), py(topY + 36));
+    ctx.lineTo(px(hw-2), py(topY + 3));
+    ctx.closePath();
+    ctx.fill();
+    // band
+    ctx.fillStyle = '#8b6333';
+    ctx.fillRect(px(-hw+2), py(topY + 6), (hw*2-4)*sc, 3*sc);
+
+  } else if (hatId === 5) { // Очки
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 2.5*sc;
+    ctx.fillStyle = '#1a3a5a99';
+    const eyeY = topY - headH * 0.55 + headH;
+    // left lens
+    ctx.beginPath();
+    ctx.roundRect(px(-19), py(eyeY + 8), 14*sc, 10*sc, 3*sc);
+    ctx.fill();
+    ctx.stroke();
+    // right lens
+    ctx.beginPath();
+    ctx.roundRect(px(5), py(eyeY + 8), 14*sc, 10*sc, 3*sc);
+    ctx.fill();
+    ctx.stroke();
+    // bridge
+    ctx.beginPath();
+    ctx.moveTo(px(-5), py(eyeY + 12));
+    ctx.lineTo(px(5), py(eyeY + 12));
+    ctx.stroke();
+    // temples
+    ctx.beginPath();
+    ctx.moveTo(px(-19), py(eyeY + 12));
+    ctx.lineTo(px(-hw), py(eyeY + 10));
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(px(19), py(eyeY + 12));
+    ctx.lineTo(px(hw), py(eyeY + 10));
+    ctx.stroke();
+
+  } else if (hatId === 6) { // Повязка на глазу
+    const eyeY = topY - headH * 0.55 + headH;
+    ctx.fillStyle = '#111';
+    ctx.beginPath();
+    ctx.ellipse(px(-11), py(eyeY + 4), 8*sc, 6*sc, 0, 0, Math.PI*2);
+    ctx.fill();
+    // strap
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 2*sc;
+    ctx.beginPath();
+    ctx.moveTo(px(-19), py(eyeY + 4));
+    ctx.lineTo(px(-hw), py(eyeY));
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(px(-3), py(eyeY + 4));
+    ctx.lineTo(px(hw), py(eyeY));
+    ctx.stroke();
+
+  } else if (hatId === 7) { // Берет
+    ctx.fillStyle = '#2c2c4e';
+    ctx.beginPath();
+    ctx.ellipse(px(-4), py(topY + 10), (hw+2)*sc, 12*sc, 0.3, Math.PI*0.1, Math.PI*2.1);
+    ctx.fill();
+    ctx.fillStyle = '#111';
+    ctx.beginPath();
+    ctx.ellipse(px(0), py(topY + 5), hw*0.85*sc, 5*sc, 0, 0, Math.PI*2);
+    ctx.fill();
+
+  } else if (hatId === 8) { // Шляпа мафии (wide brim)
+    ctx.fillStyle = '#0a0a0a';
+    // brim
+    ctx.beginPath();
+    ctx.ellipse(px(0), py(topY + 2), (hw+16)*sc, 6*sc, 0, 0, Math.PI*2);
+    ctx.fill();
+    // crown tall
+    ctx.beginPath();
+    ctx.roundRect(px(-hw+4), py(topY + 2), (hw*2-8)*sc, 32*sc, [2*sc,2*sc,0,0]);
+    ctx.fill();
+    // white band
+    ctx.fillStyle = '#eeeeee';
+    ctx.fillRect(px(-hw+4), py(topY + 4), (hw*2-8)*sc, 3*sc);
+    // shadow on brim
+    ctx.fillStyle = '#00000033';
+    ctx.beginPath();
+    ctx.ellipse(px(0), py(topY + 2), (hw+14)*sc, 4*sc, 0, 0, Math.PI*2);
+    ctx.fill();
+
+  } else if (hatId === 9) { // Золотая цепь (на голове)
+    ctx.strokeStyle = '#e8c96e';
+    ctx.lineWidth = 3*sc;
+    ctx.beginPath();
+    ctx.arc(px(0), py(topY - headH * 0.5 + headH * 0.1), (hw+3)*sc, Math.PI*0.2, Math.PI*0.8);
+    ctx.stroke();
+    // pendant
+    ctx.fillStyle = '#e8c96e';
+    ctx.beginPath();
+    ctx.arc(px(0), py(topY - headH * 0.5 + headH * 0.1 - 10), 4*sc, 0, Math.PI*2);
+    ctx.fill();
+  }
+}
+
+// ── THUMBNAIL ─────────────────────────────────────────────────────────────
+function makeThumb(type, idx) {
+  const c = document.createElement('canvas');
+  c.width = 52; c.height = 52;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#111122';
+  ctx.fillRect(0, 0, 52, 52);
+
+  const opts = { skin: state.skin, body: state.body, face: state.face, hair: state.hair, hat: state.hat };
+  opts[type] = idx;
+  drawChar(ctx, 52, 52, null, opts);
+  return c;
+}
+
+// ── MAIN CANVAS REDRAW ────────────────────────────────────────────────────
+const mainCanvas = document.getElementById('preview');
+const mainCtx = mainCanvas.getContext('2d');
+
+function redraw() {
+  drawChar(mainCtx, 220, 280, null, state);
+}
+
+// ── BUILD UI ──────────────────────────────────────────────────────────────
+function buildSkinGrid() {
+  const grid = document.getElementById('skin-grid');
+  SKINS.forEach((col, i) => {
+    const btn = document.createElement('div');
+    btn.className = 'skin-btn' + (i === state.skin ? ' selected' : '');
+    btn.style.background = col;
+    btn.onclick = () => {
+      state.skin = i;
+      document.querySelectorAll('.skin-btn').forEach((b,j) => b.classList.toggle('selected', j===i));
+      redraw();
+    };
+    grid.appendChild(btn);
+  });
+}
+
+function buildGrid(type, names, gridId) {
+  const grid = document.getElementById(gridId);
+  names.forEach((name, i) => {
+    const btn = document.createElement('div');
+    btn.className = 'opt-btn' + (i === state[type] ? ' selected' : '');
+    btn.id = `${type}-btn-${i}`;
+
+    const c = document.createElement('canvas');
+    c.width = 52; c.height = 52;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#111122';
+    ctx.fillRect(0,0,52,52);
+    // draw preview
+    const previewOpts = { skin: state.skin, body: 1, face: 0, hair: 0, hat: 0 };
+    previewOpts[type] = i;
+    drawChar(ctx, 52, 52, null, previewOpts);
+
+    btn.appendChild(c);
+    btn.onclick = () => {
+      state[type] = i;
+      document.querySelectorAll(`#${gridId} .opt-btn`).forEach((b,j) => b.classList.toggle('selected', j===i));
+      redraw();
+    };
+    grid.appendChild(btn);
+  });
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────
+const panels = ['tab-skin','tab-body','tab-face','tab-hair','tab-hat'];
+function switchTab(idx) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i===idx));
+  panels.forEach((p,i) => {
+    const el = document.getElementById(p);
+    el.classList.toggle('active', i===idx);
+  });
+}
+
+// ── RANDOMIZE ─────────────────────────────────────────────────────────────
+function randomize() {
+  state.skin = Math.floor(Math.random() * SKINS.length);
+  state.body = Math.floor(Math.random() * BODY_NAMES.length);
+  state.face = Math.floor(Math.random() * FACE_NAMES.length);
+  state.hair = Math.floor(Math.random() * HAIR_NAMES.length);
+  state.hat  = Math.floor(Math.random() * HAT_NAMES.length);
+
+  // update skin buttons
+  document.querySelectorAll('.skin-btn').forEach((b,i) => b.classList.toggle('selected', i===state.skin));
+  // update option buttons
+  ['body','face','hair','hat'].forEach(type => {
+    const gridId = `${type}-grid`;
+    document.querySelectorAll(`#${gridId} .opt-btn`).forEach((b,i) => b.classList.toggle('selected', i===state[type]));
+  });
+  redraw();
+}
+
+// ── SAVE ──────────────────────────────────────────────────────────────────
+function saveChar() {
+  const data = JSON.stringify({
+    a: 'set_look',
+    skin: state.skin,
+    body: state.body,
+    face: state.face,
+    hair: state.hair,
+    hat: state.hat
+  });
+
+  if (tg && tg.sendData) {
+    tg.sendData(data);
+  } else {
+    // fallback for testing in browser
+    alert('Сохранено: ' + data);
+  }
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+buildSkinGrid();
+buildGrid('body', BODY_NAMES, 'body-grid');
+buildGrid('face', FACE_NAMES, 'face-grid');
+buildGrid('hair', HAIR_NAMES, 'hair-grid');
+buildGrid('hat',  HAT_NAMES,  'hat-grid');
+redraw();
+</script>
+</body>
+</html>
