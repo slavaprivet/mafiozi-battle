@@ -222,6 +222,16 @@
     }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
     .enemy-turn-indicator.pulsing { animation: pulse .6s ease infinite; }
+    /* ── Blood particles ────────────────────────────────────── */
+    .blood-particle {
+      position: fixed; border-radius: 50%; pointer-events: none;
+      animation: blood-fly var(--dur, .7s) ease-out forwards;
+      z-index: 9999;
+    }
+    @keyframes blood-fly {
+      0%   { transform: translate(0,0) scale(1); opacity: 1; }
+      100% { transform: translate(var(--tx,0px), var(--ty,0px)) scale(0.2); opacity: 0; }
+    }
     /* ── Co-op partner strip ────────────────────────────────── */
     .partner-strip {
       background: var(--surface2); border:1px solid #1e3a5f;
@@ -523,6 +533,36 @@
       });
     }
 
+    // ── Blood particles ──────────────────────────────────────────
+    function spawnBlood(elId, count, isPlayer) {
+      var el = document.getElementById(elId);
+      if (!el) return;
+      var rect = el.getBoundingClientRect();
+      var cx = rect.left + rect.width  / 2;
+      var cy = rect.top  + rect.height / 2;
+      var colors = isPlayer
+        ? ['#cc0000','#990000','#ff2222','#880000','#ff4444']
+        : ['#cc0000','#aa0000','#ff1111','#dd2222','#ff6666'];
+      for (var i = 0; i < count; i++) {
+        var p = document.createElement('div');
+        p.className = 'blood-particle';
+        var angle = Math.random() * Math.PI * 2;
+        var dist  = 30 + Math.random() * 70;
+        var tx = Math.cos(angle) * dist;
+        var ty = Math.sin(angle) * dist - 10;
+        var size = 4 + Math.random() * 7;
+        var dur  = 0.5 + Math.random() * 0.4;
+        p.style.cssText =
+          'left:' + (cx - size/2) + 'px;top:' + (cy - size/2) + 'px;' +
+          'width:' + size + 'px;height:' + size + 'px;' +
+          'background:' + colors[Math.floor(Math.random()*colors.length)] + ';' +
+          '--tx:' + tx + 'px;--ty:' + ty + 'px;--dur:' + dur + 's;' +
+          'box-shadow:0 0 3px rgba(180,0,0,.6);';
+        document.body.appendChild(p);
+        setTimeout(function(el){ el.remove(); }, (dur + 0.1) * 1000, p);
+      }
+    }
+
     // ── Damage calc ─────────────────────────────────────────────
     function rnd(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
     function calcDmg(atk, def, mult=1.0) {
@@ -685,6 +725,7 @@
       addLog('😤 ' + eName + ' бьёт тебя: ' + dmg + ' урона!', 'log-enemy');
       shakeEl('player-side');
       showFloatDmg('player-side', dmg, 'player');
+      spawnBlood('player-side', 10, true);
       updateBars();
       if (coopId) { var phObj = {}; phObj['p' + myPnum + 'hp'] = playerHp; fbPatch(phObj); }
       if (playerHp <= 0) { endBattle('lose'); return; }
@@ -763,6 +804,7 @@
         addLog('💥 ' + pname + ': ' + actionLabel + ' — ' + dmg + ' урона!', 'log-player');
         shakeEl('enemy-side');
         showFloatDmg('enemy-side', dmg, 'enemy');
+        spawnBlood('enemy-side', 10, false);
 
       } else if (type === 'skill') {
         if (playerMp < skCost) return;
@@ -782,6 +824,7 @@
         addLog(logTxt, 'log-player');
         shakeEl('enemy-side');
         showFloatDmg('enemy-side', dmg, 'enemy');
+        spawnBlood('enemy-side', 12, false);
 
       } else if (type === 'potion') {
         if (!hasPotions) return;
@@ -811,6 +854,7 @@
         addLog('💣 ' + pname + ' бросает гранату — ' + nadeDmg + ' урона! (без ответки)', 'log-special');
         shakeEl('enemy-side');
         showFloatDmg('enemy-side', nadeDmg, 'enemy');
+        spawnBlood('enemy-side', 20, false);
         const nadeTxt = document.getElementById('nade-txt');
         if (nadeTxt) nadeTxt.textContent = grenCount > 0 ? '×' + grenCount : 'нет';
         updateBars();
@@ -829,6 +873,7 @@
         addLog('🎯 ' + pname + ': ' + actionLabel + ' — ' + dmg + ' урона! (без ответки)', 'log-special');
         shakeEl('enemy-side');
         showFloatDmg('enemy-side', dmg, 'enemy');
+        spawnBlood('enemy-side', 14, false);
         const propBtn = document.getElementById('btn-prop');
         if (propBtn) propBtn.disabled = true;
         updateBars();
@@ -859,6 +904,7 @@
       addLog(typeLabel + ' ' + m.name + ' атакует: ' + dmg + ' урона!', 'log-party');
       shakeEl('enemy-side');
       showFloatDmg('enemy-side', dmg, 'enemy');
+      spawnBlood('enemy-side', 10, false);
       updateBars();
       fbSync();
       if (enemyHp <= 0) { endBattle('win'); return; }
