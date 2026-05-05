@@ -222,6 +222,15 @@
     }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
     .enemy-turn-indicator.pulsing { animation: pulse .6s ease infinite; }
+    /* ── Co-op partner strip ────────────────────────────────── */
+    .partner-strip {
+      background: var(--surface2); border:1px solid #1e3a5f;
+      border-radius:9px; padding:5px 10px; flex-shrink:0;
+    }
+    .partner-title { font-size:11px; font-weight:700; color:#66ccff; margin-bottom:4px; }
+    .partner-bar-row { display:flex; align-items:center; gap:8px; }
+    .partner-bar-track { flex:1; height:6px; background:#0a0a2a; border-radius:3px; overflow:hidden; }
+    .partner-bar-fill { height:100%; background:#3498db; border-radius:3px; width:100%; transition:width .3s; }
   </style>
 </head>
 <body>
@@ -255,6 +264,15 @@
   </div>
 
   <div class="enemy-turn-indicator" id="enemy-indicator"></div>
+
+  <div class="partner-strip" id="partner-strip" style="display:none">
+    <div class="partner-title">👥 <span id="partner-name-lbl">Напарник</span></div>
+    <div class="partner-bar-row">
+      <span style="font-size:11px;color:#aaa;">❤️</span>
+      <div class="partner-bar-track"><div class="partner-bar-fill" id="partner-hp-bar"></div></div>
+      <span style="font-size:11px;color:#aaa;" id="partner-hp-lbl">—</span>
+    </div>
+  </div>
 
   <div class="party-section" id="party-section" style="display:none">
     <div class="party-title">⚔️ ОТРЯД</div>
@@ -373,6 +391,11 @@
     const ppOk   = gn('pp_ok', 1); // 1 = owner (can use), 0 = partner (cannot)
     let   propUsed = false;
 
+    // ── Co-op Firebase ──────────────────────────────────────────
+    const coopId   = get('coop_id', '');
+    const myPnum   = gn('pnum', 0);       // 1=хост, 2=партнёр, 0=соло
+    const partnerN = get('partner', '');
+
     const partyCount = gn('pc',0);
     const party = [];
     for (let i = 0; i < partyCount; i++) {
@@ -395,6 +418,110 @@
     let endResult = null;
     let potUsed = false;
     let hasPotions = hasPots;
+
+    // ── Firebase Co-op Realtime ──────────────────────────────────
+    const FB_URL = "https://mafiozy-default-rtdb.firebaseio.com";
+    let fbWriteTime = 0;
+    let fbPartnerMaxHp = 100;
+
+    function fbPatch(obj) {
+      if (!coopId) return;
+      fetch(FB_URL + '/battles/' + coopId + '.json', {
+        method: 'PATCH', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(obj)
+      }).catch(function(){});
+    }
+
+    // Синхронизировать HP босса + своё HP после каждого удара
+    function fbSync() {
+      if (!coopId) return;
+      fbWriteTime = Date.now();
+      var obj = { bossHp: enemyHp };
+      obj['p' + myPnum + 'hp'] = playerHp;
+      fbPatch(obj);
+    }
+
+    // Обновить отображение HP партнёра
+    function updatePartnerDisplay(hp, maxHp) {
+      var bar = document.getElementById('partner-hp-bar');
+      var lbl = document.getElementById('partner-hp-lbl');
+      if (!bar || !lbl) return;
+      var pct = maxHp > 0 ? Math.max(0, Math.min(100, hp / maxHp * 100)) : 0;
+      bar.style.width = pct + '%';
+      lbl.textContent = hp + '/' + maxHp;
+    }
+
+    // Обработка Firebase-событий
+    function handleFbData(path, data) {
+      if (battleDone || data === null || data === undefined) return;
+
+      // Обновление HP босса от партнёра
+      var isBossRoot = (path === '/' && typeof data === 'object' && data.bossHp !== undefined);
+      var isBossPath = (path === '/bossHp');
+      if (isBossRoot || isBossPath) {
+        var fbHp = parseInt(isBossRoot ? data.bossHp : data);
+        if (isNaN(fbHp)) return;
+        if (Date.now() - fbWriteTime < 1000) return; // игнорируем эхо своей записи
+        if (fbHp < enemyHp && !waiting) {
+          var diff = enemyHp - fbHp;
+          enemyHp = Math.max(0, fbHp);
+          shakeEl('enemy-side');
+          showFloatDmg('enemy-side', diff, 'enemy');
+          addLog('💥 ' + (partnerN || 'Напарник') + ': ' + diff + ' урона врагу!', 'log-party');
+          updateBars();
+          if (enemyHp <= 0 && !battleDone) endBattle('win');
+        }
+      }
+
+      // Обновление HP партнёра
+      var partnerMaxKey = 'p' + (3 - myPnum) + 'maxhp';
+      var partnerHpKey  = 'p' + (3 - myPnum) + 'hp';
+      if (path === '/' + partnerMaxKey || (path === '/' && data[partnerMaxKey] !== undefined)) {
+        fbPartnerMaxHp = parseInt(path === '/' ? data[partnerMaxKey] : data) || 100;
+      }
+      if (path === '/' + partnerHpKey || (path === '/' && typeof data === 'object' && data[partnerHpKey] !== undefined)) {
+        var pHp = parseInt(path === '/' ? data[partnerHpKey] : data);
+        if (!isNaN(pHp)) updatePartnerDisplay(pHp, fbPartnerMaxHp);
+      }
+    }
+
+    function fbConnect() {
+      if (!coopId) return;
+
+      // Показываем полосу партнёра
+      var strip = document.getElementById('partner-strip');
+      if (strip) strip.style.display = '';
+      var nl = document.getElementById('partner-name-lbl');
+      if (nl) nl.textContent = partnerN || 'Напарник';
+
+      if (myPnum === 1) {
+        // Хост создаёт комнату
+        fbWriteTime = Date.now();
+        var init = { bossHp: enemyHp, bossMaxHp: enemyMaxHp, status: 'active',
+                     p1hp: playerHp, p1maxhp: playerMaxHp };
+        fetch(FB_URL + '/battles/' + coopId + '.json', {
+          method: 'PUT', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(init)
+        }).catch(function(){});
+      } else {
+        // Партнёр объявляет своё HP
+        fbPatch({ p2hp: playerHp, p2maxhp: playerMaxHp });
+      }
+
+      // SSE подключение к Firebase
+      var src = new EventSource(FB_URL + '/battles/' + coopId + '.json');
+      src.addEventListener('put', function(e) {
+        try { var ev = JSON.parse(e.data); handleFbData(ev.path, ev.data); } catch(ex) {}
+      });
+      src.addEventListener('patch', function(e) {
+        try {
+          var ev = JSON.parse(e.data);
+          if (ev.data && typeof ev.data === 'object') {
+            Object.keys(ev.data).forEach(function(k) { handleFbData('/' + k, ev.data[k]); });
+          }
+        } catch(ex) {}
+      });
+    }
 
     // ── Damage calc ─────────────────────────────────────────────
     function rnd(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
@@ -559,6 +686,7 @@
       shakeEl('player-side');
       showFloatDmg('player-side', dmg, 'player');
       updateBars();
+      if (coopId) { var phObj = {}; phObj['p' + myPnum + 'hp'] = playerHp; fbPatch(phObj); }
       if (playerHp <= 0) { endBattle('lose'); return; }
       setWaiting(false);
     }
@@ -686,6 +814,7 @@
         const nadeTxt = document.getElementById('nade-txt');
         if (nadeTxt) nadeTxt.textContent = grenCount > 0 ? '×' + grenCount : 'нет';
         updateBars();
+        fbSync();
         if (enemyHp <= 0) { endBattle('win'); return; }
         return; // без ответки
 
@@ -703,11 +832,13 @@
         const propBtn = document.getElementById('btn-prop');
         if (propBtn) propBtn.disabled = true;
         updateBars();
+        fbSync();
         if (enemyHp <= 0) { endBattle('win'); return; }
         return; // без ответки
       }
 
       updateBars();
+      fbSync();
       if (enemyHp <= 0) { endBattle('win'); return; }
       setWaiting(true);
       const delay = 1100 + Math.floor(Math.random()*700);
@@ -729,6 +860,7 @@
       shakeEl('enemy-side');
       showFloatDmg('enemy-side', dmg, 'enemy');
       updateBars();
+      fbSync();
       if (enemyHp <= 0) { endBattle('win'); return; }
       setWaiting(true);
       const delay = 1100 + Math.floor(Math.random()*700);
@@ -772,6 +904,8 @@
         closeBtn.className = 'btn-close-win';
         closeBtn.textContent = '✅ Получить награду';
         endResult = {a:'battle_won', php: playerHp, pmp: playerMp, gu: grenUsed};
+        // Уведомляем партнёра через Firebase что босс мёртв
+        if (coopId) { fbWriteTime = Date.now(); fbPatch({bossHp: 0, status: 'won'}); }
       } else if (result === 'lose') {
         icon.textContent = '💀';
         title.textContent = 'ПОРАЖЕНИЕ'; title.className='end-title lose';
@@ -921,6 +1055,7 @@
     addLog('⚔️ Бой начался! Удачи, ' + pname + '.', 'log-system');
 
     updateBars();
+    fbConnect(); // Подключаем Firebase для co-op (в соло-бою не делает ничего)
   </script>
 </body>
 </html>
