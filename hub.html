@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Мафиози</title>
+<style>
+:root {
+  --gold:   #e8c96e;
+  --gold2:  #c8a030;
+  --red:    #c0392b;
+  --bg:     #08080f;
+  --bg2:    #0f0f1e;
+  --bg3:    #161628;
+  --card:   #12121f;
+  --border: #2a2a44;
+  --text:   #eee;
+  --muted:  #888;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, 'Arial', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+  padding-bottom: 24px;
+}
+
+/* ── TOP BAR ── */
+.top-bar {
+  background: linear-gradient(135deg, #0a0a18 0%, #12122a 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.game-title {
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, var(--gold), #fff8dc, var(--gold2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.top-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--gold);
+  font-weight: 700;
+}
+.wanted-stars { color: #ff4444; font-size: 14px; }
+
+/* ── HERO CARD ── */
+.hero-card {
+  margin: 14px 14px 0;
+  background: linear-gradient(135deg, var(--bg3) 0%, var(--card) 100%);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 14px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  box-shadow: 0 4px 24px #00000066, 0 0 40px #e8c96e0a;
+  position: relative;
+  overflow: hidden;
+}
+.hero-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+
+/* ── AVATAR ── */
+.avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+#avatar-canvas {
+  display: block;
+  border-radius: 12px;
+  border: 1.5px solid var(--border);
+  background: radial-gradient(circle at 50% 80%, #1a1a30, #0a0a18);
+}
+.class-badge {
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  color: #111;
+  font-size: 10px;
+  font-weight: 900;
+  padding: 2px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+}
+
+/* ── HERO INFO ── */
+.hero-info {
+  flex: 1;
+  min-width: 0;
+  padding-top: 2px;
+}
+.hero-name {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+.hero-rank {
+  font-size: 12px;
+  color: var(--gold);
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+/* ── STAT BARS ── */
+.stat-row {
+  margin-bottom: 7px;
+}
+.stat-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+.stat-label span:last-child { color: var(--text); font-weight: 600; }
+.stat-bar-bg {
+  height: 6px;
+  background: #1e1e38;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.stat-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.8s cubic-bezier(.4,0,.2,1);
+}
+.bar-hp   { background: linear-gradient(90deg, #c0392b, #e74c3c); }
+.bar-mana { background: linear-gradient(90deg, #1a6ea0, #3498db); }
+
+.money-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.money-chip {
+  flex: 1;
+  background: #1a1a2e;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 8px;
+  text-align: center;
+}
+.money-chip .icon { font-size: 14px; }
+.money-chip .val  { font-size: 12px; font-weight: 700; color: var(--gold); display: block; }
+.money-chip .lbl  { font-size: 9px;  color: var(--muted); }
+
+/* ── SECTION LABEL ── */
+.section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 14px 16px 8px;
+}
+
+/* ── GRID ── */
+.tiles-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 0 14px;
+}
+
+.tile {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 8px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.12s, border-color 0.12s, box-shadow 0.12s;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.tile::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.tile:active {
+  transform: scale(0.93);
+  border-color: var(--gold);
+  box-shadow: 0 0 12px #e8c96e33;
+}
+.tile:active::before { opacity: 1; }
+
+.tile-icon {
+  font-size: 26px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+.tile-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ccc;
+  text-align: center;
+  line-height: 1.2;
+  letter-spacing: 0.3px;
+}
+.tile-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: var(--red);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 900;
+  padding: 1px 5px;
+  border-radius: 6px;
+  min-width: 16px;
+  text-align: center;
+}
+
+/* Tile color themes */
+.tile-districts { --tc: #e8c96e33; }
+.tile-character { --tc: #3498db33; }
+.tile-inventory { --tc: #e67e2233; }
+.tile-shop      { --tc: #9b59b633; }
+.tile-jobs      { --tc: #2ecc7133; }
+.tile-gang      { --tc: #e74c3c33; }
+.tile-diamonds  { --tc: #1abc9c33; }
+.tile-contacts  { --tc: #f39c1233; }
+.tile-creator   { --tc: #8e44ad33; }
+
+.tile-districts::before { background: var(--tc); }
+.tile-character::before { background: var(--tc); }
+.tile-inventory::before { background: var(--tc); }
+.tile-shop::before      { background: var(--tc); }
+.tile-jobs::before      { background: var(--tc); }
+.tile-gang::before      { background: var(--tc); }
+.tile-diamonds::before  { background: var(--tc); }
+.tile-contacts::before  { background: var(--tc); }
+.tile-creator::before   { background: var(--tc); }
+
+/* Bottom glow line on tiles */
+.tile::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 10%; right: 10%;
+  height: 1.5px;
+  border-radius: 1px;
+  opacity: 0.4;
+}
+.tile-districts::after { background: #e8c96e; }
+.tile-character::after { background: #3498db; }
+.tile-inventory::after { background: #e67e22; }
+.tile-shop::after      { background: #9b59b6; }
+.tile-jobs::after      { background: #2ecc71; }
+.tile-gang::after      { background: #e74c3c; }
+.tile-diamonds::after  { background: #1abc9c; }
+.tile-contacts::after  { background: #f39c12; }
+.tile-creator::after   { background: #8e44ad; }
+
+/* ── RIPPLE ── */
+@keyframes ripple {
+  0%   { transform: scale(0); opacity: 0.5; }
+  100% { transform: scale(4); opacity: 0; }
+}
+.ripple-dot {
+  position: absolute;
+  border-radius: 50%;
+  width: 30px; height: 30px;
+  background: rgba(232,201,110,0.35);
+  pointer-events: none;
+  animation: ripple 0.4s ease-out forwards;
+  transform-origin: center;
+}
+
+/* ── SEPARATOR ── */
+.sep {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+  margin: 14px 14px 0;
+}
+
+/* ── STATUS BAR ── */
+.status-bar {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px 0;
+  flex-wrap: wrap;
+}
+.status-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #1a1a2e;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.status-chip.active { color: var(--gold); border-color: var(--gold)44; }
+
+/* ── ANIM ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.hero-card { animation: fadeUp 0.3s ease both; }
+.tiles-grid { animation: fadeUp 0.4s 0.1s ease both; }
+
+/* ── SHIMMER on avatar while loading ── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+.avatar-shimmer {
+  border-radius: 12px;
+  background: linear-gradient(90deg, #1a1a30 25%, #2a2a50 50%, #1a1a30 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="top-bar">
+  <div class="game-title">🤵 Мафиози</div>
+  <div class="top-bar-right">
+    <span id="top-kills">💀 0</span>
+    <span id="top-wanted" class="wanted-stars" style="display:none"></span>
+  </div>
+</div>
+
+<!-- HERO CARD -->
+<div class="hero-card">
+  <div class="avatar-wrap">
+    <canvas id="avatar-canvas" width="100" height="128"></canvas>
+    <div class="class-badge" id="class-badge">Гангстер</div>
+  </div>
+  <div class="hero-info">
+    <div class="hero-name" id="hero-name">—</div>
+    <div class="hero-rank" id="hero-rank">Ранг 1</div>
+
+    <div class="stat-row">
+      <div class="stat-label"><span>❤️ Здоровье</span><span id="hp-val">—</span></div>
+      <div class="stat-bar-bg"><div class="stat-bar-fill bar-hp" id="hp-bar" style="width:0%"></div></div>
+    </div>
+    <div class="stat-row">
+      <div class="stat-label"><span>⚡ Энергия</span><span id="mp-val">—</span></div>
+      <div class="stat-bar-bg"><div class="stat-bar-fill bar-mana" id="mp-bar" style="width:0%"></div></div>
+    </div>
+
+    <div class="money-row">
+      <div class="money-chip">
+        <span class="icon">💵</span>
+        <span class="val" id="cash-val">0</span>
+        <span class="lbl">Наличные</span>
+      </div>
+      <div class="money-chip">
+        <span class="icon">💎</span>
+        <span class="val" id="dia-val">0</span>
+        <span class="lbl">Брилл.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS CHIPS -->
+<div class="status-bar" id="status-bar"></div>
+
+<div class="sep"></div>
+<div class="section-label">Навигация</div>
+
+<!-- TILES GRID -->
+<div class="tiles-grid">
+
+  <div class="tile tile-districts" onclick="nav('explore')">
+    <div class="tile-icon">🗺️</div>
+    <div class="tile-label">Районы</div>
+  </div>
+
+  <div class="tile tile-character" onclick="nav('character')">
+    <div class="tile-icon">👤</div>
+    <div class="tile-label">Досье</div>
+  </div>
+
+  <div class="tile tile-inventory" onclick="nav('inventory')">
+    <div class="tile-icon">🎒</div>
+    <div class="tile-label">Барахло</div>
+  </div>
+
+  <div class="tile tile-shop" onclick="nav('shop')">
+    <div class="tile-icon">🏪</div>
+    <div class="tile-label">Чёрный рынок</div>
+  </div>
+
+  <div class="tile tile-jobs" onclick="nav('jobs')">
+    <div class="tile-icon">💼</div>
+    <div class="tile-label">Работа</div>
+  </div>
+
+  <div class="tile tile-gang" onclick="nav('gang_menu')">
+    <div class="tile-icon">🔱</div>
+    <div class="tile-label">Моя банда</div>
+  </div>
+
+  <div class="tile tile-diamonds" onclick="nav('diamonds')">
+    <div class="tile-icon">💎</div>
+    <div class="tile-label">Бриллианты</div>
+  </div>
+
+  <div class="tile tile-contacts" id="tile-contacts" onclick="nav('my_contacts')">
+    <div class="tile-icon">🤝</div>
+    <div class="tile-label">Мои связи</div>
+  </div>
+
+  <div class="tile tile-creator" onclick="openCreator()">
+    <div class="tile-icon">🎨</div>
+    <div class="tile-label">Мой гангстер</div>
+  </div>
+
+</div>
+
+<script>
+// ── Telegram WebApp ───────────────────────────────────────────────────
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.ready(); tg.expand(); tg.setHeaderColor('#08080f'); tg.setBackgroundColor('#08080f'); }
+
+// ── Parse URL params ─────────────────────────────────────────────────
+const P = new URLSearchParams(location.search);
+function p(k, def='') { return P.get(k) ?? def; }
+function pi(k, def=0) { return parseInt(P.get(k)) || def; }
+
+const DATA = {
+  name:    p('name','Гангстер'),
+  level:   pi('lvl', 1),
+  cls:     p('cls','fixer'),
+  hp:      pi('hp', 100),
+  maxhp:   pi('maxhp', 100),
+  mp:      pi('mp', 50),
+  maxmp:   pi('maxmp', 50),
+  cash:    pi('cash', 0),
+  dia:     pi('dia', 0),
+  kills:   pi('kills', 0),
+  wanted:  pi('wanted', 0),
+  contacts:pi('contacts', 0),
+  job:     p('job',''),
+  // look
+  gender: pi('gender', 0),
+  skin:   pi('skin', 0),
+  body:   pi('body', 1),
+  face:   pi('face', 0),
+  hair:   pi('hair', 0),
+  hat:    pi('hat', 0),
+};
+
+// ── Class definitions ─────────────────────────────────────────────────
+const CLASSES = {
+  killer:   { label: '🔫 Киллер',  color: '#c0392b' },
+  enforcer: { label: '🥊 Громила', color: '#e67e22' },
+  fixer:    { label: '🃏 Решала',  color: '#2980b9' },
+  conman:   { label: '🎩 Аферист', color: '#8e44ad' },
+};
+
+// ── Populate hero info ────────────────────────────────────────────────
+document.getElementById('hero-name').textContent = DATA.name;
+document.getElementById('hero-rank').textContent = `★ Ранг ${DATA.level}`;
+document.getElementById('hp-val').textContent  = `${DATA.hp} / ${DATA.maxhp}`;
+document.getElementById('mp-val').textContent  = `${DATA.mp} / ${DATA.maxmp}`;
+document.getElementById('cash-val').textContent = fmtNum(DATA.cash);
+document.getElementById('dia-val').textContent  = fmtNum(DATA.dia);
+document.getElementById('top-kills').textContent = `💀 ${DATA.kills}`;
+
+const cls = CLASSES[DATA.cls] || CLASSES.fixer;
+document.getElementById('class-badge').textContent = cls.label;
+
+// Animate HP/MP bars after a tick
+requestAnimationFrame(() => {
+  setTimeout(() => {
+    document.getElementById('hp-bar').style.width = Math.min(100, DATA.hp / DATA.maxhp * 100).toFixed(1) + '%';
+    document.getElementById('mp-bar').style.width = Math.min(100, DATA.mp / DATA.maxmp * 100).toFixed(1) + '%';
+  }, 50);
+});
+
+// Wanted stars
+if (DATA.wanted > 0) {
+  const el = document.getElementById('top-wanted');
+  el.textContent = '⭐'.repeat(DATA.wanted);
+  el.style.display = '';
+}
+
+// Contacts badge
+if (DATA.contacts > 0) {
+  const tc = document.getElementById('tile-contacts');
+  tc.innerHTML += `<div class="tile-badge">${DATA.contacts}</div>`;
+}
+
+// Status chips
+const sb = document.getElementById('status-bar');
+if (DATA.job) {
+  const chip = document.createElement('div');
+  chip.className = 'status-chip active';
+  chip.textContent = `💼 ${DATA.job}`;
+  sb.appendChild(chip);
+}
+if (DATA.wanted > 0) {
+  const chip = document.createElement('div');
+  chip.className = 'status-chip active';
+  chip.style.color = '#ff4444';
+  chip.style.borderColor = '#ff444444';
+  chip.textContent = `🔍 В розыске: ${'⭐'.repeat(DATA.wanted)}`;
+  sb.appendChild(chip);
+}
+
+// ── Format number ─────────────────────────────────────────────────────
+function fmtNum(n) {
+  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+  if (n >= 1000)    return (n/1000).toFixed(1) + 'k';
+  return String(n);
+}
+
+// ── Navigation ────────────────────────────────────────────────────────
+function nav(dest) {
+  if (tg && tg.sendData) {
+    tg.sendData(JSON.stringify({ a: 'hub_nav', to: dest }));
+  } else {
+    alert('nav: ' + dest);
+  }
+}
+
+function openCreator() {
+  const look = `gender=${DATA.gender}&skin=${DATA.skin}&body=${DATA.body}&face=${DATA.face}&hair=${DATA.hair}&hat=${DATA.hat}`;
+  const url = 'https://slavaprivet.github.io/mafiozi-battle/creator.html?' + look;
+  if (tg && tg.openLink) {
+    window.location.href = url;
+  } else {
+    window.location.href = url;
+  }
+}
+
+// ── Ripple effect ─────────────────────────────────────────────────────
+document.querySelectorAll('.tile').forEach(tile => {
+  tile.addEventListener('pointerdown', e => {
+    const r = document.createElement('div');
+    r.className = 'ripple-dot';
+    const rect = tile.getBoundingClientRect();
+    r.style.left = (e.clientX - rect.left - 15) + 'px';
+    r.style.top  = (e.clientY - rect.top  - 15) + 'px';
+    tile.appendChild(r);
+    setTimeout(() => r.remove(), 450);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+//  AVATAR DRAWING (reuses same logic as creator.html)
+// ══════════════════════════════════════════════════════════════════════
+const SKINS = ['#FDDBB4','#F0C27F','#D4935A','#A0622A','#7A3B10','#C8A882'];
+
+const avatarCanvas = document.getElementById('avatar-canvas');
+const actx = avatarCanvas.getContext('2d');
+
+function drawAvatar() {
+  const W = avatarCanvas.width, H = avatarCanvas.height;
+  const cx = W/2;
+  const sc = Math.min(W,H)/220;
+  function px(x) { return cx + x*sc; }
+  function py(y) { return H*0.92 - y*sc; }
+  const skinCol = SKINS[DATA.skin] || SKINS[0];
+
+  actx.clearRect(0,0,W,H);
+
+  if (DATA.gender === 0) drawMaleAvatar(actx,px,py,sc,skinCol,DATA.body,DATA.face,DATA.hair,DATA.hat);
+  else                   drawFemaleAvatar(actx,px,py,sc,skinCol,DATA.body,DATA.face,DATA.hair,DATA.hat);
+}
+
+function drawMaleAvatar(ctx,px,py,sc,skinCol,body,face,hair,hat) {
+  const bodyDefs=[
+    {sw:34,sh:80,nw:14,nh:22,hw:26},{sw:44,sh:85,nw:16,nh:22,hw:30},
+    {sw:58,sh:82,nw:18,nh:20,hw:36},{sw:52,sh:92,nw:16,nh:24,hw:32}
+  ];
+  const bd=bodyDefs[body]||bodyDefs[1];
+  const suitCol=['#1a1a2e','#1a2e1a','#2e1a1a','#1a1e2e'][body%4];
+  const tieCol=['#c0392b','#e8c96e','#8e44ad','#2980b9'][face%4];
+
+  // Legs
+  ctx.fillStyle=suitCol;
+  const legW=bd.sw*0.38,legH=55*sc;
+  ctx.beginPath();ctx.roundRect(px(-bd.sw*0.22),py(legH),legW*sc,legH,4*sc);ctx.fill();
+  ctx.beginPath();ctx.roundRect(px(bd.sw*0.22-legW),py(legH),legW*sc,legH,4*sc);ctx.fill();
+  ctx.fillStyle='#111';
+  [-1,1].forEach(s=>{ctx.beginPath();ctx.ellipse(px(s*bd.sw*0.1),py(2),10*sc,5*sc,0,0,Math.PI*2);ctx.fill();});
+
+  // Body
+  ctx.fillStyle=suitCol;
+  ctx.beginPath();ctx.roundRect(px(-bd.sw/2),py(bd.sh),bd.sw*sc,bd.sh*sc,[0,0,6*sc,6*sc]);ctx.fill();
+  ctx.fillStyle='#ddd';ctx.beginPath();ctx.roundRect(px(-7),py(bd.sh),14*sc,bd.sh*0.7*sc,2*sc);ctx.fill();
+  ctx.fillStyle=tieCol;
+  ctx.beginPath();ctx.moveTo(px(-5),py(bd.sh-4));ctx.lineTo(px(5),py(bd.sh-4));ctx.lineTo(px(3),py(bd.sh*0.32));ctx.lineTo(px(0),py(bd.sh*0.25));ctx.lineTo(px(-3),py(bd.sh*0.32));ctx.closePath();ctx.fill();
+  ctx.fillStyle=suitCol;
+  ctx.beginPath();ctx.moveTo(px(0),py(bd.sh-2));ctx.lineTo(px(-bd.sw/2),py(bd.sh));ctx.lineTo(px(-bd.sw/2),py(bd.sh-20));ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(px(0),py(bd.sh-2));ctx.lineTo(px(bd.sw/2),py(bd.sh));ctx.lineTo(px(bd.sw/2),py(bd.sh-20));ctx.closePath();ctx.fill();
+
+  // Arms
+  const armLen=body===3?65:60,armW=body===3?13:10;
+  ctx.fillStyle=suitCol;
+  ctx.beginPath();ctx.roundRect(px(-bd.sw/2-armW*sc+2),py(bd.sh),armW*sc,armLen*sc,5*sc);ctx.fill();
+  ctx.beginPath();ctx.roundRect(px(bd.sw/2-2),py(bd.sh),armW*sc,armLen*sc,5*sc);ctx.fill();
+  ctx.fillStyle=skinCol;
+  ctx.beginPath();ctx.ellipse(px(-bd.sw/2-armW*sc/2+2),py(armLen-10),7*sc,9*sc,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(px(bd.sw/2+armW*sc/2-2),py(armLen-10),7*sc,9*sc,0,0,Math.PI*2);ctx.fill();
+
+  // Neck + head
+  ctx.fillStyle=skinCol;
+  ctx.beginPath();ctx.roundRect(px(-bd.nw/2),py(bd.sh+bd.nh),bd.nw*sc,bd.nh*sc,4*sc);ctx.fill();
+  const headH=bd.hw*1.22,headY=bd.sh+bd.nh+headH;
+  ctx.beginPath();ctx.ellipse(px(0),py(bd.sh+bd.nh+headH/2),bd.hw/2*sc,headH/2*sc,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(px(0),py(bd.sh+bd.nh+5),bd.hw/2.2*sc,10*sc,0,0,Math.PI);ctx.fill();
+
+  // Simple face
+  const eyeY=bd.sh+bd.nh+headH*0.55,eyeSpan=bd.hw*0.22;
+  ctx.fillStyle='#fff';
+  [-1,1].forEach(s=>{ctx.beginPath();ctx.ellipse(px(s*eyeSpan),py(eyeY),4.2*sc,3.2*sc,0,0,Math.PI*2);ctx.fill();});
+  ctx.fillStyle='#111';
+  [-1,1].forEach(s=>{ctx.beginPath();ctx.arc(px(s*eyeSpan),py(eyeY),2*sc,0,Math.PI*2);ctx.fill();});
+  ctx.strokeStyle='#333';ctx.lineWidth=2*sc;
+  ctx.beginPath();ctx.moveTo(px(-7),py(bd.sh+bd.nh+headH*0.18));ctx.lineTo(px(7),py(bd.sh+bd.nh+headH*0.18));ctx.stroke();
+
+  // Hair basic
+  if(hair>0){
+    const hc=['#1a0e00','#3d2200','#8b6333','#b8860b','#888','#111'][hair%6];
+    ctx.fillStyle=hc;
+    ctx.beginPath();ctx.ellipse(px(0),py(headY),(bd.hw/2)*sc,9*sc,0,Math.PI,Math.PI*2);ctx.fill();
+    if(hair===3){ctx.beginPath();ctx.moveTo(px(-3),py(headY));ctx.lineTo(px(-2),py(headY+24));ctx.lineTo(px(2),py(headY+24));ctx.lineTo(px(3),py(headY));ctx.fill();}
+  }
+  // Hat basic
+  if(hat>0) drawHatSimple(ctx,hat,px,py,bd,headY,headH,sc);
+}
+
+function drawFemaleAvatar(ctx,px,py,sc,skinCol,body,face,hair,hat) {
+  const bodyDefs=[
+    {sw:30,sh:78,nw:12,nh:20,hw:24,hip:32},{sw:36,sh:80,nw:13,nh:20,hw:27,hip:40},
+    {sw:48,sh:76,nw:15,nh:18,hw:32,hip:54},{sw:34,sh:85,nw:13,nh:22,hw:26,hip:38}
+  ];
+  const bd=bodyDefs[body]||bodyDefs[1];
+  const dressCol=['#3a1a3a','#1a2a3a','#3a1a1a','#1a3a2a'][body%4];
+  const accentCol=['#e8c96e','#c0392b','#8e44ad','#2980b9'][face%4];
+
+  ctx.fillStyle=dressCol;
+  ctx.beginPath();ctx.moveTo(px(-bd.sw/2),py(bd.sh));ctx.lineTo(px(-bd.hip/2),py(0));ctx.lineTo(px(bd.hip/2),py(0));ctx.lineTo(px(bd.sw/2),py(bd.sh));ctx.closePath();ctx.fill();
+  ctx.fillStyle='#111';
+  [-1,1].forEach(s=>{ctx.beginPath();ctx.ellipse(px(s*bd.hip*0.18),py(3),8*sc,4*sc,0,0,Math.PI*2);ctx.fill();});
+  ctx.fillStyle=dressCol;
+  ctx.beginPath();ctx.roundRect(px(-bd.sw/2),py(bd.sh),bd.sw*sc,bd.sh*sc,[0,0,6*sc,6*sc]);ctx.fill();
+  const armLen=58,armW=8;
+  ctx.beginPath();ctx.roundRect(px(-bd.sw/2-armW*sc+2),py(bd.sh),armW*sc,armLen*sc,4*sc);ctx.fill();
+  ctx.beginPath();ctx.roundRect(px(bd.sw/2-2),py(bd.sh),armW*sc,armLen*sc,4*sc);ctx.fill();
+  ctx.fillStyle=skinCol;
+  ctx.beginPath();ctx.ellipse(px(-bd.sw/2-armW*sc/2+2),py(armLen-10),6*sc,8*sc,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(px(bd.sw/2+armW*sc/2-2),py(armLen-10),6*sc,8*sc,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=skinCol;
+  ctx.beginPath();ctx.roundRect(px(-bd.nw/2),py(bd.sh+bd.nh),bd.nw*sc,bd.nh*sc,4*sc);ctx.fill();
+  const headH=bd.hw*1.18,headY=bd.sh+bd.nh+headH;
+  ctx.beginPath();ctx.ellipse(px(0),py(bd.sh+bd.nh+headH/2),bd.hw/2*sc,headH/2*sc,0,0,Math.PI*2);ctx.fill();
+
+  // Eyes
+  ctx.fillStyle='#fff';
+  const eyeY=bd.sh+bd.nh+headH*0.55,eyeSpan=bd.hw*0.22;
+  [-1,1].forEach(s=>{ctx.beginPath();ctx.ellipse(px(s*eyeSpan),py(eyeY),4.5*sc,3.5*sc,0,0,Math.PI*2);ctx.fill();});
+  ctx.fillStyle='#1a0a30';
+  [-1,1].forEach(s=>{ctx.beginPath();ctx.arc(px(s*eyeSpan),py(eyeY),2.2*sc,0,Math.PI*2);ctx.fill();});
+  // Lips
+  ctx.fillStyle='#c0392b';
+  ctx.beginPath();ctx.ellipse(px(0),py(bd.sh+bd.nh+headH*0.18),5*sc,3*sc,0,0,Math.PI*2);ctx.fill();
+
+  // Hair
+  if(hair>0){
+    const hc=['#1a0e00','#8b1a1a','#b8860b','#3d2200','#888','#c87050'][hair%6];
+    ctx.fillStyle=hc;
+    ctx.beginPath();ctx.ellipse(px(0),py(headY),(bd.hw/2)*sc,10*sc,0,Math.PI,Math.PI*2);ctx.fill();
+    if(hair===1){ctx.lineWidth=9*sc;ctx.strokeStyle=hc;ctx.beginPath();ctx.moveTo(px(bd.hw/2),py(headY));ctx.quadraticCurveTo(px(bd.hw/2+8),py(headY-15),px(bd.hw/2+4),py(headY-38));ctx.stroke();}
+    if(hair===3){ctx.lineWidth=9*sc;ctx.strokeStyle=hc;[-1,1].forEach(s=>{ctx.beginPath();ctx.moveTo(px(s*bd.hw/2),py(headY));ctx.quadraticCurveTo(px(s*(bd.hw/2+5)),py(headY-30),px(s*(bd.hw/2+2)),py(headY-65));ctx.stroke();});}
+  }
+  if(hat>0) drawHatSimple(ctx,hat,px,py,bd,headY,headH,sc);
+}
+
+// Simplified hat for avatar (correct coords)
+function drawHatSimple(ctx,hatId,px,py,bd,headY,headH,sc) {
+  const hw=bd.hw/2;
+  const eyeY=headY-headH*0.45;
+  if(hatId===1){
+    ctx.fillStyle='#1a0e00';
+    ctx.beginPath();ctx.ellipse(px(0),py(headY+2),(hw+10)*sc,5*sc,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.roundRect(px(-hw+2),py(headY+2+26),(hw*2-4)*sc,26*sc,4*sc);ctx.fill();
+    ctx.fillStyle='#e8c96e';ctx.fillRect(px(-hw+2),py(headY+7),(hw*2-4)*sc,4*sc);
+  } else if(hatId===2){
+    ctx.fillStyle='#1a2e3a';
+    ctx.beginPath();ctx.ellipse(px(0),py(headY),hw*sc,13*sc,0,Math.PI,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(px(hw*0.4),py(headY),(hw+5)*sc,4*sc,0.15,0,Math.PI);ctx.fill();
+  } else if(hatId===4){
+    ctx.fillStyle='#5c3d11';
+    ctx.beginPath();ctx.ellipse(px(0),py(headY+3),(hw+13)*sc,5*sc,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.moveTo(px(-hw+2),py(headY+3));ctx.lineTo(px(-hw+5),py(headY+35));ctx.lineTo(px(0),py(headY+40));ctx.lineTo(px(hw-5),py(headY+35));ctx.lineTo(px(hw-2),py(headY+3));ctx.closePath();ctx.fill();
+  } else if(hatId===5){
+    ctx.strokeStyle='#111';ctx.lineWidth=2.5*sc;ctx.fillStyle='#1a3a5a88';
+    ctx.beginPath();ctx.roundRect(px(-18),py(eyeY+5),13*sc,9*sc,3*sc);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.roundRect(px(5),py(eyeY+5),13*sc,9*sc,3*sc);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.moveTo(px(-5),py(eyeY+8));ctx.lineTo(px(5),py(eyeY+8));ctx.stroke();
+  } else if(hatId===7){
+    ctx.fillStyle='#2c2c4e';
+    ctx.beginPath();ctx.ellipse(px(-3),py(headY+8),(hw+3)*sc,12*sc,-0.15,Math.PI*0.05,Math.PI*1.95);ctx.fill();
+  } else if(hatId===8){
+    ctx.fillStyle='#0a0a0a';
+    ctx.beginPath();ctx.ellipse(px(0),py(headY+2),(hw+14)*sc,5*sc,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.roundRect(px(-hw+4),py(headY+2+28),(hw*2-8)*sc,28*sc,[2*sc,2*sc,0,0]);ctx.fill();
+  }
+}
+
+// Draw the avatar
+drawAvatar();
+</script>
+</body>
+</html>
