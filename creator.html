@@ -921,86 +921,100 @@ function setGender(g) {
   redraw();
 }
 
-// ── BUILD UI ──────────────────────────────────────────────────────────────
-function buildSkinGrid() {
-  const grid = document.getElementById('skin-grid');
-  SKINS.forEach((col, i) => {
-    const btn = document.createElement('div');
-    btn.className = 'skin-btn' + (i===state.skin?' selected':'');
-    btn.style.background = col;
-    btn.onclick = () => {
-      state.skin = i;
-      document.querySelectorAll('.skin-btn').forEach((b,j)=>b.classList.toggle('selected',j===i));
-      redraw();
-    };
-    grid.appendChild(btn);
-  });
-}
 
+// ── BUILD UI ──────────────────────────────────────────────────────────────
 function buildGrid(type, names, gridId) {
   const grid = document.getElementById(gridId);
+  if (!grid) return;
+  grid.innerHTML = '';
   names.forEach((name, i) => {
     const btn = document.createElement('div');
-    btn.className = 'opt-btn' + (i===state[type]?' selected':'');
-    btn.id = `${type}-btn-${i}`;
-    const c = document.createElement('canvas');
-    c.width = 52; c.height = 52;
-    const ctx = c.getContext('2d');
-    ctx.fillStyle = '#111122'; ctx.fillRect(0,0,52,52);
-    const previewOpts = { gender: state.gender, skin: state.skin, body: 1, face: 0, hair: 0, hat: 0 };
-    previewOpts[type] = i;
-    drawChar(ctx, 52, 52, previewOpts);
-    btn.appendChild(c);
-    btn.onclick = () => {
+    btn.className = 'opt-btn' + (state[type] === i ? ' selected' : '');
+    const cv = document.createElement('canvas');
+    cv.width = 56; cv.height = 72;
+    const cxT = cv.getContext('2d');
+    drawChar(cxT, 56, 72, { ...state, [type]: i });
+    btn.appendChild(cv);
+    const lbl = document.createElement('span');
+    lbl.textContent = name;
+    btn.appendChild(lbl);
+    btn.addEventListener('click', () => {
       state[type] = i;
-      document.querySelectorAll(`#${gridId} .opt-btn`).forEach((b,j)=>b.classList.toggle('selected',j===i));
+      grid.querySelectorAll('.opt-btn').forEach((b, j) => b.classList.toggle('selected', j === i));
+      grid.querySelectorAll('.opt-btn canvas').forEach((c2, j) => {
+        drawChar(c2.getContext('2d'), 56, 72, { ...state, [type]: j });
+      });
       redraw();
-    };
+    });
     grid.appendChild(btn);
   });
 }
 
-// ── TABS ──────────────────────────────────────────────────────────────────
-const panels = ['tab-skin','tab-body','tab-face','tab-hair','tab-hat'];
-function switchTab(idx) {
-  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
-  panels.forEach((p,i)=>{document.getElementById(p).classList.toggle('active',i===idx);});
-}
-
-// ── RANDOMIZE ─────────────────────────────────────────────────────────────
-function randomize() {
-  state.skin = Math.floor(Math.random()*SKINS.length);
-  state.body = Math.floor(Math.random()*4);
-  state.face = Math.floor(Math.random()*10);
-  state.hair = Math.floor(Math.random()*10);
-  state.hat  = Math.floor(Math.random()*HAT_NAMES.length);
-  document.querySelectorAll('.skin-btn').forEach((b,i)=>b.classList.toggle('selected',i===state.skin));
-  ['body','face','hair','hat'].forEach(type=>{
-    document.querySelectorAll(`#${type}-grid .opt-btn`).forEach((b,i)=>b.classList.toggle('selected',i===state[type]));
+function buildSkinGrid() {
+  const grid = document.getElementById('skin-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  SKINS.forEach((col, i) => {
+    const btn = document.createElement('div');
+    btn.className = 'skin-dot' + (state.skin === i ? ' selected' : '');
+    btn.style.background = col;
+    btn.addEventListener('click', () => {
+      state.skin = i;
+      buildSkinGrid();
+      ['body','face','hair','hat'].forEach(t => buildGrid(t, getNames(t), t + '-grid'));
+      redraw();
+    });
+    grid.appendChild(btn);
   });
-  redraw();
 }
 
-// ── SAVE ──────────────────────────────────────────────────────────────────
-function saveChar() {
-  const data = JSON.stringify({ a:'set_look', gender:state.gender, skin:state.skin, body:state.body, face:state.face, hair:state.hair, hat:state.hat });
-  if (tg && tg.sendData) { tg.sendData(data); }
-  else { alert('Сохранено: ' + data); }
+function initUI() {
+  buildSkinGrid();
+  ['body','face','hair','hat'].forEach(t => buildGrid(t, getNames(t), t + '-grid'));
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + tab)?.classList.add('active');
+    });
+  });
+
+  document.getElementById('random-btn')?.addEventListener('click', () => {
+    state.skin = Math.floor(Math.random() * SKINS.length);
+    state.body = Math.floor(Math.random() * 4);
+    state.face = Math.floor(Math.random() * 10);
+    state.hair = Math.floor(Math.random() * 10);
+    state.hat  = Math.floor(Math.random() * 10);
+    buildSkinGrid();
+    ['body','face','hair','hat'].forEach(t => buildGrid(t, getNames(t), t + '-grid'));
+    redraw();
+  });
 }
 
-// ── INIT ──────────────────────────────────────────────────────────────────
-buildSkinGrid();
-buildGrid('body', getNames('body'), 'body-grid');
-buildGrid('face', getNames('face'), 'face-grid');
-buildGrid('hair', getNames('hair'), 'hair-grid');
-buildGrid('hat',  HAT_NAMES,         'hat-grid');
-// Apply initial gender from URL params
-if (state.gender === 1) {
-  document.getElementById('gbtn-m').classList.remove('active');
-  document.getElementById('gbtn-f').classList.add('active');
-  document.getElementById('page-title').textContent = '💄 Создай гангстершу';
-}
+initUI();
 redraw();
+
+// ── SAVE ───────────────────────────────────────────────────────────────────
+function saveChar() {
+  const payload = JSON.stringify({
+    a:      'set_look',
+    gender: state.gender,
+    skin:   state.skin,
+    body:   state.body,
+    face:   state.face,
+    hair:   state.hair,
+    hat:    state.hat,
+  });
+  if (tg && typeof tg.sendData === 'function') {
+    tg.sendData(payload);
+  } else {
+    alert('Открой создателя через кнопку \u00ab\u{1F3A8} Создать гангстера\u00bb в чате бота!');
+  }
+}
+
 </script>
 </body>
 </html>
