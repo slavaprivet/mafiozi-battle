@@ -111,13 +111,23 @@
     .pm-dead-lbl { font-size: 9px; color: #c0392b; font-weight: 700; flex-shrink: 0; }
     .btn-pm-atk {
       border: none; border-radius: 7px; padding: 5px 8px;
-      background: linear-gradient(135deg,#7b0000,#c0392b);
       color: #fff; font-size: 10px; font-weight: 700;
       cursor: pointer; flex-shrink: 0;
       transition: transform .1s; -webkit-tap-highlight-color: transparent;
+      background: linear-gradient(135deg,#7b0000,#c0392b);
     }
+    .btn-pm-atk.role-bruiser  { background: linear-gradient(135deg,#003060,#1a5fa0); }
+    .btn-pm-atk.role-sniper   { background: linear-gradient(135deg,#4a0040,#9b30a0); }
+    .btn-pm-atk.role-bomber   { background: linear-gradient(135deg,#5a2e00,#c67c00); }
+    .btn-pm-atk.role-medic    { background: linear-gradient(135deg,#003820,#27ae60); }
+    .btn-pm-atk.role-scout    { background: linear-gradient(135deg,#1a1a00,#7a7a00); }
     .btn-pm-atk:active { transform: scale(0.93); }
     .btn-pm-atk:disabled { opacity: 0.35; cursor: not-allowed; }
+    .pm-ability {
+      font-size: 8px; color: #99bbff; margin-top: 2px; line-height: 1.4;
+    }
+    .pm-ability .ab-active  { color: #ffdd88; }
+    .pm-ability .ab-passive { color: #88ddaa; }
     /* ── Combat log ───────────────────────────────────────── */
     .log-box {
       background: var(--surface2); border: 1px solid #22224a;
@@ -449,10 +459,51 @@
       const hp = gn('p'+i+'h',0), mxhp = gn('p'+i+'m',50);
       const atkRaw = get('p'+i+'a','5-10');
       const [lo,hi] = atkRaw.split(/[-–]/).map(Number);
-      party.push({ name: get('p'+i+'n','?'), hp, maxHp: mxhp,
-                   type: get('p'+i+'t','m'), alive: hp > 0,
-                   atkLo: lo||5, atkHi: hi||10 });
+      const ptype = get('p'+i+'t','m');
+      const prole = get('p'+i+'r', ptype==='f' ? 'friend' : 'mercenary');
+      party.push({
+        name: get('p'+i+'n','?'), hp, maxHp: mxhp,
+        type: ptype, role: prole, alive: hp > 0,
+        atkLo: lo||5, atkHi: hi||10,
+        cd: 0,           // активный кулдаун (ходов до следующего использования)
+        passiveCharge: 0,// счётчик для пассивного авто-лечения медика
+        shieldActive: false,  // Здоровяк: принять следующий удар
+        smokeActive: false,   // Разведчик: повышенный шанс промаха
+        bomberUsed: false,    // Подрывник: уже взорвался
+      });
     }
+
+    // ── Таблицы ролей ─────────────────────────────────────────────
+    const ROLE_ICONS = {
+      mercenary:'🔫', bruiser:'💪', sniper:'🔪',
+      bomber:'💣', medic:'🏥', scout:'🕵️', friend:'👥'
+    };
+    const ROLE_ACTIONS = {
+      mercenary: {label:'⚔️ Удар',      cls:'',            baseCd:1},
+      bruiser:   {label:'🛡 Прикрыть',  cls:'role-bruiser', baseCd:3},
+      sniper:    {label:'🎯 Прицел',    cls:'role-sniper',  baseCd:3},
+      bomber:    {label:'💥 ВЗРЫВ!',   cls:'role-bomber',  baseCd:-1},
+      medic:     {label:'🩹 Лечить',   cls:'role-medic',   baseCd:2},
+      scout:     {label:'💨 Дымовуха', cls:'role-scout',   baseCd:3},
+      friend:    {label:'🤝 Помочь',   cls:'role-medic',   baseCd:2},
+    };
+    const ROLE_PASSIVES = {
+      mercenary: '🔄 Авто-контр.',
+      bruiser:   '🛡 -8% урона',
+      medic:     '💊 Авто-лечение',
+      scout:     '👁 15% уклон',
+      sniper:    '', bomber:'', friend:'',
+    };
+    // Описание способностей для карточки бойца
+    const ROLE_DESC = {
+      mercenary: { active: '⚔️ Удар без ответки (кд:1)', passive: '🔄 Контр. после удара босса' },
+      bruiser:   { active: '🛡 Прикрыть — берёт удар (кд:3)', passive: '🛡 −8% урона пока жив' },
+      sniper:    { active: '🎯 Прицел — x2.5 урона (кд:3)', passive: null },
+      bomber:    { active: '💥 ВЗРЫВ — 60-80% HP босса, гибнет', passive: null },
+      medic:     { active: '🩹 Лечить +20-30 HP (кд:2)', passive: '💊 +10-15 HP авто каждые 3 хода' },
+      scout:     { active: '💨 Дымовуха — 40% промах (кд:3)', passive: '👁 15% шанс промаха всегда' },
+      friend:    { active: '🤝 Лечить +20-30 HP (кд:2)', passive: null },
+    };
 
     const ATKMANA = 5;
     const ATK_LABELS = {0:'🤜 Бить', 1:'🔪 Колоть', 2:'🔫 Стрелять'};
@@ -748,11 +799,8 @@
       if (btnProp) btnProp.disabled = waiting || battleDone || propUsed || !ppName || ppOk === 0;
       // Low HP badge
       updateLowHp();
-      // party buttons
-      party.forEach((_,i) => {
-        const b = document.getElementById('pmbtn-'+i);
-        if (b) b.disabled = waiting || battleDone || !party[i].alive;
-      });
+      // Party buttons — обновляем роль и кулдаун
+      party.forEach((_,i) => { updatePartyMember(i); });
     }
 
     function setWaiting(val) {
@@ -805,11 +853,33 @@
       const btn   = document.getElementById('pmbtn-'+idx);
       if (hpLbl) hpLbl.textContent = '❤️ '+m.hp+'/'+m.maxHp;
       if (bar)   bar.style.width = Math.max(0, m.hp/m.maxHp*100)+'%';
-      if (m.hp <= 0 && m.alive) {
-        m.alive = false;
+      if ((m.hp <= 0 || !m.alive)) {
+        if (m.alive) m.alive = false;
         const row = document.getElementById('pmrow-'+idx);
         if (row) row.classList.add('dead');
-        if (btn) btn.outerHTML = '<span class="pm-dead-lbl">💀 Выбыл</span>';
+        if (btn && btn.tagName === 'BUTTON') btn.outerHTML = '<span class="pm-dead-lbl">💀 Выбыл</span>';
+        return;
+      }
+      // Обновляем кнопку действия
+      if (btn && btn.tagName === 'BUTTON') {
+        const role = m.role || 'mercenary';
+        const ra = ROLE_ACTIONS[role] || ROLE_ACTIONS.mercenary;
+        if (m.cd > 0) {
+          btn.textContent = '⏳ ' + m.cd + ' хода';
+          btn.disabled = true;
+        } else if (role === 'bomber' && m.bomberUsed) {
+          btn.textContent = '💀 Погиб';
+          btn.disabled = true;
+        } else if (role === 'bruiser' && m.shieldActive) {
+          btn.textContent = '🛡 На щите';
+          btn.disabled = false;
+        } else if (role === 'scout' && m.smokeActive) {
+          btn.textContent = '💨 Дымка';
+          btn.disabled = false;
+        } else {
+          btn.textContent = ra.label;
+          btn.disabled = waiting || battleDone;
+        }
       }
     }
 
@@ -869,21 +939,75 @@
 
     // ── Enemy attacks player ─────────────────────────────────────
     function enemyTurn() {
-      const dmg = calcDmg(enemyAtk, playerDef);
-      playerHp = Math.max(0, playerHp - dmg);
-      turnNum++;
       const eName = stripEmoji(enemyName) || enemyName;
-      stats.push({turn: turnNum, who: eName, cls: 'sl-enemy', action: '👊 Удар', damage: dmg, heal: 0});
-      // Фраза врага (75% шанс)
-      const taunt = getEnemyTaunt(playerHp / playerMaxHp, enemyHp / enemyMaxHp);
+      turnNum++;
+
+      // ─ Пассив: Разведчик — шанс промаха ─────────────────────────
+      const aliveScouts = party.filter(m => m.alive && m.role === 'scout').length;
+      const smokeM = party.find(m => m.alive && m.role === 'scout' && m.smokeActive);
+      const dodgeChance = aliveScouts * 0.15 + (smokeM ? 0.40 : 0);
+      if (smokeM) smokeM.smokeActive = false;
+      if (dodgeChance > 0 && Math.random() < dodgeChance) {
+        const src = smokeM ? '💨 Дымовая завеса!' : '🕵️ Разведчик отвлёк врага!';
+        addLog(src + ' ' + eName + ' промахнулся!', 'log-party');
+        tickPartyCooldowns();
+        medicPassiveTick();
+        updateBars();
+        setWaiting(false);
+        return;
+      }
+
+      // ─ Пассив: Здоровяк — снижение урона ─────────────────────────
+      const aliveBruisers = party.filter(m => m.alive && m.role === 'bruiser').length;
+      const defMult = Math.max(0.6, 1 - aliveBruisers * 0.08);
+
+      // ─ Пассив: Здоровяк — щит (берёт удар на себя) ───────────────
+      const shieldM = party.find(m => m.alive && m.role === 'bruiser' && m.shieldActive);
+      let dmg = calcDmg(enemyAtk, playerDef);
+      if (shieldM) {
+        shieldM.shieldActive = false;
+        const shieldDmg = Math.max(1, Math.round(dmg * 0.7)); // Здоровяк берёт 70%
+        shieldM.hp = Math.max(0, shieldM.hp - shieldDmg);
+        const si = party.indexOf(shieldM);
+        stats.push({turn:turnNum, who:eName, cls:'sl-enemy', action:'👊 Удар→Щит', damage:shieldDmg, heal:0});
+        addLog('🛡 ' + shieldM.name + ' принял удар ' + shieldDmg + ' на себя!', 'log-party');
+        shakeEl('pmrow-'+si);
+        showFloatDmg('enemy-side', shieldDmg, 'player');
+        spawnStrike('player-side', -1);
+        updatePartyMember(si);
+        if (shieldM.hp <= 0) {
+          shieldM.alive = false;
+          addLog('💀 ' + shieldM.name + ' пал прикрывая тебя!', 'log-system');
+        }
+        tickPartyCooldowns();
+        medicPassiveTick();
+        updateBars();
+        if (coopId) { var pObj = {}; pObj['p'+myPnum+'hp'] = playerHp; fbPatch(pObj); }
+        setWaiting(false);
+        return;
+      }
+
+      // ─ Обычный удар по игроку ─────────────────────────────────────
+      dmg = Math.max(1, Math.round(dmg * defMult));
+      playerHp = Math.max(0, playerHp - dmg);
+      stats.push({turn:turnNum, who:eName, cls:'sl-enemy', action:'👊 Удар', damage:dmg, heal:0});
+      const taunt = getEnemyTaunt(playerHp/playerMaxHp, enemyHp/enemyMaxHp);
       if (taunt) addLog('💬 ' + eName + ': «' + taunt + '»', 'log-enemy');
-      addLog('😤 ' + eName + ' бьёт тебя: ' + dmg + ' урона!', 'log-enemy');
+      const defNote = aliveBruisers > 0 ? ' (−' + Math.round((1-defMult)*100) + '% от Здоровяка)' : '';
+      addLog('😤 ' + eName + ' бьёт тебя: ' + dmg + ' урона!' + defNote, 'log-enemy');
       shakeEl('player-side');
       showFloatDmg('player-side', dmg, 'player');
       spawnBlood('player-side', 10, true);
       spawnStrike('player-side', -1);
+
+      // ─ Авто-контратака Хулиганов ──────────────────────────────────
+      autoCounterAttack();
+      // ─ Тик кулдаунов и пассив Медика ─────────────────────────────
+      tickPartyCooldowns();
+      medicPassiveTick();
+
       updateBars();
-      if (coopId) { var phObj = {}; phObj['p' + myPnum + 'hp'] = playerHp; fbPatch(phObj); }
+      if (coopId) { var phObj = {}; phObj['p'+myPnum+'hp'] = playerHp; fbPatch(phObj); }
       if (playerHp <= 0) { endBattle('lose'); return; }
       setWaiting(false);
     }
@@ -1050,27 +1174,112 @@
       setTimeout(enemyTurn, delay);
     }
 
-    // ── Party member attack ──────────────────────────────────────
+    // ── Party member action (FREE — враг не отвечает) ────────────
     function partyAct(idx) {
       if (waiting || battleDone || !party[idx].alive) return;
       const m = party[idx];
-      const dmg = rnd(m.atkLo, m.atkHi);
+      if (m.cd > 0) return;
+      const role = m.role || (m.type === 'f' ? 'friend' : 'mercenary');
       turnNum++;
-      enemyHp = Math.max(0, enemyHp - dmg);
-      const typeLabel  = m.type === 'm' ? '🗡️' : '🤝';
-      const allyPhrase = m.type === 'm' ? pick(MERC_PHRASES) : pick(FRIEND_PHRASES);
-      stats.push({turn: turnNum, who: m.name, cls:'sl-party', action: typeLabel+' Атака', damage: dmg, heal: 0});
-      addLog('💬 ' + m.name + ': «' + allyPhrase + '»', 'log-party');
-      addLog(typeLabel + ' ' + m.name + ' атакует: ' + dmg + ' урона!', 'log-party');
-      shakeEl('enemy-side');
-      showFloatDmg('enemy-side', dmg, 'enemy');
-      spawnBlood('enemy-side', 10, false);
+
+      if (role === 'bomber' && !m.bomberUsed) {
+        // 💥 ВЗРЫВ — гибнет, огромный урон
+        const bombDmg = Math.round(enemyMaxHp * (0.6 + Math.random() * 0.2));
+        enemyHp = Math.max(0, enemyHp - bombDmg);
+        m.hp = 0; m.alive = false; m.bomberUsed = true; m.cd = 999;
+        stats.push({turn:turnNum, who:m.name, cls:'sl-special', action:'💥 ВЗРЫВ', damage:bombDmg, heal:0});
+        addLog('💬 ' + m.name + ': «За всех!»', 'log-special');
+        addLog('💥 ' + m.name + ' ВЗРЫВАЕТСЯ — ' + bombDmg + ' урона! Подрывник погиб.', 'log-special');
+        shakeEl('enemy-side'); showFloatDmg('enemy-side', bombDmg, 'enemy');
+        spawnBlood('enemy-side', 20, false);
+
+      } else if (role === 'bruiser') {
+        // 🛡 Прикрыть — берёт следующий удар
+        m.shieldActive = true; m.cd = 3;
+        addLog('💬 ' + m.name + ': «Держитесь за мной!»', 'log-party');
+        addLog('🛡 ' + m.name + ' встаёт щитом — примет следующий удар!', 'log-party');
+        shakeEl('player-side');
+
+      } else if (role === 'sniper') {
+        // 🎯 Прицел — x2.5 урона
+        const sDmg = Math.round(rnd(m.atkLo, m.atkHi) * 2.5);
+        enemyHp = Math.max(0, enemyHp - sDmg);
+        m.cd = 3;
+        stats.push({turn:turnNum, who:m.name, cls:'sl-party', action:'🎯 Прицел', damage:sDmg, heal:0});
+        addLog('💬 ' + m.name + ': «Вижу цель.»', 'log-party');
+        addLog('🎯 ' + m.name + ' берёт прицел: ' + sDmg + ' урона!', 'log-party');
+        shakeEl('enemy-side'); showFloatDmg('enemy-side', sDmg, 'enemy');
+        spawnBlood('enemy-side', 14, false);
+        spawnBullets('player-side', 'enemy-side', 2);
+
+      } else if (role === 'medic' || role === 'friend') {
+        // 🩹 Лечить — восстанавливает HP игрока
+        const healAmt = 20 + Math.floor(Math.random() * 11);
+        playerHp = Math.min(playerMaxHp, playerHp + healAmt);
+        m.cd = 2;
+        stats.push({turn:turnNum, who:m.name, cls:'sl-party', action:'🩹 Лечит', damage:0, heal:healAmt});
+        addLog('💬 ' + m.name + ': «Держись, перевяжу.»', 'log-party');
+        addLog('🩹 ' + m.name + ' лечит тебя: +' + healAmt + ' HP', 'log-party');
+        showFloatDmg('player-side', healAmt, 'heal');
+
+      } else if (role === 'scout') {
+        // 💨 Дымовуха — следующий удар 40% промах
+        m.smokeActive = true; m.cd = 3;
+        addLog('💬 ' + m.name + ': «Дымовуха!»', 'log-party');
+        addLog('💨 ' + m.name + ' ставит дымовую завесу — враг может промахнуться!', 'log-party');
+
+      } else {
+        // ⚔️ Удар (Хулиган / дефолт) — обычная атака, без ответа врага
+        const dmg = rnd(m.atkLo, m.atkHi);
+        enemyHp = Math.max(0, enemyHp - dmg);
+        m.cd = 1;
+        const phrase = pick(m.type === 'f' ? FRIEND_PHRASES : MERC_PHRASES);
+        stats.push({turn:turnNum, who:m.name, cls:'sl-party', action:'⚔️ Удар', damage:dmg, heal:0});
+        addLog('💬 ' + m.name + ': «' + phrase + '»', 'log-party');
+        addLog('⚔️ ' + m.name + ' атакует: ' + dmg + ' урона!', 'log-party');
+        shakeEl('enemy-side'); showFloatDmg('enemy-side', dmg, 'enemy');
+        spawnBlood('enemy-side', 8, false);
+        if (wt === 2) spawnBullets('player-side', 'enemy-side', 2);
+        else spawnStrike('enemy-side', 0);
+      }
+
       updateBars();
       fbSync();
       if (enemyHp <= 0) { endBattle('win'); return; }
-      setWaiting(true);
-      const delay = 1100 + Math.floor(Math.random()*700);
-      setTimeout(enemyTurn, delay);
+      // ✅ Нет setWaiting / нет enemyTurn — действие отряда БЕСПЛАТНОЕ
+    }
+
+    // ── Хелперы отряда после хода врага ──────────────────────────
+    function tickPartyCooldowns() {
+      party.forEach(m => { if (m.alive && m.cd > 0) m.cd--; });
+    }
+
+    function autoCounterAttack() {
+      // Хулиган авто-контратакует после удара врага
+      const avail = party.filter((m,i) => m.alive && m.cd === 0 && m.role === 'mercenary');
+      if (avail.length === 0) return;
+      const m = avail[Math.floor(Math.random() * avail.length)];
+      const dmg = rnd(m.atkLo, m.atkHi);
+      enemyHp = Math.max(0, enemyHp - dmg);
+      m.cd = 1;
+      addLog('🔄 ' + m.name + ' контратакует: ' + dmg + ' урона!', 'log-party');
+      showFloatDmg('enemy-side', dmg, 'enemy');
+      spawnBlood('enemy-side', 6, false);
+    }
+
+    function medicPassiveTick() {
+      // Медик авто-лечит каждые 3 хода врага
+      party.forEach((m, i) => {
+        if (!m.alive || m.role !== 'medic') return;
+        m.passiveCharge = (m.passiveCharge || 0) + 1;
+        if (m.passiveCharge >= 3) {
+          m.passiveCharge = 0;
+          const h = 10 + Math.floor(Math.random() * 6);
+          playerHp = Math.min(playerMaxHp, playerHp + h);
+          addLog('💊 ' + m.name + ' (авто): +' + h + ' HP', 'log-party');
+          showFloatDmg('player-side', h, 'heal');
+        }
+      });
     }
 
     // ── Flee ─────────────────────────────────────────────────────
@@ -1226,12 +1435,21 @@
       document.getElementById('party-section').style.display = '';
       const cont = document.getElementById('party-members');
       party.forEach(function(m, i) {
+        const role = m.role || (m.type==='f'?'friend':'mercenary');
+        const ra   = ROLE_ACTIONS[role] || ROLE_ACTIONS.mercenary;
+        const icon = ROLE_ICONS[role] || '🔫';
+        const rd   = ROLE_DESC[role]   || ROLE_DESC.mercenary;
         const badge = m.type === 'f'
           ? '<span class="pm-type-badge pm-type-f">Друг</span>'
           : '<span class="pm-type-badge pm-type-m">Наём</span>';
+        const abilityLine =
+          '<div class="pm-ability">' +
+            '<span class="ab-active">' + rd.active + '</span>' +
+            (rd.passive ? '<br><span class="ab-passive">' + rd.passive + '</span>' : '') +
+          '</div>';
         cont.innerHTML +=
           '<div class="party-member" id="pmrow-'+i+'">'+
-          '<div class="pm-icon">'+(m.type==='f'?'👥':'🔫')+'</div>'+
+          '<div class="pm-icon">'+icon+'</div>'+
           '<div class="pm-info">'+
             '<div class="pm-name">'+m.name+'</div>'+
             '<div class="pm-bar-row">'+
@@ -1239,8 +1457,9 @@
               '<div class="pm-bar-track"><div class="pm-bar-fill" id="pmbar-'+i+'" style="width:'+Math.round(m.hp/m.maxHp*100)+'%"></div></div>'+
               badge+
             '</div>'+
+            abilityLine+
           '</div>'+
-          '<button class="btn-pm-atk" id="pmbtn-'+i+'" onclick="partyAct('+i+')">⚔️ Атака</button>'+
+          '<button class="btn-pm-atk '+ra.cls+'" id="pmbtn-'+i+'" onclick="partyAct('+i+')">'+ra.label+'</button>'+
           '</div>';
       });
     }
