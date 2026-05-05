@@ -232,15 +232,58 @@
       0%   { transform: translate(0,0) scale(1); opacity: 1; }
       100% { transform: translate(var(--tx,0px), var(--ty,0px)) scale(0.2); opacity: 0; }
     }
-    /* ── Co-op partner strip ────────────────────────────────── */
-    .partner-strip {
-      background: var(--surface2); border:1px solid #1e3a5f;
-      border-radius:9px; padding:5px 10px; flex-shrink:0;
+    /* ── Co-op players grid ─────────────────────────────────── */
+    .coop-players {
+      display:flex; gap:4px; flex-shrink:0;
     }
-    .partner-title { font-size:11px; font-weight:700; color:#66ccff; margin-bottom:4px; }
-    .partner-bar-row { display:flex; align-items:center; gap:8px; }
-    .partner-bar-track { flex:1; height:6px; background:#0a0a2a; border-radius:3px; overflow:hidden; }
-    .partner-bar-fill { height:100%; background:#3498db; border-radius:3px; width:100%; transition:width .3s; }
+    .coop-player {
+      flex:1; background:var(--surface2); border:1px solid #1e3a5f;
+      border-radius:8px; padding:4px 6px; min-width:0;
+    }
+    .cp-name { font-size:10px; font-weight:700; color:#66ccff;
+               white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .cp-hp   { font-size:10px; color:#888; }
+    .cp-bar  { height:4px; background:#0a0a2a; border-radius:2px; margin-top:2px; overflow:hidden; }
+    .cp-fill { height:100%; background:#3498db; border-radius:2px; width:100%; transition:width .3s; }
+    /* ── Bullet projectile ────────────────────────────────── */
+    .bullet-proj {
+      position:fixed; pointer-events:none; z-index:9998;
+      width:9px; height:9px; border-radius:50%;
+      background:radial-gradient(circle, #ffe066 30%, #ff8800 100%);
+      box-shadow:0 0 7px 2px rgba(255,150,0,.7);
+      animation:bullet-fly var(--bur,.22s) linear forwards;
+    }
+    @keyframes bullet-fly {
+      0%   { transform:translate(0,0) scale(1); opacity:1; }
+      80%  { opacity:1; }
+      100% { transform:translate(var(--bx,0px),var(--by,0px)) scale(.3); opacity:0; }
+    }
+    /* ── Strike flash ─────────────────────────────────────── */
+    .strike-flash {
+      position:absolute; top:50%; left:50%;
+      transform:translate(-50%,-50%) scale(.5);
+      font-size:38px; pointer-events:none; z-index:100;
+      animation:strike-pop .42s ease-out forwards;
+    }
+    @keyframes strike-pop {
+      0%   { transform:translate(-50%,-50%) scale(.5); opacity:1; }
+      45%  { transform:translate(-50%,-60%) scale(1.5); opacity:1; }
+      100% { transform:translate(-50%,-75%) scale(1.0); opacity:0; }
+    }
+    /* ── Low HP badge ─────────────────────────────────────── */
+    .low-hp-badge {
+      position:absolute; top:3px; right:3px;
+      background:rgba(90,0,0,.88); border:1px solid #c0392b;
+      border-radius:6px; padding:2px 5px;
+      font-size:9px; color:#ff9999; font-weight:700; white-space:nowrap;
+      animation:low-hp-pulse 1.1s ease infinite; z-index:10;
+      display:none;
+    }
+    @keyframes low-hp-pulse { 0%,100%{opacity:1} 50%{opacity:.45} }
+    .cp-low-hp {
+      font-size:8px; color:#ff7777; font-weight:700;
+      animation:low-hp-pulse 1.1s ease infinite;
+    }
   </style>
 </head>
 <body>
@@ -248,6 +291,7 @@
 
   <div class="fighters">
     <div class="fighter player" id="player-side">
+      <div class="low-hp-badge" id="player-low-hp">🩹 едва держусь</div>
       <div class="f-avatar">🤵</div>
       <div class="f-name" id="pname">Игрок</div>
       <div class="bar-row">
@@ -275,14 +319,7 @@
 
   <div class="enemy-turn-indicator" id="enemy-indicator"></div>
 
-  <div class="partner-strip" id="partner-strip" style="display:none">
-    <div class="partner-title">👥 <span id="partner-name-lbl">Напарник</span></div>
-    <div class="partner-bar-row">
-      <span style="font-size:11px;color:#aaa;">❤️</span>
-      <div class="partner-bar-track"><div class="partner-bar-fill" id="partner-hp-bar"></div></div>
-      <span style="font-size:11px;color:#aaa;" id="partner-hp-lbl">—</span>
-    </div>
-  </div>
+  <div class="coop-players" id="coop-players" style="display:none"></div>
 
   <div class="party-section" id="party-section" style="display:none">
     <div class="party-title">⚔️ ОТРЯД</div>
@@ -429,10 +466,13 @@
     let potUsed = false;
     let hasPotions = hasPots;
 
-    // ── Firebase Co-op Realtime ──────────────────────────────────
+    // ── Firebase Co-op Realtime (до 4 игроков) ───────────────────
     const FB_URL = "https://mafiozy-default-rtdb.firebaseio.com";
-    let fbWriteTime = 0;
-    let fbPartnerMaxHp = 100;
+    let fbWriteTime  = 0;
+    var fbMaxHp = {}; // pnum → maxHp
+
+    // Имена со-op игроков из URL-параметра (через запятую)
+    var coopPartnerNames = partnerN ? partnerN.split(',').map(function(s){ return s.trim(); }) : [];
 
     function fbPatch(obj) {
       if (!coopId) return;
@@ -442,7 +482,7 @@
       }).catch(function(){});
     }
 
-    // Синхронизировать HP босса + своё HP после каждого удара
+    // Синхронизировать HP босса + своё HP
     function fbSync() {
       if (!coopId) return;
       fbWriteTime = Date.now();
@@ -451,74 +491,134 @@
       fbPatch(obj);
     }
 
-    // Обновить отображение HP партнёра
-    function updatePartnerDisplay(hp, maxHp) {
-      var bar = document.getElementById('partner-hp-bar');
-      var lbl = document.getElementById('partner-hp-lbl');
-      if (!bar || !lbl) return;
-      var pct = maxHp > 0 ? Math.max(0, Math.min(100, hp / maxHp * 100)) : 0;
-      bar.style.width = pct + '%';
-      lbl.textContent = hp + '/' + maxHp;
+    // Обновить карточку игрока в сетке
+    function updateCoopCard(pnum, hp, maxHp, name) {
+      var card = document.getElementById('cp' + pnum);
+      if (!card) return;
+      if (maxHp) fbMaxHp[pnum] = maxHp;
+      var mxhp = fbMaxHp[pnum] || maxHp || 100;
+      var pct  = hp !== null ? Math.max(0, Math.min(100, hp / mxhp * 100)) : null;
+      var bar  = document.getElementById('cpbar' + pnum);
+      var lbl  = document.getElementById('cphp' + pnum);
+      var nl   = document.getElementById('cpname' + pnum);
+      if (bar && pct !== null) bar.style.width = pct + '%';
+      if (lbl && hp !== null) {
+        var lowHpTxt = (hp > 0 && hp / mxhp < 0.3) ? ' <span class="cp-low-hp">🩹едва</span>' : '';
+        lbl.innerHTML = hp + '/' + mxhp + lowHpTxt;
+      }
+      if (nl && name) nl.textContent = name;
     }
 
     // Обработка Firebase-событий
     function handleFbData(path, data) {
       if (battleDone || data === null || data === undefined) return;
 
-      // Обновление HP босса от партнёра
-      var isBossRoot = (path === '/' && typeof data === 'object' && data.bossHp !== undefined);
-      var isBossPath = (path === '/bossHp');
-      if (isBossRoot || isBossPath) {
-        var fbHp = parseInt(isBossRoot ? data.bossHp : data);
-        if (isNaN(fbHp)) return;
-        if (Date.now() - fbWriteTime < 1000) return; // игнорируем эхо своей записи
-        if (fbHp < enemyHp && !waiting) {
-          var diff = enemyHp - fbHp;
-          enemyHp = Math.max(0, fbHp);
-          shakeEl('enemy-side');
-          showFloatDmg('enemy-side', diff, 'enemy');
-          addLog('💥 ' + (partnerN || 'Напарник') + ': ' + diff + ' урона врагу!', 'log-party');
-          updateBars();
-          if (enemyHp <= 0 && !battleDone) endBattle('win');
+      // Начальная загрузка (path = '/')
+      if (path === '/' && typeof data === 'object') {
+        // HP всех игроков
+        for (var pn = 1; pn <= 4; pn++) {
+          if (pn === myPnum) continue;
+          var hk = 'p' + pn + 'hp', mk = 'p' + pn + 'maxhp', nk = 'p' + pn + 'name';
+          if (data[hk] !== undefined) updateCoopCard(pn, parseInt(data[hk]), parseInt(data[mk])||100, data[nk]||'');
         }
+        // Boss HP
+        if (data.bossHp !== undefined && Date.now() - fbWriteTime > 1000) {
+          var fbHp = parseInt(data.bossHp);
+          if (!isNaN(fbHp) && fbHp < enemyHp && !waiting) applyPartnerDamage(enemyHp - fbHp, fbHp, data);
+        }
+        return;
       }
 
-      // Обновление HP партнёра
-      var partnerMaxKey = 'p' + (3 - myPnum) + 'maxhp';
-      var partnerHpKey  = 'p' + (3 - myPnum) + 'hp';
-      if (path === '/' + partnerMaxKey || (path === '/' && data[partnerMaxKey] !== undefined)) {
-        fbPartnerMaxHp = parseInt(path === '/' ? data[partnerMaxKey] : data) || 100;
+      // Boss HP
+      if (path === '/bossHp') {
+        if (Date.now() - fbWriteTime < 1000) return;
+        var fbHp2 = parseInt(data);
+        if (!isNaN(fbHp2) && fbHp2 < enemyHp && !waiting) applyPartnerDamage(enemyHp - fbHp2, fbHp2, null);
+        return;
       }
-      if (path === '/' + partnerHpKey || (path === '/' && typeof data === 'object' && data[partnerHpKey] !== undefined)) {
-        var pHp = parseInt(path === '/' ? data[partnerHpKey] : data);
-        if (!isNaN(pHp)) updatePartnerDisplay(pHp, fbPartnerMaxHp);
+
+      // Имя игрока
+      var nameMatch = path.match(/^\/p(\d)name$/);
+      if (nameMatch) { updateCoopCard(parseInt(nameMatch[1]), null, null, String(data)); return; }
+
+      // maxhp игрока
+      var maxMatch = path.match(/^\/p(\d)maxhp$/);
+      if (maxMatch) { fbMaxHp[parseInt(maxMatch[1])] = parseInt(data)||100; return; }
+
+      // HP игрока
+      var hpMatch = path.match(/^\/p(\d)hp$/);
+      if (hpMatch) {
+        var pn2 = parseInt(hpMatch[1]);
+        if (pn2 !== myPnum) updateCoopCard(pn2, parseInt(data)||0, fbMaxHp[pn2]||100, null);
+        return;
       }
+
+      // status = won
+      if (path === '/status' && data === 'won' && !battleDone) endBattle('win');
+    }
+
+    function applyPartnerDamage(diff, newHp, rootData) {
+      // Определяем имя атакующего партнёра по данным Firebase
+      var attackerName = 'Напарник';
+      if (rootData) {
+        for (var pn = 1; pn <= 4; pn++) {
+          if (pn === myPnum) continue;
+          var nk2 = 'p' + pn + 'name';
+          if (rootData[nk2]) { attackerName = rootData[nk2]; break; }
+        }
+      } else if (coopPartnerNames.length > 0) {
+        attackerName = coopPartnerNames[0];
+      }
+      enemyHp = Math.max(0, newHp);
+      shakeEl('enemy-side');
+      showFloatDmg('enemy-side', diff, 'enemy');
+      spawnBlood('enemy-side', 10, false);
+      addLog('💥 ' + attackerName + ': ' + diff + ' урона врагу!', 'log-party');
+      updateBars();
+      if (enemyHp <= 0 && !battleDone) endBattle('win');
     }
 
     function fbConnect() {
       if (!coopId) return;
 
-      // Показываем полосу партнёра
-      var strip = document.getElementById('partner-strip');
-      if (strip) strip.style.display = '';
-      var nl = document.getElementById('partner-name-lbl');
-      if (nl) nl.textContent = partnerN || 'Напарник';
+      // Строим сетку карточек других игроков
+      var container = document.getElementById('coop-players');
+      if (container) {
+        container.style.display = 'flex';
+        // Создаём карточки для pnum 1..4, пропускаем свой
+        for (var pn = 1; pn <= 4; pn++) {
+          if (pn === myPnum) continue;
+          var nameHint = coopPartnerNames[pn - 2] || ('P' + pn);
+          if (pn === 1) nameHint = coopPartnerNames[coopPartnerNames.length - (myPnum - 1)] || 'P1';
+          var div = document.createElement('div');
+          div.className = 'coop-player';
+          div.id = 'cp' + pn;
+          div.innerHTML =
+            '<div class="cp-name" id="cpname' + pn + '">' + nameHint + '</div>' +
+            '<div class="cp-hp"  id="cphp'  + pn + '">—</div>' +
+            '<div class="cp-bar"><div class="cp-fill" id="cpbar' + pn + '" style="width:100%"></div></div>';
+          container.appendChild(div);
+        }
+      }
 
+      // Инициализируем свои данные в Firebase
+      fbWriteTime = Date.now();
       if (myPnum === 1) {
-        // Хост создаёт комнату
-        fbWriteTime = Date.now();
-        var init = { bossHp: enemyHp, bossMaxHp: enemyMaxHp, status: 'active',
-                     p1hp: playerHp, p1maxhp: playerMaxHp };
+        var init = { bossHp: enemyHp, bossMaxHp: enemyMaxHp, status: 'active' };
+        init['p1hp'] = playerHp; init['p1maxhp'] = playerMaxHp; init['p1name'] = pname;
         fetch(FB_URL + '/battles/' + coopId + '.json', {
           method: 'PUT', headers: {'Content-Type':'application/json'},
           body: JSON.stringify(init)
         }).catch(function(){});
       } else {
-        // Партнёр объявляет своё HP
-        fbPatch({ p2hp: playerHp, p2maxhp: playerMaxHp });
+        var myObj = {};
+        myObj['p' + myPnum + 'hp']    = playerHp;
+        myObj['p' + myPnum + 'maxhp'] = playerMaxHp;
+        myObj['p' + myPnum + 'name']  = pname;
+        fbPatch(myObj);
       }
 
-      // SSE подключение к Firebase
+      // SSE подключение
       var src = new EventSource(FB_URL + '/battles/' + coopId + '.json');
       src.addEventListener('put', function(e) {
         try { var ev = JSON.parse(e.data); handleFbData(ev.path, ev.data); } catch(ex) {}
@@ -563,6 +663,59 @@
       }
     }
 
+    // ── Bullet animation ─────────────────────────────────────────
+    function spawnBullets(fromId, toId, count) {
+      count = count || 3;
+      var from = document.getElementById(fromId);
+      var to   = document.getElementById(toId);
+      if (!from || !to) return;
+      var fr = from.getBoundingClientRect();
+      var tr = to.getBoundingClientRect();
+      var sx = fr.left + fr.width  / 2;
+      var sy = fr.top  + fr.height / 2;
+      var ex = tr.left + tr.width  / 2;
+      var ey = tr.top  + tr.height / 2;
+      var dx = ex - sx, dy = ey - sy;
+      for (var i = 0; i < count; i++) {
+        (function(delay) {
+          setTimeout(function() {
+            var b = document.createElement('div');
+            b.className = 'bullet-proj';
+            var spread = (Math.random() - 0.5) * 24;
+            var bx = dx + spread, by = dy + spread;
+            var dur = 0.18 + Math.random() * 0.08;
+            b.style.cssText =
+              'left:' + (sx - 4.5) + 'px;top:' + (sy - 4.5) + 'px;' +
+              '--bx:' + bx + 'px;--by:' + by + 'px;--bur:' + dur + 's;';
+            document.body.appendChild(b);
+            setTimeout(function() { b.remove(); }, (dur + 0.15) * 1000);
+          }, delay);
+        })(i * 90);
+      }
+    }
+
+    // ── Strike flash (melee / knife / enemy hit) ──────────────────
+    function spawnStrike(targetId, weaponType) {
+      var el = document.getElementById(targetId);
+      if (!el) return;
+      // wt: 0=fist 💢, 1=knife 🔪, -1=enemy hit ⚡
+      var emoji = weaponType === 1 ? '🔪' : (weaponType === -1 ? '⚡' : '💢');
+      var flash = document.createElement('div');
+      flash.className = 'strike-flash';
+      flash.textContent = emoji;
+      el.style.position = 'relative';
+      el.appendChild(flash);
+      setTimeout(function() { flash.remove(); }, 460);
+    }
+
+    // ── Low HP badge (player) ─────────────────────────────────────
+    function updateLowHp() {
+      var pct = playerMaxHp > 0 ? playerHp / playerMaxHp : 1;
+      var badge = document.getElementById('player-low-hp');
+      if (!badge) return;
+      badge.style.display = (pct > 0 && pct < 0.3) ? '' : 'none';
+    }
+
     // ── Damage calc ─────────────────────────────────────────────
     function rnd(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
     function calcDmg(atk, def, mult=1.0) {
@@ -593,6 +746,8 @@
       const btnProp = document.getElementById('btn-prop');
       if (btnNade) btnNade.disabled = waiting || battleDone || grenCount <= 0;
       if (btnProp) btnProp.disabled = waiting || battleDone || propUsed || !ppName || ppOk === 0;
+      // Low HP badge
+      updateLowHp();
       // party buttons
       party.forEach((_,i) => {
         const b = document.getElementById('pmbtn-'+i);
@@ -726,6 +881,7 @@
       shakeEl('player-side');
       showFloatDmg('player-side', dmg, 'player');
       spawnBlood('player-side', 10, true);
+      spawnStrike('player-side', -1);
       updateBars();
       if (coopId) { var phObj = {}; phObj['p' + myPnum + 'hp'] = playerHp; fbPatch(phObj); }
       if (playerHp <= 0) { endBattle('lose'); return; }
@@ -805,6 +961,8 @@
         shakeEl('enemy-side');
         showFloatDmg('enemy-side', dmg, 'enemy');
         spawnBlood('enemy-side', 10, false);
+        if (wt === 2) spawnBullets('player-side', 'enemy-side', 3);
+        else spawnStrike('enemy-side', wt);
 
       } else if (type === 'skill') {
         if (playerMp < skCost) return;
@@ -825,6 +983,8 @@
         shakeEl('enemy-side');
         showFloatDmg('enemy-side', dmg, 'enemy');
         spawnBlood('enemy-side', 12, false);
+        if (wt === 2) spawnBullets('player-side', 'enemy-side', 4);
+        else spawnStrike('enemy-side', wt);
 
       } else if (type === 'potion') {
         if (!hasPotions) return;
