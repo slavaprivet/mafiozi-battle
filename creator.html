@@ -1068,6 +1068,11 @@ function initViewMode() {
   document.getElementById('page-title').textContent = '🤵 Мой гангстер';
   // Показываем кнопки просмотра
   document.getElementById('view-mode-btns').style.display = 'flex';
+  // Нативная кнопка «Назад» в шапке Telegram
+  if (tg && tg.BackButton) {
+    tg.BackButton.onClick(exitToMenu);
+    tg.BackButton.show();
+  }
 }
 
 function enterEditMode() {
@@ -1083,6 +1088,11 @@ function enterEditMode() {
 }
 
 function exitToMenu() {
+  try {
+    const url = localStorage.getItem('hubUrl');
+    if (url) { window.location.href = url; return; }
+  } catch(e) {}
+  // Fallback: закрыть WebApp
   if (tg) tg.close();
   else window.history.back();
 }
