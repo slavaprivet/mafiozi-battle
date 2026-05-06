@@ -101,29 +101,42 @@ h2 {
 }
 .options-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
   margin-bottom: 10px;
 }
 .opt-btn {
-  aspect-ratio: 1;
   border-radius: 10px;
   border: 2px solid #333;
   background: #111122;
   cursor: pointer;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  font-size: 11px;
+  justify-content: flex-start;
+  overflow: hidden;
+  transition: all .15s;
+  user-select: none;
+  padding: 0 0 4px 0;
+}
+.opt-btn canvas {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 56 / 72;
+  display: block;
+  pointer-events: none;
+}
+.opt-btn span {
+  font-size: 10px;
   color: #ccc;
   text-align: center;
   line-height: 1.2;
-  padding: 2px;
-  transition: all .15s;
-  user-select: none;
+  padding: 0 2px;
+  width: 100%;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
-.opt-btn canvas { width: 100%; height: 100%; display: block; pointer-events: none; }
 .opt-btn.selected {
   border-color: #e8c96e;
   background: #e8c96e22;
@@ -920,31 +933,37 @@ function drawHat(ctx, hatId, px, py, bd, headY, headH, sc) {
     ctx.fillRect(px(-hw+2), py(headY+BRIM_H+5), (hw*2-4)*sc, 3*sc);
 
   } else if (hatId===5) { // ── Очки ─────────────────────────────────────
-    // eyeY is correctly at eye level (see top of function)
+    // Scale lens width/position with head width so glasses fit all body types
+    const span  = hw * 0.55;          // half-distance between lens centres
+    const lensW = (hw * 0.55) * sc;   // lens width scales with head
+    const lensH = 9 * sc;
+    const gap   = hw * 0.08;          // nose bridge half-gap
+    const lL    = -(span + gap);       // left lens left edge (world x)
+    const lR    = -(gap);              // left lens right edge
+    const rL    = gap;                 // right lens left edge
     ctx.strokeStyle = '#111';
-    ctx.lineWidth = 2.5*sc;
+    ctx.lineWidth = 2 * sc;
     ctx.fillStyle = '#1a3a5a88';
-    const lensH = 10*sc, lensW = 14*sc;
     // Left lens
     ctx.beginPath();
-    ctx.roundRect(px(-19), py(eyeY+5), lensW, lensH, 3*sc);
+    ctx.roundRect(px(lL), py(eyeY+5), lensW, lensH, 3*sc);
     ctx.fill(); ctx.stroke();
     // Right lens
     ctx.beginPath();
-    ctx.roundRect(px(5), py(eyeY+5), lensW, lensH, 3*sc);
+    ctx.roundRect(px(rL), py(eyeY+5), lensW, lensH, 3*sc);
     ctx.fill(); ctx.stroke();
-    // Bridge
+    // Bridge (nose)
     ctx.beginPath();
-    ctx.moveTo(px(-5), py(eyeY+8));
-    ctx.lineTo(px(5),  py(eyeY+8));
+    ctx.moveTo(px(lR), py(eyeY+9));
+    ctx.lineTo(px(rL), py(eyeY+9));
     ctx.stroke();
     // Temples
     ctx.beginPath();
-    ctx.moveTo(px(-19), py(eyeY+8));
+    ctx.moveTo(px(lL), py(eyeY+9));
     ctx.lineTo(px(-hw-2), py(eyeY+6));
     ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(px(19), py(eyeY+8));
+    ctx.moveTo(px(rL + span), py(eyeY+9));
     ctx.lineTo(px(hw+2), py(eyeY+6));
     ctx.stroke();
 
