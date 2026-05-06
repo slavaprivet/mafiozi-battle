@@ -1053,6 +1053,37 @@ body {
 .coop-result-title.lose { color: var(--red); }
 .coop-result-back { padding: 13px 28px; border-radius: 12px; border: none; cursor: pointer;
   background: var(--bg3); border: 1px solid var(--border); color: var(--text); font-size: 14px; font-weight: 700; }
+
+/* ── DONATE PAGE ─────────────────────────────────────── */
+.donate-tabs { display:flex; gap:8px; padding:12px 16px 4px; }
+.donate-tab  {
+  flex:1; padding:10px 0; border-radius:10px; border:1px solid var(--border);
+  background:var(--bg2); color:var(--muted); font-size:14px; font-weight:600;
+  cursor:pointer; transition:.2s;
+}
+.donate-tab.active { background:linear-gradient(135deg,#c8a84b,#f0d060); color:#000; border-color:var(--gold); }
+.donate-packs  { padding:8px 16px; }
+.donate-info   { font-size:12px; color:var(--muted); margin-bottom:12px; line-height:1.5; }
+.donate-pack-grid { display:flex; flex-direction:column; gap:10px; }
+.donate-pack-card {
+  background:var(--bg2); border:1px solid var(--border); border-radius:14px;
+  padding:14px 16px; display:flex; align-items:center; gap:14px;
+  cursor:pointer; transition:transform .15s, border-color .15s;
+}
+.donate-pack-card:active { transform:scale(.97); }
+.donate-pack-card.highlight { border-color:var(--gold); }
+.donate-pack-icon  { font-size:32px; flex-shrink:0; }
+.donate-pack-info  { flex:1; }
+.donate-pack-name  { font-size:15px; font-weight:700; color:#fff; }
+.donate-pack-bonus { font-size:12px; color:var(--gold); margin-top:2px; }
+.donate-pack-price {
+  background:linear-gradient(135deg,#7b5ea7,#9b59b6);
+  border-radius:10px; padding:8px 14px; text-align:center;
+  font-size:13px; font-weight:700; color:#fff; white-space:nowrap;
+  flex-shrink:0;
+}
+.donate-footer { text-align:center; color:var(--muted); font-size:12px; padding:16px; line-height:1.6; }
+
 </style>
 </head>
 <body>
@@ -1087,15 +1118,15 @@ body {
     </div>
 
     <div class="money-row">
-      <div class="money-chip">
+      <div class="money-chip" onclick="nav('donate')" style="cursor:pointer" title="Купить баксы">
         <span class="icon">💵</span>
         <span class="val" id="cash-val">0</span>
-        <span class="lbl">Наличные</span>
+        <span class="lbl">Наличные <span style="font-size:9px;opacity:.6">+</span></span>
       </div>
-      <div class="money-chip">
+      <div class="money-chip" onclick="nav('donate','diamonds')" style="cursor:pointer" title="Купить бриллианты">
         <span class="icon">💎</span>
         <span class="val" id="dia-val">0</span>
-        <span class="lbl">Брилл.</span>
+        <span class="lbl">Брилл. <span style="font-size:9px;opacity:.6">+</span></span>
       </div>
     </div>
   </div>
@@ -1116,7 +1147,7 @@ body {
   </div>
 
   <div class="tile tile-coop" onclick="nav('coop')">
-    <div class="tile-icon">⚔️</div>
+    <div class="tile-icon">🗡️</div>
     <div class="tile-label">Кооператив</div>
   </div>
 
@@ -1316,14 +1347,14 @@ body {
 <div id="page-coop" class="subpage" style="display:none">
   <div class="subpage-header">
     <button class="back-btn" onclick="goBack()">← Назад</button>
-    <div class="subpage-title">⚔️ Кооператив</div>
+    <div class="subpage-title">🗡️ Кооператив</div>
   </div>
 
   <!-- LOBBY VIEW -->
   <div id="coop-lobby">
     <div class="coop-section">
       <div class="coop-intro">
-        <div class="coop-intro-icon">⚔️</div>
+        <div class="coop-intro-icon">🗡️</div>
         <div class="coop-intro-title">Кооперативный бой</div>
         <div class="coop-intro-desc">Зови бандитов из банды, берите босса вместе.<br>До 4 игроков. Награды делятся поровну.</div>
       </div>
@@ -1333,19 +1364,20 @@ body {
         Попроси администратора указать <b>COOP_API_BASE</b> в боте.
       </div>
 
+      <div class="coop-gang-label">Выбери босса</div>
+      <div id="coop-boss-selector" style="margin-bottom:8px"></div>
+
       <div class="coop-gang-label">Члены банды</div>
       <div id="coop-gang-list">
         <div style="color:var(--muted);font-size:13px;padding:8px 4px">Нет членов банды — пригласи друзей!</div>
       </div>
 
-      <div style="display:flex;gap:8px">
-        <button class="coop-create-btn" id="coop-create-btn" style="flex:1" onclick="coopCreateSession()">
-          ⚔️ Создать сессию
-        </button>
-        <button class="coop-create-btn" style="flex:0 0 auto;padding:15px 14px;background:linear-gradient(135deg,#1a3a5a,#0d2035);box-shadow:none" onclick="coopShowJoin()">
-          🔗 Войти
-        </button>
-      </div>
+      <button class="coop-create-btn" id="coop-create-btn" onclick="coopCreateSession()">
+        🗡 Создать сессию
+      </button>
+      <button class="coop-create-btn" style="background:linear-gradient(135deg,#1a3a5a,#0d2035);box-shadow:none" onclick="coopShowJoin()">
+        🔗 Войти в сессию по коду
+      </button>
     </div>
   </div>
 
@@ -1410,6 +1442,35 @@ body {
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════ DONATE PAGE -->
+<div id="page-donate" class="subpage" style="display:none">
+  <div class="subpage-header">
+    <button class="back-btn" onclick="goBack()">← Назад</button>
+    <div class="subpage-title">💰 Пополнить счёт</div>
+  </div>
+
+  <div class="donate-tabs" id="donate-tabs">
+    <button class="donate-tab active" id="dtab-cash" onclick="donateSwitchTab('cash')">💵 Баксы</button>
+    <button class="donate-tab" id="dtab-diamonds" onclick="donateSwitchTab('diamonds')">💎 Бриллианты</button>
+  </div>
+
+  <!-- CASH PACKS -->
+  <div id="donate-cash-packs" class="donate-packs">
+    <div class="donate-info">Пополни баланс наличными — трать на улучшения, лечение и рынок.</div>
+    <div id="donate-cash-list" class="donate-pack-grid"></div>
+  </div>
+
+  <!-- DIAMOND PACKS -->
+  <div id="donate-dia-packs" class="donate-packs" style="display:none">
+    <div class="donate-info">Бриллианты — премиум-валюта. Используй для элитного снаряжения и особых возможностей.</div>
+    <div id="donate-dia-list" class="donate-pack-grid"></div>
+  </div>
+
+  <div class="donate-footer">
+    Оплата через ⭐ Telegram Stars.<br>Звёзды зачисляются мгновенно.
+  </div>
+</div>
+
 <script>
 // ── Telegram WebApp ───────────────────────────────────────────────────
 const tg = window.Telegram?.WebApp;
@@ -1454,6 +1515,18 @@ const DATA = {
              return {uid, name: decodeURIComponent(name||''), emoji: emoji||'🔫', role: role||'mercenary'};
            }),
   api:     p('api',''),  // co-op API base URL (e.g. https://xxx.ngrok.io)
+  // Co-op battle state (set by bot when session active)
+  coopSid:      pi('coop_sid', 0),
+  coopStatus:   p('coop_status', ''),   // waiting | battle | won | lost
+  coopMyTurn:   pi('coop_my_turn', 0),
+  coopBossId:   p('coop_boss_id', ''),
+  coopBossHp:   pi('coop_boss_hp', 0),
+  coopBossMax:  pi('coop_boss_max', 0),
+  coopPlayers:  p('coop_players','').split(',').filter(Boolean).map(s => {
+                  const parts = s.split(':');
+                  return {name: decodeURIComponent(parts[0]||'?'), hp: parseInt(parts[1])||0, maxhp: parseInt(parts[2])||100};
+                }),
+  coopTurnName: decodeURIComponent(p('coop_turn_name','')),
 };
 
 // ── Class definitions ─────────────────────────────────────────────────
@@ -1517,7 +1590,7 @@ function fmtNum(n) {
 }
 
 // ── SPA Navigation ────────────────────────────────────────────────────
-const CLIENT_PAGES = ['explore', 'district', 'battle', 'character', 'coop'];
+const CLIENT_PAGES = ['explore', 'district', 'battle', 'character', 'coop', 'donate'];
 const BOT_PAGES = {
   inventory:   { title: '🎒 Барахло',        icon: '🎒' },
   shop:        { title: '🏪 Чёрный рынок',   icon: '🏪' },
@@ -1530,10 +1603,11 @@ let pendingBotDest = null;
 
 try { localStorage.setItem('hubUrl', location.href); } catch(e) {}
 
-function nav(dest) {
+function nav(dest, extra) {
   document.getElementById('page-main').style.display = 'none';
   document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
 
+  if (dest === 'donate') { renderDonatePage(extra); return; }
   if (CLIENT_PAGES.includes(dest)) {
     if (dest === 'explore')    renderDistricts();
     if (dest === 'character')  renderCharacter();
@@ -2431,21 +2505,30 @@ function coopMyUidStr() {
 }
 
 // ── LOBBY ─────────────────────────────────────────────────────────────
-function renderCoopLobby() {
-  coopShowLobby();
-  const apiOk = !!coopApi();
-  document.getElementById('coop-no-api-warn').style.display = apiOk ? 'none' : '';
-  const btn = document.getElementById('coop-create-btn');
-  if (btn) btn.disabled = !apiOk;
+// ── Selected gang members for invite ─────────────────────────────────
+const _coopInviteSet = new Set();
 
-  // Render gang list
+function renderCoopLobby() {
+  // If bot sent us into a coop session, skip the lobby
+  if (DATA.coopSid > 0) {
+    _coopShowFromData();
+    return;
+  }
+  coopShowLobby();
+
+  // Boss/district selector
+  _renderCoopBossSelector();
+
+  // Gang member list with invite checkboxes
   const listEl = document.getElementById('coop-gang-list');
   if (DATA.gang && DATA.gang.length > 0) {
     listEl.innerHTML = '';
     DATA.gang.slice(0, 8).forEach(m => {
       const row = document.createElement('div');
       row.className = 'coop-member-row';
-      row.innerHTML = `
+      const chk = `<input type="checkbox" id="inv_${m.uid}" style="accent-color:var(--gold);width:18px;height:18px;flex-shrink:0"
+        onchange="if(this.checked)_coopInviteSet.add('${m.uid}');else _coopInviteSet.delete('${m.uid}')">`;
+      row.innerHTML = `${chk}
         <div class="coop-member-avatar">${m.emoji || '🔫'}</div>
         <div class="coop-member-info">
           <div class="coop-member-name">${m.name || 'Бандит'}</div>
@@ -2458,6 +2541,185 @@ function renderCoopLobby() {
   }
 }
 
+function _renderCoopBossSelector() {
+  const wrap = document.getElementById('coop-boss-selector');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+
+  const districts = [
+    {id:'market',  icon:'🏪', name:'Рынок',    minLvl:1,  bosses:['kosoy','bychok','shustryy','zhigan']},
+    {id:'port',    icon:'⚓', name:'Порт',      minLvl:5,  bosses:['tolsty','kaban','kontrabas','bukhgalter']},
+    {id:'casino',  icon:'🎰', name:'Казино',    minLvl:10, bosses:['legenda','professor','svalshchik','artist']},
+    {id:'factory', icon:'🏭', name:'Промзона',  minLvl:15, bosses:['buryy','khirurg','palach','tigr']},
+    {id:'mansion', icon:'🏛', name:'Резиденция',minLvl:20, bosses:['sedoy','prizrak','vizir','don_karlo']},
+  ];
+  const availDist = districts.filter(d => DATA.level >= d.minLvl);
+
+  const sel = document.createElement('div');
+  sel.style.cssText = 'display:flex;flex-direction:column;gap:8px';
+
+  // District picker
+  const distSel = document.createElement('select');
+  distSel.id = 'coop-dist-sel';
+  distSel.style.cssText = 'background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:#fff;padding:8px 12px;font-size:14px;width:100%';
+  availDist.forEach(d => {
+    const o = document.createElement('option');
+    o.value = d.id;
+    o.textContent = `${d.icon} ${d.name}`;
+    distSel.appendChild(o);
+  });
+
+  // Boss picker
+  const bossSel = document.createElement('select');
+  bossSel.id = 'coop-boss-sel';
+  bossSel.style.cssText = 'background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:#fff;padding:8px 12px;font-size:14px;width:100%';
+
+  function refreshBosses() {
+    const dist = availDist.find(d => d.id === distSel.value) || availDist[0];
+    bossSel.innerHTML = '';
+    dist.bosses.forEach(bid => {
+      const bd = BOSS_DATA[bid];
+      if (!bd) return;
+      const o = document.createElement('option');
+      o.value = bid;
+      o.textContent = `${bd.name} — ❤️${bd.hp}`;
+      bossSel.appendChild(o);
+    });
+  }
+  distSel.onchange = refreshBosses;
+  refreshBosses();
+
+  sel.appendChild(distSel);
+  sel.appendChild(bossSel);
+  wrap.appendChild(sel);
+}
+
+function _coopShowFromData() {
+  const status = DATA.coopStatus;
+  if (status === 'waiting') {
+    _coopShowWaitroomFromData();
+  } else if (status === 'battle') {
+    _coopShowBattleFromData();
+  } else if (status === 'won' || status === 'lost') {
+    document.getElementById('coop-lobby').style.display    = 'none';
+    document.getElementById('coop-battle').style.display   = 'none';
+    document.getElementById('coop-waitroom').style.display = 'none';
+    document.getElementById('coop-result').style.display   = '';
+    const won = status === 'won';
+    const boss = BOSS_DATA[DATA.coopBossId] || {};
+    document.getElementById('coop-result-inner').innerHTML = `
+      <div class="coop-result-icon">${won ? '🏆' : '💀'}</div>
+      <div class="coop-result-title ${won ? 'win' : 'lose'}">${won ? 'ПОБЕДА!' : 'ПОРАЖЕНИЕ'}</div>
+      <div style="color:var(--muted);font-size:13px">${boss.name || ''}</div>
+      <button class="coop-result-back" onclick="coopShowLobby();renderCoopLobby()">← В лобби</button>`;
+  }
+}
+
+function _coopShowWaitroomFromData() {
+  document.getElementById('coop-lobby').style.display    = 'none';
+  document.getElementById('coop-battle').style.display   = 'none';
+  document.getElementById('coop-result').style.display   = 'none';
+  document.getElementById('coop-waitroom').style.display = '';
+  document.getElementById('coop-session-code').textContent = String(DATA.coopSid);
+  document.getElementById('coop-countdown').textContent    = '';
+
+  // Render current players
+  const playersEl = document.getElementById('coop-players-in');
+  playersEl.innerHTML = '';
+  DATA.coopPlayers.forEach((p, i) => {
+    const slot = document.createElement('div');
+    slot.className = 'coop-player-slot';
+    slot.innerHTML = `<span>🤵</span> <span>${p.name}</span> <span style="color:var(--muted);font-size:11px">${p.hp}/${p.maxhp} HP</span>`;
+    playersEl.appendChild(slot);
+  });
+
+  // Show correct buttons based on whether I'm host (coopMyTurn used as host flag here)
+  const startBtn = document.getElementById('coop-start-btn');
+  if (startBtn) {
+    const amHost = (DATA.coopMyTurn === 1);  // bot sets my_turn=1 for host in waiting
+    startBtn.style.display = amHost ? '' : 'none';
+    startBtn.disabled = false;
+    startBtn.onclick = () => {
+      if (tg && tg.sendData) {
+        tg.sendData(JSON.stringify({a:'coop_start_hub', sid: DATA.coopSid}));
+      }
+    };
+  }
+
+  // "Готов" button — replace cancel with ready
+  const cancelBtn = document.querySelector('#coop-waitroom .coop-cancel-btn');
+  if (cancelBtn) {
+    cancelBtn.textContent = '✅ Готов к бою';
+    cancelBtn.style.background = 'linear-gradient(135deg,#27ae60,#1a7a40)';
+    cancelBtn.style.color = '#fff';
+    cancelBtn.style.border = 'none';
+    cancelBtn.onclick = () => {
+      if (tg && tg.sendData) {
+        tg.sendData(JSON.stringify({a:'coop_ready_hub', sid: DATA.coopSid}));
+      }
+    };
+  }
+}
+
+function _coopShowBattleFromData() {
+  document.getElementById('coop-lobby').style.display    = 'none';
+  document.getElementById('coop-waitroom').style.display = 'none';
+  document.getElementById('coop-result').style.display   = 'none';
+  document.getElementById('coop-battle').style.display   = '';
+
+  const boss = BOSS_DATA[DATA.coopBossId] || {name: 'Босс'};
+  const bPct = DATA.coopBossMax > 0 ? Math.max(0, DATA.coopBossHp / DATA.coopBossMax * 100) : 0;
+  document.getElementById('cb-boss-name').textContent = boss.name;
+  document.getElementById('cb-boss-bar').style.width  = bPct.toFixed(1) + '%';
+  document.getElementById('cb-boss-hp').textContent   = DATA.coopBossHp + ' / ' + DATA.coopBossMax;
+  document.getElementById('cb-boss-quote').textContent = DATA.coopTurnName
+    ? `Ход: ${DATA.coopTurnName}` : '';
+
+  // Players HP bars
+  const playersEl = document.getElementById('cb-players');
+  playersEl.innerHTML = '';
+  DATA.coopPlayers.forEach(pl => {
+    const hpPct = pl.maxhp > 0 ? Math.max(0, pl.hp / pl.maxhp * 100) : 0;
+    const dead  = pl.hp <= 0;
+    const row   = document.createElement('div');
+    row.className = 'coop-player-battle-row' + (dead ? ' dead' : '');
+    row.innerHTML = `
+      <div class="cpb-avatar">${dead ? '💀' : '🤵'}</div>
+      <div class="cpb-info">
+        <div class="cpb-name">${pl.name}</div>
+        <div class="cpb-hp-bg"><div class="cpb-hp-fill" style="width:${hpPct.toFixed(1)}%"></div></div>
+      </div>
+      <div class="cpb-turn-badge">${pl.hp}/${pl.maxhp}</div>`;
+    playersEl.appendChild(row);
+  });
+
+  // Attack/wait button
+  const atkBtn = document.getElementById('cb-atk-btn');
+  if (DATA.coopMyTurn) {
+    atkBtn.disabled  = false;
+    atkBtn.textContent = getAttackLabel();
+    atkBtn.onclick = () => {
+      if (tg && tg.sendData) {
+        atkBtn.disabled = true;
+        tg.sendData(JSON.stringify({a:'coop_turn_hub', sid: DATA.coopSid, turn:'attack'}));
+      }
+    };
+  } else {
+    atkBtn.disabled  = true;
+    atkBtn.textContent = `⏳ Ходит ${DATA.coopTurnName || 'союзник'}...`;
+  }
+
+  // Flee button
+  const fleeBtn = document.querySelector('#coop-battle .coop-flee-btn');
+  if (fleeBtn) {
+    fleeBtn.onclick = () => {
+      if (tg && tg.sendData) {
+        tg.sendData(JSON.stringify({a:'coop_turn_hub', sid: DATA.coopSid, turn:'flee'}));
+      }
+    };
+  }
+}
+
 function coopShowLobby() {
   document.getElementById('coop-lobby').style.display = '';
   document.getElementById('coop-waitroom').style.display = 'none';
@@ -2467,6 +2729,89 @@ function coopShowLobby() {
   _coopStopPoll();
 }
 
+// ═══════════════════════════════════════════════════════ DONATE PAGE
+
+const CASH_PACKS = [
+  {stars:25,  cash:500,   label:'💵 500 баксов',    bonus:'Стартовый набор',   highlight:false},
+  {stars:75,  cash:2000,  label:'💵 2 000 баксов',  bonus:'Популярный выбор 🔥', highlight:true},
+  {stars:175, cash:6000,  label:'💵 6 000 баксов',  bonus:'+20% бонус',        highlight:false},
+  {stars:400, cash:20000, label:'💵 20 000 баксов', bonus:'+50% мега-бонус',   highlight:false},
+];
+const DIA_PACKS = [
+  {stars:50,  diamonds:100,  label:'💎 100 бриллиантов',   bonus:'Базовый набор',  highlight:false},
+  {stars:200, diamonds:500,  label:'💎 500 бриллиантов',   bonus:'Лучшая цена 🔥', highlight:true},
+  {stars:500, diamonds:1500, label:'💎 1 500 бриллиантов', bonus:'+20% бонус',     highlight:false},
+];
+
+function renderDonatePage(tab) {
+  document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
+  document.getElementById('page-donate').style.display = '';
+  history.pushState({page:'donate'}, '');
+
+  donateSwitchTab(tab === 'diamonds' ? 'diamonds' : 'cash');
+
+  // Build cash list
+  const cashList = document.getElementById('donate-cash-list');
+  cashList.innerHTML = '';
+  CASH_PACKS.forEach((p, i) => {
+    const card = document.createElement('div');
+    card.className = 'donate-pack-card' + (p.highlight ? ' highlight' : '');
+    card.onclick = () => donateConfirm('cash', i);
+    card.innerHTML = `
+      <div class="donate-pack-icon">💵</div>
+      <div class="donate-pack-info">
+        <div class="donate-pack-name">${p.label}</div>
+        <div class="donate-pack-bonus">${p.bonus}</div>
+      </div>
+      <div class="donate-pack-price">⭐ ${p.stars}</div>`;
+    cashList.appendChild(card);
+  });
+
+  // Build diamonds list
+  const diaList = document.getElementById('donate-dia-list');
+  diaList.innerHTML = '';
+  DIA_PACKS.forEach((p, i) => {
+    const card = document.createElement('div');
+    card.className = 'donate-pack-card' + (p.highlight ? ' highlight' : '');
+    card.onclick = () => donateConfirm('diamonds', i);
+    card.innerHTML = `
+      <div class="donate-pack-icon">💎</div>
+      <div class="donate-pack-info">
+        <div class="donate-pack-name">${p.label}</div>
+        <div class="donate-pack-bonus">${p.bonus}</div>
+      </div>
+      <div class="donate-pack-price">⭐ ${p.stars}</div>`;
+    diaList.appendChild(card);
+  });
+}
+
+function donateSwitchTab(tab) {
+  document.getElementById('dtab-cash').classList.toggle('active', tab === 'cash');
+  document.getElementById('dtab-diamonds').classList.toggle('active', tab === 'diamonds');
+  document.getElementById('donate-cash-packs').style.display = tab === 'cash'     ? '' : 'none';
+  document.getElementById('donate-dia-packs').style.display  = tab === 'diamonds' ? '' : 'none';
+}
+
+function donateConfirm(type, idx) {
+  const pack = type === 'cash' ? CASH_PACKS[idx] : DIA_PACKS[idx];
+  const icon  = type === 'cash' ? '💵' : '💎';
+  const amount = type === 'cash'
+    ? pack.cash + ' баксов'
+    : pack.diamonds + ' бриллиантов';
+  if (!tg) { alert('Открой в Telegram!'); return; }
+  tg.showConfirm(
+    icon + ' ' + pack.label + '\n\nСтоимость: ⭐ ' + pack.stars + ' Telegram Stars\nПолучишь: ' + amount + '\n\nПродолжить?',
+    (ok) => {
+      if (!ok) return;
+      tg.sendData(JSON.stringify({
+        a: type === 'cash' ? 'buy_cash_hub' : 'buy_dia_hub',
+        idx: idx
+      }));
+    }
+  );
+}
+
+
 function coopShowJoin() {
   document.getElementById('coop-lobby').style.display = 'none';
   document.getElementById('coop-join-view').style.display = '';
@@ -2474,41 +2819,22 @@ function coopShowJoin() {
 }
 
 // ── CREATE SESSION ────────────────────────────────────────────────────
-async function coopCreateSession() {
-  if (!coopApi()) { showToast('Сервер не настроен', '⚠️'); return; }
-  const btn = document.getElementById('coop-create-btn');
-  btn.disabled = true;
-  btn.textContent = '⌛ Создаём...';
-
-  // Pick a boss from first available district
-  const locId   = 'market';
-  const bossId  = LOC_DATA[locId].bosses[0];
-
-  try {
-    const resp = await fetch(coopApi() + '/coop/create', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        uid:    coopMyUidStr(),
-        name:   DATA.name,
-        atk:    DATA.atk,
-        def:    DATA.def,
-        hp:     session.hp,
-        maxhp:  DATA.maxhp,
-        boss_id: bossId,
-        loc_id:  locId,
-        init_data: tg?.initData || '',
-      })
-    });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const data = await resp.json();
-    coopSid = data.sid;
-    _coopEnterWaitRoom(data);
-  } catch(e) {
-    showToast('Ошибка сервера: ' + e.message, '❌');
-    btn.disabled = false;
-    btn.textContent = '⚔️ Создать сессию';
+function coopCreateSession() {
+  if (!tg || !tg.sendData) { showToast('Только в Telegram', '⚠️'); return; }
+  const bossEl = document.getElementById('coop-boss-sel');
+  const distEl = document.getElementById('coop-dist-sel');
+  const bossId = bossEl ? bossEl.value : 'kosoy';
+  const locId  = distEl ? distEl.value : 'market';
+  const inviteUids = Array.from(_coopInviteSet);
+  if (inviteUids.length === 0 && DATA.gang.length > 0) {
+    showToast('Выбери хотя бы одного союзника!', '⚠️'); return;
   }
+  tg.sendData(JSON.stringify({
+    a:           'coop_create_hub',
+    boss_id:     bossId,
+    loc_id:      locId,
+    invite_uids: inviteUids,
+  }));
 }
 
 // ── JOIN SESSION ──────────────────────────────────────────────────────
