@@ -2529,15 +2529,15 @@ function renderCoopLobby() {
       const chk = `<input type="checkbox" id="inv_${m.uid}" style="accent-color:var(--gold);width:18px;height:18px;flex-shrink:0"
         onchange="if(this.checked)_coopInviteSet.add('${m.uid}');else _coopInviteSet.delete('${m.uid}')">`;
       row.innerHTML = `${chk}
-        <div class="coop-member-avatar">${m.emoji || '🔫'}</div>
+        <div class="coop-member-avatar">${m.emoji || '👤'}</div>
         <div class="coop-member-info">
-          <div class="coop-member-name">${m.name || 'Бандит'}</div>
-          <div class="coop-member-role">${m.role || 'mercenary'}</div>
+          <div class="coop-member-name">${m.name || 'Игрок'}</div>
+          <div class="coop-member-role" style="color:var(--gold);font-size:11px">👥 Игрок банды</div>
         </div>`;
       listEl.appendChild(row);
     });
   } else {
-    listEl.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 4px">Нет членов банды. Набери банду в боте!</div>';
+    listEl.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 4px">Нет игроков в банде. Пригласи друзей через реф-ссылку в боте!</div>';
   }
 }
 
