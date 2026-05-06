@@ -473,6 +473,338 @@ body {
   width: 100%;
   max-width: 280px;
 }
+
+/* ── IMPROVED DISTRICT LIST ── */
+.district-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.district-card:active { transform: scale(0.98); }
+.district-card.locked { opacity: 0.4; pointer-events: none; }
+.district-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+.district-card.locked::before { background: linear-gradient(90deg, transparent, #444, transparent); }
+.district-icon { font-size: 34px; flex-shrink: 0; }
+.district-info { flex: 1; min-width: 0; }
+.district-name { font-size: 15px; font-weight: 800; color: var(--text); }
+.district-desc { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+.district-meta { display: flex; gap: 8px; margin-top: 5px; flex-wrap: wrap; }
+.district-tag {
+  font-size: 10px; padding: 2px 7px; border-radius: 8px;
+  background: #1a1a30; border: 1px solid #333; color: var(--muted);
+  font-weight: 600;
+}
+.district-tag.unlocked { color: #4caf50; border-color: #4caf5044; background: #4caf5011; }
+.district-tag.locked-tag { color: #c0392b; border-color: #c0392b44; background: #c0392b11; }
+.district-arrow { font-size: 18px; color: var(--gold); flex-shrink: 0; }
+
+/* ── DISTRICT DETAIL PAGE ── */
+.dist-hero {
+  background: linear-gradient(135deg, #0d0d20, #12122a);
+  border-bottom: 1px solid var(--border);
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.dist-hero-icon { font-size: 48px; }
+.dist-hero-info { flex: 1; }
+.dist-hero-name { font-size: 18px; font-weight: 900; color: var(--gold); }
+.dist-hero-desc { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+.dist-session-hp {
+  padding: 10px 16px;
+  background: #0a0a18;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dist-hp-label { font-size: 12px; color: var(--muted); flex-shrink: 0; }
+.dist-hp-bar-bg {
+  flex: 1;
+  height: 8px;
+  background: #1a1a2e;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.dist-hp-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #e74c3c, #c0392b);
+  transition: width .4s ease;
+}
+.dist-hp-val { font-size: 12px; color: #e74c3c; font-weight: 700; flex-shrink: 0; }
+
+.gather-section {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.gather-btn {
+  width: 100%;
+  padding: 11px;
+  background: linear-gradient(135deg, #1a2e1a, #0f1f0f);
+  border: 1.5px solid #4caf5066;
+  color: #4caf50;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: center;
+}
+.gather-btn:active { transform: scale(0.98); }
+.gather-btn.on-cd {
+  background: #0f0f1e;
+  border-color: #333;
+  color: var(--muted);
+  cursor: default;
+}
+.gather-cd-text { font-size: 11px; color: var(--muted); text-align: center; margin-top: 4px; }
+
+.bosses-section { padding: 8px 16px 16px; }
+.bosses-label {
+  font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--muted); font-weight: 700; padding: 8px 0;
+}
+.boss-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  overflow: hidden;
+}
+.boss-card::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: var(--red);
+}
+.boss-icon { font-size: 26px; flex-shrink: 0; }
+.boss-info { flex: 1; min-width: 0; }
+.boss-name { font-size: 14px; font-weight: 800; color: var(--text); }
+.boss-title { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.boss-stats { display: flex; gap: 8px; margin-top: 5px; flex-wrap: wrap; }
+.boss-stat {
+  font-size: 11px; color: var(--muted);
+  background: #1a1a2e; padding: 2px 7px; border-radius: 6px;
+}
+.boss-rewards { display: flex; gap: 6px; margin-top: 4px; }
+.boss-reward { font-size: 11px; color: var(--gold); font-weight: 600; }
+.boss-fight-btn {
+  background: linear-gradient(135deg, var(--red), #8b1a1a);
+  color: #fff;
+  border: none;
+  padding: 9px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.boss-fight-btn:active { transform: scale(0.94); }
+.boss-fight-btn:disabled {
+  background: #333; color: #555; cursor: default; transform: none;
+}
+
+/* ── BATTLE SCREEN ── */
+.battle-screen {
+  min-height: 100vh;
+  background: #060610;
+  display: flex;
+  flex-direction: column;
+}
+.battle-header {
+  padding: 10px 16px;
+  background: #0a0a18;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--gold);
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 1px;
+}
+.battle-fighters {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 16px;
+  background: linear-gradient(180deg, #0a0a18 0%, #060610 100%);
+}
+.fighter-side {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.fighter-icon { font-size: 42px; line-height: 1; }
+.fighter-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  text-align: center;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fighter-hp-wrap { width: 100%; }
+.fighter-hp-bar-bg {
+  height: 8px;
+  background: #1a1a2e;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 3px;
+}
+.fighter-hp-bar { height: 100%; border-radius: 4px; transition: width .3s ease; }
+.fighter-hp-bar.player { background: linear-gradient(90deg, #27ae60, #2ecc71); }
+.fighter-hp-bar.boss   { background: linear-gradient(90deg, #c0392b, #e74c3c); }
+.fighter-hp-text { font-size: 11px; color: var(--muted); text-align: center; }
+.vs-divider {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--gold);
+  padding-top: 20px;
+}
+.battle-log-wrap {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 16px;
+  min-height: 160px;
+  max-height: 220px;
+  background: #080814;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.battle-log-entry {
+  font-size: 13px;
+  color: #ccc;
+  padding: 3px 0;
+  line-height: 1.4;
+  animation: fadeInLog .3s ease;
+}
+.battle-log-entry.player-hit { color: #3498db; }
+.battle-log-entry.boss-hit   { color: #e74c3c; }
+.battle-log-entry.system     { color: var(--gold); font-weight: 700; }
+@keyframes fadeInLog { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+.battle-actions {
+  padding: 14px 16px;
+  display: flex;
+  gap: 10px;
+}
+.battle-attack-btn {
+  flex: 2;
+  padding: 14px;
+  background: linear-gradient(135deg, var(--red), #8b1a1a);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+}
+.battle-attack-btn:active { transform: scale(0.97); }
+.battle-attack-btn:disabled { background: #2a2a3a; color: #444; cursor: default; }
+.battle-flee-btn {
+  flex: 1;
+  padding: 14px;
+  background: #1a1a2e;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  cursor: pointer;
+}
+.battle-flee-btn:active { transform: scale(0.97); }
+.battle-flee-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* Battle result overlay */
+.battle-result-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.85);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  gap: 12px;
+  padding: 24px;
+}
+.battle-result-icon { font-size: 64px; animation: popIn .4s cubic-bezier(.34,1.56,.64,1) both; }
+.battle-result-title {
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  animation: popIn .4s .1s cubic-bezier(.34,1.56,.64,1) both;
+}
+.battle-result-title.win  { color: var(--gold); }
+.battle-result-title.lose { color: var(--red); }
+.battle-result-rewards {
+  display: flex; gap: 14px; margin-top: 4px;
+  animation: popIn .4s .2s cubic-bezier(.34,1.56,.64,1) both;
+}
+.battle-reward-chip {
+  background: #1a1a2e;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px 16px;
+  text-align: center;
+}
+.battle-reward-chip .rval { font-size: 18px; font-weight: 900; color: var(--gold); display: block; }
+.battle-reward-chip .rlbl { font-size: 11px; color: var(--muted); }
+.battle-result-btn {
+  margin-top: 8px;
+  padding: 14px 40px;
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  color: #111;
+  font-size: 16px;
+  font-weight: 900;
+  border: none;
+  border-radius: 24px;
+  cursor: pointer;
+  animation: popIn .4s .3s cubic-bezier(.34,1.56,.64,1) both;
+  letter-spacing: 0.5px;
+}
+.battle-result-btn:active { transform: scale(0.96); }
+.battle-result-btn.exit-btn-r {
+  background: #1a1a2e;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 14px;
+  padding: 12px 32px;
+}
+@keyframes popIn { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: scale(1); } }
+
+/* hit flash */
+.flash-red   { animation: flashRed   .25s ease; }
+.flash-blue  { animation: flashBlue  .25s ease; }
+@keyframes flashRed  { 0%,100%{background:transparent} 50%{background:#c0392b33} }
+@keyframes flashBlue { 0%,100%{background:transparent} 50%{background:#3498db33} }
 </style>
 </head>
 <body>
@@ -579,13 +911,83 @@ body {
 
 </div><!-- #page-main -->
 
-<!-- ══ SUB-PAGE: РАЙОНЫ ══ -->
+<!-- ══ SUB-PAGE: РАЙОНЫ (список) ══ -->
 <div id="page-explore" class="subpage" style="display:none">
   <div class="subpage-header">
     <button class="back-btn" onclick="goBack()">← Назад</button>
     <div class="subpage-title">🗺️ Районы</div>
   </div>
-  <div class="district-list" id="district-list"></div>
+  <div style="padding:12px 14px;display:flex;flex-direction:column;gap:10px" id="district-list"></div>
+</div>
+
+<!-- ══ SUB-PAGE: ДЕТАЛИ РАЙОНА ══ -->
+<div id="page-district" class="subpage" style="display:none">
+  <div class="subpage-header">
+    <button class="back-btn" onclick="navDistrict('back')">← Районы</button>
+    <div class="subpage-title" id="district-page-title">Район</div>
+  </div>
+  <!-- District hero -->
+  <div class="dist-hero">
+    <div class="dist-hero-icon" id="dist-icon">🏪</div>
+    <div class="dist-hero-info">
+      <div class="dist-hero-name" id="dist-name">Рынок</div>
+      <div class="dist-hero-desc" id="dist-desc">Описание района</div>
+    </div>
+  </div>
+  <!-- Session HP bar -->
+  <div class="dist-session-hp">
+    <div class="dist-hp-label">❤️ Здоровье</div>
+    <div class="dist-hp-bar-bg"><div class="dist-hp-bar-fill" id="dist-hp-bar" style="width:100%"></div></div>
+    <div class="dist-hp-val" id="dist-hp-val">100/100</div>
+  </div>
+  <!-- Gather action -->
+  <div class="gather-section">
+    <button class="gather-btn" id="gather-btn" onclick="doGather()">🍺 Собрать</button>
+    <div class="gather-cd-text" id="gather-cd-text"></div>
+  </div>
+  <!-- Boss list -->
+  <div class="bosses-section">
+    <div class="bosses-label">⚔️ Враги</div>
+    <div id="boss-list"></div>
+  </div>
+</div>
+
+<!-- ══ SUB-PAGE: БИТВА ══ -->
+<div id="page-battle" class="subpage" style="display:none">
+  <div class="battle-screen" id="battle-screen">
+    <div class="battle-header" id="battle-loc-name">Битва</div>
+    <!-- Fighters -->
+    <div class="battle-fighters">
+      <div class="fighter-side" id="battle-player-side">
+        <div class="fighter-icon">🤵</div>
+        <div class="fighter-name" id="b-player-name">Игрок</div>
+        <div class="fighter-hp-wrap">
+          <div class="fighter-hp-bar-bg"><div class="fighter-hp-bar player" id="b-player-bar" style="width:100%"></div></div>
+          <div class="fighter-hp-text" id="b-player-hp">100/100</div>
+        </div>
+      </div>
+      <div class="vs-divider">⚔️</div>
+      <div class="fighter-side" id="battle-boss-side">
+        <div class="fighter-icon" id="b-boss-icon">😈</div>
+        <div class="fighter-name" id="b-boss-name">Босс</div>
+        <div class="fighter-hp-wrap">
+          <div class="fighter-hp-bar-bg"><div class="fighter-hp-bar boss" id="b-boss-bar" style="width:100%"></div></div>
+          <div class="fighter-hp-text" id="b-boss-hp">150/150</div>
+        </div>
+      </div>
+    </div>
+    <!-- Boss quote -->
+    <div style="padding:6px 16px;font-size:12px;color:var(--muted);font-style:italic;text-align:center" id="b-boss-quote">"..."</div>
+    <!-- Battle log -->
+    <div class="battle-log-wrap" id="battle-log"></div>
+    <!-- Actions -->
+    <div class="battle-actions">
+      <button class="battle-attack-btn" id="battle-atk-btn" onclick="playerAttack()">🔫 Атаковать</button>
+      <button class="battle-flee-btn" id="battle-flee-btn" onclick="fleeBattle()">🏃 Бежать</button>
+    </div>
+  </div>
+  <!-- Result overlay (hidden by default) -->
+  <div class="battle-result-overlay" id="battle-result" style="display:none"></div>
 </div>
 
 <!-- ══ SUB-PAGE: ДОСЬЕ ══ -->
@@ -662,6 +1064,8 @@ const DATA = {
   hair:    pi('hair', 0),
   hat:     pi('hat', 0),
   hasLook: pi('has_look', 0),
+  atk:     pi('atk', 20),
+  def:     pi('def', 10),
 };
 
 // ── Class definitions ─────────────────────────────────────────────────
@@ -730,7 +1134,7 @@ function fmtNum(n) {
 }
 
 // ── SPA Navigation ────────────────────────────────────────────────────
-const CLIENT_PAGES = ['explore', 'character'];
+const CLIENT_PAGES = ['explore', 'district', 'battle', 'character'];
 const BOT_PAGES = {
   inventory:   { title: '🎒 Барахло',        icon: '🎒' },
   shop:        { title: '🏪 Чёрный рынок',   icon: '🏪' },
@@ -768,6 +1172,17 @@ function nav(dest) {
 }
 
 function goBack() {
+  // Если в бою — вернуться к деталям района
+  if (document.getElementById('page-battle').style.display !== 'none') {
+    if (battleState) afterBattle(false);
+    return;
+  }
+  // Если в деталях района — вернуться к списку
+  if (document.getElementById('page-district').style.display !== 'none') {
+    navDistrict('back');
+    return;
+  }
+  // Иначе — на главную
   document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
   document.getElementById('page-main').style.display = '';
   window.scrollTo(0, 0);
@@ -781,41 +1196,447 @@ function openInBot() {
   }
 }
 
-// ── Render: Районы ────────────────────────────────────────────────────
-const DISTRICTS = [
-  { id:'market',  icon:'🏪', name:'Рынок',            desc:'Шумный базар, где всё продаётся. Мелкая шпана трётся у ларьков.',          minLvl:1  },
-  { id:'port',    icon:'⚓', name:'Порт',              desc:'Запах рыбы и солярки. Здесь разгружают не только рыбу.',                   minLvl:5  },
-  { id:'casino',  icon:'🎰', name:'Казино',            desc:'Блестящие огни и крупные ставки. За каждым столом — история с кровью.',    minLvl:10 },
-  { id:'factory', icon:'🏭', name:'Промзона',          desc:'Заброшенные цеха. Сюда не возвращаются.',                                  minLvl:15 },
-  { id:'mansion', icon:'🏛️', name:'Резиденция Дона',  desc:'Роскошный особняк. Только лучшие попадают сюда... живыми.',               minLvl:20 },
-];
+// ══════════════════════════════════════════════════════════════════════
+//  DISTRICTS SYSTEM — полная система районов внутри мини-приложения
+// ══════════════════════════════════════════════════════════════════════
 
+// Данные совпадают с BOSSES / LOCATIONS / GATHER_ACTIONS в боте
+const BOSS_DATA = {
+  kosoy:     {name:'😈 Косой',    title:'Мелкий воришка',        hp:150, atk:28, def:10, exp:22,  cash:80,  quote:'Да я тебя знаешь как...'},
+  bychok:    {name:'🐂 Бычок',    title:'Рыночный рэкетир',      hp:200, atk:34, def:15, exp:30,  cash:110, quote:'Чё уставился, баран?'},
+  zhigan:    {name:'🪒 Жиган',    title:'Карманник со стажем',   hp:338, atk:55, def:26, exp:52,  cash:169, quote:'Лоха видно за версту.'},
+  shustryy:  {name:'🏃 Шустрый',  title:'Карманник-скороход',    hp:300, atk:48, def:22, exp:45,  cash:160, quote:'Догони — тогда поговорим.'},
+  tolsty:    {name:'🐷 Толстый',  title:'Смотрящий за портом',   hp:380, atk:55, def:30, exp:65,  cash:250, quote:'Всё через меня. Всё.'},
+  kaban:     {name:'🦏 Кабан',    title:'Бригадир докеров',      hp:440, atk:52, def:36, exp:75,  cash:280, quote:'Молчи и работай.'},
+  bukhgalter:{name:'🧮 Бухгалтер',title:'Финансист группировки', hp:360, atk:65, def:28, exp:80,  cash:350, quote:'Деньги счёт любят.'},
+  kontrabas: {name:'📦 Контрабас', title:'Портовый контрабандист',hp:420, atk:60, def:32, exp:70,  cash:300, quote:'Таможня? Не слышал.'},
+  legenda:   {name:'👑 Легенда',  title:'Живая икона криминала', hp:520, atk:78, def:42, exp:100, cash:450, quote:'Меня знают все. Все боятся.'},
+  professor: {name:'🎓 Профессор',title:'Мастер схем и афер',    hp:460, atk:82, def:35, exp:110, cash:500, quote:'Ты просто пешка в моей игре.'},
+  artist:    {name:'🎭 Артист',   title:'Мошенник высшей пробы', hp:500, atk:88, def:38, exp:120, cash:480, quote:'Жизнь — театр. А ты — массовка.'},
+  svalshchik:{name:'♟️ Сдатчик',  title:'Предатель с опытом',    hp:480, atk:72, def:30, exp:90,  cash:400, quote:'Деловой разговор. Ничего личного.'},
+  buryy:     {name:'🐻 Бурый',    title:'Авторитет старой закалки',hp:680,atk:96, def:50, exp:145, cash:650, quote:'Я тут раньше тебя, щенок.'},
+  khirurg:   {name:'🩺 Хирург',   title:'Чистильщик группировки',hp:620, atk:105,def:48, exp:155, cash:700, quote:'Больно не будет. Обещаю.'},
+  tigr:      {name:'🐯 Тигр',     title:'Наёмный убийца',        hp:750, atk:100,def:55, exp:165, cash:720, quote:'Я не промахиваюсь.'},
+  palach:    {name:'🪓 Палач',     title:'Исполнитель приговоров',hp:700, atk:98, def:52, exp:150, cash:680, quote:'Тебя сюда никто не звал.'},
+  sedoy:     {name:'👴 Седой',    title:'Серый кардинал',        hp:920, atk:120,def:65, exp:210, cash:950, quote:'Я видел, как рушились империи.'},
+  prizrak:   {name:'👻 Призрак',  title:'Невидимка преступного мира',hp:860,atk:135,def:60,exp:230,cash:1000,quote:'Меня нет. Я везде.'},
+  don_karlo: {name:'🤵 Дон Карло',title:'Крёстный отец',         hp:1400,atk:155,def:90, exp:420, cash:2000,quote:'Сделаю предложение, от которого не откажешься.'},
+  vizir:     {name:'🎯 Визирь',   title:'Правая рука Дона',      hp:1050,atk:140,def:78, exp:300, cash:1500,quote:'Дон знает о твоём визите.'},
+};
+
+const LOC_DATA = {
+  market:  {icon:'🏪', name:'Рынок',           minLvl:1,  bosses:['kosoy','bychok','shustryy','zhigan'],
+            gatherBtn:'🍺 Собрать бутылки',   cdKey:'gather_market',  cdMs:3600000, cashMin:1,   cashMax:5,   perLvl:0.5},
+  port:    {icon:'⚓', name:'Порт',             minLvl:5,  bosses:['tolsty','kaban','kontrabas','bukhgalter'],
+            gatherBtn:'🐟 Разгрузить улов',   cdKey:'gather_port',    cdMs:3600000, cashMin:20,  cashMax:60,  perLvl:3},
+  casino:  {icon:'🎰', name:'Казино',           minLvl:10, bosses:['legenda','professor','svalshchik','artist'],
+            gatherBtn:'🃏 Срубить по-лёгкому',cdKey:'gather_casino',  cdMs:3600000, cashMin:60,  cashMax:150, perLvl:8},
+  factory: {icon:'🏭', name:'Промзона',         minLvl:15, bosses:['buryy','khirurg','palach','tigr'],
+            gatherBtn:'🔧 Сдать металлолом',  cdKey:'gather_factory', cdMs:3600000, cashMin:100, cashMax:250, perLvl:12},
+  mansion: {icon:'🏛️', name:'Резиденция Дона', minLvl:20, bosses:['sedoy','prizrak','vizir','don_karlo'],
+            gatherBtn:'💍 Стрясти должок',    cdKey:'gather_mansion', cdMs:3600000, cashMin:250, cashMax:500, perLvl:20},
+};
+
+// ── SESSION STATE — накапливаем результаты между боями ────────────────
+const session = {
+  hp:        DATA.hp,
+  mp:        DATA.mp,
+  wins:      [],    // [{boss_id, loc_id, exp, cash}]
+  gathers:   [],    // [{loc_id, cash}]
+  dirty:     false, // есть несохранённые результаты
+};
+
+let currentLocId  = null;  // текущий открытый район
+let battleState   = null;  // состояние текущего боя
+
+// ── COMBAT ENGINE ────────────────────────────────────────────────────
+function calcDmg(atk, def) {
+  const base = Math.max(1, atk - Math.floor(def / 2));
+  return Math.max(1, Math.round(base * (0.85 + Math.random() * 0.30)));
+}
+
+// ── RENDER: СПИСОК РАЙОНОВ ────────────────────────────────────────────
 function renderDistricts() {
   const list = document.getElementById('district-list');
   list.innerHTML = '';
-  DISTRICTS.forEach(d => {
+  Object.entries(LOC_DATA).forEach(([id, d]) => {
     const unlocked = DATA.level >= d.minLvl;
     const card = document.createElement('div');
     card.className = 'district-card' + (unlocked ? '' : ' locked');
+    if (unlocked) card.onclick = () => openDistrict(id);
     card.innerHTML = `
       <div class="district-icon">${d.icon}</div>
       <div class="district-info">
         <div class="district-name">${d.name}</div>
-        <div class="district-desc">${d.desc}</div>
-        <div class="district-level">${unlocked ? '✅ Доступен' : '🔒 Ранг ' + d.minLvl}</div>
+        <div class="district-desc">${LOC_DATA[id].bosses.length} врага · ${d.bosses.length} бандита</div>
+        <div class="district-meta">
+          ${unlocked
+            ? `<span class="district-tag unlocked">✅ Доступен</span>`
+            : `<span class="district-tag locked-tag">🔒 Ранг ${d.minLvl}</span>`}
+          <span class="district-tag">⚔️ ${d.bosses.length} врага</span>
+          <span class="district-tag">💵 до ${d.cashMax}$</span>
+        </div>
       </div>
-      ${unlocked
-        ? `<button class="district-btn" onclick="fightDistrict('${d.id}')">⚔️ Бой</button>`
-        : `<div class="district-lock">🔒</div>`}
+      <div class="district-arrow">${unlocked ? '›' : '🔒'}</div>
     `;
     list.appendChild(card);
   });
 }
 
-function fightDistrict(districtId) {
-  if (tg && tg.sendData) {
-    tg.sendData(JSON.stringify({ a: 'hub_nav', to: 'explore', district: districtId }));
+// ── ОТКРЫТЬ СТРАНИЦУ РАЙОНА ──────────────────────────────────────────
+function openDistrict(locId) {
+  currentLocId = locId;
+  const loc = LOC_DATA[locId];
+  // Заголовок
+  document.getElementById('district-page-title').textContent = loc.icon + ' ' + loc.name;
+  document.getElementById('dist-icon').textContent  = loc.icon;
+  document.getElementById('dist-name').textContent  = loc.name;
+  document.getElementById('dist-desc').textContent  = getLocDesc(locId);
+  // Session HP
+  updateDistHPBar();
+  // Gather button
+  renderGatherBtn(locId);
+  // Boss list
+  renderBossList(locId);
+  // Show page
+  document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
+  document.getElementById('page-district').style.display = '';
+  if (tg && tg.BackButton) {
+    tg.BackButton.onClick(() => navDistrict('back'));
+    tg.BackButton.show();
   }
+  window.scrollTo(0, 0);
+}
+
+function getLocDesc(id) {
+  const descs = {
+    market:  'Шумный базар, где всё продаётся. Мелкая шпана трётся у ларьков.',
+    port:    'Запах рыбы и солярки. Здесь разгружают не только рыбу.',
+    casino:  'Блестящие огни и крупные ставки. За каждым столом — история с кровью.',
+    factory: 'Заброшенные цеха. Туда не возвращаются.',
+    mansion: 'Роскошный особняк. Только лучшие попадают сюда... живыми.',
+  };
+  return descs[id] || '';
+}
+
+function updateDistHPBar() {
+  const pct = Math.max(0, Math.min(100, (session.hp / DATA.maxhp) * 100));
+  document.getElementById('dist-hp-bar').style.width = pct + '%';
+  document.getElementById('dist-hp-val').textContent = session.hp + ' / ' + DATA.maxhp;
+}
+
+// ── GATHER ACTION ────────────────────────────────────────────────────
+function renderGatherBtn(locId) {
+  const loc = LOC_DATA[locId];
+  const btn = document.getElementById('gather-btn');
+  const cdTxt = document.getElementById('gather-cd-text');
+  let lastTs = 0;
+  try { lastTs = parseInt(localStorage.getItem(loc.cdKey) || '0'); } catch(e) {}
+  const now = Date.now();
+  const remaining = lastTs + loc.cdMs - now;
+  if (remaining > 0) {
+    const mins = Math.ceil(remaining / 60000);
+    btn.textContent = loc.gatherBtn + ' (кулдаун)';
+    btn.className = 'gather-btn on-cd';
+    cdTxt.textContent = `Снова через ${mins} мин.`;
+  } else {
+    btn.textContent = loc.gatherBtn;
+    btn.className = 'gather-btn';
+    cdTxt.textContent = '';
+  }
+}
+
+function doGather() {
+  if (!currentLocId) return;
+  const loc = LOC_DATA[currentLocId];
+  let lastTs = 0;
+  try { lastTs = parseInt(localStorage.getItem(loc.cdKey) || '0'); } catch(e) {}
+  if (Date.now() - lastTs < loc.cdMs) { renderGatherBtn(currentLocId); return; }
+  // Compute cash
+  const lvl = DATA.level;
+  const cash = Math.floor(
+    (loc.cashMin + lvl * loc.perLvl * 0.5) +
+    Math.random() * ((loc.cashMax - loc.cashMin) + lvl * loc.perLvl * 0.5)
+  );
+  // Save cooldown
+  try { localStorage.setItem(loc.cdKey, String(Date.now())); } catch(e) {}
+  // Record in session
+  session.gathers.push({loc_id: currentLocId, cash});
+  session.dirty = true;
+  // Show toast
+  showToast(`${loc.gatherBtn} · +${cash}$`, '💰');
+  renderGatherBtn(currentLocId);
+}
+
+// ── BOSS LIST ────────────────────────────────────────────────────────
+function renderBossList(locId) {
+  const list = document.getElementById('boss-list');
+  list.innerHTML = '';
+  LOC_DATA[locId].bosses.forEach(bossId => {
+    const b = BOSS_DATA[bossId];
+    if (!b) return;
+    const canFight = session.hp >= 10;  // нельзя воевать при <10 HP
+    const card = document.createElement('div');
+    card.className = 'boss-card';
+    const cashRange = Math.round(b.cash * 1.33);
+    card.innerHTML = `
+      <div class="boss-icon">${b.name.match(/^./u)[0]}</div>
+      <div class="boss-info">
+        <div class="boss-name">${b.name}</div>
+        <div class="boss-title">${b.title}</div>
+        <div class="boss-stats">
+          <span class="boss-stat">❤️ ${b.hp}</span>
+          <span class="boss-stat">⚔️ ${b.atk}</span>
+          <span class="boss-stat">🛡 ${b.def}</span>
+        </div>
+        <div class="boss-rewards">
+          <span class="boss-reward">+${b.exp} опыта</span>
+          <span class="boss-reward">+${b.cash}-${cashRange}$</span>
+        </div>
+      </div>
+      <button class="boss-fight-btn" ${canFight ? '' : 'disabled'}
+              onclick="startBattle('${bossId}','${locId}')">
+        ${canFight ? '⚔️ Бой' : '💀 HP'}
+      </button>
+    `;
+    list.appendChild(card);
+  });
+}
+
+function navDistrict(dir) {
+  if (dir === 'back') {
+    // Вернуться к списку районов
+    document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
+    document.getElementById('page-explore').style.display = '';
+    if (tg && tg.BackButton) {
+      tg.BackButton.onClick(goBack);
+      tg.BackButton.show();
+    }
+    // Если есть несохранённые результаты — сохранить и закрыть
+    if (session.dirty) {
+      commitSession();
+    }
+  }
+}
+
+// ── COMMIT SESSION → отправить в бот (закрывает мини-приложение) ────
+function commitSession() {
+  if (!session.dirty) return;
+  const payload = {
+    a:         'hub_battles',
+    wins:      session.wins,
+    gathers:   session.gathers,
+    final_hp:  session.hp,
+    final_mp:  session.mp,
+  };
+  if (tg && typeof tg.sendData === 'function') {
+    tg.sendData(JSON.stringify(payload));
+  }
+}
+
+// ── BATTLE SYSTEM ────────────────────────────────────────────────────
+function startBattle(bossId, locId) {
+  const boss = BOSS_DATA[bossId];
+  if (!boss) return;
+
+  battleState = {
+    bossId,
+    locId,
+    bossHp:    boss.hp,
+    bossMaxHp: boss.hp,
+    playerHp:  session.hp,
+    playerMaxHp: DATA.maxhp,
+    playerAtk: DATA.atk,
+    playerDef: DATA.def,
+    running:   true,
+  };
+
+  // Fill UI
+  document.getElementById('battle-loc-name').textContent =
+    LOC_DATA[locId].icon + ' ' + LOC_DATA[locId].name + ' — Бой!';
+  document.getElementById('b-player-name').textContent = DATA.name;
+  document.getElementById('b-player-hp').textContent   = session.hp + '/' + DATA.maxhp;
+  document.getElementById('b-player-bar').style.width  = (session.hp / DATA.maxhp * 100).toFixed(1) + '%';
+  document.getElementById('b-boss-icon').textContent   = boss.name.match(/^./u)[0];
+  document.getElementById('b-boss-name').textContent   = boss.name.slice(2);
+  document.getElementById('b-boss-hp').textContent     = boss.hp + '/' + boss.hp;
+  document.getElementById('b-boss-bar').style.width    = '100%';
+  document.getElementById('b-boss-quote').textContent  = '«' + boss.quote + '»';
+  document.getElementById('battle-log').innerHTML      = '';
+  document.getElementById('battle-result').style.display = 'none';
+  document.getElementById('battle-atk-btn').disabled  = false;
+  document.getElementById('battle-flee-btn').disabled = false;
+
+  addBattleLog(`Встречаешь ${boss.name}! Бой начинается...`, 'system');
+
+  // Show battle page
+  document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
+  document.getElementById('page-battle').style.display = '';
+  if (tg && tg.BackButton) tg.BackButton.hide();
+  window.scrollTo(0, 0);
+}
+
+function addBattleLog(text, type='') {
+  const log = document.getElementById('battle-log');
+  const el = document.createElement('div');
+  el.className = 'battle-log-entry ' + type;
+  el.textContent = text;
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+}
+
+function updateBattleUI() {
+  const bs = battleState;
+  // Player
+  const pPct = Math.max(0, bs.playerHp / bs.playerMaxHp * 100);
+  document.getElementById('b-player-hp').textContent  = bs.playerHp + '/' + bs.playerMaxHp;
+  document.getElementById('b-player-bar').style.width = pPct.toFixed(1) + '%';
+  // Boss
+  const bPct = Math.max(0, bs.bossHp / bs.bossMaxHp * 100);
+  document.getElementById('b-boss-hp').textContent  = bs.bossHp + '/' + bs.bossMaxHp;
+  document.getElementById('b-boss-bar').style.width = bPct.toFixed(1) + '%';
+}
+
+function playerAttack() {
+  if (!battleState || !battleState.running) return;
+  document.getElementById('battle-atk-btn').disabled  = true;
+  document.getElementById('battle-flee-btn').disabled = true;
+
+  // Player hits boss
+  const pdmg = calcDmg(battleState.playerAtk, battleState.bossHp > 0 ? BOSS_DATA[battleState.bossId].def : 0);
+  battleState.bossHp = Math.max(0, battleState.bossHp - pdmg);
+  addBattleLog(`💥 Ты бьёшь — ${pdmg} урона!`, 'player-hit');
+
+  // Flash boss
+  const bossEl = document.getElementById('battle-boss-side');
+  bossEl.classList.remove('flash-red');
+  void bossEl.offsetWidth;
+  bossEl.classList.add('flash-red');
+
+  updateBattleUI();
+
+  // Check win
+  if (battleState.bossHp <= 0) {
+    setTimeout(handleWin, 400);
+    return;
+  }
+
+  // Boss counterattacks after 500ms
+  setTimeout(() => {
+    const boss = BOSS_DATA[battleState.bossId];
+    const bdmg = calcDmg(boss.atk, battleState.playerAtk > 0 ? battleState.playerAtk / 3 : 0);
+    battleState.playerHp = Math.max(0, battleState.playerHp - bdmg);
+    addBattleLog(`⚠️ ${boss.name} бьёт в ответ — ${bdmg} урона!`, 'boss-hit');
+
+    // Flash player
+    const pEl = document.getElementById('battle-player-side');
+    pEl.classList.remove('flash-blue');
+    void pEl.offsetWidth;
+    pEl.classList.add('flash-blue');
+
+    updateBattleUI();
+
+    // Check lose
+    if (battleState.playerHp <= 0) {
+      setTimeout(handleLose, 400);
+      return;
+    }
+
+    // Enable buttons again
+    document.getElementById('battle-atk-btn').disabled  = false;
+    document.getElementById('battle-flee-btn').disabled = false;
+  }, 500);
+}
+
+function handleWin() {
+  if (!battleState) return;
+  battleState.running = false;
+  const boss  = BOSS_DATA[battleState.bossId];
+  const exp   = boss.exp;
+  const cash  = boss.cash + Math.floor(Math.random() * Math.round(boss.cash / 3));
+
+  // Update session
+  session.hp   = battleState.playerHp;
+  session.wins.push({boss_id: battleState.bossId, loc_id: battleState.locId, exp, cash});
+  session.dirty = true;
+
+  addBattleLog(`🏆 Победа! +${exp} опыта, +${cash}$`, 'system');
+
+  // Show result overlay
+  const ov = document.getElementById('battle-result');
+  ov.innerHTML = `
+    <div class="battle-result-icon">🏆</div>
+    <div class="battle-result-title win">ПОБЕДА!</div>
+    <div class="battle-result-rewards">
+      <div class="battle-reward-chip"><span class="rval">+${exp}</span><span class="rlbl">Опыт</span></div>
+      <div class="battle-reward-chip"><span class="rval">+${cash}$</span><span class="rlbl">Наличные</span></div>
+    </div>
+    <div style="margin-top:8px;font-size:12px;color:var(--muted)">HP осталось: ${session.hp}/${DATA.maxhp}</div>
+    <button class="battle-result-btn" onclick="afterBattle(true)">⚔️ Продолжить</button>
+    <button class="battle-result-btn exit-btn-r" onclick="afterBattle(false)">← Выйти из района</button>
+  `;
+  ov.style.display = 'flex';
+}
+
+function handleLose() {
+  if (!battleState) return;
+  battleState.running = false;
+  session.hp = 1;  // минимум 1 HP
+
+  addBattleLog('💀 Ты пал в бою...', 'system');
+
+  const ov = document.getElementById('battle-result');
+  ov.innerHTML = `
+    <div class="battle-result-icon">💀</div>
+    <div class="battle-result-title lose">ПОРАЖЕНИЕ</div>
+    <div style="color:var(--muted);font-size:13px;margin-top:4px">Ты чудом выжил. Зализывай раны.</div>
+    <button class="battle-result-btn" style="margin-top:16px" onclick="afterBattle(false)">← Уйти</button>
+  `;
+  ov.style.display = 'flex';
+}
+
+function fleeBattle() {
+  if (!battleState || !battleState.running) return;
+  battleState.running = false;
+  addBattleLog('🏃 Ты сбежал с поля боя.', 'system');
+  afterBattle(false);
+}
+
+function afterBattle(stayInDistrict) {
+  document.getElementById('battle-result').style.display = 'none';
+  if (stayInDistrict && session.hp >= 10) {
+    openDistrict(battleState.locId);  // вернуться к списку боссов
+  } else {
+    // Вернуться к списку районов и закоммитить
+    document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
+    document.getElementById('page-explore').style.display = '';
+    renderDistricts();
+    if (session.dirty) commitSession();
+  }
+}
+
+// ── TOAST NOTIFICATION ───────────────────────────────────────────────
+function showToast(msg, icon='✅') {
+  let t = document.getElementById('toast-msg');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'toast-msg';
+    Object.assign(t.style, {
+      position:'fixed', bottom:'80px', left:'50%', transform:'translateX(-50%)',
+      background:'#1a1a2e', border:'1px solid var(--border)', borderRadius:'24px',
+      padding:'10px 20px', fontSize:'14px', color:'#eee', fontWeight:'700',
+      zIndex:'9999', display:'none', whiteSpace:'nowrap', boxShadow:'0 4px 20px #000a'
+    });
+    document.body.appendChild(t);
+  }
+  t.textContent = icon + ' ' + msg;
+  t.style.display = 'block';
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => {
+    t.style.opacity = '0';
+    setTimeout(() => { t.style.display = 'none'; }, 300);
+  }, 2500);
 }
 
 // ── Render: Досье ─────────────────────────────────────────────────────
