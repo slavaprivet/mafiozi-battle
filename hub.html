@@ -741,34 +741,41 @@ const BOT_PAGES = {
 };
 let pendingBotDest = null;
 
+// Сохраняем полный URL хаба — creator.html вернётся сюда
+try { localStorage.setItem('hubUrl', location.href); } catch(e) {}
+
 function nav(dest) {
-  // Hide main
   document.getElementById('page-main').style.display = 'none';
-  // Hide all subpages
   document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
 
   if (CLIENT_PAGES.includes(dest)) {
-    // Render client-side page
     if (dest === 'explore') renderDistricts();
     if (dest === 'character') renderCharacter();
     document.getElementById('page-' + dest).style.display = '';
   } else if (BOT_PAGES[dest]) {
-    // Show "open in bot" page
     pendingBotDest = dest;
     document.getElementById('bot-page-title').textContent = BOT_PAGES[dest].title;
     document.getElementById('bot-page-icon').textContent  = BOT_PAGES[dest].icon;
     document.getElementById('page-bot').style.display = '';
   }
   window.scrollTo(0, 0);
+
+  // Нативная кнопка «Назад» в шапке Telegram
+  if (tg && tg.BackButton) {
+    tg.BackButton.onClick(goBack);
+    tg.BackButton.show();
+  }
 }
 
 function goBack() {
   document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
   document.getElementById('page-main').style.display = '';
   window.scrollTo(0, 0);
+  if (tg && tg.BackButton) tg.BackButton.hide();
 }
 
 function openInBot() {
+  // Открывает раздел в боте через sendData — только по явному нажатию пользователя
   if (tg && tg.sendData) {
     tg.sendData(JSON.stringify({ a: 'hub_nav', to: pendingBotDest }));
   }
