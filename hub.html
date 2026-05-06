@@ -64,6 +64,8 @@ body {
   background: linear-gradient(135deg, var(--bg3) 0%, var(--card) 100%);
   border: 1px solid var(--border);
   border-radius: 18px;
+  cursor: pointer;
+  transition: box-shadow .18s, border-color .18s;
   padding: 14px;
   display: flex;
   gap: 14px;
@@ -250,6 +252,7 @@ body {
 /* Tile color themes */
 .tile-districts { --tc: #e8c96e33; }
 .tile-character { --tc: #3498db33; }
+.tile-coop      { --tc: #e74c3c55; }
 .tile-inventory { --tc: #e67e2233; }
 .tile-shop      { --tc: #9b59b633; }
 .tile-jobs      { --tc: #2ecc7133; }
@@ -260,6 +263,7 @@ body {
 
 .tile-districts::before { background: var(--tc); }
 .tile-character::before { background: var(--tc); }
+.tile-coop::before      { background: var(--tc); }
 .tile-inventory::before { background: var(--tc); }
 .tile-shop::before      { background: var(--tc); }
 .tile-jobs::before      { background: var(--tc); }
@@ -279,6 +283,7 @@ body {
 }
 .tile-districts::after { background: #e8c96e; }
 .tile-character::after { background: #3498db; }
+.tile-coop::after      { background: #ff4444; }
 .tile-inventory::after { background: #e67e22; }
 .tile-shop::after      { background: #9b59b6; }
 .tile-jobs::after      { background: #2ecc71; }
@@ -934,6 +939,120 @@ body {
 }
 .battle-mana-bar { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #1a6ea0,#3498db); transition: width .3s; }
 .battle-mana-text { font-size: 10px; color: #3498db; font-weight: 700; flex-shrink: 0; }
+
+/* ── CO-OP PAGE ── */
+.coop-section { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.coop-intro {
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 14px;
+  padding: 14px; text-align: center;
+}
+.coop-intro-icon { font-size: 40px; margin-bottom: 6px; }
+.coop-intro-title { font-size: 17px; font-weight: 800; color: var(--gold); margin-bottom: 4px; }
+.coop-intro-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.coop-no-api { background: #1a0a0a; border: 1px solid #c0392b55; border-radius: 12px;
+  padding: 12px; font-size: 12px; color: #e74c3c; text-align: center; line-height: 1.6; }
+.coop-gang-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 1px; padding: 0 2px; }
+.coop-member-row {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  padding: 10px 12px;
+}
+.coop-member-avatar { font-size: 26px; flex-shrink: 0; }
+.coop-member-info { flex: 1; min-width: 0; }
+.coop-member-name { font-size: 14px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.coop-member-role { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.coop-invite-btn {
+  background: linear-gradient(135deg, #1a1a2e, #0d0d1a); border: 1px solid #3498db55;
+  border-radius: 10px; color: #3498db; font-size: 13px; font-weight: 700;
+  padding: 8px 14px; cursor: pointer; flex-shrink: 0;
+}
+.coop-create-btn {
+  width: 100%; padding: 15px; border-radius: 14px; border: none; cursor: pointer;
+  background: linear-gradient(135deg, #c0392b, #8b1a1a);
+  color: #fff; font-size: 16px; font-weight: 900; letter-spacing: 0.5px;
+  box-shadow: 0 4px 16px #c0392b44;
+}
+.coop-create-btn:active { transform: scale(0.97); }
+.coop-create-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+/* Wait room */
+.coop-wait-box {
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 14px;
+  padding: 18px; text-align: center; display: flex; flex-direction: column; gap: 10px;
+}
+.coop-wait-title { font-size: 16px; font-weight: 800; color: var(--gold); }
+.coop-wait-code { font-size: 28px; font-weight: 900; color: #fff; letter-spacing: 4px;
+  background: var(--bg2); border-radius: 10px; padding: 8px 18px; display: inline-block;
+  border: 1px solid var(--border); }
+.coop-wait-hint { font-size: 12px; color: var(--muted); }
+.coop-timer { font-size: 22px; font-weight: 900; color: #e74c3c; }
+.coop-players-in { display: flex; flex-direction: column; gap: 6px; }
+.coop-player-slot {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  padding: 8px 12px; font-size: 13px; font-weight: 700;
+}
+.coop-player-slot.empty { color: var(--muted); font-weight: 400; font-style: italic; }
+.coop-start-btn {
+  width: 100%; padding: 13px; border-radius: 12px; border: none; cursor: pointer;
+  background: linear-gradient(135deg, #27ae60, #1a7a40);
+  color: #fff; font-size: 15px; font-weight: 900;
+}
+.coop-start-btn:disabled { opacity: .45; cursor: not-allowed; }
+.coop-cancel-btn {
+  width: 100%; padding: 11px; border-radius: 12px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted); font-size: 13px; cursor: pointer;
+}
+
+/* Co-op battle */
+.coop-battle-section { padding: 10px 14px; display: flex; flex-direction: column; gap: 10px; }
+.coop-boss-bar { background: var(--bg3); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+.coop-boss-name { font-size: 15px; font-weight: 800; color: var(--gold); margin-bottom: 6px; }
+.coop-boss-hp-bar-bg { height: 10px; background: var(--bg2); border-radius: 6px; overflow: hidden; }
+.coop-boss-hp-bar { height: 100%; background: linear-gradient(90deg,#c0392b,#e74c3c); border-radius: 6px; transition: width .4s; }
+.coop-boss-hp-txt { font-size: 11px; color: var(--muted); margin-top: 4px; text-align: right; }
+.coop-players-battle { display: flex; flex-direction: column; gap: 8px; }
+.coop-player-battle-row {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  padding: 8px 12px;
+}
+.coop-player-battle-row.my-turn { border-color: var(--gold); box-shadow: 0 0 10px var(--gold)33; }
+.coop-player-battle-row.dead { opacity: .4; }
+.cpb-avatar { font-size: 22px; flex-shrink: 0; }
+.cpb-info { flex: 1; min-width: 0; }
+.cpb-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cpb-hp-bg { height: 5px; background: var(--bg2); border-radius: 3px; margin-top: 4px; overflow: hidden; }
+.cpb-hp-fill { height: 100%; background: linear-gradient(90deg,#27ae60,#2ecc71); border-radius: 3px; transition: width .3s; }
+.cpb-turn-badge { font-size: 10px; font-weight: 700; color: var(--gold); flex-shrink: 0; }
+.coop-log { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
+  max-height: 120px; overflow-y: auto; padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 3px; }
+.coop-log-entry { font-size: 12px; color: var(--muted); }
+.coop-log-entry.hit-boss { color: #f0c030; }
+.coop-log-entry.boss-hits { color: #e74c3c; }
+.coop-log-entry.sys { color: #3498db; font-style: italic; }
+.coop-atk-row { display: flex; gap: 8px; }
+.coop-atk-btn {
+  flex: 1; padding: 14px 10px; border-radius: 12px; border: none; cursor: pointer;
+  background: linear-gradient(135deg, #c0392b, #8b1a1a);
+  color: #fff; font-size: 14px; font-weight: 800;
+}
+.coop-atk-btn:disabled { opacity: .4; cursor: not-allowed; }
+.coop-flee-btn {
+  padding: 14px 16px; border-radius: 12px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--muted); font-size: 13px; cursor: pointer;
+}
+.coop-result { text-align: center; padding: 24px 14px; display: flex; flex-direction: column;
+  align-items: center; gap: 10px; }
+.coop-result-icon { font-size: 56px; }
+.coop-result-title { font-size: 24px; font-weight: 900; }
+.coop-result-title.win  { color: var(--gold); }
+.coop-result-title.lose { color: var(--red); }
+.coop-result-back { padding: 13px 28px; border-radius: 12px; border: none; cursor: pointer;
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text); font-size: 14px; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -949,7 +1068,7 @@ body {
 </div>
 
 <!-- HERO CARD -->
-<div class="hero-card">
+<div class="hero-card" onclick="nav('character')" title="Открыть досье">
   <div class="avatar-wrap">
     <canvas id="avatar-canvas" width="100" height="128"></canvas>
     <div class="class-badge" id="class-badge">Гангстер</div>
@@ -996,9 +1115,9 @@ body {
     <div class="tile-label">Районы</div>
   </div>
 
-  <div class="tile tile-character" onclick="nav('character')">
-    <div class="tile-icon">👤</div>
-    <div class="tile-label">Досье</div>
+  <div class="tile tile-coop" onclick="nav('coop')">
+    <div class="tile-icon">⚔️</div>
+    <div class="tile-label">Кооператив</div>
   </div>
 
   <div class="tile tile-inventory" onclick="nav('inventory')">
@@ -1193,6 +1312,104 @@ body {
   </div>
 </div>
 
+<!-- ══ SUB-PAGE: КООПЕРАТИВ ══ -->
+<div id="page-coop" class="subpage" style="display:none">
+  <div class="subpage-header">
+    <button class="back-btn" onclick="goBack()">← Назад</button>
+    <div class="subpage-title">⚔️ Кооператив</div>
+  </div>
+
+  <!-- LOBBY VIEW -->
+  <div id="coop-lobby">
+    <div class="coop-section">
+      <div class="coop-intro">
+        <div class="coop-intro-icon">⚔️</div>
+        <div class="coop-intro-title">Кооперативный бой</div>
+        <div class="coop-intro-desc">Зови бандитов из банды, берите босса вместе.<br>До 4 игроков. Награды делятся поровну.</div>
+      </div>
+
+      <div id="coop-no-api-warn" style="display:none" class="coop-no-api">
+        ⚠️ Сервер кооператива не настроен.<br>
+        Попроси администратора указать <b>COOP_API_BASE</b> в боте.
+      </div>
+
+      <div class="coop-gang-label">Члены банды</div>
+      <div id="coop-gang-list">
+        <div style="color:var(--muted);font-size:13px;padding:8px 4px">Нет членов банды — пригласи друзей!</div>
+      </div>
+
+      <div style="display:flex;gap:8px">
+        <button class="coop-create-btn" id="coop-create-btn" style="flex:1" onclick="coopCreateSession()">
+          ⚔️ Создать сессию
+        </button>
+        <button class="coop-create-btn" style="flex:0 0 auto;padding:15px 14px;background:linear-gradient(135deg,#1a3a5a,#0d2035);box-shadow:none" onclick="coopShowJoin()">
+          🔗 Войти
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- WAIT ROOM VIEW -->
+  <div id="coop-waitroom" style="display:none">
+    <div class="coop-section">
+      <div class="coop-wait-box">
+        <div class="coop-wait-title">🕐 Ожидание игроков</div>
+        <div style="font-size:12px;color:var(--muted)">Код сессии:</div>
+        <div class="coop-wait-code" id="coop-session-code">—</div>
+        <div class="coop-wait-hint">Скинь код другу — пусть вводит в разделе Кооператив → Войти</div>
+        <div class="coop-timer" id="coop-countdown">60</div>
+        <div style="font-size:11px;color:var(--muted)">секунд до автостарта</div>
+        <div class="coop-players-in" id="coop-players-in"></div>
+        <button class="coop-start-btn" id="coop-start-btn" onclick="coopStartBattle()" disabled>
+          ▶ Начать бой
+        </button>
+        <button class="coop-cancel-btn" onclick="coopCancelSession()">Отменить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JOIN SESSION VIEW -->
+  <div id="coop-join-view" style="display:none">
+    <div class="coop-section">
+      <div class="coop-wait-box">
+        <div class="coop-wait-title">🔗 Войти в сессию</div>
+        <input id="coop-join-input" type="text" maxlength="6"
+          style="text-align:center;font-size:24px;letter-spacing:4px;font-weight:900;
+                 background:var(--bg2);border:1px solid var(--border);border-radius:10px;
+                 color:#fff;padding:10px;width:100%;outline:none;"
+          placeholder="XXXXXX" />
+        <button class="coop-start-btn" onclick="coopJoinSession()">Войти</button>
+        <button class="coop-cancel-btn" onclick="coopShowLobby()">← Назад</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BATTLE VIEW -->
+  <div id="coop-battle" style="display:none">
+    <div class="coop-battle-section">
+      <div class="coop-boss-bar">
+        <div class="coop-boss-name" id="cb-boss-name">Босс</div>
+        <div class="coop-boss-hp-bar-bg">
+          <div class="coop-boss-hp-bar" id="cb-boss-bar" style="width:100%"></div>
+        </div>
+        <div class="coop-boss-hp-txt" id="cb-boss-hp">—</div>
+        <div style="font-size:11px;color:var(--muted);font-style:italic;margin-top:4px" id="cb-boss-quote">"..."</div>
+      </div>
+      <div class="coop-players-battle" id="cb-players"></div>
+      <div class="coop-log" id="coop-log"></div>
+      <div class="coop-atk-row">
+        <button class="coop-atk-btn" id="cb-atk-btn" onclick="coopAttack()" disabled>⚔️ Атаковать</button>
+        <button class="coop-flee-btn" onclick="coopLeave()">🏃 Уйти</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULT VIEW -->
+  <div id="coop-result" style="display:none">
+    <div class="coop-result" id="coop-result-inner"></div>
+  </div>
+</div>
+
 <script>
 // ── Telegram WebApp ───────────────────────────────────────────────────
 const tg = window.Telegram?.WebApp;
@@ -1232,6 +1449,11 @@ const DATA = {
   med_l:   pi('med_l', 0),
   weapon:  p('weapon', ''),
   prop:    p('prop','').split(',').filter(Boolean),
+  gang:    p('gang','').split(',').filter(Boolean).map(s => {
+             const [uid,name,emoji,role] = s.split('|');
+             return {uid, name: decodeURIComponent(name||''), emoji: emoji||'🔫', role: role||'mercenary'};
+           }),
+  api:     p('api',''),  // co-op API base URL (e.g. https://xxx.ngrok.io)
 };
 
 // ── Class definitions ─────────────────────────────────────────────────
@@ -1295,7 +1517,7 @@ function fmtNum(n) {
 }
 
 // ── SPA Navigation ────────────────────────────────────────────────────
-const CLIENT_PAGES = ['explore', 'district', 'battle', 'character'];
+const CLIENT_PAGES = ['explore', 'district', 'battle', 'character', 'coop'];
 const BOT_PAGES = {
   inventory:   { title: '🎒 Барахло',        icon: '🎒' },
   shop:        { title: '🏪 Чёрный рынок',   icon: '🏪' },
@@ -1313,8 +1535,9 @@ function nav(dest) {
   document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
 
   if (CLIENT_PAGES.includes(dest)) {
-    if (dest === 'explore') renderDistricts();
-    if (dest === 'character') renderCharacter();
+    if (dest === 'explore')    renderDistricts();
+    if (dest === 'character')  renderCharacter();
+    if (dest === 'coop')       renderCoopLobby();
     document.getElementById('page-' + dest).style.display = '';
   } else if (BOT_PAGES[dest]) {
     pendingBotDest = dest;
@@ -1388,9 +1611,18 @@ function getWeaponType() {
 }
 function getAttackLabel() {
   const t = getWeaponType();
-  if (t === 'gun')   return '🔫 Стрелять';
-  if (t === 'knife') return '🔪 Колоть';
-  return '🤜 Бить';
+  let icon, label;
+  if (t === 'gun')        { icon = '🔫'; label = 'Стрелять'; }
+  else if (t === 'knife') { icon = '🔪'; label = 'Колоть'; }
+  else                    { icon = '🤜'; label = 'Бить'; }
+  if (battleState) {
+    const boss = BOSS_DATA[battleState.bossId];
+    const base = Math.max(1, battleState.playerAtk - Math.floor(boss.def / 2));
+    const lo   = Math.max(1, Math.round(base * 0.85));
+    const hi   = Math.round(base * 1.15);
+    return `${icon} ${label} (${lo}–${hi})`;
+  }
+  return `${icon} ${label}`;
 }
 function getAttackVerb() {
   const t = getWeaponType();
@@ -1402,6 +1634,42 @@ function getAttackVerb() {
 // ══════════════════════════════════════════════════════════════════════
 //  DISTRICTS SYSTEM
 // ══════════════════════════════════════════════════════════════════════
+
+// ── BOSS COMBAT TAUNTS ────────────────────────────────────────────────
+const BOSS_TAUNTS = {
+  _generic: [
+    'Это всё что ты можешь?', 'Ляг и не вставай!', 'Хватит уже корчить из себя героя.',
+    'Больно? Ещё будет.', 'Ты устал? Я только разогреваюсь.', 'Вот так. Знай своё место.',
+    'Ещё раз — и ты труп.', 'Слабак.', 'Думал, тут прогулка?', 'Иди домой, пока цел.',
+  ],
+  kosoy:     ['Ха-ха, лох!','Тебя кто сюда звал?','Щас ещё добавлю!'],
+  bychok:    ['Рогами насажу!','Стой ровно, баран.','Больно? Это начало.'],
+  zhigan:    ['Лоха видно за версту.','Кошелёк оставь и вали.','Руки убери!'],
+  shustryy:  ['Не поймаешь!','Слишком медленный.','Бежать надо было раньше.'],
+  tolsty:    ['Всё через меня. Всё.','Здесь я командую.','Лишние слова, лишняя боль.'],
+  kaban:     ['Молчи и работай.','Хрюкни ещё раз.','Убью и не почешусь.'],
+  bukhgalter:['Каждый удар — это убыток.','Деньги счёт любят.','Сведу баланс на твоей шкуре.'],
+  kontrabas: ['Таможня не знает? И ты не узнаешь.','Без документов — ничего.','Чисто работаю.'],
+  legenda:   ['Все боятся.','Ты — никто.','Легенду не победить.'],
+  professor: ['Ты просто пешка.','Я это предвидел.','Мат через три хода.'],
+  artist:    ['Браво, массовка!','Жизнь — театр.','Финальный акт близко.'],
+  svalshchik:['Ничего личного.','Так выгоднее.','Предательство — это просто бизнес.'],
+  buryy:     ['Щенок.','Я тут раньше тебя.','Знаешь, сколько таких было до тебя?'],
+  khirurg:   ['Больно не будет. Обещаю.','Чисто. Профессионально.','Закрой глаза.'],
+  tigr:      ['Я не промахиваюсь.','Не убегай.','Ты уже мёртв. Просто не знаешь.'],
+  palach:    ['Тебя сюда никто не звал.','Приговор уже вынесен.','Дёргаться бесполезно.'],
+  sedoy:     ['Я видел, как рушились империи.','Молодость — не сила.','Советую сдаться.'],
+  prizrak:   ['Меня нет. Я везде.','Ты не видишь меня.','Тень не поймать.'],
+  don_karlo: ['Не разочаровывай меня.','Дон не прощает дважды.','Последнее предупреждение.'],
+  vizir:     ['Дон знает о тебе всё.','Ты проиграл ещё до начала.','Уходи, пока дают.'],
+};
+
+function getBossTaunt(bossId) {
+  const arr = BOSS_TAUNTS[bossId] || [];
+  const gen = BOSS_TAUNTS._generic;
+  const pool = Math.random() < 0.45 && arr.length ? arr : gen;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 
 const BOSS_DATA = {
   kosoy:     {name:'😈 Косой',    title:'Мелкий воришка',        hp:150, atk:28, def:10, exp:22,  cash:80,  quote:'Да я тебя знаешь как...'},
@@ -1991,7 +2259,13 @@ function playerAttack(type) {
   setTimeout(() => {
     const bdmg = calcDmg(boss.atk, Math.floor(battleState.playerAtk / 3));
     battleState.playerHp = Math.max(0, battleState.playerHp - bdmg);
-    addBattleLog('⚠️ ' + boss.name.replace(/^\S+\s*/, '') + ' бьёт в ответ — ' + bdmg + ' урона!', 'boss-hit');
+    const bossShortName = boss.name.replace(/^\S+\s*/, '');
+    // ~35% chance to taunt
+    if (Math.random() < 0.35) {
+      const taunt = getBossTaunt(battleState.bossId);
+      document.getElementById('b-boss-quote').textContent = '«' + taunt + '»';
+    }
+    addBattleLog('⚠️ ' + bossShortName + ' бьёт в ответ — ' + bdmg + ' урона!', 'boss-hit');
 
     triggerFlash(document.getElementById('battle-player-side'), 'flash-blue');
     animateBlood('player');
@@ -2134,6 +2408,380 @@ document.querySelectorAll('.tile').forEach(tile => {
 });
 
 // ══════════════════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════════════
+//  CO-OP SYSTEM
+// ══════════════════════════════════════════════════════════════════════
+
+let coopState = null;       // current coop session state from server
+let coopSid   = null;       // session id string
+let coopPollTimer = null;   // setInterval handle
+let coopWaitTimer = null;   // setInterval for countdown
+let coopMyUid = null;       // my uid string (from tg or fallback)
+
+function coopApi() { return DATA.api || ''; }
+
+function coopMyUidStr() {
+  if (coopMyUid) return coopMyUid;
+  // try tg initDataUnsafe
+  try {
+    coopMyUid = String(tg?.initDataUnsafe?.user?.id || ('guest_' + Math.random().toString(36).slice(2)));
+  } catch(e) { coopMyUid = 'guest_' + Math.random().toString(36).slice(2); }
+  return coopMyUid;
+}
+
+// ── LOBBY ─────────────────────────────────────────────────────────────
+function renderCoopLobby() {
+  coopShowLobby();
+  const apiOk = !!coopApi();
+  document.getElementById('coop-no-api-warn').style.display = apiOk ? 'none' : '';
+  const btn = document.getElementById('coop-create-btn');
+  if (btn) btn.disabled = !apiOk;
+
+  // Render gang list
+  const listEl = document.getElementById('coop-gang-list');
+  if (DATA.gang && DATA.gang.length > 0) {
+    listEl.innerHTML = '';
+    DATA.gang.slice(0, 8).forEach(m => {
+      const row = document.createElement('div');
+      row.className = 'coop-member-row';
+      row.innerHTML = `
+        <div class="coop-member-avatar">${m.emoji || '🔫'}</div>
+        <div class="coop-member-info">
+          <div class="coop-member-name">${m.name || 'Бандит'}</div>
+          <div class="coop-member-role">${m.role || 'mercenary'}</div>
+        </div>`;
+      listEl.appendChild(row);
+    });
+  } else {
+    listEl.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 4px">Нет членов банды. Набери банду в боте!</div>';
+  }
+}
+
+function coopShowLobby() {
+  document.getElementById('coop-lobby').style.display = '';
+  document.getElementById('coop-waitroom').style.display = 'none';
+  document.getElementById('coop-join-view').style.display = 'none';
+  document.getElementById('coop-battle').style.display = 'none';
+  document.getElementById('coop-result').style.display = 'none';
+  _coopStopPoll();
+}
+
+function coopShowJoin() {
+  document.getElementById('coop-lobby').style.display = 'none';
+  document.getElementById('coop-join-view').style.display = '';
+  document.getElementById('coop-join-input').value = '';
+}
+
+// ── CREATE SESSION ────────────────────────────────────────────────────
+async function coopCreateSession() {
+  if (!coopApi()) { showToast('Сервер не настроен', '⚠️'); return; }
+  const btn = document.getElementById('coop-create-btn');
+  btn.disabled = true;
+  btn.textContent = '⌛ Создаём...';
+
+  // Pick a boss from first available district
+  const locId   = 'market';
+  const bossId  = LOC_DATA[locId].bosses[0];
+
+  try {
+    const resp = await fetch(coopApi() + '/coop/create', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        uid:    coopMyUidStr(),
+        name:   DATA.name,
+        atk:    DATA.atk,
+        def:    DATA.def,
+        hp:     session.hp,
+        maxhp:  DATA.maxhp,
+        boss_id: bossId,
+        loc_id:  locId,
+        init_data: tg?.initData || '',
+      })
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    coopSid = data.sid;
+    _coopEnterWaitRoom(data);
+  } catch(e) {
+    showToast('Ошибка сервера: ' + e.message, '❌');
+    btn.disabled = false;
+    btn.textContent = '⚔️ Создать сессию';
+  }
+}
+
+// ── JOIN SESSION ──────────────────────────────────────────────────────
+async function coopJoinSession() {
+  const code = document.getElementById('coop-join-input').value.trim().toUpperCase();
+  if (!code || code.length < 4) { showToast('Введи код сессии', '⚠️'); return; }
+  if (!coopApi()) { showToast('Сервер не настроен', '⚠️'); return; }
+
+  try {
+    const resp = await fetch(coopApi() + '/coop/' + code + '/join', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        uid:  coopMyUidStr(),
+        name: DATA.name,
+        atk:  DATA.atk,
+        def:  DATA.def,
+        hp:   session.hp,
+        maxhp: DATA.maxhp,
+        init_data: tg?.initData || '',
+      })
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || 'HTTP ' + resp.status);
+    }
+    const data = await resp.json();
+    coopSid = code;
+    if (data.state === 'battle') {
+      _coopEnterBattle(data);
+    } else {
+      _coopEnterWaitRoom(data);
+    }
+  } catch(e) {
+    showToast('Ошибка: ' + e.message, '❌');
+  }
+}
+
+// ── WAIT ROOM ─────────────────────────────────────────────────────────
+function _coopEnterWaitRoom(data) {
+  coopState = data;
+  document.getElementById('coop-lobby').style.display    = 'none';
+  document.getElementById('coop-join-view').style.display= 'none';
+  document.getElementById('coop-waitroom').style.display = '';
+  document.getElementById('coop-session-code').textContent = coopSid;
+
+  // Countdown timer
+  let secs = 60;
+  _coopStopWait();
+  _coopRenderWaitPlayers(data);
+  coopWaitTimer = setInterval(() => {
+    secs--;
+    const el = document.getElementById('coop-countdown');
+    if (el) el.textContent = Math.max(0, secs);
+    if (secs <= 0) {
+      _coopStopWait();
+      coopStartBattle();
+    }
+  }, 1000);
+
+  // Poll for new joiners
+  _coopStopPoll();
+  coopPollTimer = setInterval(_coopPollWait, 2000);
+}
+
+function _coopRenderWaitPlayers(data) {
+  const el = document.getElementById('coop-players-in');
+  if (!el) return;
+  el.innerHTML = '';
+  const players = data.players || [];
+  for (let i = 0; i < 4; i++) {
+    const slot = document.createElement('div');
+    if (players[i]) {
+      slot.className = 'coop-player-slot';
+      const isMe = players[i].uid === coopMyUidStr();
+      slot.innerHTML = `<span>🤵</span> <span>${players[i].name}${isMe ? ' (ты)' : ''}</span>`;
+    } else {
+      slot.className = 'coop-player-slot empty';
+      slot.textContent = 'Слот ' + (i+1) + ' — свободен';
+    }
+    el.appendChild(slot);
+  }
+  const startBtn = document.getElementById('coop-start-btn');
+  if (startBtn) startBtn.disabled = players.length < 2;
+}
+
+async function _coopPollWait() {
+  if (!coopSid) return;
+  try {
+    const resp = await fetch(coopApi() + '/coop/' + coopSid);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    coopState = data;
+    _coopRenderWaitPlayers(data);
+    if (data.state === 'battle') {
+      _coopStopWait();
+      _coopStopPoll();
+      _coopEnterBattle(data);
+    } else if (data.state === 'cancelled') {
+      _coopStopWait();
+      _coopStopPoll();
+      showToast('Сессия отменена', '❌');
+      coopShowLobby();
+    }
+  } catch(e) {}
+}
+
+async function coopStartBattle() {
+  _coopStopWait();
+  _coopStopPoll();
+  if (!coopSid) return;
+  try {
+    const resp = await fetch(coopApi() + '/coop/' + coopSid + '/start', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ uid: coopMyUidStr() })
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    coopState = data;
+    _coopEnterBattle(data);
+  } catch(e) {
+    showToast('Ошибка старта: ' + e.message, '❌');
+  }
+}
+
+async function coopCancelSession() {
+  _coopStopWait();
+  _coopStopPoll();
+  if (coopSid) {
+    try {
+      await fetch(coopApi() + '/coop/' + coopSid + '/cancel', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ uid: coopMyUidStr() })
+      });
+    } catch(e) {}
+  }
+  coopSid = null;
+  coopShowLobby();
+}
+
+// ── BATTLE ────────────────────────────────────────────────────────────
+function _coopEnterBattle(data) {
+  coopState = data;
+  document.getElementById('coop-waitroom').style.display = 'none';
+  document.getElementById('coop-lobby').style.display    = 'none';
+  document.getElementById('coop-battle').style.display   = '';
+  _coopRenderBattle(data);
+  _coopStopPoll();
+  coopPollTimer = setInterval(_coopPollBattle, 1800);
+}
+
+function _coopRenderBattle(data) {
+  if (!data) return;
+  const boss = BOSS_DATA[data.boss_id] || {};
+  // Boss
+  document.getElementById('cb-boss-name').textContent = boss.name || 'Босс';
+  const bPct = data.boss_max_hp > 0 ? Math.max(0, data.boss_hp / data.boss_max_hp * 100) : 0;
+  document.getElementById('cb-boss-bar').style.width = bPct.toFixed(1) + '%';
+  document.getElementById('cb-boss-hp').textContent = data.boss_hp + ' / ' + data.boss_max_hp;
+
+  // Players
+  const playersEl = document.getElementById('cb-players');
+  playersEl.innerHTML = '';
+  (data.players || []).forEach((pl, idx) => {
+    const isMe   = pl.uid === coopMyUidStr();
+    const isMyTurn = data.turn_uid === pl.uid;
+    const isDead = pl.hp <= 0;
+    const row = document.createElement('div');
+    row.className = 'coop-player-battle-row' + (isMyTurn ? ' my-turn' : '') + (isDead ? ' dead' : '');
+    const hpPct = pl.max_hp > 0 ? Math.max(0, pl.hp / pl.max_hp * 100) : 0;
+    row.innerHTML = `
+      <div class="cpb-avatar">${isDead ? '💀' : '🤵'}</div>
+      <div class="cpb-info">
+        <div class="cpb-name">${pl.name}${isMe ? ' (ты)' : ''}</div>
+        <div class="cpb-hp-bg"><div class="cpb-hp-fill" style="width:${hpPct.toFixed(1)}%"></div></div>
+      </div>
+      <div class="cpb-turn-badge">${isMyTurn ? '⚔️ ХОД' : ''}  ${pl.hp}/${pl.max_hp} HP</div>`;
+    playersEl.appendChild(row);
+  });
+
+  // Log
+  const logEl = document.getElementById('coop-log');
+  const prevLen = parseInt(logEl.dataset.loglen || '0');
+  const entries = data.log || [];
+  if (entries.length > prevLen) {
+    entries.slice(prevLen).forEach(entry => {
+      const el = document.createElement('div');
+      el.className = 'coop-log-entry ' + (entry.type || '');
+      el.textContent = entry.text;
+      logEl.appendChild(el);
+    });
+    logEl.scrollTop = logEl.scrollHeight;
+    logEl.dataset.loglen = entries.length;
+  }
+
+  // Attack button
+  const atkBtn = document.getElementById('cb-atk-btn');
+  const myTurn = data.turn_uid === coopMyUidStr() && data.state === 'battle';
+  atkBtn.disabled = !myTurn;
+  atkBtn.textContent = myTurn ? getAttackLabel() : '⏳ Ход другого';
+}
+
+async function _coopPollBattle() {
+  if (!coopSid) return;
+  try {
+    const resp = await fetch(coopApi() + '/coop/' + coopSid);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    coopState = data;
+    _coopRenderBattle(data);
+    if (data.state === 'won' || data.state === 'lost') {
+      _coopStopPoll();
+      _coopShowResult(data);
+    }
+  } catch(e) {}
+}
+
+async function coopAttack() {
+  if (!coopSid || !coopState) return;
+  document.getElementById('cb-atk-btn').disabled = true;
+  try {
+    const resp = await fetch(coopApi() + '/coop/' + coopSid + '/attack', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ uid: coopMyUidStr(), type: 'normal' })
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    coopState = data;
+    _coopRenderBattle(data);
+    if (data.state === 'won' || data.state === 'lost') {
+      _coopStopPoll();
+      _coopShowResult(data);
+    }
+  } catch(e) {
+    showToast('Ошибка атаки: ' + e.message, '❌');
+    document.getElementById('cb-atk-btn').disabled = false;
+  }
+}
+
+async function coopLeave() {
+  _coopStopPoll();
+  if (coopSid) {
+    try {
+      await fetch(coopApi() + '/coop/' + coopSid + '/leave', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ uid: coopMyUidStr() })
+      });
+    } catch(e) {}
+  }
+  coopSid = null;
+  coopState = null;
+  coopShowLobby();
+}
+
+function _coopShowResult(data) {
+  document.getElementById('coop-battle').style.display = 'none';
+  document.getElementById('coop-result').style.display = '';
+  const won = data.state === 'won';
+  const boss = BOSS_DATA[data.boss_id] || {};
+  document.getElementById('coop-result-inner').innerHTML = `
+    <div class="coop-result-icon">${won ? '🏆' : '💀'}</div>
+    <div class="coop-result-title ${won ? 'win' : 'lose'}">${won ? 'ПОБЕДА!' : 'ПОРАЖЕНИЕ'}</div>
+    ${won ? `<div style="color:var(--muted);font-size:13px">Босс повержен. Награды разделены.</div>` : ''}
+    <button class="coop-result-back" onclick="coopShowLobby()">← В лобби</button>`;
+}
+
+function _coopStopPoll() { if (coopPollTimer) { clearInterval(coopPollTimer); coopPollTimer = null; } }
+function _coopStopWait() { if (coopWaitTimer) { clearInterval(coopWaitTimer); coopWaitTimer = null; } }
+
 //  AVATAR DRAWING
 // ══════════════════════════════════════════════════════════════════════
 const SKINS = ['#FDDBB4','#F0C27F','#D4935A','#A0622A','#7A3B10','#C8A882'];
