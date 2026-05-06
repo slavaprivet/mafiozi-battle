@@ -319,8 +319,10 @@ const urlP = new URLSearchParams(location.search);
 ['gender','skin','body','face','hair','hat'].forEach(k => {
   if (urlP.has(k)) state[k] = parseInt(urlP.get(k)) || 0;
 });
-const hasLook     = parseInt(urlP.get('has_look')) || 0;
-const playerDia   = parseInt(urlP.get('dia'))      || 0;
+// Если creator открыт из хаба — в URL будут параметры внешности (skin, gender и т.д.)
+// Если открыт напрямую из бота для первого создания — URL пустой
+const hasLook   = urlP.has('skin') ? 1 : 0;
+const playerDia = parseInt(urlP.get('dia')) || 0;
 let changeLookMode = false;   // режим смены образа (платный)
 let viewAngle      = 0;       // 0=спереди 1=вправо 2=сзади 3=влево
 
