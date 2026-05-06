@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<title>Создай гангстера</title>
+<title>Создай гангстера v3</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 body {
@@ -264,13 +264,15 @@ h2 {
   <button class="rot-btn" onclick="rotateRight()">▶</button>
 </div>
 
-<!-- Кнопки режима просмотра (показываются если гангстер уже создан) -->
-<div id="view-mode-btns" style="display:none">
+<!-- Кнопки режима просмотра — показаны по умолчанию -->
+<div id="view-mode-btns">
   <button class="change-look-btn" onclick="enterEditMode()">✏️ Сменить образ · 5 💎</button>
   <button class="exit-btn" onclick="exitToMenu()">← Выйти в меню</button>
 </div>
 
-<!-- Пол -->
+<!-- Редактор — скрыт по умолчанию, включается только при первом создании -->
+<div id="editor-wrap" style="display:none; width:100%">
+
 <div class="gender-toggle">
   <div class="gender-btn active" id="gbtn-m" onclick="setGender(0)">♂ Мужской</div>
   <div class="gender-btn"        id="gbtn-f" onclick="setGender(1)">♀ Женский</div>
@@ -309,6 +311,8 @@ h2 {
 
 <button id="save-btn" onclick="saveChar()">💾 Сохранить персонажа</button>
 
+</div><!-- #editor-wrap -->
+
 <script>
 const tg = window.Telegram?.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
@@ -319,10 +323,11 @@ const urlP = new URLSearchParams(location.search);
 ['gender','skin','body','face','hair','hat'].forEach(k => {
   if (urlP.has(k)) state[k] = parseInt(urlP.get(k)) || 0;
 });
-// Если creator открыт из хаба — в URL будут параметры внешности (skin, gender и т.д.)
-// Если открыт напрямую из бота для первого создания — URL пустой
-const hasLook   = urlP.has('skin') ? 1 : 0;
-const playerDia = parseInt(urlP.get('dia')) || 0;
+// Если creator открыт из хаба — в URL будут параметры (skin и др.)
+// Если открыт напрямую из бота впервые — URL пустой
+const isFirstTime = !urlP.has('skin');   // true = первое создание, false = просмотр
+const hasLook     = isFirstTime ? 0 : 1;
+const playerDia   = parseInt(urlP.get('dia')) || 0;
 let changeLookMode = false;   // режим смены образа (платный)
 let viewAngle      = 0;       // 0=спереди 1=вправо 2=сзади 3=влево
 
@@ -1060,33 +1065,29 @@ function rotateRight() { viewAngle = (viewAngle + 1) % 4; document.getElementByI
 
 // ── VIEW MODE ─────────────────────────────────────────────────────────────
 function initViewMode() {
-  if (!hasLook) return; // Первое создание — все кнопки видны
-  // Прячем UI редактора
-  document.querySelector('.gender-toggle').style.display = 'none';
-  document.querySelector('.randomize-btn').style.display = 'none';
-  document.querySelector('.tabs').style.display = 'none';
-  document.querySelectorAll('.panel').forEach(p => p.style.display = 'none');
-  document.getElementById('save-btn').style.display = 'none';
-  document.getElementById('page-title').textContent = '🤵 Мой гангстер';
-  // Показываем кнопки просмотра
-  document.getElementById('view-mode-btns').style.display = 'flex';
-  // Нативная кнопка «Назад» в шапке Telegram
-  if (tg && tg.BackButton) {
-    tg.BackButton.onClick(exitToMenu);
-    tg.BackButton.show();
+  if (isFirstTime) {
+    // Первое создание — показываем редактор, скрываем кнопки просмотра
+    document.getElementById('editor-wrap').style.display = 'block';
+    document.getElementById('view-mode-btns').style.display = 'none';
+    document.getElementById('page-title').textContent = '🎩 Создай гангстера';
+  } else {
+    // Персонаж уже есть — редактор скрыт (по умолчанию), кнопки просмотра видны
+    document.getElementById('page-title').textContent = '🤵 Мой гангстер';
+    if (tg && tg.BackButton) {
+      tg.BackButton.onClick(exitToMenu);
+      tg.BackButton.show();
+    }
   }
 }
 
 function enterEditMode() {
   changeLookMode = true;
-  document.querySelector('.gender-toggle').style.display = 'flex';
-  document.querySelector('.randomize-btn').style.display = 'block';
-  document.querySelector('.tabs').style.display = 'flex';
-  document.querySelectorAll('.panel').forEach((p, i) => { if (i === 0) p.style.display = 'block'; });
-  document.getElementById('save-btn').style.display = 'block';
+  document.getElementById('editor-wrap').style.display = 'block';
   document.getElementById('save-btn').textContent = '💎 Сохранить (-5 кристаллов)';
   document.getElementById('view-mode-btns').style.display = 'none';
   document.getElementById('page-title').textContent = '✏️ Изменить образ';
+  buildSkinGrid();
+  ['body','face','hair','hat'].forEach(t => buildGrid(t, getNames(t), t + '-grid'));
 }
 
 function exitToMenu() {
