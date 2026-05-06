@@ -1090,8 +1090,10 @@ function enterEditMode() {
   document.getElementById('save-btn').textContent = '💎 Сохранить (-5 кристаллов)';
   document.getElementById('view-mode-btns').style.display = 'none';
   document.getElementById('page-title').textContent = '✏️ Изменить образ';
+  switchTab(0);  // сброс на вкладку «Кожа»
   buildSkinGrid();
   ['body','face','hair','hat'].forEach(t => buildGrid(t, getNames(t), t + '-grid'));
+  window.scrollTo(0, 0);
 }
 
 function exitToMenu() {
@@ -1155,7 +1157,7 @@ function buildSkinGrid() {
   grid.innerHTML = '';
   SKINS.forEach((col, i) => {
     const btn = document.createElement('div');
-    btn.className = 'skin-dot' + (state.skin === i ? ' selected' : '');
+    btn.className = 'skin-btn' + (state.skin === i ? ' selected' : '');
     btn.style.background = col;
     btn.addEventListener('click', () => {
       state.skin = i;
@@ -1167,30 +1169,30 @@ function buildSkinGrid() {
   });
 }
 
+// ── SWITCH TAB (вызывается из onclick в HTML) ─────────────────────────────
+const TAB_NAMES = ['skin','body','face','hair','hat'];
+function switchTab(idx) {
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === idx));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById('tab-' + TAB_NAMES[idx]);
+  if (panel) panel.classList.add('active');
+}
+
+// ── RANDOMIZE (вызывается из onclick в HTML) ──────────────────────────────
+function randomize() {
+  state.skin = Math.floor(Math.random() * SKINS.length);
+  state.body = Math.floor(Math.random() * 4);
+  state.face = Math.floor(Math.random() * 10);
+  state.hair = Math.floor(Math.random() * 10);
+  state.hat  = Math.floor(Math.random() * 10);
+  buildSkinGrid();
+  ['body','face','hair','hat'].forEach(t => buildGrid(t, getNames(t), t + '-grid'));
+  redraw();
+}
+
 function initUI() {
   buildSkinGrid();
   ['body','face','hair','hat'].forEach(t => buildGrid(t, getNames(t), t + '-grid'));
-
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const tab = btn.dataset.tab;
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById('tab-' + tab)?.classList.add('active');
-    });
-  });
-
-  document.getElementById('random-btn')?.addEventListener('click', () => {
-    state.skin = Math.floor(Math.random() * SKINS.length);
-    state.body = Math.floor(Math.random() * 4);
-    state.face = Math.floor(Math.random() * 10);
-    state.hair = Math.floor(Math.random() * 10);
-    state.hat  = Math.floor(Math.random() * 10);
-    buildSkinGrid();
-    ['body','face','hair','hat'].forEach(t => buildGrid(t, getNames(t), t + '-grid'));
-    redraw();
-  });
 }
 
 initUI();
