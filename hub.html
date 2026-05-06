@@ -655,12 +655,13 @@ const DATA = {
   contacts:pi('contacts', 0),
   job:     p('job',''),
   // look
-  gender: pi('gender', 0),
-  skin:   pi('skin', 0),
-  body:   pi('body', 1),
-  face:   pi('face', 0),
-  hair:   pi('hair', 0),
-  hat:    pi('hat', 0),
+  gender:  pi('gender', 0),
+  skin:    pi('skin', 0),
+  body:    pi('body', 1),
+  face:    pi('face', 0),
+  hair:    pi('hair', 0),
+  hat:     pi('hat', 0),
+  hasLook: pi('has_look', 0),
 };
 
 // ── Class definitions ─────────────────────────────────────────────────
@@ -825,13 +826,8 @@ function renderCharacter() {
 }
 
 function openCreator() {
-  const look = `gender=${DATA.gender}&skin=${DATA.skin}&body=${DATA.body}&face=${DATA.face}&hair=${DATA.hair}&hat=${DATA.hat}`;
-  const url = 'https://slavaprivet.github.io/mafiozi-battle/creator.html?' + look;
-  if (tg && tg.openLink) {
-    window.location.href = url;
-  } else {
-    window.location.href = url;
-  }
+  const look = `gender=${DATA.gender}&skin=${DATA.skin}&body=${DATA.body}&face=${DATA.face}&hair=${DATA.hair}&hat=${DATA.hat}&has_look=${DATA.hasLook}&dia=${DATA.dia}`;
+  window.location.href = 'https://slavaprivet.github.io/mafiozi-battle/creator.html?' + look;
 }
 
 // ── Ripple effect ─────────────────────────────────────────────────────
