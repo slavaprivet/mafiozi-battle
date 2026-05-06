@@ -348,9 +348,135 @@ body {
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
+
+/* ── SUB-PAGES ── */
+.subpage { min-height: 100vh; }
+.subpage-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px 10px;
+  background: linear-gradient(135deg, #0a0a18 0%, #12122a 100%);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.back-btn {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--gold);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.subpage-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: 1px;
+}
+
+/* ── DISTRICT CARDS ── */
+.district-list { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.district-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  overflow: hidden;
+}
+.district-card.locked { opacity: 0.45; }
+.district-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+.district-card.locked::before { background: linear-gradient(90deg, transparent, #555, transparent); }
+.district-icon { font-size: 32px; flex-shrink: 0; }
+.district-info { flex: 1; }
+.district-name { font-size: 15px; font-weight: 700; color: var(--text); }
+.district-desc { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.district-level { font-size: 11px; color: var(--gold); margin-top: 4px; font-weight: 700; }
+.district-lock { font-size: 22px; flex-shrink: 0; }
+.district-btn {
+  background: linear-gradient(135deg, var(--red), #8b1a1a);
+  border: none;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ── CHARACTER PAGE ── */
+.char-section { padding: 12px 14px; }
+.char-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.char-row:last-child { border-bottom: none; }
+.char-label { color: var(--muted); }
+.char-value { color: var(--text); font-weight: 700; }
+.char-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.char-card-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--gold);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+/* ── BOT SECTION PAGE ── */
+.bot-section-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+  gap: 16px;
+  text-align: center;
+}
+.bot-section-icon { font-size: 52px; }
+.bot-section-text { color: var(--muted); font-size: 14px; line-height: 1.5; }
+.bot-section-btn {
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  color: #111;
+  font-size: 15px;
+  font-weight: 800;
+  padding: 13px 28px;
+  border-radius: 24px;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  max-width: 280px;
+}
 </style>
 </head>
 <body>
+<div id="page-main">
 
 <!-- TOP BAR -->
 <div class="top-bar">
@@ -451,6 +577,59 @@ body {
 
 </div>
 
+</div><!-- #page-main -->
+
+<!-- ══ SUB-PAGE: РАЙОНЫ ══ -->
+<div id="page-explore" class="subpage" style="display:none">
+  <div class="subpage-header">
+    <button class="back-btn" onclick="goBack()">← Назад</button>
+    <div class="subpage-title">🗺️ Районы</div>
+  </div>
+  <div class="district-list" id="district-list"></div>
+</div>
+
+<!-- ══ SUB-PAGE: ДОСЬЕ ══ -->
+<div id="page-character" class="subpage" style="display:none">
+  <div class="subpage-header">
+    <button class="back-btn" onclick="goBack()">← Назад</button>
+    <div class="subpage-title">👤 Досье</div>
+  </div>
+  <div class="char-section">
+    <div class="char-card">
+      <div class="char-card-title">Основное</div>
+      <div class="char-row"><span class="char-label">Имя</span><span class="char-value" id="cs-name">—</span></div>
+      <div class="char-row"><span class="char-label">Ранг</span><span class="char-value" id="cs-rank">—</span></div>
+      <div class="char-row"><span class="char-label">Класс</span><span class="char-value" id="cs-class">—</span></div>
+    </div>
+    <div class="char-card">
+      <div class="char-card-title">Боевые</div>
+      <div class="char-row"><span class="char-label">❤️ Здоровье</span><span class="char-value" id="cs-hp">—</span></div>
+      <div class="char-row"><span class="char-label">⚡ Энергия</span><span class="char-value" id="cs-mp">—</span></div>
+      <div class="char-row"><span class="char-label">☠️ Убийств</span><span class="char-value" id="cs-kills">—</span></div>
+      <div class="char-row"><span class="char-label">🔍 Розыск</span><span class="char-value" id="cs-wanted">—</span></div>
+    </div>
+    <div class="char-card">
+      <div class="char-card-title">Финансы</div>
+      <div class="char-row"><span class="char-label">💵 Наличные</span><span class="char-value" id="cs-cash">—</span></div>
+      <div class="char-row"><span class="char-label">💎 Бриллианты</span><span class="char-value" id="cs-dia">—</span></div>
+      <div class="char-row"><span class="char-label">💼 Работа</span><span class="char-value" id="cs-job">—</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SUB-PAGE: ОТКРЫТЬ В ЧАТЕ (для разделов с данными из БД) ══ -->
+<div id="page-bot" class="subpage" style="display:none">
+  <div class="subpage-header">
+    <button class="back-btn" onclick="goBack()">← Назад</button>
+    <div class="subpage-title" id="bot-page-title">Раздел</div>
+  </div>
+  <div class="bot-section-body">
+    <div class="bot-section-icon" id="bot-page-icon">📋</div>
+    <div class="bot-section-text">Этот раздел открывается в чате бота.<br>Нажми кнопку ниже — бот покажет информацию.</div>
+    <button class="bot-section-btn" onclick="openInBot()">Открыть в чате ↗</button>
+  </div>
+</div>
+
 <script>
 // ── Telegram WebApp ───────────────────────────────────────────────────
 const tg = window.Telegram?.WebApp;
@@ -549,13 +728,100 @@ function fmtNum(n) {
   return String(n);
 }
 
-// ── Navigation ────────────────────────────────────────────────────────
+// ── SPA Navigation ────────────────────────────────────────────────────
+const CLIENT_PAGES = ['explore', 'character'];
+const BOT_PAGES = {
+  inventory:   { title: '🎒 Барахло',        icon: '🎒' },
+  shop:        { title: '🏪 Чёрный рынок',   icon: '🏪' },
+  jobs:        { title: '💼 Работа',          icon: '💼' },
+  gang_menu:   { title: '🔱 Моя банда',       icon: '🔱' },
+  diamonds:    { title: '💎 Бриллианты',      icon: '💎' },
+  my_contacts: { title: '🤝 Мои связи',       icon: '🤝' },
+};
+let pendingBotDest = null;
+
 function nav(dest) {
-  if (tg && tg.sendData) {
-    tg.sendData(JSON.stringify({ a: 'hub_nav', to: dest }));
-  } else {
-    alert('nav: ' + dest);
+  // Hide main
+  document.getElementById('page-main').style.display = 'none';
+  // Hide all subpages
+  document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
+
+  if (CLIENT_PAGES.includes(dest)) {
+    // Render client-side page
+    if (dest === 'explore') renderDistricts();
+    if (dest === 'character') renderCharacter();
+    document.getElementById('page-' + dest).style.display = '';
+  } else if (BOT_PAGES[dest]) {
+    // Show "open in bot" page
+    pendingBotDest = dest;
+    document.getElementById('bot-page-title').textContent = BOT_PAGES[dest].title;
+    document.getElementById('bot-page-icon').textContent  = BOT_PAGES[dest].icon;
+    document.getElementById('page-bot').style.display = '';
   }
+  window.scrollTo(0, 0);
+}
+
+function goBack() {
+  document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
+  document.getElementById('page-main').style.display = '';
+  window.scrollTo(0, 0);
+}
+
+function openInBot() {
+  if (tg && tg.sendData) {
+    tg.sendData(JSON.stringify({ a: 'hub_nav', to: pendingBotDest }));
+  }
+}
+
+// ── Render: Районы ────────────────────────────────────────────────────
+const DISTRICTS = [
+  { id:'market',  icon:'🏪', name:'Рынок',            desc:'Шумный базар, где всё продаётся. Мелкая шпана трётся у ларьков.',          minLvl:1  },
+  { id:'port',    icon:'⚓', name:'Порт',              desc:'Запах рыбы и солярки. Здесь разгружают не только рыбу.',                   minLvl:5  },
+  { id:'casino',  icon:'🎰', name:'Казино',            desc:'Блестящие огни и крупные ставки. За каждым столом — история с кровью.',    minLvl:10 },
+  { id:'factory', icon:'🏭', name:'Промзона',          desc:'Заброшенные цеха. Сюда не возвращаются.',                                  minLvl:15 },
+  { id:'mansion', icon:'🏛️', name:'Резиденция Дона',  desc:'Роскошный особняк. Только лучшие попадают сюда... живыми.',               minLvl:20 },
+];
+
+function renderDistricts() {
+  const list = document.getElementById('district-list');
+  list.innerHTML = '';
+  DISTRICTS.forEach(d => {
+    const unlocked = DATA.level >= d.minLvl;
+    const card = document.createElement('div');
+    card.className = 'district-card' + (unlocked ? '' : ' locked');
+    card.innerHTML = `
+      <div class="district-icon">${d.icon}</div>
+      <div class="district-info">
+        <div class="district-name">${d.name}</div>
+        <div class="district-desc">${d.desc}</div>
+        <div class="district-level">${unlocked ? '✅ Доступен' : '🔒 Ранг ' + d.minLvl}</div>
+      </div>
+      ${unlocked
+        ? `<button class="district-btn" onclick="fightDistrict('${d.id}')">⚔️ Бой</button>`
+        : `<div class="district-lock">🔒</div>`}
+    `;
+    list.appendChild(card);
+  });
+}
+
+function fightDistrict(districtId) {
+  if (tg && tg.sendData) {
+    tg.sendData(JSON.stringify({ a: 'hub_nav', to: 'explore', district: districtId }));
+  }
+}
+
+// ── Render: Досье ─────────────────────────────────────────────────────
+function renderCharacter() {
+  document.getElementById('cs-name').textContent   = DATA.name;
+  document.getElementById('cs-rank').textContent   = 'Ранг ' + DATA.level;
+  document.getElementById('cs-class').textContent  = (CLASSES[DATA.cls] || CLASSES.fixer).label;
+  document.getElementById('cs-hp').textContent     = DATA.hp + ' / ' + DATA.maxhp;
+  document.getElementById('cs-mp').textContent     = DATA.mp + ' / ' + DATA.maxmp;
+  document.getElementById('cs-kills').textContent  = DATA.kills;
+  document.getElementById('cs-wanted').textContent = DATA.wanted > 0 ? '⭐'.repeat(DATA.wanted) : 'Чист';
+  document.getElementById('cs-cash').textContent   = fmtNum(DATA.cash) + ' $';
+  document.getElementById('cs-dia').textContent    = fmtNum(DATA.dia) + ' 💎';
+  document.getElementById('cs-job').textContent    = DATA.job || 'Безработный';
 }
 
 function openCreator() {
