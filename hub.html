@@ -833,8 +833,9 @@ function renderCharacter() {
 }
 
 function openCreator() {
-  const v = Date.now(); // cache-buster
-  const look = `gender=${DATA.gender}&skin=${DATA.skin}&body=${DATA.body}&face=${DATA.face}&hair=${DATA.hair}&hat=${DATA.hat}&has_look=${DATA.hasLook}&dia=${DATA.dia}&v=${v}`;
+  const v   = Date.now(); // cache-buster — уникальный URL каждый раз
+  const isNew = DATA.hasLook ? 0 : 1; // 1 = первый раз, 0 = уже есть образ
+  const look = `gender=${DATA.gender}&skin=${DATA.skin}&body=${DATA.body}&face=${DATA.face}&hair=${DATA.hair}&hat=${DATA.hat}&has_look=${DATA.hasLook}&dia=${DATA.dia}&new=${isNew}&v=${v}`;
   window.location.href = 'https://slavaprivet.github.io/mafiozi-battle/creator.html?' + look;
 }
 
