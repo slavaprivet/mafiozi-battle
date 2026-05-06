@@ -805,6 +805,135 @@ body {
 .flash-blue  { animation: flashBlue  .25s ease; }
 @keyframes flashRed  { 0%,100%{background:transparent} 50%{background:#c0392b33} }
 @keyframes flashBlue { 0%,100%{background:transparent} 50%{background:#3498db33} }
+
+/* ── HOSPITAL ── */
+.hospital-btn {
+  width: 100%;
+  padding: 11px;
+  background: linear-gradient(135deg, #1a1a2e, #12122a);
+  border: 1.5px solid #3498db55;
+  color: #3498db;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: center;
+  margin-top: 8px;
+}
+.hospital-btn:active { transform: scale(0.98); }
+.hospital-section { padding: 0 16px 10px; border-bottom: 1px solid var(--border); }
+
+/* Hospital modal */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.8);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200; padding: 24px;
+}
+.modal-box {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 20px;
+  width: 100%;
+  max-width: 320px;
+  animation: popIn .3s cubic-bezier(.34,1.56,.64,1) both;
+}
+.modal-title { font-size: 16px; font-weight: 900; color: var(--gold); margin-bottom: 4px; }
+.modal-sub   { font-size: 12px; color: var(--muted); margin-bottom: 12px; font-style: italic; }
+.modal-line  { font-size: 13px; color: var(--text); margin-bottom: 6px; }
+.modal-btn {
+  width: 100%; padding: 13px; border: none; border-radius: 12px;
+  font-size: 14px; font-weight: 800; cursor: pointer; margin-top: 6px;
+}
+.modal-btn-heal { background: linear-gradient(135deg, #27ae60, #2ecc71); color: #fff; }
+.modal-btn-close { background: #1a1a2e; border: 1px solid var(--border); color: var(--muted); }
+
+/* ── EXTRA BATTLE ACTIONS ── */
+.battle-special-actions {
+  padding: 0 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.battle-special-btn {
+  width: 100%;
+  padding: 11px 14px;
+  border: none;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+}
+.battle-special-btn:active { transform: scale(0.97); }
+.battle-special-btn.nade  { background: linear-gradient(135deg, #e67e22, #d35400); color:#fff; }
+.battle-special-btn.medkit{ background: linear-gradient(135deg, #27ae60, #1a7a40); color:#fff; }
+.battle-special-btn.skill { background: linear-gradient(135deg, #8e44ad, #6c3483); color:#fff; }
+.battle-special-btn.prop  { background: linear-gradient(135deg, #2980b9, #1a5276); color:#fff; }
+
+/* ── INJURY INDICATORS ── */
+.fighter-injury {
+  font-size: 16px; text-align: center; min-height: 20px;
+  animation: fadeInLog .3s ease;
+}
+.fighter-icon-wrap { position: relative; display: inline-block; }
+
+/* ── BATTLE ANIMATIONS ── */
+.battle-fighters { position: relative; overflow: visible; }
+.battle-fx-layer {
+  position: absolute; inset: 0; pointer-events: none; z-index: 10;
+  overflow: hidden;
+}
+.fx-projectile {
+  position: absolute; font-size: 22px; pointer-events: none;
+  z-index: 11;
+}
+.blood-drop {
+  position: absolute; width: 6px; height: 6px; border-radius: 50%;
+  background: #c0392b; pointer-events: none; z-index: 11;
+  animation: bloodFly .55s ease-out forwards;
+}
+.crit-label {
+  position: absolute; font-size: 18px; font-weight: 900;
+  color: #f0c030; pointer-events: none; z-index: 12;
+  animation: critPop .5s ease-out forwards;
+  text-shadow: 0 0 10px #f0c030;
+}
+@keyframes flyBullet {
+  from { transform: translateX(0) scaleX(1); opacity: 1; }
+  to   { transform: translateX(140px) scaleX(0.3); opacity: 0; }
+}
+@keyframes flyKnife {
+  0%   { transform: rotate(-30deg) scale(0.8); opacity: 1; }
+  60%  { transform: rotate(15deg) scale(1.3); opacity: 1; }
+  100% { transform: rotate(40deg) scale(0.5) translateX(20px); opacity: 0; }
+}
+@keyframes flyFist {
+  0%   { transform: scale(0.6) translateX(-10px); opacity: 1; }
+  60%  { transform: scale(1.4); opacity: 1; }
+  100% { transform: scale(0.6) translateX(10px); opacity: 0; }
+}
+@keyframes bloodFly {
+  0%   { transform: translate(0,0); opacity: .9; }
+  100% { transform: translate(var(--dx), var(--dy)); opacity: 0; }
+}
+@keyframes critPop {
+  0%   { transform: scale(0.5) translateY(0); opacity: 1; }
+  60%  { transform: scale(1.3) translateY(-20px); opacity: 1; }
+  100% { transform: scale(1) translateY(-35px); opacity: 0; }
+}
+.battle-log-entry.crit { color: #f0c030 !important; font-weight: 900; }
+
+/* mana bar in battle */
+.battle-mana-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 16px 0;
+}
+.battle-mana-bar-bg {
+  flex: 1; height: 5px; background: #1a1a2e; border-radius: 3px; overflow: hidden;
+}
+.battle-mana-bar { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #1a6ea0,#3498db); transition: width .3s; }
+.battle-mana-text { font-size: 10px; color: #3498db; font-weight: 700; flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -945,10 +1074,27 @@ body {
     <button class="gather-btn" id="gather-btn" onclick="doGather()">🍺 Собрать</button>
     <div class="gather-cd-text" id="gather-cd-text"></div>
   </div>
+  <!-- Hospital -->
+  <div class="hospital-section">
+    <button class="hospital-btn" id="hospital-btn" onclick="showHospital()">🏥 Больница</button>
+  </div>
   <!-- Boss list -->
   <div class="bosses-section">
     <div class="bosses-label">⚔️ Враги</div>
     <div id="boss-list"></div>
+  </div>
+</div>
+
+<!-- ══ HOSPITAL MODAL ══ -->
+<div class="modal-overlay" id="hospital-modal" style="display:none">
+  <div class="modal-box">
+    <div class="modal-title" id="hosp-name">🏥 Больница</div>
+    <div class="modal-sub"  id="hosp-doc">Доктор принимает всех.</div>
+    <div class="modal-line" id="hosp-hp-line">❤️ HP: —</div>
+    <div class="modal-line" id="hosp-mp-line">⚡ Энергия: —</div>
+    <div class="modal-line" id="hosp-cost-line">💵 Лечение: 100$</div>
+    <button class="modal-btn modal-btn-heal" onclick="doHospitalHeal()">💊 Вылечиться</button>
+    <button class="modal-btn modal-btn-close" onclick="document.getElementById('hospital-modal').style.display='none'">Закрыть</button>
   </div>
 </div>
 
@@ -957,9 +1103,13 @@ body {
   <div class="battle-screen" id="battle-screen">
     <div class="battle-header" id="battle-loc-name">Битва</div>
     <!-- Fighters -->
-    <div class="battle-fighters">
+    <div class="battle-fighters" id="battle-fighters-wrap">
+      <div class="battle-fx-layer" id="battle-fx-layer"></div>
       <div class="fighter-side" id="battle-player-side">
-        <div class="fighter-icon">🤵</div>
+        <div class="fighter-icon-wrap">
+          <div class="fighter-icon">🤵</div>
+        </div>
+        <div class="fighter-injury" id="b-player-injury"></div>
         <div class="fighter-name" id="b-player-name">Игрок</div>
         <div class="fighter-hp-wrap">
           <div class="fighter-hp-bar-bg"><div class="fighter-hp-bar player" id="b-player-bar" style="width:100%"></div></div>
@@ -968,7 +1118,10 @@ body {
       </div>
       <div class="vs-divider">⚔️</div>
       <div class="fighter-side" id="battle-boss-side">
-        <div class="fighter-icon" id="b-boss-icon">😈</div>
+        <div class="fighter-icon-wrap">
+          <div class="fighter-icon" id="b-boss-icon">😈</div>
+        </div>
+        <div class="fighter-injury" id="b-boss-injury"></div>
         <div class="fighter-name" id="b-boss-name">Босс</div>
         <div class="fighter-hp-wrap">
           <div class="fighter-hp-bar-bg"><div class="fighter-hp-bar boss" id="b-boss-bar" style="width:100%"></div></div>
@@ -976,15 +1129,23 @@ body {
         </div>
       </div>
     </div>
+    <!-- Mana bar -->
+    <div class="battle-mana-row">
+      <span style="font-size:10px;color:#3498db">⚡</span>
+      <div class="battle-mana-bar-bg"><div class="battle-mana-bar" id="b-mana-bar" style="width:100%"></div></div>
+      <div class="battle-mana-text" id="b-mana-text">50/50</div>
+    </div>
     <!-- Boss quote -->
     <div style="padding:6px 16px;font-size:12px;color:var(--muted);font-style:italic;text-align:center" id="b-boss-quote">"..."</div>
     <!-- Battle log -->
     <div class="battle-log-wrap" id="battle-log"></div>
-    <!-- Actions -->
+    <!-- Main actions -->
     <div class="battle-actions">
-      <button class="battle-attack-btn" id="battle-atk-btn" onclick="playerAttack()">🔫 Атаковать</button>
+      <button class="battle-attack-btn" id="battle-atk-btn" onclick="playerAttack('normal')">🔫 Атаковать</button>
       <button class="battle-flee-btn" id="battle-flee-btn" onclick="fleeBattle()">🏃 Бежать</button>
     </div>
+    <!-- Special actions (grenade / medkit / skill / property) -->
+    <div class="battle-special-actions" id="battle-special-actions"></div>
   </div>
   <!-- Result overlay (hidden by default) -->
   <div class="battle-result-overlay" id="battle-result" style="display:none"></div>
@@ -1056,7 +1217,6 @@ const DATA = {
   wanted:  pi('wanted', 0),
   contacts:pi('contacts', 0),
   job:     p('job',''),
-  // look
   gender:  pi('gender', 0),
   skin:    pi('skin', 0),
   body:    pi('body', 1),
@@ -1066,6 +1226,12 @@ const DATA = {
   hasLook: pi('has_look', 0),
   atk:     pi('atk', 20),
   def:     pi('def', 10),
+  gren:    pi('gren', 0),
+  med_s:   pi('med_s', 0),
+  med_m:   pi('med_m', 0),
+  med_l:   pi('med_l', 0),
+  weapon:  p('weapon', ''),
+  prop:    p('prop','').split(',').filter(Boolean),
 };
 
 // ── Class definitions ─────────────────────────────────────────────────
@@ -1088,7 +1254,6 @@ document.getElementById('top-kills').textContent = `💀 ${DATA.kills}`;
 const cls = CLASSES[DATA.cls] || CLASSES.fixer;
 document.getElementById('class-badge').textContent = cls.label;
 
-// Animate HP/MP bars after a tick
 requestAnimationFrame(() => {
   setTimeout(() => {
     document.getElementById('hp-bar').style.width = Math.min(100, DATA.hp / DATA.maxhp * 100).toFixed(1) + '%';
@@ -1096,20 +1261,16 @@ requestAnimationFrame(() => {
   }, 50);
 });
 
-// Wanted stars
 if (DATA.wanted > 0) {
   const el = document.getElementById('top-wanted');
   el.textContent = '⭐'.repeat(DATA.wanted);
   el.style.display = '';
 }
-
-// Contacts badge
 if (DATA.contacts > 0) {
   const tc = document.getElementById('tile-contacts');
   tc.innerHTML += `<div class="tile-badge">${DATA.contacts}</div>`;
 }
 
-// Status chips
 const sb = document.getElementById('status-bar');
 if (DATA.job) {
   const chip = document.createElement('div');
@@ -1145,7 +1306,6 @@ const BOT_PAGES = {
 };
 let pendingBotDest = null;
 
-// Сохраняем полный URL хаба — creator.html вернётся сюда
 try { localStorage.setItem('hubUrl', location.href); } catch(e) {}
 
 function nav(dest) {
@@ -1164,7 +1324,6 @@ function nav(dest) {
   }
   window.scrollTo(0, 0);
 
-  // Нативная кнопка «Назад» в шапке Telegram
   if (tg && tg.BackButton) {
     tg.BackButton.onClick(goBack);
     tg.BackButton.show();
@@ -1172,17 +1331,14 @@ function nav(dest) {
 }
 
 function goBack() {
-  // Если в бою — вернуться к деталям района
   if (document.getElementById('page-battle').style.display !== 'none') {
     if (battleState) afterBattle(false);
     return;
   }
-  // Если в деталях района — вернуться к списку
   if (document.getElementById('page-district').style.display !== 'none') {
     navDistrict('back');
     return;
   }
-  // Иначе — на главную
   document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
   document.getElementById('page-main').style.display = '';
   window.scrollTo(0, 0);
@@ -1190,17 +1346,63 @@ function goBack() {
 }
 
 function openInBot() {
-  // Открывает раздел в боте через sendData — только по явному нажатию пользователя
   if (tg && tg.sendData) {
     tg.sendData(JSON.stringify({ a: 'hub_nav', to: pendingBotDest }));
   }
 }
 
 // ══════════════════════════════════════════════════════════════════════
-//  DISTRICTS SYSTEM — полная система районов внутри мини-приложения
+//  GAME DATA TABLES
 // ══════════════════════════════════════════════════════════════════════
 
-// Данные совпадают с BOSSES / LOCATIONS / GATHER_ACTIONS в боте
+const CLASS_SKILLS = {
+  killer:   {name:'🎯 Контрольный выстрел', mult:2.5, cost:25},
+  enforcer: {name:'⛓ Удар кастетом',       mult:2.0, cost:20},
+  fixer:    {name:'🔪 Разборка по понятиям', mult:2.2, cost:22},
+  conman:   {name:'🧠 Психологическое давление', mult:1.8, cost:20, heal:35},
+};
+
+const PROP_SKILLS = {
+  car:       {name:'🚗 Стрелять из машины',     mult:3.0},
+  helicopter:{name:'🚁 Пальнуть из вертолёта',  mult:5.0},
+  yacht:     {name:'⛵ Запустить ракету с яхты', mult:8.0},
+};
+
+const HOSPITAL_NAMES = {
+  market:  {name:'🏥 Фельдшерский пункт', doc:'Старый фельдшер Семёныч'},
+  port:    {name:'🏥 Портовый медпункт',  doc:'Доктор Якорь'},
+  casino:  {name:'🏥 Частная клиника',    doc:'Доктор Рубин'},
+  factory: {name:'🏥 Заводской санитар',  doc:'Санитар Петрович'},
+  mansion: {name:'🏥 Личный врач Дона',   doc:'Профессор Морелли'},
+};
+const HOSPITAL_COST = 100;
+
+const GUN_WEAPONS  = new Set(['nagan','sawn_off','uzi','golden_colt','tt_pistol','shotgun',
+  'ak74','revolver','deagle','sniper','m16','rpg','golden_uzi','tommy_gun']);
+const KNIFE_WEAPONS = new Set(['zatochka']);
+
+function getWeaponType() {
+  if (GUN_WEAPONS.has(DATA.weapon))   return 'gun';
+  if (KNIFE_WEAPONS.has(DATA.weapon)) return 'knife';
+  return 'fist';
+}
+function getAttackLabel() {
+  const t = getWeaponType();
+  if (t === 'gun')   return '🔫 Стрелять';
+  if (t === 'knife') return '🔪 Колоть';
+  return '🤜 Бить';
+}
+function getAttackVerb() {
+  const t = getWeaponType();
+  if (t === 'gun')   return 'Стреляешь';
+  if (t === 'knife') return 'Колешь';
+  return 'Бьёшь';
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  DISTRICTS SYSTEM
+// ══════════════════════════════════════════════════════════════════════
+
 const BOSS_DATA = {
   kosoy:     {name:'😈 Косой',    title:'Мелкий воришка',        hp:150, atk:28, def:10, exp:22,  cash:80,  quote:'Да я тебя знаешь как...'},
   bychok:    {name:'🐂 Бычок',    title:'Рыночный рэкетир',      hp:200, atk:34, def:15, exp:30,  cash:110, quote:'Чё уставился, баран?'},
@@ -1213,7 +1415,7 @@ const BOSS_DATA = {
   legenda:   {name:'👑 Легенда',  title:'Живая икона криминала', hp:520, atk:78, def:42, exp:100, cash:450, quote:'Меня знают все. Все боятся.'},
   professor: {name:'🎓 Профессор',title:'Мастер схем и афер',    hp:460, atk:82, def:35, exp:110, cash:500, quote:'Ты просто пешка в моей игре.'},
   artist:    {name:'🎭 Артист',   title:'Мошенник высшей пробы', hp:500, atk:88, def:38, exp:120, cash:480, quote:'Жизнь — театр. А ты — массовка.'},
-  svalshchik:{name:'♟️ Сдатчик',  title:'Предатель с опытом',    hp:480, atk:72, def:30, exp:90,  cash:400, quote:'Деловой разговор. Ничего личного.'},
+  svalshchik:{name:'♟ Сдатчик',  title:'Предатель с опытом',    hp:480, atk:72, def:30, exp:90,  cash:400, quote:'Деловой разговор. Ничего личного.'},
   buryy:     {name:'🐻 Бурый',    title:'Авторитет старой закалки',hp:680,atk:96, def:50, exp:145, cash:650, quote:'Я тут раньше тебя, щенок.'},
   khirurg:   {name:'🩺 Хирург',   title:'Чистильщик группировки',hp:620, atk:105,def:48, exp:155, cash:700, quote:'Больно не будет. Обещаю.'},
   tigr:      {name:'🐯 Тигр',     title:'Наёмный убийца',        hp:750, atk:100,def:55, exp:165, cash:720, quote:'Я не промахиваюсь.'},
@@ -1233,26 +1435,48 @@ const LOC_DATA = {
             gatherBtn:'🃏 Срубить по-лёгкому',cdKey:'gather_casino',  cdMs:3600000, cashMin:60,  cashMax:150, perLvl:8},
   factory: {icon:'🏭', name:'Промзона',         minLvl:15, bosses:['buryy','khirurg','palach','tigr'],
             gatherBtn:'🔧 Сдать металлолом',  cdKey:'gather_factory', cdMs:3600000, cashMin:100, cashMax:250, perLvl:12},
-  mansion: {icon:'🏛️', name:'Резиденция Дона', minLvl:20, bosses:['sedoy','prizrak','vizir','don_karlo'],
+  mansion: {icon:'🏛', name:'Резиденция Дона', minLvl:20, bosses:['sedoy','prizrak','vizir','don_karlo'],
             gatherBtn:'💍 Стрясти должок',    cdKey:'gather_mansion', cdMs:3600000, cashMin:250, cashMax:500, perLvl:20},
 };
 
-// ── SESSION STATE — накапливаем результаты между боями ────────────────
+// ── SESSION STATE ────────────────────────────────────────────────────
 const session = {
-  hp:        DATA.hp,
-  mp:        DATA.mp,
-  wins:      [],    // [{boss_id, loc_id, exp, cash}]
-  gathers:   [],    // [{loc_id, cash}]
-  dirty:     false, // есть несохранённые результаты
+  hp:    DATA.hp,
+  mp:    DATA.mp,
+  cash:  DATA.cash,
+  gren:  DATA.gren,
+  med_s: DATA.med_s,
+  med_m: DATA.med_m,
+  med_l: DATA.med_l,
+  wins:    [],
+  gathers: [],
+  heals:   [],
+  dirty:   false,
 };
 
-let currentLocId  = null;  // текущий открытый район
-let battleState   = null;  // состояние текущего боя
+let currentLocId = null;
+let battleState  = null;
 
-// ── COMBAT ENGINE ────────────────────────────────────────────────────
+// ── COMBAT ENGINE ─────────────────────────────────────────────────────
 function calcDmg(atk, def) {
   const base = Math.max(1, atk - Math.floor(def / 2));
   return Math.max(1, Math.round(base * (0.85 + Math.random() * 0.30)));
+}
+
+// ── COMMIT SESSION ────────────────────────────────────────────────────
+function commitSession() {
+  if (!session.dirty) return;
+  const payload = {
+    a:        'hub_battles',
+    wins:     session.wins,
+    gathers:  session.gathers,
+    heals:    session.heals,
+    final_hp: session.hp,
+    final_mp: session.mp,
+  };
+  if (tg && typeof tg.sendData === 'function') {
+    tg.sendData(JSON.stringify(payload));
+  }
 }
 
 // ── RENDER: СПИСОК РАЙОНОВ ────────────────────────────────────────────
@@ -1268,7 +1492,6 @@ function renderDistricts() {
       <div class="district-icon">${d.icon}</div>
       <div class="district-info">
         <div class="district-name">${d.name}</div>
-        <div class="district-desc">${LOC_DATA[id].bosses.length} врага · ${d.bosses.length} бандита</div>
         <div class="district-meta">
           ${unlocked
             ? `<span class="district-tag unlocked">✅ Доступен</span>`
@@ -1283,22 +1506,18 @@ function renderDistricts() {
   });
 }
 
-// ── ОТКРЫТЬ СТРАНИЦУ РАЙОНА ──────────────────────────────────────────
+// ── ОТКРЫТЬ СТРАНИЦУ РАЙОНА ───────────────────────────────────────────
 function openDistrict(locId) {
   currentLocId = locId;
   const loc = LOC_DATA[locId];
-  // Заголовок
   document.getElementById('district-page-title').textContent = loc.icon + ' ' + loc.name;
   document.getElementById('dist-icon').textContent  = loc.icon;
   document.getElementById('dist-name').textContent  = loc.name;
   document.getElementById('dist-desc').textContent  = getLocDesc(locId);
-  // Session HP
   updateDistHPBar();
-  // Gather button
   renderGatherBtn(locId);
-  // Boss list
   renderBossList(locId);
-  // Show page
+  updateHospitalBtn();
   document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
   document.getElementById('page-district').style.display = '';
   if (tg && tg.BackButton) {
@@ -1325,7 +1544,46 @@ function updateDistHPBar() {
   document.getElementById('dist-hp-val').textContent = session.hp + ' / ' + DATA.maxhp;
 }
 
-// ── GATHER ACTION ────────────────────────────────────────────────────
+function updateHospitalBtn() {
+  const btn = document.getElementById('hospital-btn');
+  const hosp = HOSPITAL_NAMES[currentLocId] || {name:'🏥 Больница'};
+  const needsHeal = session.hp < DATA.maxhp || session.mp < DATA.maxmp;
+  btn.textContent = hosp.name + (needsHeal ? '' : ' (здоров)');
+  btn.style.opacity = needsHeal ? '1' : '0.5';
+}
+
+// ── HOSPITAL ──────────────────────────────────────────────────────────
+function showHospital() {
+  const locId = currentLocId;
+  const hosp  = HOSPITAL_NAMES[locId] || {name:'🏥 Больница', doc:'Доктор'};
+  const hpFull = session.hp >= DATA.maxhp;
+  const mpFull = session.mp >= DATA.maxmp;
+  if (hpFull && mpFull) { showToast('Ты уже в полном порядке!', '✅'); return; }
+  if (session.cash < HOSPITAL_COST) { showToast(`Нужно ${HOSPITAL_COST}$, у тебя ${session.cash}$`, '❌'); return; }
+  document.getElementById('hosp-name').textContent      = hosp.name;
+  document.getElementById('hosp-doc').textContent       = hosp.doc + ' принимает всех.';
+  document.getElementById('hosp-hp-line').textContent   = '❤️ HP: ' + session.hp + ' / ' + DATA.maxhp;
+  document.getElementById('hosp-mp-line').textContent   = '⚡ Энергия: ' + session.mp + ' / ' + DATA.maxmp;
+  document.getElementById('hosp-cost-line').textContent = '💵 Полное лечение: ' + HOSPITAL_COST + '$ (у тебя ' + session.cash + '$)';
+  document.getElementById('hospital-modal').style.display = 'flex';
+}
+
+function doHospitalHeal() {
+  if (session.cash < HOSPITAL_COST) { showToast('Не хватает денег!', '❌'); return; }
+  if (session.hp >= DATA.maxhp && session.mp >= DATA.maxmp) { showToast('Ты уже здоров!', '✅'); return; }
+  session.cash -= HOSPITAL_COST;
+  session.hp    = DATA.maxhp;
+  session.mp    = DATA.maxmp;
+  session.heals.push({loc_id: currentLocId, cost: HOSPITAL_COST});
+  session.dirty = true;
+  document.getElementById('hospital-modal').style.display = 'none';
+  updateDistHPBar();
+  updateHospitalBtn();
+  renderBossList(currentLocId);
+  showToast('Вылечен за ' + HOSPITAL_COST + '$!', '🏥');
+}
+
+// ── GATHER ACTION ─────────────────────────────────────────────────────
 function renderGatherBtn(locId) {
   const loc = LOC_DATA[locId];
   const btn = document.getElementById('gather-btn');
@@ -1338,7 +1596,7 @@ function renderGatherBtn(locId) {
     const mins = Math.ceil(remaining / 60000);
     btn.textContent = loc.gatherBtn + ' (кулдаун)';
     btn.className = 'gather-btn on-cd';
-    cdTxt.textContent = `Снова через ${mins} мин.`;
+    cdTxt.textContent = 'Снова через ' + mins + ' мин.';
   } else {
     btn.textContent = loc.gatherBtn;
     btn.className = 'gather-btn';
@@ -1352,30 +1610,27 @@ function doGather() {
   let lastTs = 0;
   try { lastTs = parseInt(localStorage.getItem(loc.cdKey) || '0'); } catch(e) {}
   if (Date.now() - lastTs < loc.cdMs) { renderGatherBtn(currentLocId); return; }
-  // Compute cash
-  const lvl = DATA.level;
+  const lvl  = DATA.level;
   const cash = Math.floor(
     (loc.cashMin + lvl * loc.perLvl * 0.5) +
     Math.random() * ((loc.cashMax - loc.cashMin) + lvl * loc.perLvl * 0.5)
   );
-  // Save cooldown
   try { localStorage.setItem(loc.cdKey, String(Date.now())); } catch(e) {}
-  // Record in session
   session.gathers.push({loc_id: currentLocId, cash});
+  session.cash += cash;
   session.dirty = true;
-  // Show toast
-  showToast(`${loc.gatherBtn} · +${cash}$`, '💰');
+  showToast(loc.gatherBtn + ' · +' + cash + '$', '💰');
   renderGatherBtn(currentLocId);
 }
 
-// ── BOSS LIST ────────────────────────────────────────────────────────
+// ── BOSS LIST ──────────────────────────────────────────────────────────
 function renderBossList(locId) {
   const list = document.getElementById('boss-list');
   list.innerHTML = '';
   LOC_DATA[locId].bosses.forEach(bossId => {
     const b = BOSS_DATA[bossId];
     if (!b) return;
-    const canFight = session.hp >= 10;  // нельзя воевать при <10 HP
+    const canFight = session.hp >= 10;
     const card = document.createElement('div');
     card.className = 'boss-card';
     const cashRange = Math.round(b.cash * 1.33);
@@ -1405,36 +1660,20 @@ function renderBossList(locId) {
 
 function navDistrict(dir) {
   if (dir === 'back') {
-    // Вернуться к списку районов
     document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
     document.getElementById('page-explore').style.display = '';
     if (tg && tg.BackButton) {
       tg.BackButton.onClick(goBack);
       tg.BackButton.show();
     }
-    // Если есть несохранённые результаты — сохранить и закрыть
-    if (session.dirty) {
-      commitSession();
-    }
+    if (session.dirty) commitSession();
   }
 }
 
-// ── COMMIT SESSION → отправить в бот (закрывает мини-приложение) ────
-function commitSession() {
-  if (!session.dirty) return;
-  const payload = {
-    a:         'hub_battles',
-    wins:      session.wins,
-    gathers:   session.gathers,
-    final_hp:  session.hp,
-    final_mp:  session.mp,
-  };
-  if (tg && typeof tg.sendData === 'function') {
-    tg.sendData(JSON.stringify(payload));
-  }
-}
+// ══════════════════════════════════════════════════════════════════════
+//  BATTLE SYSTEM
+// ══════════════════════════════════════════════════════════════════════
 
-// ── BATTLE SYSTEM ────────────────────────────────────────────────────
 function startBattle(bossId, locId) {
   const boss = BOSS_DATA[bossId];
   if (!boss) return;
@@ -1442,44 +1681,46 @@ function startBattle(bossId, locId) {
   battleState = {
     bossId,
     locId,
-    bossHp:    boss.hp,
-    bossMaxHp: boss.hp,
-    playerHp:  session.hp,
+    bossHp:      boss.hp,
+    bossMaxHp:   boss.hp,
+    playerHp:    session.hp,
     playerMaxHp: DATA.maxhp,
-    playerAtk: DATA.atk,
-    playerDef: DATA.def,
-    running:   true,
+    playerMp:    session.mp,
+    playerMaxMp: DATA.maxmp,
+    playerAtk:   DATA.atk,
+    playerDef:   DATA.def,
+    propUsed:    [],
+    running:     true,
   };
 
-  // Fill UI
-  document.getElementById('battle-loc-name').textContent =
-    LOC_DATA[locId].icon + ' ' + LOC_DATA[locId].name + ' — Бой!';
+  document.getElementById('battle-atk-btn').textContent = getAttackLabel();
+  document.getElementById('battle-loc-name').textContent = LOC_DATA[locId].icon + ' ' + LOC_DATA[locId].name + ' — Бой!';
   document.getElementById('b-player-name').textContent = DATA.name;
-  document.getElementById('b-player-hp').textContent   = session.hp + '/' + DATA.maxhp;
-  document.getElementById('b-player-bar').style.width  = (session.hp / DATA.maxhp * 100).toFixed(1) + '%';
   document.getElementById('b-boss-icon').textContent   = boss.name.match(/^./u)[0];
-  document.getElementById('b-boss-name').textContent   = boss.name.slice(2);
-  document.getElementById('b-boss-hp').textContent     = boss.hp + '/' + boss.hp;
-  document.getElementById('b-boss-bar').style.width    = '100%';
+  document.getElementById('b-boss-name').textContent   = boss.name.replace(/^\S+\s*/, '');
   document.getElementById('b-boss-quote').textContent  = '«' + boss.quote + '»';
   document.getElementById('battle-log').innerHTML      = '';
   document.getElementById('battle-result').style.display = 'none';
-  document.getElementById('battle-atk-btn').disabled  = false;
-  document.getElementById('battle-flee-btn').disabled = false;
+  document.getElementById('b-player-injury').textContent = '';
+  document.getElementById('b-boss-injury').textContent   = '';
+  document.getElementById('battle-fx-layer').innerHTML   = '';
 
-  addBattleLog(`Встречаешь ${boss.name}! Бой начинается...`, 'system');
+  updateBattleUI();
+  renderBattleActions();
+  enableBattleButtons();
 
-  // Show battle page
+  addBattleLog('Встречаешь ' + boss.name + '! Бой начинается...', 'system');
+
   document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
   document.getElementById('page-battle').style.display = '';
   if (tg && tg.BackButton) tg.BackButton.hide();
   window.scrollTo(0, 0);
 }
 
-function addBattleLog(text, type='') {
+function addBattleLog(text, type) {
   const log = document.getElementById('battle-log');
-  const el = document.createElement('div');
-  el.className = 'battle-log-entry ' + type;
+  const el  = document.createElement('div');
+  el.className = 'battle-log-entry ' + (type || '');
   el.textContent = text;
   log.appendChild(el);
   log.scrollTop = log.scrollHeight;
@@ -1487,64 +1728,283 @@ function addBattleLog(text, type='') {
 
 function updateBattleUI() {
   const bs = battleState;
-  // Player
   const pPct = Math.max(0, bs.playerHp / bs.playerMaxHp * 100);
   document.getElementById('b-player-hp').textContent  = bs.playerHp + '/' + bs.playerMaxHp;
   document.getElementById('b-player-bar').style.width = pPct.toFixed(1) + '%';
-  // Boss
   const bPct = Math.max(0, bs.bossHp / bs.bossMaxHp * 100);
   document.getElementById('b-boss-hp').textContent  = bs.bossHp + '/' + bs.bossMaxHp;
   document.getElementById('b-boss-bar').style.width = bPct.toFixed(1) + '%';
+  // Mana bar
+  const mPct = Math.max(0, bs.playerMp / bs.playerMaxMp * 100);
+  document.getElementById('b-mana-bar').style.width = mPct.toFixed(1) + '%';
+  document.getElementById('b-mana-text').textContent = bs.playerMp + '/' + bs.playerMaxMp;
+  // Player HP bar colour
+  const playerBar = document.getElementById('b-player-bar');
+  if (pPct < 20) playerBar.style.background = 'linear-gradient(90deg,#6b0000,#c0392b)';
+  else if (pPct < 40) playerBar.style.background = 'linear-gradient(90deg,#8b0000,#e74c3c)';
+  else playerBar.style.background = 'linear-gradient(90deg,#27ae60,#2ecc71)';
 }
 
-function playerAttack() {
-  if (!battleState || !battleState.running) return;
+// ── SPECIAL ACTION BUTTONS ────────────────────────────────────────────
+function renderBattleActions() {
+  const area = document.getElementById('battle-special-actions');
+  area.innerHTML = '';
+  if (!battleState) return;
+  const bs    = battleState;
+  const skill = CLASS_SKILLS[DATA.cls];
+
+  if (session.gren > 0) {
+    _addSpecBtn(area, 'nade', '💣 Граната x' + session.gren + '  (80-130 урона, без ответки)', () => playerAttack('grenade'));
+  }
+  if (session.med_s > 0) {
+    _addSpecBtn(area, 'medkit', '🩹 Малая аптечка x' + session.med_s + '  (+55 HP)', () => playerAttack('medkit_s'));
+  }
+  if (session.med_m > 0) {
+    _addSpecBtn(area, 'medkit', '🏥 Аптечка x' + session.med_m + '  (+130 HP)', () => playerAttack('medkit_m'));
+  }
+  if (session.med_l > 0) {
+    _addSpecBtn(area, 'medkit', '💉 Большая аптечка x' + session.med_l + '  (+280 HP)', () => playerAttack('medkit_l'));
+  }
+  if (skill && bs.playerMp >= skill.cost) {
+    _addSpecBtn(area, 'skill', skill.name + '  (⚡' + skill.cost + ' мана)', () => playerAttack('skill'));
+  }
+  DATA.prop.forEach(propId => {
+    if (bs.propUsed.includes(propId)) return;
+    const ps = PROP_SKILLS[propId];
+    if (!ps) return;
+    _addSpecBtn(area, 'prop', ps.name, () => playerAttack('prop_' + propId));
+  });
+}
+
+function _addSpecBtn(container, type, label, onClick) {
+  const btn = document.createElement('button');
+  btn.className = 'battle-special-btn ' + type;
+  btn.textContent = label;
+  btn.onclick = onClick;
+  container.appendChild(btn);
+}
+
+function disableBattleButtons() {
   document.getElementById('battle-atk-btn').disabled  = true;
   document.getElementById('battle-flee-btn').disabled = true;
+  document.querySelectorAll('.battle-special-btn').forEach(b => b.disabled = true);
+}
+function enableBattleButtons() {
+  document.getElementById('battle-atk-btn').disabled  = false;
+  document.getElementById('battle-flee-btn').disabled = false;
+  document.querySelectorAll('.battle-special-btn').forEach(b => b.disabled = false);
+}
 
-  // Player hits boss
-  const pdmg = calcDmg(battleState.playerAtk, battleState.bossHp > 0 ? BOSS_DATA[battleState.bossId].def : 0);
-  battleState.bossHp = Math.max(0, battleState.bossHp - pdmg);
-  addBattleLog(`💥 Ты бьёшь — ${pdmg} урона!`, 'player-hit');
+// ── ANIMATION SYSTEM ──────────────────────────────────────────────────
+function triggerFlash(el, cls) {
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
+}
 
-  // Flash boss
-  const bossEl = document.getElementById('battle-boss-side');
-  bossEl.classList.remove('flash-red');
-  void bossEl.offsetWidth;
-  bossEl.classList.add('flash-red');
+function animateProjectile(type) {
+  const layer = document.getElementById('battle-fx-layer');
+  if (!layer) return;
+  const w = layer.offsetWidth  || 300;
+  const h = layer.offsetHeight || 120;
+  const el = document.createElement('div');
+  el.className = 'fx-projectile';
+  el.style.top  = Math.round(h * 0.28) + 'px';
+  if (type === 'gun') {
+    el.textContent = '🔸';
+    el.style.left  = Math.round(w * 0.12) + 'px';
+    el.style.animation = 'flyBullet .28s ease-out forwards';
+  } else if (type === 'knife') {
+    el.textContent = '🗡';
+    el.style.left  = Math.round(w * 0.25) + 'px';
+    el.style.animation = 'flyKnife .3s ease-out forwards';
+  } else if (type === 'fist') {
+    el.textContent = '💢';
+    el.style.left  = Math.round(w * 0.55) + 'px';
+    el.style.animation = 'flyFist .3s ease-out forwards';
+  } else if (type === 'grenade') {
+    el.textContent = '💣';
+    el.style.left  = Math.round(w * 0.1) + 'px';
+    el.style.animation = 'flyBullet .32s ease-out forwards';
+  } else if (type === 'skill') {
+    el.textContent = '✨';
+    el.style.left  = Math.round(w * 0.3) + 'px';
+    el.style.top   = Math.round(h * 0.1) + 'px';
+    el.style.animation = 'flyFist .4s ease-out forwards';
+  } else {
+    el.textContent = '💥';
+    el.style.left  = Math.round(w * 0.45) + 'px';
+    el.style.animation = 'flyFist .4s ease-out forwards';
+  }
+  layer.appendChild(el);
+  setTimeout(() => el.remove(), 500);
+}
 
-  updateBattleUI();
+function animateBlood(side) {
+  const sideEl = document.getElementById(side === 'boss' ? 'battle-boss-side' : 'battle-player-side');
+  if (!sideEl) return;
+  const w = sideEl.offsetWidth  || 120;
+  const h = sideEl.offsetHeight || 120;
+  sideEl.style.position = 'relative';
+  sideEl.style.overflow = 'visible';
+  for (let i = 0; i < 6; i++) {
+    const drop = document.createElement('div');
+    drop.className = 'blood-drop';
+    const angle = Math.random() * Math.PI * 2;
+    const dist  = 18 + Math.random() * 28;
+    drop.style.left = (w / 2) + 'px';
+    drop.style.top  = (h * 0.35) + 'px';
+    drop.style.setProperty('--dx', (Math.cos(angle) * dist).toFixed(1) + 'px');
+    drop.style.setProperty('--dy', (Math.sin(angle) * dist).toFixed(1) + 'px');
+    sideEl.appendChild(drop);
+    setTimeout(() => drop.remove(), 650);
+  }
+}
 
-  // Check win
-  if (battleState.bossHp <= 0) {
-    setTimeout(handleWin, 400);
+function animateCrit(side) {
+  const sideEl = document.getElementById(side === 'boss' ? 'battle-boss-side' : 'battle-player-side');
+  if (!sideEl) return;
+  sideEl.style.position = 'relative';
+  const lbl = document.createElement('div');
+  lbl.className = 'crit-label';
+  lbl.textContent = 'КРИТ!';
+  lbl.style.left = '50%';
+  lbl.style.top  = '0%';
+  lbl.style.transform = 'translateX(-50%)';
+  sideEl.appendChild(lbl);
+  setTimeout(() => lbl.remove(), 600);
+}
+
+// ── INJURY INDICATORS ─────────────────────────────────────────────────
+function updateInjuryIndicators() {
+  if (!battleState) return;
+  _setInjury('b-player-injury', battleState.playerHp, battleState.playerMaxHp);
+  _setInjury('b-boss-injury',   battleState.bossHp,   battleState.bossMaxHp);
+}
+function _setInjury(elId, hp, maxHp) {
+  const el  = document.getElementById(elId);
+  if (!el) return;
+  const pct = hp / maxHp;
+  if (pct <= 0)        el.textContent = '💀';
+  else if (pct <= 0.2) el.textContent = '🩸😵';
+  else if (pct <= 0.4) el.textContent = '🩹';
+  else                 el.textContent = '';
+}
+
+// ── MAIN ATTACK FUNCTION ──────────────────────────────────────────────
+function playerAttack(type) {
+  if (!battleState || !battleState.running) return;
+  const boss = BOSS_DATA[battleState.bossId];
+  disableBattleButtons();
+
+  let dmg = 0, logMsg = '', animType = 'fist', noCounter = false;
+
+  // MEDKITS — heal, no attack
+  if (type === 'medkit_s' || type === 'medkit_m' || type === 'medkit_l') {
+    const healAmt  = type === 'medkit_s' ? 55 : type === 'medkit_m' ? 130 : 280;
+    const healName = type === 'medkit_s' ? '🩹 Малая аптечка' :
+                     type === 'medkit_m' ? '🏥 Аптечка' : '💉 Большая аптечка';
+    battleState.playerHp = Math.min(battleState.playerMaxHp, battleState.playerHp + healAmt);
+    if (type === 'medkit_s') session.med_s = Math.max(0, session.med_s - 1);
+    else if (type === 'medkit_m') session.med_m = Math.max(0, session.med_m - 1);
+    else session.med_l = Math.max(0, session.med_l - 1);
+    session.hp    = battleState.playerHp;
+    session.dirty = true;
+    addBattleLog(healName + ' — +' + healAmt + ' HP!', 'system');
+    updateBattleUI();
+    updateInjuryIndicators();
+    renderBattleActions();
+    enableBattleButtons();
     return;
   }
 
-  // Boss counterattacks after 500ms
-  setTimeout(() => {
-    const boss = BOSS_DATA[battleState.bossId];
-    const bdmg = calcDmg(boss.atk, battleState.playerAtk > 0 ? battleState.playerAtk / 3 : 0);
-    battleState.playerHp = Math.max(0, battleState.playerHp - bdmg);
-    addBattleLog(`⚠️ ${boss.name} бьёт в ответ — ${bdmg} урона!`, 'boss-hit');
-
-    // Flash player
-    const pEl = document.getElementById('battle-player-side');
-    pEl.classList.remove('flash-blue');
-    void pEl.offsetWidth;
-    pEl.classList.add('flash-blue');
-
-    updateBattleUI();
-
-    // Check lose
-    if (battleState.playerHp <= 0) {
-      setTimeout(handleLose, 400);
-      return;
+  // GRENADE
+  if (type === 'grenade') {
+    dmg       = 80 + Math.floor(Math.random() * 51);
+    logMsg    = '💣 Граната! — ' + dmg + ' урона! (ответки нет)';
+    animType  = 'grenade';
+    noCounter = true;
+    session.gren = Math.max(0, session.gren - 1);
+  }
+  // CLASS SKILL
+  else if (type === 'skill') {
+    const skill = CLASS_SKILLS[DATA.cls];
+    if (!skill || battleState.playerMp < skill.cost) { enableBattleButtons(); return; }
+    dmg     = Math.round(calcDmg(battleState.playerAtk, boss.def) * skill.mult);
+    logMsg  = '✨ ' + skill.name + ' — ' + dmg + ' урона!';
+    animType = 'skill';
+    battleState.playerMp = Math.max(0, battleState.playerMp - skill.cost);
+    session.mp = battleState.playerMp;
+    if (skill.heal) {
+      battleState.playerHp = Math.min(battleState.playerMaxHp, battleState.playerHp + skill.heal);
+      logMsg += ' (+' + skill.heal + ' HP)';
     }
+  }
+  // PROPERTY SKILL
+  else if (type.startsWith('prop_')) {
+    const propId = type.replace('prop_', '');
+    const ps = PROP_SKILLS[propId];
+    if (!ps || battleState.propUsed.includes(propId)) { enableBattleButtons(); return; }
+    dmg     = Math.round(calcDmg(battleState.playerAtk, boss.def) * ps.mult);
+    logMsg  = ps.name + ' — ' + dmg + ' урона!';
+    animType = 'gun';
+    battleState.propUsed.push(propId);
+  }
+  // NORMAL ATTACK with critical hit
+  else {
+    const baseDmg = calcDmg(battleState.playerAtk, boss.def);
+    const isCrit  = Math.random() < 0.15;
+    dmg      = isCrit ? Math.round(baseDmg * 1.5) : baseDmg;
+    animType = getWeaponType();
+    if (isCrit) {
+      logMsg = '💥 КРИТ! ' + getAttackVerb() + ' — ' + dmg + ' урона!';
+      animateCrit('boss');
+    } else {
+      logMsg = '💥 ' + getAttackVerb() + ' — ' + dmg + ' урона!';
+    }
+  }
 
-    // Enable buttons again
-    document.getElementById('battle-atk-btn').disabled  = false;
-    document.getElementById('battle-flee-btn').disabled = false;
+  // Apply damage
+  battleState.bossHp = Math.max(0, battleState.bossHp - dmg);
+
+  // Projectile animation
+  animateProjectile(animType);
+  const flashDelay = (animType === 'gun') ? 240 : 80;
+  setTimeout(() => {
+    triggerFlash(document.getElementById('battle-boss-side'), 'flash-red');
+    animateBlood('boss');
+  }, flashDelay);
+
+  addBattleLog(logMsg, type === 'grenade' ? 'system' : 'player-hit');
+  updateBattleUI();
+  updateInjuryIndicators();
+
+  if (battleState.bossHp <= 0) { setTimeout(handleWin, 400); return; }
+
+  if (noCounter) {
+    renderBattleActions();
+    enableBattleButtons();
+    return;
+  }
+
+  // Boss counterattack
+  setTimeout(() => {
+    const bdmg = calcDmg(boss.atk, Math.floor(battleState.playerAtk / 3));
+    battleState.playerHp = Math.max(0, battleState.playerHp - bdmg);
+    addBattleLog('⚠️ ' + boss.name.replace(/^\S+\s*/, '') + ' бьёт в ответ — ' + bdmg + ' урона!', 'boss-hit');
+
+    triggerFlash(document.getElementById('battle-player-side'), 'flash-blue');
+    animateBlood('player');
+
+    session.hp = battleState.playerHp;
+    session.mp = battleState.playerMp;
+    updateBattleUI();
+    updateInjuryIndicators();
+
+    if (battleState.playerHp <= 0) { setTimeout(handleLose, 400); return; }
+
+    renderBattleActions();
+    enableBattleButtons();
   }, 500);
 }
 
@@ -1554,15 +2014,12 @@ function handleWin() {
   const boss  = BOSS_DATA[battleState.bossId];
   const exp   = boss.exp;
   const cash  = boss.cash + Math.floor(Math.random() * Math.round(boss.cash / 3));
-
-  // Update session
-  session.hp   = battleState.playerHp;
+  session.hp    = battleState.playerHp;
+  session.mp    = battleState.playerMp;
+  session.cash += cash;
   session.wins.push({boss_id: battleState.bossId, loc_id: battleState.locId, exp, cash});
   session.dirty = true;
-
-  addBattleLog(`🏆 Победа! +${exp} опыта, +${cash}$`, 'system');
-
-  // Show result overlay
+  addBattleLog('🏆 Победа! +' + exp + ' опыта, +' + cash + '$', 'system');
   const ov = document.getElementById('battle-result');
   ov.innerHTML = `
     <div class="battle-result-icon">🏆</div>
@@ -1571,7 +2028,7 @@ function handleWin() {
       <div class="battle-reward-chip"><span class="rval">+${exp}</span><span class="rlbl">Опыт</span></div>
       <div class="battle-reward-chip"><span class="rval">+${cash}$</span><span class="rlbl">Наличные</span></div>
     </div>
-    <div style="margin-top:8px;font-size:12px;color:var(--muted)">HP осталось: ${session.hp}/${DATA.maxhp}</div>
+    <div style="margin-top:8px;font-size:12px;color:var(--muted)">❤️ ${session.hp}/${DATA.maxhp}  ·  💵 ${session.cash}$</div>
     <button class="battle-result-btn" onclick="afterBattle(true)">⚔️ Продолжить</button>
     <button class="battle-result-btn exit-btn-r" onclick="afterBattle(false)">← Выйти из района</button>
   `;
@@ -1581,10 +2038,10 @@ function handleWin() {
 function handleLose() {
   if (!battleState) return;
   battleState.running = false;
-  session.hp = 1;  // минимум 1 HP
-
+  session.hp    = 1;
+  session.mp    = battleState.playerMp;
+  session.dirty = true;
   addBattleLog('💀 Ты пал в бою...', 'system');
-
   const ov = document.getElementById('battle-result');
   ov.innerHTML = `
     <div class="battle-result-icon">💀</div>
@@ -1598,6 +2055,8 @@ function handleLose() {
 function fleeBattle() {
   if (!battleState || !battleState.running) return;
   battleState.running = false;
+  session.hp = battleState.playerHp;
+  session.mp = battleState.playerMp;
   addBattleLog('🏃 Ты сбежал с поля боя.', 'system');
   afterBattle(false);
 }
@@ -1605,9 +2064,8 @@ function fleeBattle() {
 function afterBattle(stayInDistrict) {
   document.getElementById('battle-result').style.display = 'none';
   if (stayInDistrict && session.hp >= 10) {
-    openDistrict(battleState.locId);  // вернуться к списку боссов
+    openDistrict(battleState.locId);
   } else {
-    // Вернуться к списку районов и закоммитить
     document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
     document.getElementById('page-explore').style.display = '';
     renderDistricts();
@@ -1615,8 +2073,8 @@ function afterBattle(stayInDistrict) {
   }
 }
 
-// ── TOAST NOTIFICATION ───────────────────────────────────────────────
-function showToast(msg, icon='✅') {
+// ── TOAST NOTIFICATION ────────────────────────────────────────────────
+function showToast(msg, icon) {
   let t = document.getElementById('toast-msg');
   if (!t) {
     t = document.createElement('div');
@@ -1629,7 +2087,7 @@ function showToast(msg, icon='✅') {
     });
     document.body.appendChild(t);
   }
-  t.textContent = icon + ' ' + msg;
+  t.textContent = (icon || '✅') + ' ' + msg;
   t.style.display = 'block';
   t.style.opacity = '1';
   clearTimeout(t._timer);
@@ -1639,7 +2097,7 @@ function showToast(msg, icon='✅') {
   }, 2500);
 }
 
-// ── Render: Досье ─────────────────────────────────────────────────────
+// ── Render: Досье ──────────────────────────────────────────────────────
 function renderCharacter() {
   document.getElementById('cs-name').textContent   = DATA.name;
   document.getElementById('cs-rank').textContent   = 'Ранг ' + DATA.level;
@@ -1654,13 +2112,15 @@ function renderCharacter() {
 }
 
 function openCreator() {
-  const v   = Date.now(); // cache-buster — уникальный URL каждый раз
-  const isNew = DATA.hasLook ? 0 : 1; // 1 = первый раз, 0 = уже есть образ
-  const look = `gender=${DATA.gender}&skin=${DATA.skin}&body=${DATA.body}&face=${DATA.face}&hair=${DATA.hair}&hat=${DATA.hat}&has_look=${DATA.hasLook}&dia=${DATA.dia}&new=${isNew}&v=${v}`;
+  const v   = Date.now();
+  const isNew = DATA.hasLook ? 0 : 1;
+  const look = 'gender=' + DATA.gender + '&skin=' + DATA.skin + '&body=' + DATA.body +
+               '&face=' + DATA.face + '&hair=' + DATA.hair + '&hat=' + DATA.hat +
+               '&has_look=' + DATA.hasLook + '&dia=' + DATA.dia + '&new=' + isNew + '&v=' + v;
   window.location.href = 'https://slavaprivet.github.io/mafiozi-battle/creator.html?' + look;
 }
 
-// ── Ripple effect ─────────────────────────────────────────────────────
+// ── Ripple effect ──────────────────────────────────────────────────────
 document.querySelectorAll('.tile').forEach(tile => {
   tile.addEventListener('pointerdown', e => {
     const r = document.createElement('div');
@@ -1674,7 +2134,7 @@ document.querySelectorAll('.tile').forEach(tile => {
 });
 
 // ══════════════════════════════════════════════════════════════════════
-//  AVATAR DRAWING (reuses same logic as creator.html)
+//  AVATAR DRAWING
 // ══════════════════════════════════════════════════════════════════════
 const SKINS = ['#FDDBB4','#F0C27F','#D4935A','#A0622A','#7A3B10','#C8A882'];
 
@@ -1688,9 +2148,7 @@ function drawAvatar() {
   function px(x) { return cx + x*sc; }
   function py(y) { return H*0.92 - y*sc; }
   const skinCol = SKINS[DATA.skin] || SKINS[0];
-
   actx.clearRect(0,0,W,H);
-
   if (DATA.gender === 0) drawMaleAvatar(actx,px,py,sc,skinCol,DATA.body,DATA.face,DATA.hair,DATA.hat);
   else                   drawFemaleAvatar(actx,px,py,sc,skinCol,DATA.body,DATA.face,DATA.hair,DATA.hat);
 }
@@ -1703,42 +2161,32 @@ function drawMaleAvatar(ctx,px,py,sc,skinCol,body,face,hair,hat) {
   const bd=bodyDefs[body]||bodyDefs[1];
   const suitCol=['#1a1a2e','#1a2e1a','#2e1a1a','#1a1e2e'][body%4];
   const tieCol=['#c0392b','#e8c96e','#8e44ad','#2980b9'][face%4];
-
-  // Legs
   ctx.fillStyle=suitCol;
   const legW=bd.sw*0.38,legH=55*sc;
-  ctx.beginPath();ctx.roundRect(px(-bd.sw*0.22),py(legH),legW*sc,legH,4*sc);ctx.fill();
-  ctx.beginPath();ctx.roundRect(px(bd.sw*0.22-legW),py(legH),legW*sc,legH,4*sc);ctx.fill();
+  ctx.beginPath();ctx.roundRect(px(-bd.sw*0.22),py(legH),legW*sc,legH,[4*sc]);ctx.fill();
+  ctx.beginPath();ctx.roundRect(px(bd.sw*0.22-legW),py(legH),legW*sc,legH,[4*sc]);ctx.fill();
   ctx.fillStyle='#111';
   [-1,1].forEach(s=>{ctx.beginPath();ctx.ellipse(px(s*bd.sw*0.1),py(2),10*sc,5*sc,0,0,Math.PI*2);ctx.fill();});
-
-  // Body
   ctx.fillStyle=suitCol;
   ctx.beginPath();ctx.roundRect(px(-bd.sw/2),py(bd.sh),bd.sw*sc,bd.sh*sc,[0,0,6*sc,6*sc]);ctx.fill();
-  ctx.fillStyle='#ddd';ctx.beginPath();ctx.roundRect(px(-7),py(bd.sh),14*sc,bd.sh*0.7*sc,2*sc);ctx.fill();
+  ctx.fillStyle='#ddd';ctx.beginPath();ctx.roundRect(px(-7),py(bd.sh),14*sc,bd.sh*0.7*sc,[2*sc]);ctx.fill();
   ctx.fillStyle=tieCol;
   ctx.beginPath();ctx.moveTo(px(-5),py(bd.sh-4));ctx.lineTo(px(5),py(bd.sh-4));ctx.lineTo(px(3),py(bd.sh*0.32));ctx.lineTo(px(0),py(bd.sh*0.25));ctx.lineTo(px(-3),py(bd.sh*0.32));ctx.closePath();ctx.fill();
   ctx.fillStyle=suitCol;
   ctx.beginPath();ctx.moveTo(px(0),py(bd.sh-2));ctx.lineTo(px(-bd.sw/2),py(bd.sh));ctx.lineTo(px(-bd.sw/2),py(bd.sh-20));ctx.closePath();ctx.fill();
   ctx.beginPath();ctx.moveTo(px(0),py(bd.sh-2));ctx.lineTo(px(bd.sw/2),py(bd.sh));ctx.lineTo(px(bd.sw/2),py(bd.sh-20));ctx.closePath();ctx.fill();
-
-  // Arms
   const armLen=body===3?65:60,armW=body===3?13:10;
   ctx.fillStyle=suitCol;
-  ctx.beginPath();ctx.roundRect(px(-bd.sw/2-armW*sc+2),py(bd.sh),armW*sc,armLen*sc,5*sc);ctx.fill();
-  ctx.beginPath();ctx.roundRect(px(bd.sw/2-2),py(bd.sh),armW*sc,armLen*sc,5*sc);ctx.fill();
+  ctx.beginPath();ctx.roundRect(px(-bd.sw/2-armW*sc+2),py(bd.sh),armW*sc,armLen*sc,[5*sc]);ctx.fill();
+  ctx.beginPath();ctx.roundRect(px(bd.sw/2-2),py(bd.sh),armW*sc,armLen*sc,[5*sc]);ctx.fill();
   ctx.fillStyle=skinCol;
   ctx.beginPath();ctx.ellipse(px(-bd.sw/2-armW*sc/2+2),py(armLen-10),7*sc,9*sc,0,0,Math.PI*2);ctx.fill();
   ctx.beginPath();ctx.ellipse(px(bd.sw/2+armW*sc/2-2),py(armLen-10),7*sc,9*sc,0,0,Math.PI*2);ctx.fill();
-
-  // Neck + head
   ctx.fillStyle=skinCol;
-  ctx.beginPath();ctx.roundRect(px(-bd.nw/2),py(bd.sh+bd.nh),bd.nw*sc,bd.nh*sc,4*sc);ctx.fill();
+  ctx.beginPath();ctx.roundRect(px(-bd.nw/2),py(bd.sh+bd.nh),bd.nw*sc,bd.nh*sc,[4*sc]);ctx.fill();
   const headH=bd.hw*1.22,headY=bd.sh+bd.nh+headH;
   ctx.beginPath();ctx.ellipse(px(0),py(bd.sh+bd.nh+headH/2),bd.hw/2*sc,headH/2*sc,0,0,Math.PI*2);ctx.fill();
   ctx.beginPath();ctx.ellipse(px(0),py(bd.sh+bd.nh+5),bd.hw/2.2*sc,10*sc,0,0,Math.PI);ctx.fill();
-
-  // Simple face
   const eyeY=bd.sh+bd.nh+headH*0.55,eyeSpan=bd.hw*0.22;
   ctx.fillStyle='#fff';
   [-1,1].forEach(s=>{ctx.beginPath();ctx.ellipse(px(s*eyeSpan),py(eyeY),4.2*sc,3.2*sc,0,0,Math.PI*2);ctx.fill();});
@@ -1746,15 +2194,12 @@ function drawMaleAvatar(ctx,px,py,sc,skinCol,body,face,hair,hat) {
   [-1,1].forEach(s=>{ctx.beginPath();ctx.arc(px(s*eyeSpan),py(eyeY),2*sc,0,Math.PI*2);ctx.fill();});
   ctx.strokeStyle='#333';ctx.lineWidth=2*sc;
   ctx.beginPath();ctx.moveTo(px(-7),py(bd.sh+bd.nh+headH*0.18));ctx.lineTo(px(7),py(bd.sh+bd.nh+headH*0.18));ctx.stroke();
-
-  // Hair basic
   if(hair>0){
     const hc=['#1a0e00','#3d2200','#8b6333','#b8860b','#888','#111'][hair%6];
     ctx.fillStyle=hc;
     ctx.beginPath();ctx.ellipse(px(0),py(headY),(bd.hw/2)*sc,9*sc,0,Math.PI,Math.PI*2);ctx.fill();
     if(hair===3){ctx.beginPath();ctx.moveTo(px(-3),py(headY));ctx.lineTo(px(-2),py(headY+24));ctx.lineTo(px(2),py(headY+24));ctx.lineTo(px(3),py(headY));ctx.fill();}
   }
-  // Hat basic
   if(hat>0) drawHatSimple(ctx,hat,px,py,bd,headY,headH,sc);
 }
 
@@ -1766,7 +2211,6 @@ function drawFemaleAvatar(ctx,px,py,sc,skinCol,body,face,hair,hat) {
   const bd=bodyDefs[body]||bodyDefs[1];
   const dressCol=['#3a1a3a','#1a2a3a','#3a1a1a','#1a3a2a'][body%4];
   const accentCol=['#e8c96e','#c0392b','#8e44ad','#2980b9'][face%4];
-
   ctx.fillStyle=dressCol;
   ctx.beginPath();ctx.moveTo(px(-bd.sw/2),py(bd.sh));ctx.lineTo(px(-bd.hip/2),py(0));ctx.lineTo(px(bd.hip/2),py(0));ctx.lineTo(px(bd.sw/2),py(bd.sh));ctx.closePath();ctx.fill();
   ctx.fillStyle='#111';
@@ -1774,49 +2218,50 @@ function drawFemaleAvatar(ctx,px,py,sc,skinCol,body,face,hair,hat) {
   ctx.fillStyle=dressCol;
   ctx.beginPath();ctx.roundRect(px(-bd.sw/2),py(bd.sh),bd.sw*sc,bd.sh*sc,[0,0,6*sc,6*sc]);ctx.fill();
   const armLen=58,armW=8;
-  ctx.beginPath();ctx.roundRect(px(-bd.sw/2-armW*sc+2),py(bd.sh),armW*sc,armLen*sc,4*sc);ctx.fill();
-  ctx.beginPath();ctx.roundRect(px(bd.sw/2-2),py(bd.sh),armW*sc,armLen*sc,4*sc);ctx.fill();
+  ctx.beginPath();ctx.roundRect(px(-bd.sw/2-armW*sc+2),py(bd.sh),armW*sc,armLen*sc,[4*sc]);ctx.fill();
+  ctx.beginPath();ctx.roundRect(px(bd.sw/2-2),py(bd.sh),armW*sc,armLen*sc,[4*sc]);ctx.fill();
   ctx.fillStyle=skinCol;
   ctx.beginPath();ctx.ellipse(px(-bd.sw/2-armW*sc/2+2),py(armLen-10),6*sc,8*sc,0,0,Math.PI*2);ctx.fill();
   ctx.beginPath();ctx.ellipse(px(bd.sw/2+armW*sc/2-2),py(armLen-10),6*sc,8*sc,0,0,Math.PI*2);ctx.fill();
   ctx.fillStyle=skinCol;
-  ctx.beginPath();ctx.roundRect(px(-bd.nw/2),py(bd.sh+bd.nh),bd.nw*sc,bd.nh*sc,4*sc);ctx.fill();
+  ctx.beginPath();ctx.roundRect(px(-bd.nw/2),py(bd.sh+bd.nh),bd.nw*sc,bd.nh*sc,[4*sc]);ctx.fill();
   const headH=bd.hw*1.18,headY=bd.sh+bd.nh+headH;
   ctx.beginPath();ctx.ellipse(px(0),py(bd.sh+bd.nh+headH/2),bd.hw/2*sc,headH/2*sc,0,0,Math.PI*2);ctx.fill();
-
-  // Eyes
   ctx.fillStyle='#fff';
   const eyeY=bd.sh+bd.nh+headH*0.55,eyeSpan=bd.hw*0.22;
   [-1,1].forEach(s=>{ctx.beginPath();ctx.ellipse(px(s*eyeSpan),py(eyeY),4.5*sc,3.5*sc,0,0,Math.PI*2);ctx.fill();});
   ctx.fillStyle='#1a0a30';
   [-1,1].forEach(s=>{ctx.beginPath();ctx.arc(px(s*eyeSpan),py(eyeY),2.2*sc,0,Math.PI*2);ctx.fill();});
-  // Lips
   ctx.fillStyle='#c0392b';
   ctx.beginPath();ctx.ellipse(px(0),py(bd.sh+bd.nh+headH*0.18),5*sc,3*sc,0,0,Math.PI*2);ctx.fill();
-
-  // Hair
   if(hair>0){
     const hc=['#1a0e00','#8b1a1a','#b8860b','#3d2200','#888','#c87050'][hair%6];
     ctx.fillStyle=hc;
-    ctx.beginPath();ctx.ellipse(px(0),py(headY),(bd.hw/2)*sc,10*sc,0,Math.PI,Math.PI*2);ctx.fill();
-    if(hair===1){ctx.lineWidth=9*sc;ctx.strokeStyle=hc;ctx.beginPath();ctx.moveTo(px(bd.hw/2),py(headY));ctx.quadraticCurveTo(px(bd.hw/2+8),py(headY-15),px(bd.hw/2+4),py(headY-38));ctx.stroke();}
-    if(hair===3){ctx.lineWidth=9*sc;ctx.strokeStyle=hc;[-1,1].forEach(s=>{ctx.beginPath();ctx.moveTo(px(s*bd.hw/2),py(headY));ctx.quadraticCurveTo(px(s*(bd.hw/2+5)),py(headY-30),px(s*(bd.hw/2+2)),py(headY-65));ctx.stroke();});}
+    ctx.beginPath();ctx.ellipse(px(0),py(headY),(bd.hw/2+3)*sc,11*sc,0,Math.PI,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(px(-bd.hw/2-3),py(headY-headH*0.3),(bd.hw*0.18)*sc,(headH*0.55)*sc,0.1,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(px(bd.hw/2+3),py(headY-headH*0.3),(bd.hw*0.18)*sc,(headH*0.55)*sc,-0.1,0,Math.PI*2);ctx.fill();
+    if(hair===3){
+      ctx.beginPath();ctx.moveTo(px(-3),py(headY));ctx.lineTo(px(-2),py(headY+30));ctx.lineTo(px(2),py(headY+30));ctx.lineTo(px(3),py(headY));ctx.fill();
+    }
   }
   if(hat>0) drawHatSimple(ctx,hat,px,py,bd,headY,headH,sc);
 }
 
-// Simplified hat for avatar (correct coords)
 function drawHatSimple(ctx,hatId,px,py,bd,headY,headH,sc) {
-  const hw=bd.hw/2;
-  const eyeY=headY-headH*0.45;
+  const hw = bd.hw;
+  const eyeY = bd.sh + bd.nh + headH * 0.55;
   if(hatId===1){
-    ctx.fillStyle='#1a0e00';
-    ctx.beginPath();ctx.ellipse(px(0),py(headY+2),(hw+10)*sc,5*sc,0,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.roundRect(px(-hw+2),py(headY+2+26),(hw*2-4)*sc,26*sc,4*sc);ctx.fill();
-    ctx.fillStyle='#e8c96e';ctx.fillRect(px(-hw+2),py(headY+7),(hw*2-4)*sc,4*sc);
+    ctx.fillStyle='#111';
+    ctx.beginPath();ctx.ellipse(px(0),py(headY+3),(hw+10)*sc,5*sc,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.roundRect(px(-hw*0.5),py(headY+3+28),(hw)*sc,28*sc,[2*sc,2*sc,0,0]);ctx.fill();
+    ctx.fillStyle='#c0392b';ctx.beginPath();ctx.roundRect(px(-hw*0.5),py(headY+3+16),(hw)*sc,5*sc);ctx.fill();
   } else if(hatId===2){
-    ctx.fillStyle='#1a2e3a';
-    ctx.beginPath();ctx.ellipse(px(0),py(headY),hw*sc,13*sc,0,Math.PI,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#8b4513';
+    ctx.beginPath();ctx.ellipse(px(0),py(headY),(hw+8)*sc,4*sc,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.roundRect(px(-hw*0.42),py(headY+18),(hw*0.84)*sc,18*sc,[4*sc,4*sc,0,0]);ctx.fill();
+  } else if(hatId===3){
+    ctx.fillStyle='#2c2c4e';
+    ctx.beginPath();ctx.ellipse(px(-3),py(headY+8),(hw+3)*sc,12*sc,-0.15,Math.PI*0.05,Math.PI*1.95);ctx.fill();
     ctx.beginPath();ctx.ellipse(px(hw*0.4),py(headY),(hw+5)*sc,4*sc,0.15,0,Math.PI);ctx.fill();
   } else if(hatId===4){
     ctx.fillStyle='#5c3d11';
@@ -1824,9 +2269,9 @@ function drawHatSimple(ctx,hatId,px,py,bd,headY,headH,sc) {
     ctx.beginPath();ctx.moveTo(px(-hw+2),py(headY+3));ctx.lineTo(px(-hw+5),py(headY+35));ctx.lineTo(px(0),py(headY+40));ctx.lineTo(px(hw-5),py(headY+35));ctx.lineTo(px(hw-2),py(headY+3));ctx.closePath();ctx.fill();
   } else if(hatId===5){
     ctx.strokeStyle='#111';ctx.lineWidth=2.5*sc;ctx.fillStyle='#1a3a5a88';
-    ctx.beginPath();ctx.roundRect(px(-18),py(eyeY+5),13*sc,9*sc,3*sc);ctx.fill();ctx.stroke();
-    ctx.beginPath();ctx.roundRect(px(5),py(eyeY+5),13*sc,9*sc,3*sc);ctx.fill();ctx.stroke();
-    ctx.beginPath();ctx.moveTo(px(-5),py(eyeY+8));ctx.lineTo(px(5),py(eyeY+8));ctx.stroke();
+    ctx.beginPath();ctx.roundRect(px(-hw*0.55),py(eyeY+5),hw*0.42*sc,9*sc,[3*sc]);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.roundRect(px(hw*0.13),py(eyeY+5),hw*0.42*sc,9*sc,[3*sc]);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.moveTo(px(-hw*0.13),py(eyeY+8));ctx.lineTo(px(hw*0.13),py(eyeY+8));ctx.stroke();
   } else if(hatId===7){
     ctx.fillStyle='#2c2c4e';
     ctx.beginPath();ctx.ellipse(px(-3),py(headY+8),(hw+3)*sc,12*sc,-0.15,Math.PI*0.05,Math.PI*1.95);ctx.fill();
@@ -1837,7 +2282,6 @@ function drawHatSimple(ctx,hatId,px,py,bd,headY,headH,sc) {
   }
 }
 
-// Draw the avatar
 drawAvatar();
 </script>
 </body>
