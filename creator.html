@@ -323,9 +323,13 @@ const urlP = new URLSearchParams(location.search);
 ['gender','skin','body','face','hair','hat'].forEach(k => {
   if (urlP.has(k)) state[k] = parseInt(urlP.get(k)) || 0;
 });
-// Если creator открыт из хаба — в URL будут параметры (skin и др.)
-// Если открыт напрямую из бота впервые — URL пустой
-const isFirstTime = !urlP.has('skin');   // true = первое создание, false = просмотр
+// isFirstTime = true ТОЛЬКО если:
+//   1) явно передан ?new=1 (новый hub.html — первое создание)
+//   2) ИЛИ нет вообще никаких параметров (очень старый hub.html)
+// Если hub.html передаёт хоть какие-то параметры без new=1 → режим просмотра
+const _hasNew  = urlP.has('new');
+const _newFlag = urlP.get('new') === '1';
+const isFirstTime = _newFlag || (!urlP.has('skin') && !_hasNew);
 const hasLook     = isFirstTime ? 0 : 1;
 const playerDia   = parseInt(urlP.get('dia')) || 0;
 let changeLookMode = false;   // режим смены образа (платный)
