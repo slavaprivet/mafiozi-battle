@@ -627,36 +627,35 @@ body {
   background: #333; color: #555; cursor: default; transform: none;
 }
 
-/* ── TACTICAL BATTLE ── */
-#tac-top{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:#12122a;border-bottom:1px solid #2a2a4a;gap:8px}
+/* ── TACTICAL BATTLE (real-time) ── */
+#tac-top{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:#12122a;border-bottom:1px solid #2a2a4a;gap:8px;flex-shrink:0}
 .t-hud{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
 .t-name{font-size:11px;font-weight:bold;color:#f0d060;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .t-hp-wrap{height:6px;background:#2a2a3a;border-radius:3px}
-.t-hp-fill{height:100%;border-radius:3px;transition:width .3s}
+.t-hp-fill{height:100%;border-radius:3px;transition:width .25s}
 .t-hp-fill.p{background:#2ecc71}
 .t-hp-fill.e{background:#e74c3c}
 .t-hp-txt{font-size:10px;color:#888;margin-top:1px}
-#tac-badge{font-size:11px;font-weight:bold;padding:5px 10px;border-radius:8px;white-space:nowrap;flex-shrink:0;text-align:center}
-#tac-badge.pt{background:#1a3a6a;color:#4af}
-#tac-badge.et{background:#5a1a1a;color:#f66}
-#tac-canvas-wrap{flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#0a0a12}
-#tac-frame{position:relative;display:inline-block}
-#tac-gc{display:block;touch-action:none}
-#tac-dmg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:hidden}
-.dmg-pop{position:absolute;font-size:16px;font-weight:900;pointer-events:none;animation:tacPop .8s ease-out forwards;white-space:nowrap;text-shadow:0 1px 3px #000}
-@keyframes tacPop{0%{opacity:1;transform:translateY(0) scale(1)}50%{opacity:1;transform:translateY(-20px) scale(1.2)}100%{opacity:0;transform:translateY(-40px) scale(0.8)}}
-#tac-bottom{background:#12122a;border-top:1px solid #2a2a4a;padding:6px 10px;flex-shrink:0}
-#tac-log{font-size:12px;color:#b0b0c0;text-align:center;margin-bottom:6px;min-height:16px;line-height:1.3}
-#tac-btns{display:flex;gap:6px;justify-content:center}
-.tac-btn{flex:1;max-width:110px;padding:9px 4px;border:none;border-radius:10px;font-size:12px;font-weight:bold;cursor:pointer;transition:transform .1s,opacity .15s;letter-spacing:.3px}
-.tac-btn:active:not(:disabled){transform:scale(.94)}
-.tac-btn:disabled{opacity:.35;cursor:default}
-#tGren{background:#4a2800;color:#f96}
-#tMove{background:#1a3a6a;color:#6cf}
-#tShoot{background:#5a1a1a;color:#f88}
-#tMelee{background:#4a3a0a;color:#fc6}
-#tEnd{background:#252535;color:#888}
-#tac-result{position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000;gap:12px;padding:24px}
+.tac-screen{height:100vh;background:#060610;display:flex;flex-direction:column;overflow:hidden}
+#tac-canvas-wrap{flex:1;position:relative;overflow:hidden;background:#0a0a12;min-height:0}
+#tac-gc{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
+#tac-dmg{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.dmg-pop{position:absolute;font-size:16px;font-weight:900;pointer-events:none;animation:tacPop .9s ease-out forwards;white-space:nowrap;text-shadow:0 1px 4px #000}
+@keyframes tacPop{0%{opacity:1;transform:translateY(0) scale(1)}50%{opacity:1;transform:translateY(-22px) scale(1.2)}100%{opacity:0;transform:translateY(-44px) scale(0.8)}}
+/* Joystick */
+#tac-joy-base{position:absolute;width:84px;height:84px;border-radius:50%;background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.18);pointer-events:none;z-index:15;display:none}
+#tac-joy-knob{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.3);border:2.5px solid rgba(255,255,255,.55);box-shadow:0 0 10px rgba(255,255,255,.15)}
+/* Action buttons */
+#tac-actions{position:absolute;right:10px;bottom:20px;display:flex;flex-direction:column;align-items:center;gap:10px;z-index:15;pointer-events:auto}
+.tac-act-btn{width:66px;height:66px;border-radius:50%;border:none;font-size:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;-webkit-tap-highlight-color:transparent;user-select:none;transition:transform .08s,box-shadow .08s;touch-action:manipulation}
+.tac-act-btn:active{transform:scale(.88)}
+.tac-act-btn.shoot{background:radial-gradient(circle at 40% 35%,#e05050,#7b1c1c);box-shadow:0 0 18px #c0392b99,0 2px 6px #0006;border:2px solid #e74c3c66}
+.tac-act-btn.melee{background:radial-gradient(circle at 40% 35%,#e08020,#7b4000);box-shadow:0 0 14px #e67e2266,0 2px 6px #0006;border:2px solid #e67e2266}
+.tac-act-btn.gren{background:radial-gradient(circle at 40% 35%,#3a4a5a,#1a252f);box-shadow:0 0 12px #00000088,0 2px 6px #0006;border:2px solid #4a5a6a66;font-size:20px}
+.tac-act-btn.gren[data-empty="1"]{opacity:.4}
+#tac-gren-ct{font-size:11px;font-weight:900;position:absolute;bottom:5px;right:9px;color:#f0d060;line-height:1}
+/* Result */
+#tac-result{position:absolute;inset:0;background:rgba(0,0,0,.9);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:100;gap:12px;padding:24px}
 .tac-res-icon{font-size:64px;animation:tacPop .4s cubic-bezier(.34,1.56,.64,1) both}
 .tac-res-title{font-size:28px;font-weight:900;letter-spacing:2px;animation:tacPop .4s .1s cubic-bezier(.34,1.56,.64,1) both}
 .tac-res-title.win{color:#f0d060}
@@ -667,7 +666,6 @@ body {
 .tac-reward .rl{font-size:11px;color:#888}
 .tac-res-btn{margin-top:8px;padding:14px 40px;background:linear-gradient(135deg,#f0d060,#c8a820);color:#111;font-size:16px;font-weight:900;border:none;border-radius:24px;cursor:pointer;animation:tacPop .4s .3s cubic-bezier(.34,1.56,.64,1) both;letter-spacing:.5px}
 .tac-res-btn.exit{background:#1a1a2e;border:1px solid #2a2a4a;color:#888;font-size:14px;padding:12px 32px}
-.tac-screen{min-height:100vh;background:#060610;display:flex;flex-direction:column;overflow:hidden}
 
 /* ── HOSPITAL ── */
 .hospital-btn {
@@ -1030,40 +1028,35 @@ body {
         <div class="t-hp-wrap"><div class="t-hp-fill p" id="tPBar" style="width:100%"></div></div>
         <div class="t-hp-txt" id="tPTxt">100/100</div>
       </div>
-      <div id="tac-badge" class="pt">ВАШ<br>ХОД</div>
+
       <div class="t-hud" style="text-align:right">
         <div class="t-name" id="tEName" style="color:#f88">Враг</div>
         <div class="t-hp-wrap"><div class="t-hp-fill e" id="tEBar" style="width:100%"></div></div>
         <div class="t-hp-txt" id="tETxt" style="text-align:right">100/100</div>
       </div>
     </div>
-    <!-- canvas -->
+    <!-- canvas + overlays -->
     <div id="tac-canvas-wrap">
-      <div id="tac-frame">
-        <canvas id="tac-gc"></canvas>
-        <div id="tac-dmg"></div>
-      </div>
-    </div>
-    <!-- bottom controls -->
-    <div id="tac-bottom">
-      <div id="tac-log">Выбери куда двигаться или атаковать</div>
-      <div id="tac-btns">
-        <button class="tac-btn" id="tMove" onclick="tacResetSel()">🚶 Движение</button>
-        <button class="tac-btn" id="tShoot" onclick="tacDoShoot()" disabled>🔫 Выстрел</button>
-        <button class="tac-btn" id="tMelee" onclick="tacDoMelee()" disabled>👊 Удар</button>
-        <button class="tac-btn" id="tGren" onclick="tacToggleGrenMode()">💣 0</button>
-        <button class="tac-btn" id="tEnd" onclick="tacEndPlayerTurn()" style="max-width:70px;font-size:10px;opacity:.7">Пас</button>
+      <canvas id="tac-gc"></canvas>
+      <div id="tac-dmg"></div>
+      <!-- joystick visual -->
+      <div id="tac-joy-base"><div id="tac-joy-knob"></div></div>
+      <!-- action buttons -->
+      <div id="tac-actions">
+        <button class="tac-act-btn gren" id="tac-btn-gren" data-empty="0">💣<span id="tac-gren-ct">0</span></button>
+        <button class="tac-act-btn melee" id="tac-btn-melee">👊</button>
+        <button class="tac-act-btn shoot" id="tac-btn-shoot">🔫</button>
       </div>
     </div>
   </div>
   <!-- tutorial overlay -->
-  <div id="tac-tutorial" style="display:none;opacity:0;position:absolute;inset:0;background:rgba(0,0,0,.78);z-index:50;flex-direction:column;align-items:center;justify-content:center;gap:10px;transition:opacity .6s;pointer-events:none">
-    <div style="font-size:14px;color:#f0d060;font-weight:900;letter-spacing:1px;margin-bottom:4px">УПРАВЛЕНИЕ</div>
-    <div style="font-size:13px;color:#ccc">👆 Тап — выбрать клетку</div>
-    <div style="font-size:13px;color:#ccc">✌️ Двойной тап — переместиться</div>
-    <div style="font-size:13px;color:#ccc">🎯 Тап на врага → кнопки атаки</div>
-    <div style="font-size:13px;color:#ccc">⚔️ Атака завершает ход</div>
-    <div style="font-size:13px;color:#4af">🗺 Мини-карта в углу</div>
+  <div id="tac-tutorial" style="display:none;opacity:0;position:absolute;inset:0;background:rgba(0,0,0,.82);z-index:50;flex-direction:column;align-items:center;justify-content:center;gap:9px;transition:opacity .6s;pointer-events:none">
+    <div style="font-size:15px;color:#f0d060;font-weight:900;letter-spacing:1px;margin-bottom:4px">УПРАВЛЕНИЕ</div>
+    <div style="font-size:13px;color:#ccc">🕹 Левая сторона — джойстик движения</div>
+    <div style="font-size:13px;color:#ccc">🔫 Удерживай — стрелять (авто-прицел)</div>
+    <div style="font-size:13px;color:#ccc">👊 Нажми — удар в ближнем бою</div>
+    <div style="font-size:13px;color:#ccc">💣 Нажми — граната (авто-цель)</div>
+    <div style="font-size:13px;color:#4af">🔴 Красная линия — прицел</div>
   </div>
   <!-- result overlay -->
   <div id="tac-result" style="display:none"></div>
@@ -2172,130 +2165,468 @@ function tacDrawMinimap(ctx,canvasW){
   ctx.setLineDash([]);
 }
 
-// ── RENDER ────────────────────────────────────────────────────────────
+// ── REAL-TIME BATTLE ENGINE ─────────────────────────────────────────────
+
+// ── COLLISION ────────────────────────────────────────────────────────────
+function tacIsBlocked(r,c){
+  const R=0.38;
+  for(const[dr,dc]of[[-R,-R],[-R,R],[R,-R],[R,R]]){
+    const tr=Math.floor(r+dr),tc=Math.floor(c+dc);
+    if(tr<0||tr>=tac.ROWS||tc<0||tc>=tac.COLS)return true;
+    if(tac.grid[tr][tc]!==0)return true;
+  }
+  return false;
+}
+function tacTryMove(unit,dr,dc){
+  const nr=unit.r+dr,nc=unit.c+dc;
+  if(!tacIsBlocked(nr,unit.c))unit.r=nr;
+  if(!tacIsBlocked(unit.r,nc))unit.c=nc;
+}
+
+// ── GAME LOOP ─────────────────────────────────────────────────────────────
+function tacGameLoop(ts){
+  if(!tac)return;
+  const dt=Math.min((ts-(tac.lastTime||ts))/1000,0.05);
+  tac.lastTime=ts;
+  if(tac.gstate==='playing')tacUpdate(dt);
+  tacRender();
+  tac.pulseRaf=requestAnimationFrame(tacGameLoop);
+}
+
+function tacUpdate(dt){
+  const p=tac.player;
+  const joy=tac.joy;
+
+  // Player movement
+  if(joy.dx!==0||joy.dy!==0){
+    const spd=3.5;
+    tacTryMove(p,joy.dy*spd*dt,joy.dx*spd*dt);
+    p.angle=Math.atan2(joy.dy,joy.dx);
+    p.isMoving=true;
+    p.walkPhase+=dt*9;
+  }else{
+    p.isMoving=false;
+  }
+
+  // Cooldowns
+  p.fireCD=Math.max(0,p.fireCD-dt*1000);
+  p.meleeCD=Math.max(0,p.meleeCD-dt*1000);
+  p.grenCD=Math.max(0,p.grenCD-dt*1000);
+  if(p.meleeAnim>0)p.meleeAnim=Math.max(0,p.meleeAnim-dt*3);
+
+  // Auto-fire while button held
+  if(tac.actions.shoot&&p.fireCD<=0)tacPlayerShoot();
+
+  // Enemies
+  tac.enemies.forEach(e=>{
+    if(e.hp<=0){if(e.deathTimer>0)e.deathTimer=Math.max(0,e.deathTimer-dt*1000);return;}
+    tacEnemyAI(e,dt);
+  });
+
+  // Bullets
+  tacUpdateBullets(dt);
+
+  // VFX decay
+  tac.meleeVfx=tac.meleeVfx.filter(v=>{v.a-=dt*2.8;v.vy=(v.vy||0)-dt*2;v.r+=(v.vy||0)*dt;return v.a>0;});
+  tac.bloodParts=tac.bloodParts.filter(bp=>{
+    bp.vr+=0.6*dt;bp.r+=bp.vr*dt*6;bp.c+=bp.vc*dt*6;bp.a-=dt*2;return bp.a>0;
+  });
+  tac.muzzleFlash=tac.muzzleFlash.filter(m=>{m.a-=dt*10;return m.a>0;});
+
+  // Camera
+  tac.camR+=(p.r-tac.camR)*Math.min(1,dt*8);
+  tac.camC+=(p.c-tac.camC)*Math.min(1,dt*8);
+
+  // Shake decay
+  if(tac.shake>0)tac.shake=Math.max(0,tac.shake-dt*10);
+}
+
+// ── PLAYER ACTIONS ────────────────────────────────────────────────────────
+function tacPlayerShoot(){
+  if(!tac||tac.gstate!=='playing')return;
+  const p=tac.player,w=tac.pw;
+  const delay=w.t==='rifle'?110:w.t==='burst'?145:w.t==='shotgun'?480:w.t==='rocket'?1100:380;
+  p.fireCD=delay;
+
+  // Target: nearest enemy in range
+  let target=null,bestD=Infinity;
+  tac.enemies.forEach(e=>{
+    if(e.hp<=0)return;
+    const d=Math.hypot(e.r-p.r,e.c-p.c);
+    if(d<bestD){bestD=d;target=e;}
+  });
+  const maxRange=(w.r||8)*1.4;
+  let angle=p.angle;
+  if(target&&bestD<=maxRange){
+    angle=Math.atan2(target.r-p.r,target.c-p.c);
+    p.angle=angle;
+  }
+
+  tac.muzzleFlash.push({r:p.r+Math.sin(angle)*0.6,c:p.c+Math.cos(angle)*0.6,a:1,enemy:false});
+
+  const spd=17;
+  if(w.t==='shotgun'){
+    for(let i=-1;i<=1;i++){
+      const a2=angle+i*0.18;
+      tac.bullets.push({r:p.r,c:p.c,vr:Math.sin(a2)*spd,vc:Math.cos(a2)*spd,isEnemy:false,dmg:Math.round(p.atk*(w.m||1)/3),dist:0,maxDist:(w.r||5)*1.2,color:w.c||'#f80',thick:3.5,hit:false});
+    }
+  }else if(w.t==='burst'){
+    for(let i=0;i<3;i++){
+      const a2=angle+(Math.random()-0.5)*0.12;
+      setTimeout(()=>{if(tac&&tac.gstate==='playing')tac.bullets.push({r:p.r,c:p.c,vr:Math.sin(a2)*spd,vc:Math.cos(a2)*spd,isEnemy:false,dmg:Math.round(p.atk*(w.m||1)*0.45),dist:0,maxDist:(w.r||6)*1.2,color:w.c||'#ffa',thick:2,hit:false});},i*55);
+    }
+  }else{
+    const a2=angle+(Math.random()-0.5)*0.06;
+    tac.bullets.push({r:p.r,c:p.c,vr:Math.sin(a2)*spd,vc:Math.cos(a2)*spd,isEnemy:false,dmg:Math.round(p.atk*(w.m||1)),dist:0,maxDist:maxRange,color:w.c||'#ff4',thick:w.thick||2.5,hit:false});
+  }
+}
+
+function tacPlayerMelee(){
+  if(!tac||tac.gstate!=='playing')return;
+  const p=tac.player,w=tac.pw;
+  if(p.meleeCD>0)return;
+  const range=w.t==='melee'?(w.r||1.5)+0.3:1.8;
+  p.meleeCD=750;p.meleeAnim=1;
+  let hit=false;
+  tac.enemies.forEach(e=>{
+    if(e.hp<=0)return;
+    const d=Math.hypot(e.r-p.r,e.c-p.c);
+    if(d<=range){
+      const dmg=Math.max(1,Math.round(p.atk*(w.t==='melee'?w.m:1.2)*(0.85+Math.random()*0.3)));
+      e.hp=Math.max(0,e.hp-dmg);
+      tacFloatDmg(e,dmg,'#ffcc44',false);
+      tac.shake=0.35;hit=true;
+      p.angle=Math.atan2(e.r-p.r,e.c-p.c);
+      if(e.hp<=0){tacSpawnBlood(e.r,e.c,16);e.deathTimer=1400;}
+    }
+  });
+  tac.meleeVfx.push({r:p.r+Math.sin(p.angle)*0.9,c:p.c+Math.cos(p.angle)*0.9,vy:-0.5,e:hit?'⚡':'💨',a:1});
+  tacHud();tacCheckDeath();
+}
+
+function tacPlayerGrenade(){
+  if(!tac||tac.gstate!=='playing')return;
+  const p=tac.player;
+  if(p.grenCD>0||(session.gren||0)<=0)return;
+  let target=null,bestD=Infinity;
+  tac.enemies.forEach(e=>{
+    if(e.hp<=0)return;
+    const d=Math.hypot(e.r-p.r,e.c-p.c);
+    if(d<=8&&d<bestD){bestD=d;target=e;}
+  });
+  if(!target)return;
+  session.gren=Math.max(0,(session.gren||0)-1);
+  p.grenCD=3500;
+  tacUpdateGrenBtn();
+  const tr=target.r+(Math.random()-0.5)*1.2,tc=target.c+(Math.random()-0.5)*1.2;
+  const dur=550,t0=performance.now(),gObj={r:p.r,c:p.c,phase:0};
+  tac.grenades.push(gObj);
+  (function step(now){
+    const prog=Math.min(1,(now-t0)/dur);
+    gObj.r=p.r+(tr-p.r)*prog;gObj.c=p.c+(tc-p.c)*prog;gObj.phase=prog;
+    if(prog<1){requestAnimationFrame(step);}
+    else{
+      tac.grenades=tac.grenades.filter(g=>g!==gObj);
+      tacExplodeAnim(tr,tc,()=>{
+        tac.enemies.forEach(e=>{
+          if(e.hp<=0)return;
+          const d=Math.hypot(e.r-tr,e.c-tc);
+          if(d<=1.6){
+            const dmg=60+Math.floor(Math.random()*40);
+            e.hp=Math.max(0,e.hp-dmg);
+            tacFloatDmg(e,dmg,'#ff6600',false);
+            tac.shake=0.9;
+            if(e.hp<=0){tacSpawnBlood(e.r,e.c,22);e.deathTimer=1400;}
+          }
+        });
+        tacHud();tacCheckDeath();
+      });
+    }
+  })(performance.now());
+}
+
+// ── ENEMY AI ─────────────────────────────────────────────────────────────
+function tacEnemyAI(e,dt){
+  e.fireCD=Math.max(0,e.fireCD-dt*1000);
+  e.meleeCD=Math.max(0,e.meleeCD-dt*1000);
+  const p=tac.player;
+  const dx=p.c-e.c,dy=p.r-e.r;
+  const dist=Math.hypot(dx,dy);
+  e.angle=Math.atan2(dy,dx);
+  const spd=e.id===0?1.7:2.1;
+  if(dist>1.6){
+    tacTryMove(e,(dy/dist)*spd*dt,(dx/dist)*spd*dt);
+    e.isMoving=true;e.walkPhase+=dt*7;
+  }else{
+    e.isMoving=false;
+    if(e.meleeCD<=0){
+      e.meleeCD=1300;
+      const dmg=Math.max(1,Math.round(e.atk*(0.8+Math.random()*0.4)));
+      p.hp=Math.max(0,p.hp-dmg);
+      tacFloatDmg(p,dmg,'#ff4444',false);
+      tac.shake=0.45;tacHud();
+      if(p.hp<=0)tacEndBattle('lost');
+    }
+  }
+  const ew=WEP_TAC[e.wep]||WEP_TAC.nagan;
+  if(dist>1.9&&dist<=(ew.r||7)*0.9&&e.fireCD<=0){
+    e.fireCD=e.id===0?1700:2300;
+    const a=Math.atan2(p.r-e.r,p.c-e.c)+(Math.random()-0.5)*0.22;
+    const spd2=14;
+    tac.bullets.push({r:e.r,c:e.c,vr:Math.sin(a)*spd2,vc:Math.cos(a)*spd2,isEnemy:true,
+      dmg:Math.max(1,Math.round(e.atk*(0.8+Math.random()*0.4))),dist:0,maxDist:(ew.r||7)*1.3,
+      color:'#ff4444',thick:2.5,hit:false});
+    tac.muzzleFlash.push({r:e.r+Math.sin(a)*0.5,c:e.c+Math.cos(a)*0.5,a:1,enemy:true});
+  }
+}
+
+// ── BULLETS ─────────────────────────────────────────────────────────────
+function tacUpdateBullets(dt){
+  tac.bullets=tac.bullets.filter(b=>{
+    if(b.hit)return false;
+    b.r+=b.vr*dt;b.c+=b.vc*dt;
+    b.dist+=Math.hypot(b.vr,b.vc)*dt;
+    const tr=Math.floor(b.r),tc=Math.floor(b.c);
+    if(tr<0||tr>=tac.ROWS||tc<0||tc>=tac.COLS||tac.grid[tr][tc]!==0){b.hit=true;return false;}
+    if(b.dist>b.maxDist)return false;
+    if(!b.isEnemy){
+      for(const e of tac.enemies){
+        if(e.hp<=0)continue;
+        if(Math.hypot(e.r-b.r,e.c-b.c)<0.45){
+          b.hit=true;
+          e.hp=Math.max(0,e.hp-b.dmg);
+          tacFloatDmg(e,b.dmg,'#ff9999',false);
+          tac.shake=0.18;
+          if(e.hp<=0){tacSpawnBlood(e.r,e.c,14);e.deathTimer=1400;}
+          tacHud();tacCheckDeath();return false;
+        }
+      }
+    }else{
+      const p=tac.player;
+      if(Math.hypot(p.r-b.r,p.c-b.c)<0.45){
+        b.hit=true;p.hp=Math.max(0,p.hp-b.dmg);
+        tacFloatDmg(p,b.dmg,'#ff4444',false);
+        tac.shake=0.28;tacHud();
+        if(p.hp<=0)tacEndBattle('lost');
+        return false;
+      }
+    }
+    return true;
+  });
+}
+
+// ── BLOOD ─────────────────────────────────────────────────────────────────
+function tacSpawnBlood(r,c,count){
+  for(let i=0;i<count;i++){
+    const a=Math.random()*Math.PI*2,spd=0.3+Math.random()*2;
+    tac.bloodParts.push({r:r+(Math.random()-0.5)*0.3,c:c+(Math.random()-0.5)*0.3,
+      vr:Math.sin(a)*spd,vc:Math.cos(a)*spd,a:1,size:2+Math.random()*5});
+  }
+  if(!tac.bloodSplats)tac.bloodSplats=[];
+  tac.bloodSplats.push({r,c,a:0.85,sz:0.28+Math.random()*0.22});
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────
 function tacRender(){
   if(!tac)return;
   const canvas=document.getElementById('tac-gc');if(!canvas||!canvas.width)return;
-  const ctx=canvas.getContext('2d');const TS=tac.TS,VW=tac.VIEW_W,VH=tac.VIEW_H;
-  tac.camR+=(tac.player.vr-tac.camR)*.11;
-  tac.camC+=(tac.player.vc-tac.camC)*.11;
-  const offR=tac.camR-VH/2,offC=tac.camC-VW/2;
-  function w2s(wr,wc){return{x:(wc-offC)*TS,y:(wr-offR)*TS};}
+  const ctx=canvas.getContext('2d');
+  const TS=tac.TS,VW=tac.VIEW_W,VH=tac.VIEW_H;
+  const sk=tac.shake>0?(Math.random()-0.5)*tac.shake*TS*0.12:0;
+  const skY=tac.shake>0?(Math.random()-0.5)*tac.shake*TS*0.12:0;
+  const offC=tac.camC-VW/2,offR=tac.camR-VH/2;
+  function w2s(wr,wc){return{x:(wc-offC)*TS+sk,y:(wr-offR)*TS+skY};}
+
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.fillStyle='#080816';ctx.fillRect(0,0,canvas.width,canvas.height);
-  // tiles
-  for(let r=0;r<tac.ROWS;r++){
-    for(let c=0;c<tac.COLS;c++){
-      const s=w2s(r,c);
-      if(s.x<-TS||s.x>canvas.width+TS||s.y<-TS||s.y>canvas.height+TS)continue;
-      tacDrawTile(ctx,r,c,s.x,s.y);
-    }
+
+  // Tiles
+  for(let r=0;r<tac.ROWS;r++)for(let c=0;c<tac.COLS;c++){
+    const s=w2s(r,c);
+    if(s.x<-TS||s.x>canvas.width+TS||s.y<-TS||s.y>canvas.height+TS)continue;
+    tacDrawTile(ctx,r,c,s.x,s.y);
   }
-  // grenade mode: show throw range
-  if(tac.grenMode){
-    for(let r=0;r<tac.ROWS;r++)for(let c=0;c<tac.COLS;c++){
-      if(tac.grid[r][c]===1)continue;
-      const d=tacDist(tac.player.r,tac.player.c,r,c);
-      if(d<=6&&d>0){
-        const s=w2s(r,c);ctx.save();ctx.globalAlpha=.28;ctx.fillStyle='#ff6600';ctx.fillRect(s.x,s.y,TS,TS);ctx.restore();
-      }
-    }
-    if(tac.grenTarget){
-      const{r,c}=tac.grenTarget,s=w2s(r,c);
-      for(const[dr,dc]of[[0,0],[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]]){
-        const s2=w2s(r+dr,c+dc);
-        ctx.save();ctx.globalAlpha=.4;ctx.fillStyle='#ff4400';ctx.fillRect(s2.x,s2.y,TS,TS);ctx.restore();
-      }
-      ctx.strokeStyle='#ff6600';ctx.lineWidth=3;ctx.strokeRect(s.x+2,s.y+2,TS-4,TS-4);
-    }
-  }
-  // move tiles
-  if(tac.gstate==='player'&&!tac.player.moved&&!tac.grenMode){
-    tac.moveTiles.forEach(({r,c})=>{
-      const s=w2s(r,c);
-      ctx.save();ctx.globalAlpha=.2;ctx.fillStyle='#4aaff0';ctx.fillRect(s.x,s.y,TS,TS);ctx.restore();
-      const cv=TAC_COV[tac.grid[r][c]]||0;
-      if(cv>0){ctx.save();ctx.globalAlpha=.12+.06*Math.sin(tac.animPhase);ctx.fillStyle=cv===2?'#00aaff':'#00ff88';ctx.fillRect(s.x,s.y,TS,TS);ctx.restore();}
-    });
-  }
-  // selected tile
-  if(tac.selTile&&!tac.player.moved){
-    const{r,c}=tac.selTile,s=w2s(r,c);
-    ctx.strokeStyle='#5ad0ff';ctx.lineWidth=3;ctx.strokeRect(s.x+2,s.y+2,TS-4,TS-4);
-    const a=TS*.15;
-    [[0,0],[TS,0],[0,TS],[TS,TS]].forEach(([dx,dy])=>{
-      ctx.beginPath();ctx.moveTo(s.x+dx+(dx?-a:a),s.y+dy);ctx.lineTo(s.x+dx,s.y+dy);ctx.lineTo(s.x+dx,s.y+dy+(dy?-a:a));ctx.stroke();
-    });
-  }
-  // enemy highlight
-  if(tac.selEnemy){
-    const e=tac.selEnemy,s=w2s(e.vr,e.vc);
-    ctx.save();ctx.globalAlpha=.25+.08*Math.sin(tac.animPhase*2);ctx.fillStyle='#ff3333';ctx.fillRect(s.x,s.y,TS,TS);ctx.restore();
-    ctx.strokeStyle='#ff4444';ctx.lineWidth=2;ctx.setLineDash([5,4]);ctx.strokeRect(s.x+2,s.y+2,TS-4,TS-4);ctx.setLineDash([]);
-  }
-  // HP bars world-space
-  function drawHP(unit){
-    if(unit.hp<=0)return;
-    const s=w2s(unit.vr,unit.vc);
-    const bw=TS*.75,bx=s.x+TS*.125,by=s.y+TS-7;
-    ctx.fillStyle='rgba(0,0,0,.7)';ctx.fillRect(bx,by,bw,6);
-    const pct=Math.max(0,unit.hp/unit.maxhp);
-    ctx.fillStyle=pct>.6?'#2ecc71':pct>.3?'#f0c030':'#e74c3c';ctx.fillRect(bx,by,bw*pct,6);
-    ctx.strokeStyle='rgba(0,0,0,.5)';ctx.lineWidth=.5;ctx.strokeRect(bx,by,bw,6);
-  }
-  // draw enemies
-  tac.enemies.forEach(e=>{
-    if(e.hp<=0)return;
-    const s=w2s(e.vr,e.vc);
-    tacDrawEnemyChar(ctx,s.x+TS/2,s.y+TS/2,TS,e,tac.selEnemy?.id===e.id);
-    drawHP(e);
-    const cv=TAC_COV[tac.grid[e.r][e.c]]||0;
-    if(cv>0){ctx.font=Math.floor(TS*.18)+'px serif';ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(cv===2?'🛡':'🪵',s.x+TS*.85,s.y+2);}
-  });
-  // draw player
-  {
-    const s=w2s(tac.player.vr,tac.player.vc);
-    tacDrawPlayerChar(ctx,s.x+TS/2,s.y+TS/2,TS,DATA,tac.animPhase);
-    drawHP(tac.player);
-    const cv=TAC_COV[tac.grid[tac.player.r][tac.player.c]]||0;
-    if(cv>0){ctx.font=Math.floor(TS*.18)+'px serif';ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(cv===2?'🛡':'🪵',(w2s(tac.player.vr,tac.player.vc).x)+TS*.85,w2s(tac.player.vr,tac.player.vc).y+2);}
-  }
-  // bullets
-  tac.bullets.forEach(b=>{
-    const p=b.prog;
-    const tx=b.sx+(b.ex-b.sx)*p,ty=b.sy+(b.ey-b.sy)*p;
-    ctx.save();ctx.globalAlpha=1-p*.4;ctx.shadowColor=b.c||'#ff0';ctx.shadowBlur=12;
-    ctx.beginPath();ctx.moveTo(b.sx,b.sy);ctx.lineTo(tx,ty);
-    ctx.strokeStyle=b.c||'#ff0';ctx.lineWidth=b.thick||2.5;ctx.stroke();
-    ctx.shadowBlur=0;
-    if(p>.75){ctx.globalAlpha=(1-p)*4*.7;ctx.beginPath();ctx.arc(tx,ty,TS*.12,0,Math.PI*2);ctx.fillStyle=b.c||'#ff0';ctx.fill();}
+
+  // Blood splats
+  if(tac.bloodSplats)tac.bloodSplats.forEach(sp=>{
+    const s=w2s(sp.r,sp.c);
+    ctx.save();ctx.globalAlpha=sp.a*0.65;ctx.fillStyle='#8B0000';
+    ctx.beginPath();ctx.ellipse(s.x+TS/2,s.y+TS*0.88,TS*sp.sz*1.1,TS*sp.sz*0.6,Math.random()*0.5,0,Math.PI*2);ctx.fill();
     ctx.restore();
   });
-  // melee vfx
+
+  // Blood particles
+  tac.bloodParts.forEach(bp=>{
+    const s=w2s(bp.r,bp.c);
+    ctx.save();ctx.globalAlpha=Math.max(0,bp.a);ctx.fillStyle='#cc1111';
+    ctx.beginPath();ctx.arc(s.x+TS/2,s.y+TS/2,Math.max(1,bp.size*TS/64),0,Math.PI*2);ctx.fill();ctx.restore();
+  });
+
+  // Grenade arcs
+  tac.grenades.forEach(g=>{
+    const s=w2s(g.r,g.c);
+    const arc=Math.sin(g.phase*Math.PI)*TS*1.6;
+    ctx.save();ctx.font=Math.floor(TS*0.38)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('💣',s.x+TS/2,s.y+TS/2-arc);ctx.restore();
+  });
+
+  // Laser aim line (from player toward nearest live enemy)
+  {
+    const p=tac.player;
+    let nearEnemy=null,nearD=Infinity;
+    tac.enemies.forEach(e=>{if(e.hp<=0)return;const d=Math.hypot(e.r-p.r,e.c-p.c);if(d<nearD){nearD=d;nearEnemy=e;}});
+    const aimAngle=nearEnemy?Math.atan2(nearEnemy.r-p.r,nearEnemy.c-p.c):p.angle;
+    const ps=w2s(p.r,p.c);
+    const laserLen=Math.min(nearD||12,(tac.pw.r||8))*TS;
+    const ex=ps.x+TS/2+Math.cos(aimAngle)*laserLen;
+    const ey=ps.y+TS/2+Math.sin(aimAngle)*laserLen;
+    // Glow layer
+    ctx.save();ctx.globalAlpha=0.18;ctx.strokeStyle='#ff3333';ctx.lineWidth=6;
+    ctx.shadowColor='#ff0000';ctx.shadowBlur=12;
+    ctx.beginPath();ctx.moveTo(ps.x+TS/2,ps.y+TS/2);ctx.lineTo(ex,ey);ctx.stroke();
+    // Core
+    ctx.globalAlpha=0.55;ctx.strokeStyle='#ff6666';ctx.lineWidth=1.5;ctx.shadowBlur=4;
+    ctx.setLineDash([6,4]);ctx.beginPath();ctx.moveTo(ps.x+TS/2,ps.y+TS/2);ctx.lineTo(ex,ey);ctx.stroke();
+    ctx.setLineDash([]);
+    // Dot at end
+    ctx.globalAlpha=0.8+0.2*Math.sin(tac.animPhase*3);ctx.fillStyle='#ff4444';ctx.shadowBlur=8;
+    ctx.beginPath();ctx.arc(ex,ey,3.5,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+
+  // Enemies
+  tac.enemies.forEach(e=>{
+    const s=w2s(e.r,e.c);
+    if(s.x<-TS*2||s.x>canvas.width+TS*2||s.y<-TS*2||s.y>canvas.height+TS*2)return;
+    if(e.hp<=0&&e.deathTimer>0){
+      const prog=1-e.deathTimer/1400;
+      ctx.save();
+      ctx.globalAlpha=Math.max(0,1-prog*0.6);
+      const cx=s.x+TS/2,cy=s.y+TS/2;
+      ctx.translate(cx,cy);ctx.rotate(prog*Math.PI/2.2);ctx.translate(-cx,-cy);
+      tacDrawEnemyChar(ctx,cx,cy+prog*TS*0.35,TS*(1-prog*0.15),e,false);
+      ctx.restore();return;
+    }
+    if(e.hp<=0)return;
+    tacDrawEnemyChar(ctx,s.x+TS/2,s.y+TS/2,TS,e,false);
+    tacDrawWeaponInHand(ctx,s.x+TS/2,s.y+TS/2,TS,e.angle,WEP_TAC[e.wep]||WEP_TAC.nagan,0,true);
+    // HP bar
+    const bw=TS*0.75,bx=s.x+TS*0.125,by=s.y+TS-7;
+    ctx.fillStyle='rgba(0,0,0,.7)';ctx.fillRect(bx,by,bw,6);
+    const pct=Math.max(0,e.hp/e.maxhp);
+    ctx.fillStyle=pct>.6?'#2ecc71':pct>.3?'#f0c030':'#e74c3c';ctx.fillRect(bx,by,bw*pct,6);
+    ctx.strokeStyle='rgba(0,0,0,.5)';ctx.lineWidth=0.5;ctx.strokeRect(bx,by,bw,6);
+  });
+
+  // Player
+  {
+    const p=tac.player,s=w2s(p.r,p.c);
+    tacDrawPlayerChar(ctx,s.x+TS/2,s.y+TS/2,TS,DATA,p.walkPhase);
+    tacDrawWeaponInHand(ctx,s.x+TS/2,s.y+TS/2,TS,p.angle,tac.pw,p.meleeAnim||0,false);
+    const bw=TS*0.75,bx=s.x+TS*0.125,by=s.y+TS-7;
+    ctx.fillStyle='rgba(0,0,0,.7)';ctx.fillRect(bx,by,bw,6);
+    const pct=Math.max(0,p.hp/tac.player_maxhp);
+    ctx.fillStyle=pct>.6?'#2ecc71':pct>.3?'#f0c030':'#e74c3c';ctx.fillRect(bx,by,bw*pct,6);
+    ctx.strokeStyle='rgba(0,0,0,.5)';ctx.lineWidth=0.5;ctx.strokeRect(bx,by,bw,6);
+  }
+
+  // Muzzle flashes
+  tac.muzzleFlash.forEach(m=>{
+    const s=w2s(m.r,m.c);
+    ctx.save();ctx.globalAlpha=m.a*0.85;
+    ctx.fillStyle=m.enemy?'#ff6600':'#ffe880';
+    ctx.shadowColor=m.enemy?'#ff3300':'#ffee00';ctx.shadowBlur=TS*0.5;
+    ctx.beginPath();ctx.arc(s.x+TS/2,s.y+TS/2,TS*0.22,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  });
+
+  // Bullets
+  tac.bullets.forEach(b=>{
+    const s=w2s(b.r,b.c);
+    const hd=w2s(b.r-b.vr*0.042,b.c-b.vc*0.042);
+    ctx.save();ctx.strokeStyle=b.color||'#ff0';ctx.lineWidth=b.thick||2.5;
+    ctx.shadowColor=b.color||'#ff0';ctx.shadowBlur=10;ctx.globalAlpha=0.92;
+    ctx.beginPath();ctx.moveTo(hd.x+TS/2,hd.y+TS/2);ctx.lineTo(s.x+TS/2,s.y+TS/2);ctx.stroke();
+    ctx.restore();
+  });
+
+  // Melee VFX
   tac.meleeVfx.forEach(v=>{
-    const s=w2s(v.vr,v.vc);ctx.save();ctx.globalAlpha=v.a;
-    ctx.font=Math.floor(TS*.95)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    const s=w2s(v.r,v.c);
+    ctx.save();ctx.globalAlpha=Math.max(0,v.a);
+    ctx.font=Math.floor(TS*0.95)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillText(v.e,s.x+TS/2,s.y+TS/2);ctx.restore();
   });
-  // minimap
+
+  // Minimap
   tacDrawMinimap(ctx,canvas.width);
+
   tac.animPhase+=0.06;
 }
 
-// ── CANVAS RESIZE ─────────────────────────────────────────────────────
+// ── WEAPON IN HAND ────────────────────────────────────────────────────────
+function tacDrawWeaponInHand(ctx,vx,vy,TS,angle,wep,meleeAnim,isEnemy){
+  if(!wep)return;
+  const sc=TS/72;
+  ctx.save();
+  ctx.translate(vx,vy+TS*0.03);
+  ctx.scale(sc,sc);
+  // facing: angle is direction of movement/aim
+  const rotAngle=isEnemy?(angle+Math.PI/2):(angle+Math.PI/2);
+  const swing=Math.sin(meleeAnim*Math.PI)*0.9;
+  ctx.rotate(rotAngle+swing);
+  const t=wep.t;
+  ctx.save();
+  if(t==='melee'){
+    const c=wep.c||'#aaa';
+    ctx.fillStyle=c;ctx.strokeStyle='rgba(0,0,0,.5)';ctx.lineWidth=1;
+    if(wep.lbl.includes('Заточка')||wep.lbl.includes('Мачете')||wep.lbl.includes('Катана')){
+      ctx.beginPath();ctx.moveTo(-2,5);ctx.lineTo(2,5);ctx.lineTo(1,-22);ctx.lineTo(0,-26);ctx.lineTo(-1,-22);ctx.closePath();ctx.fill();ctx.stroke();
+      ctx.fillStyle='#888';ctx.fillRect(-3,4,6,5);
+    }else{
+      _rr(ctx,-4,-24,8,30,3);ctx.fill();ctx.stroke();
+      ctx.fillStyle=_lc(c,22);_rr(ctx,-3,-24,6,10,3);ctx.fill();
+    }
+  }else if(t==='pistol'){
+    ctx.fillStyle='#2a2a2a';ctx.strokeStyle='#111';ctx.lineWidth=1;
+    _rr(ctx,-5,-2,11,14,2);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#1a1a1a';_rr(ctx,-5,-16,8,15,1);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#333';_rr(ctx,-3,-17,4,4,1);ctx.fill();
+  }else if(t==='burst'){
+    ctx.fillStyle='#2a2a2a';ctx.strokeStyle='#111';ctx.lineWidth=1;
+    _rr(ctx,-4,-24,8,32,2);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#1a1a1a';_rr(ctx,-3,-27,6,7,1);ctx.fill();
+    ctx.fillStyle='#333';_rr(ctx,-3,-8,6,12,1);ctx.fill();ctx.stroke();
+  }else if(t==='rifle'){
+    ctx.fillStyle='#2a2a2a';ctx.strokeStyle='#111';ctx.lineWidth=1;
+    _rr(ctx,-4,-32,8,40,2);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#1a1a1a';_rr(ctx,-3,-35,6,7,1);ctx.fill();
+    ctx.fillStyle='#3a2a18';_rr(ctx,-3,-10,6,18,1);ctx.fill();
+  }else if(t==='shotgun'){
+    ctx.fillStyle='#3a2a18';ctx.strokeStyle='#1a0e04';ctx.lineWidth=1;
+    _rr(ctx,-5,-26,10,32,2);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#2a1a08';_rr(ctx,-5,-26,5,32,1);ctx.fill();
+  }else if(t==='rocket'){
+    ctx.fillStyle='#2a3a18';ctx.strokeStyle='#111';ctx.lineWidth=1;
+    _rr(ctx,-7,-28,14,38,3);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#1a2a08';ctx.beginPath();ctx.arc(0,-28,6,Math.PI,0);ctx.fill();
+  }
+  ctx.restore();
+  ctx.restore();
+}
+
+// ── CANVAS RESIZE ─────────────────────────────────────────────────────────
 function tacResize(){
   if(!tac)return;
   const wrap=document.getElementById('tac-canvas-wrap');
   const canvas=document.getElementById('tac-gc');
+  if(!wrap||!canvas)return;
   const W=wrap.clientWidth,H=wrap.clientHeight;
+  canvas.width=W;canvas.height=H;
   tac.TS=Math.floor(Math.min(W/tac.VIEW_W,H/tac.VIEW_H));
-  canvas.width=Math.floor(tac.TS*tac.VIEW_W);
-  canvas.height=Math.floor(tac.TS*tac.VIEW_H);
-  const f=document.getElementById('tac-frame');
-  f.style.width=canvas.width+'px';f.style.height=canvas.height+'px';
 }
 
-// ── HUD ───────────────────────────────────────────────────────────────
+// ── HUD ───────────────────────────────────────────────────────────────────
 function tacHud(){
   if(!tac)return;
   const p=tac.player,e=tac.enemies[0];
@@ -2305,327 +2636,174 @@ function tacHud(){
   document.getElementById('tEName').textContent=e.name;
   document.getElementById('tETxt').textContent=e.hp+'/'+e.maxhp;
   document.getElementById('tEBar').style.width=Math.max(0,e.hp/e.maxhp*100)+'%';
+  tacUpdateGrenBtn();
 }
-function tacLog(t){document.getElementById('tac-log').textContent=t;}
-function tacBtns(){
-  if(!tac)return;
-  const sh=document.getElementById('tShoot'),me=document.getElementById('tMelee');
-  const mv=document.getElementById('tMove'),en=document.getElementById('tEnd');
-  const gr=document.getElementById('tGren');
-  const ok=tac.gstate==='player';
-  const grenCount=session.gren||0;
-  gr.textContent='💣 '+grenCount;
-  gr.disabled=!ok||tac.player.attacked||grenCount<=0;
-  gr.style.opacity=grenCount<=0?.4:1;
-  mv.disabled=!ok||tac.player.moved||tac.grenMode;
-  en.disabled=!ok;
-  if(ok&&tac.selEnemy&&!tac.player.attacked&&!tac.grenMode){
-    const d=tacDist(tac.player.r,tac.player.c,tac.selEnemy.r,tac.selEnemy.c);
-    const w=tac.pw;
-    sh.disabled=(w.t==='melee')||(d>w.r);
-    me.disabled=d>Math.max(2,w.t==='melee'?w.r:2);
-  }else{sh.disabled=true;me.disabled=true;}
+function tacUpdateGrenBtn(){
+  const ct=document.getElementById('tac-gren-ct');if(ct)ct.textContent=session.gren||0;
+  const btn=document.getElementById('tac-btn-gren');
+  if(btn){const empty=(session.gren||0)<=0;btn.dataset.empty=empty?'1':'0';}
 }
 
-// ── HELPERS ───────────────────────────────────────────────────────────
-function tacDist(r1,c1,r2,c2){return Math.abs(r1-r2)+Math.abs(c1-c2);}
-function tacWalkable(r,c){
-  if(!tac||r<0||r>=tac.ROWS||c<0||c>=tac.COLS)return false;
-  if(tac.grid[r][c]===1)return false;
-  if(tac.enemies.some(e=>e.hp>0&&e.r===r&&e.c===c))return false;
-  return true;
-}
-function tacBfs(sr,sc,range){
-  const vis=new Set([sr+','+sc]),q=[{r:sr,c:sc,n:0}],res=[];
-  while(q.length){
-    const{r,c,n}=q.shift();if(n>0)res.push({r,c});if(n>=range)continue;
-    for(const[dr,dc]of[[-1,0],[1,0],[0,-1],[0,1]]){
-      const nr=r+dr,nc=c+dc,k=nr+','+nc;
-      if(!vis.has(k)&&tacWalkable(nr,nc)){vis.add(k);q.push({r:nr,c:nc,n:n+1});}
-    }
-  }
-  return res;
-}
-function tacHitChance(ar,ac,tr,tc,cov){
-  const d=tacDist(ar,ac,tr,tc);
-  let b=d<=1?.97:d<=2?.90:d<=3?.82:d<=4?.72:d<=5?.60:d<=7?.50:.40;
-  if(cov===1)b*=.55;if(cov===2)b*=.22;return Math.max(.05,Math.min(.95,b));
-}
-function tacDmgCalc(atk,def,mult,d,melee){
-  let b=Math.max(1,atk-def);
-  if(!melee)b*=d<=2?1.3:d<=4?1.0:d<=6?.85:.70;
-  return Math.max(1,Math.round(b*mult*(.85+Math.random()*.3)));
-}
-function tacW2SScreen(unit){
-  const TS=tac.TS,offC=tac.camC-tac.VIEW_W/2,offR=tac.camR-tac.VIEW_H/2;
-  return{x:(unit.vc-offC)*TS+TS/2,y:(unit.vr-offR)*TS+TS/2};
-}
-
-// ── ANIMATIONS ────────────────────────────────────────────────────────
-function easeInOut(t){return t<.5?2*t*t:-1+(4-2*t)*t;}
-function tacShootAnim(sx,sy,ex,ey,wData,cb){
-  const dur=260,t0=performance.now();
-  tac.bullets=[{sx,sy,ex,ey,c:wData.c,thick:wData.thick||2.5,prog:0}];
-  (function step(now){tac.bullets[0].prog=Math.min(1,(now-t0)/dur);if(tac.bullets[0].prog<1)requestAnimationFrame(step);else{tac.bullets=[];cb();}})(performance.now());
-}
-function tacMeleeAnim(vr,vc,cb){
-  const EMOJIS=['💥','⚡','💫','✨','🔥'];
-  tac.meleeVfx=[{vr,vc,e:EMOJIS[Math.floor(Math.random()*EMOJIS.length)],a:1}];
-  let s=0;const iv=setInterval(()=>{tac.meleeVfx[0].a=Math.max(0,1-s/10);if(++s>=10){clearInterval(iv);tac.meleeVfx=[];}},40);
-}
-function tacMoveAnim(unit,tr,tc,cb){
-  const dur=340,t0=performance.now(),or=unit.vr,oc=unit.vc;
-  unit.r=tr;unit.c=tc;unit.isWalking=true;
-  (function step(now){
-    const raw=Math.min(1,(now-t0)/dur),p=easeInOut(raw);
-    unit.vr=or+(tr-or)*p;unit.vc=oc+(tc-oc)*p;unit.walkPhase=now/80;
-    if(raw<1)requestAnimationFrame(step);else{unit.vr=tr;unit.vc=tc;unit.isWalking=false;cb();}
-  })(performance.now());
-}
+// ── HELPERS ───────────────────────────────────────────────────────────────
 function tacFloatDmg(unit,dmg,color,miss){
-  const layer=document.getElementById('tac-dmg');
+  const layer=document.getElementById('tac-dmg');if(!layer||!tac)return;
   const TS=tac.TS,offC=tac.camC-tac.VIEW_W/2,offR=tac.camR-tac.VIEW_H/2;
-  const sx=(unit.vc-offC)*TS,sy=(unit.vr-offR)*TS;
+  const sx=(unit.c-offC)*TS,sy=(unit.r-offR)*TS;
   const el=document.createElement('div');el.className='dmg-pop';
-  el.style.cssText=`color:${color};left:${sx+TS*.1}px;top:${sy}px;font-size:${Math.floor(TS*.34)}px`;
+  el.style.cssText=`color:${color};left:${sx+TS*0.1}px;top:${sy}px;font-size:${Math.floor(TS*0.34)}px`;
   el.textContent=miss?'МИМО!':'-'+dmg;
   layer.appendChild(el);setTimeout(()=>el.remove(),950);
 }
+
 function tacExplodeAnim(tr,tc,cb){
-  tac.meleeVfx=[{vr:tr,vc:tc,e:'💥',a:1},{vr:tr-1,vc:tc,e:'🔥',a:.8},{vr:tr,vc:tc+1,e:'💨',a:.7}];
-  let s=0;const iv=setInterval(()=>{tac.meleeVfx.forEach(v=>v.a=Math.max(0,1-s/12));if(++s>=12){clearInterval(iv);tac.meleeVfx=[];cb();}},45);
+  tac.meleeVfx.push({r:tr,c:tc,vy:-0.6,e:'💥',a:1});
+  tac.meleeVfx.push({r:tr-0.5,c:tc+0.3,vy:-0.3,e:'🔥',a:0.9});
+  tac.meleeVfx.push({r:tr+0.3,c:tc-0.5,vy:-0.2,e:'💨',a:0.8});
+  setTimeout(cb,380);
 }
 
-// ── COMBAT ────────────────────────────────────────────────────────────
-function tacAutoEndTurn(){setTimeout(()=>{if(tac&&tac.gstate==='player')tacEnemyTurn();},700);}
-
-function tacDoShoot(){
-  if(!tac||!tac.selEnemy||tac.player.attacked||tac.gstate!=='player')return;
-  const e=tac.selEnemy,w=tac.pw;
-  if(w.t==='melee'){tacDoMelee();return;}
-  const d=tacDist(tac.player.r,tac.player.c,e.r,e.c);
-  if(d>w.r){tacLog('Слишком далеко!');return;}
-  tac.gstate='anim';tac.player.attacked=true;
-  const cv=TAC_COV[tac.grid[e.r][e.c]]||0;
-  const hit=Math.random()<tacHitChance(tac.player.r,tac.player.c,e.r,e.c,cv);
-  const ps=tacW2SScreen(tac.player),es=tacW2SScreen(e);
-  tacShootAnim(ps.x,ps.y,es.x,es.y,w,()=>{
-    if(hit){const dmg=tacDmgCalc(tac.player.atk,e.def,w.m,d,false);e.hp=Math.max(0,e.hp-dmg);tacFloatDmg(e,dmg,'#ff9999',false);tacLog(w.lbl+' → попал! −'+dmg+' HP'+(cv>0?' 🛡':''));}
-    else{tacFloatDmg(e,0,'#aaa',true);tacLog(w.lbl+' → мимо!'+(cv>0?' (укрытие)':''));}
-    tacHud();tacCheckDeath();tac.gstate='player';tac.selEnemy=null;tacCalcMoveTiles();tacBtns();tacAutoEndTurn();
-  });
-}
-function tacDoMelee(){
-  if(!tac||!tac.selEnemy||tac.player.attacked||tac.gstate!=='player')return;
-  const e=tac.selEnemy,w=tac.pw;
-  const d=tacDist(tac.player.r,tac.player.c,e.r,e.c);
-  if(d>Math.max(2,w.t==='melee'?w.r:2)){tacLog('Слишком далеко!');return;}
-  tac.gstate='anim';tac.player.attacked=true;
-  tacMeleeAnim(e.vr,e.vc,()=>{
-    const dmg=tacDmgCalc(tac.player.atk,e.def,w.m*(w.t==='melee'?1:1.2),d,true);
-    e.hp=Math.max(0,e.hp-dmg);tacFloatDmg(e,dmg,'#ffcc44',false);
-    tacLog((w.t==='melee'?w.lbl:'Ближний бой')+' → −'+dmg+' HP!');
-    tacHud();tacCheckDeath();tac.gstate='player';tac.selEnemy=null;tacCalcMoveTiles();tacBtns();tacAutoEndTurn();
-  });
-}
-function tacToggleGrenMode(){
-  if(!tac||tac.gstate!=='player'||tac.player.attacked||(session.gren||0)<=0)return;
-  tac.grenMode=!tac.grenMode;tac.grenTarget=null;tac.selTile=null;tac.selEnemy=null;
-  if(tac.grenMode)tacLog('💣 Выбери цель для броска гранаты (радиус 6)');
-  else tacLog('Бросок отменён. Выбери куда двигаться или атаковать.');
-  tacBtns();
-}
-function tacThrowGrenade(tr,tc){
-  if(!tac||tac.player.attacked||tac.gstate!=='player')return;
-  const d=tacDist(tac.player.r,tac.player.c,tr,tc);
-  if(d>6){tacLog('Слишком далеко для броска!');return;}
-  tac.gstate='anim';tac.player.attacked=true;tac.grenMode=false;
-  session.gren=Math.max(0,(session.gren||0)-1);
-  tacExplodeAnim(tr,tc,()=>{
-    let hits=0;
-    tac.enemies.forEach(e=>{
-      if(e.hp<=0)return;
-      if(tacDist(tr,tc,e.r,e.c)<=1){
-        const dmg=60+Math.floor(Math.random()*40);
-        e.hp=Math.max(0,e.hp-dmg);tacFloatDmg(e,dmg,'#ff6600',false);hits++;
-      }
-    });
-    tacLog('💣 Граната! '+(hits>0?'Попал в '+hits+' врагов!':'Мимо всех...'));
-    tacHud();tacCheckDeath();tac.gstate='player';tacCalcMoveTiles();tacBtns();tacAutoEndTurn();
-  });
-}
 function tacCheckDeath(){
-  if(!tac)return;
-  if(tac.enemies.every(e=>e.hp<=0)){setTimeout(()=>tacEndBattle('won'),500);return;}
+  if(!tac||tac.gstate!=='playing')return;
+  if(tac.enemies.every(e=>e.hp<=0)){setTimeout(()=>tacEndBattle('won'),900);return;}
   if(tac.player.hp<=0)setTimeout(()=>tacEndBattle('lost'),500);
 }
 
-// ── ENEMY AI ─────────────────────────────────────────────────────────
-function tacSleep(ms){return new Promise(r=>setTimeout(r,ms));}
-async function tacEnemyTurn(){
-  if(!tac||tac.gstate==='won'||tac.gstate==='lost')return;
-  tac.gstate='enemy';
-  document.getElementById('tac-badge').textContent='ХОД\nВРАГА';
-  document.getElementById('tac-badge').className='et';
-  tacLog('Враги действуют...');tacBtns();
-  for(const e of tac.enemies){
-    if(e.hp<=0)continue;await tacSleep(400);
-    const ew=WEP_TAC[e.wep]||WEP_TAC.nagan;
-    if(!e.moved){
-      const reach=tacBfs(e.r,e.c,e.moveRange);let best=null,bsc=Infinity;
-      reach.forEach(({r,c})=>{const nd=tacDist(r,c,tac.player.r,tac.player.c),cb=TAC_COV[tac.grid[r][c]]>0?-2:0;if(nd+cb<bsc){bsc=nd+cb;best={r,c};}});
-      if(best&&(best.r!==e.r||best.c!==e.c)){await new Promise(res=>tacMoveAnim(e,best.r,best.c,res));e.moved=true;await tacSleep(100);}
-    }
-    const d=tacDist(e.r,e.c,tac.player.r,tac.player.c);
-    if(d<=ew.r&&!e.attacked){
-      e.attacked=true;
-      const cv=TAC_COV[tac.grid[tac.player.r][tac.player.c]]||0;
-      const hit=Math.random()<tacHitChance(e.r,e.c,tac.player.r,tac.player.c,cv);
-      const es=tacW2SScreen(e),ps=tacW2SScreen(tac.player);
-      await new Promise(res=>tacShootAnim(es.x,es.y,ps.x,ps.y,ew,res));
-      if(hit){const dmg=tacDmgCalc(e.atk,tac.player.def,1.0,d,false);tac.player.hp=Math.max(0,tac.player.hp-dmg);tacFloatDmg(tac.player,dmg,'#ff4444',false);tacLog(e.name+' попал! −'+dmg+(cv>0?' 🛡':''));}
-      else{tacFloatDmg(tac.player,0,'#aaa',true);tacLog(e.name+' промахнулся!'+(cv>0?' Укрытие спасло!':''));}
-      tacHud();if(tac.player.hp<=0){tacEndBattle('lost');return;}
-    }
-  }
-  await tacSleep(280);tacStartPlayerTurn();
-}
-
-// ── TURNS ─────────────────────────────────────────────────────────────
-function tacCalcMoveTiles(){if(tac)tac.moveTiles=tac.player.moved?[]:tacBfs(tac.player.r,tac.player.c,tac.player.moveRange);}
-function tacStartPlayerTurn(){
-  if(!tac)return;
-  tac.gstate='player';tac.player.moved=false;tac.player.attacked=false;tac.grenMode=false;tac.grenTarget=null;
-  tac.enemies.forEach(e=>{e.moved=false;e.attacked=false;});
-  tac.selTile=null;tac.selEnemy=null;tacCalcMoveTiles();
-  document.getElementById('tac-badge').textContent='ВАШ\nХОД';
-  document.getElementById('tac-badge').className='pt';
-  tacLog('Твой ход: переместись, затем атакуй');tacBtns();
-}
-function tacResetSel(){if(tac){tac.grenMode=false;tac.grenTarget=null;tac.selTile=null;tac.selEnemy=null;tacCalcMoveTiles();tacBtns();}}
-function tacEndPlayerTurn(){if(!tac||tac.gstate!=='player')return;tac.selTile=null;tac.selEnemy=null;tac.grenMode=false;tacEnemyTurn();}
-
-// ── BATTLE END ────────────────────────────────────────────────────────
+// ── BATTLE END ────────────────────────────────────────────────────────────
 function tacEndBattle(res){
-  if(!tac)return;tac.gstate=res;
+  if(!tac||tac.gstate===res)return;
+  tac.gstate=res;
   if(tac.pulseRaf){cancelAnimationFrame(tac.pulseRaf);tac.pulseRaf=null;}
-  ['tShoot','tMelee','tEnd','tMove','tGren'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=true;});
-  const boss=BOSS_DATA[tac.bossId],ov=document.getElementById('tac-result');
+  const boss=BOSS_DATA[tac.bossId];
+  const ov=document.getElementById('tac-result');
   if(res==='won'){
     const exp=boss.exp,cash=boss.cash+Math.floor(Math.random()*Math.round(boss.cash/3));
     session.hp=Math.max(1,tac.player.hp);session.cash+=cash;
     session.wins.push({boss_id:tac.bossId,loc_id:tac.locId,exp,cash});session.dirty=true;
-    document.getElementById('tac-badge').textContent='🏆 ПОБЕДА';document.getElementById('tac-badge').className='pt';
     ov.innerHTML=`<div class="tac-res-icon">🏆</div><div class="tac-res-title win">ПОБЕДА!</div>
-      <div class="tac-res-rewards"><div class="tac-reward"><span class="rv">+${exp}</span><span class="rl">Опыт</span></div><div class="tac-reward"><span class="rv">+${cash}$</span><span class="rl">Наличные</span></div></div>
-      <div style="margin-top:8px;font-size:12px;color:#888">❤️ ${session.hp}/${DATA.maxhp} · 💵 ${session.cash}$</div>
-      <button class="tac-res-btn" onclick="afterBattle(true)">⚔️ Продолжить</button>
-      <button class="tac-res-btn exit" onclick="afterBattle(false)">← Выйти</button>`;
+      <div class="tac-res-rewards"><div class="tac-reward"><span class="rv">+${exp}</span><span class="rl">Опыт</span></div><div class="tac-reward"><span class="rv">+${cash}$</span><span class="rl">Нал</span></div></div>
+      <div style="margin-top:8px;font-size:12px;color:#888">HP: ${session.hp}/${DATA.maxhp}</div>
+      <button class="tac-res-btn" onclick="afterBattle(true)">Продолжить</button>
+      <button class="tac-res-btn exit" onclick="afterBattle(false)">Выход</button>`;
   }else{
     session.hp=1;session.dirty=true;
-    document.getElementById('tac-badge').textContent='💀 КОНЕЦ';document.getElementById('tac-badge').className='et';
     ov.innerHTML=`<div class="tac-res-icon">💀</div><div class="tac-res-title lose">ПОРАЖЕНИЕ</div>
-      <div style="color:#888;font-size:13px;margin-top:4px">Ты чудом выжил.</div>
-      <button class="tac-res-btn" style="margin-top:16px" onclick="afterBattle(false)">← Уйти</button>`;
+      <div style="color:#888;font-size:13px;margin-top:4px">Вы потеряли сознание.</div>
+      <button class="tac-res-btn" style="margin-top:16px" onclick="afterBattle(false)">Выход</button>`;
   }
   ov.style.display='flex';
 }
 
-// ── INIT ─────────────────────────────────────────────────────────────
+// ── INIT ──────────────────────────────────────────────────────────────────
 function startBattle(bossId,locId){
   const boss=BOSS_DATA[bossId];if(!boss)return;
   const bossEmoji=boss.name.match(/^./u)[0],bossName=boss.name.replace(/^\S+\s*/,'');
-  const grid=TAC_MAPS[locId]||TAC_MAPS.market,ROWS=grid.length,COLS=grid[0].length;
-  const mk=(id,r,c,hp,atk,def,name,e,wep,mr)=>({
-    id,r,c,vr:r,vc:c,hp,maxhp:hp,atk,def,name,e,wep,
-    moveRange:mr,moved:false,attacked:false,isWalking:false,walkPhase:0
-  });
+  const grid=TAC_MAPS[locId]||TAC_MAPS.market;
+  const ROWS=grid.length,COLS=grid[0].length;
   tac={
-    bossId,locId,grid,ROWS,COLS,VIEW_W:5,VIEW_H:7,
-    gstate:'player',
-    player:mk(-1,12,1,session.hp,DATA.atk,DATA.def,DATA.name,'🤵','',4),
+    bossId,locId,grid,ROWS,COLS,
+    VIEW_W:7,VIEW_H:9,
+    gstate:'playing',
+    player:{r:12.5,c:1.5,hp:session.hp,maxhp:DATA.maxhp,atk:DATA.atk,def:DATA.def,name:DATA.name,
+      angle:0,isMoving:false,walkPhase:0,fireCD:0,meleeCD:0,grenCD:0,meleeAnim:0},
     enemies:[
-      mk(0,1,16,boss.hp,boss.atk,boss.def,bossName,bossEmoji,'tt_pistol',3),
-      mk(1,3,12,Math.round(boss.hp*.4),Math.round(boss.atk*.7),Math.round(boss.def*.6),'Охранник','👮','nagan',3),
+      {id:0,r:1.5,c:16.5,hp:boss.hp,maxhp:boss.hp,atk:boss.atk,def:boss.def,
+       name:bossName,emoji:bossEmoji,wep:'tt_pistol',
+       angle:Math.PI,isMoving:false,walkPhase:0,fireCD:1200,meleeCD:0,deathTimer:0},
+      {id:1,r:3.5,c:12.5,hp:Math.round(boss.hp*0.45),maxhp:Math.round(boss.hp*0.45),
+       atk:Math.round(boss.atk*0.7),def:Math.round(boss.def*0.6),
+       name:'Охранник',emoji:'🕵️',wep:'nagan',
+       angle:Math.PI,isMoving:false,walkPhase:0,fireCD:1600,meleeCD:0,deathTimer:0},
     ],
     player_maxhp:DATA.maxhp,
-    selTile:null,selEnemy:null,moveTiles:[],
-    grenMode:false,grenTarget:null,
-    bullets:[],meleeVfx:[],
-    animPhase:0,pulseRaf:null,
-    camR:12,camC:1,
+    bullets:[],meleeVfx:[],muzzleFlash:[],bloodParts:[],bloodSplats:[],grenades:[],
+    joy:{dx:0,dy:0,bx:0,by:0},
+    actions:{shoot:false},
+    camR:12.5,camC:1.5,
     pw:WEP_TAC[DATA.weapon]||WEP_TAC.nagan,
-    TS:60,lastTap:{r:-1,c:-1,t:0},
+    TS:60,shake:0,lastTime:0,animPhase:0,pulseRaf:null,
   };
   document.querySelectorAll('.subpage').forEach(p=>p.style.display='none');
   document.getElementById('page-battle').style.display='';
   document.getElementById('tac-result').style.display='none';
   if(tg&&tg.BackButton)tg.BackButton.hide();
   window.scrollTo(0,0);
-  tacResize();tacHud();tacCalcMoveTiles();tacStartPlayerTurn();
-  // tutorial overlay
+  tacResize();tacHud();
   const tutEl=document.getElementById('tac-tutorial');
-  if(tutEl){tutEl.style.opacity='1';tutEl.style.display='flex';setTimeout(()=>{tutEl.style.opacity='0';setTimeout(()=>tutEl.style.display='none',600);},4000);}
+  if(tutEl){tutEl.style.opacity='1';tutEl.style.display='flex';
+    setTimeout(()=>{tutEl.style.opacity='0';setTimeout(()=>tutEl.style.display='none',600);},3800);}
   if(tac.pulseRaf)cancelAnimationFrame(tac.pulseRaf);
-  (function loop(){tacRender();tac.pulseRaf=requestAnimationFrame(loop);})();
+  tac.pulseRaf=requestAnimationFrame(tacGameLoop);
 }
 
-// ── TAP INPUT (double-tap to move) ────────────────────────────────────
-(function(){
-  function onTacTap(evt){
-    if(!tac||tac.gstate!=='player')return;
-    const canvas=document.getElementById('tac-gc');if(!canvas)return;
-    const rect=canvas.getBoundingClientRect();
-    const scX=canvas.width/rect.width,scY=canvas.height/rect.height;
-    const cx2=(evt.clientX-rect.left)*scX,cy2=(evt.clientY-rect.top)*scY;
-    const TS=tac.TS,offC=tac.camC-tac.VIEW_W/2,offR=tac.camR-tac.VIEW_H/2;
-    const c=Math.floor(cx2/TS+offC),r=Math.floor(cy2/TS+offR);
-    if(r<0||r>=tac.ROWS||c<0||c>=tac.COLS)return;
-
-    // Grenade mode
-    if(tac.grenMode){
-      const d=tacDist(tac.player.r,tac.player.c,r,c);
-      if(d<=6&&d>0&&tac.grid[r][c]!==1){
-        if(tac.grenTarget&&tac.grenTarget.r===r&&tac.grenTarget.c===c){tacThrowGrenade(r,c);}
-        else{tac.grenTarget={r,c};tacLog('💣 Бросить сюда? Тапни ещё раз для подтверждения.');}
-      }else tacLog('Вне досягаемости гранаты (макс. 6 клеток)');
-      return;
-    }
-
-    const ce=tac.enemies.find(e=>e.hp>0&&e.r===r&&e.c===c);
-    if(ce){tac.selEnemy=ce;tac.selTile=null;
-      const d=tacDist(tac.player.r,tac.player.c,ce.r,ce.c);
-      const cv=TAC_COV[tac.grid[ce.r][ce.c]]||0;
-      const hp=Math.round(tacHitChance(tac.player.r,tac.player.c,ce.r,ce.c,cv)*100);
-      tacLog(ce.name+' | дист.'+d+' | шанс '+hp+'%'+(cv>0?' 🛡':''));tacBtns();return;
-    }
-
-    if(!tac.player.moved){
-      const inRange=tac.moveTiles.some(t=>t.r===r&&t.c===c);
-      if(!inRange){tac.selTile=null;tac.selEnemy=null;tacBtns();return;}
-      const now=Date.now(),lt=tac.lastTap,doubleTap=(lt.r===r&&lt.c===c&&now-lt.t<420);
-      tac.lastTap={r,c,t:now};
-      if(doubleTap){
-        tac.gstate='anim';tac.selTile=null;
-        tacMoveAnim(tac.player,r,c,()=>{
-          tac.player.moved=true;tacCalcMoveTiles();tac.gstate='player';
-          const cv=TAC_COV[tac.grid[tac.player.r][tac.player.c]]||0;
-          if(cv>0)tacLog(cv===2?'🛡 Тяжёлое укрытие! −80% урон':'🪵 Лёгкое укрытие! −50% урон');
-          else tacLog('Переместился. Теперь атакуй.');
-          tacBtns();
-        });
-      }else{
-        tac.selTile={r,c};tac.selEnemy=null;
-        const cv=TAC_COV[tac.grid[r][c]]||0;
-        tacLog((cv===2?'🛡 Тяж. укрытие':(cv===1?'🪵 Лёгкое укрытие':'Открытое место'))+' — двойной тап чтобы идти');
-        tacBtns();
+// ── JOYSTICK & CONTROLS ───────────────────────────────────────────────────
+(function setupTacControls(){
+  const wrap=document.getElementById('tac-canvas-wrap');
+  if(!wrap)return;
+  let joyId=null,mouseDown=false;
+  function joyStart(x,y,id){
+    if(!tac||tac.gstate!=='playing')return;
+    joyId=id;tac.joy.bx=x;tac.joy.by=y;tac.joy.dx=0;tac.joy.dy=0;
+    const base=document.getElementById('tac-joy-base');
+    const rect=wrap.getBoundingClientRect();
+    base.style.display='block';
+    base.style.left=(x-rect.left-42)+'px';
+    base.style.top=(y-rect.top-42)+'px';
+    document.getElementById('tac-joy-knob').style.transform='translate(-50%,-50%)';
+  }
+  function joyMove(x,y){
+    if(!tac||!tac.joy.bx)return;
+    const MAX=44;
+    const dx=x-tac.joy.bx,dy=y-tac.joy.by;
+    const len=Math.sqrt(dx*dx+dy*dy);
+    tac.joy.dx=len>MAX?dx/len:dx/MAX;
+    tac.joy.dy=len>MAX?dy/len:dy/MAX;
+    const cl=Math.min(len,MAX);
+    document.getElementById('tac-joy-knob').style.transform=`translate(calc(-50% + ${tac.joy.dx*cl}px),calc(-50% + ${tac.joy.dy*cl}px))`;
+  }
+  function joyEnd(){
+    if(!tac)return;
+    tac.joy.dx=0;tac.joy.dy=0;tac.joy.bx=0;joyId=null;
+    document.getElementById('tac-joy-base').style.display='none';
+  }
+  wrap.addEventListener('touchstart',e=>{
+    for(const t of e.changedTouches){
+      const rect=wrap.getBoundingClientRect();
+      if(t.clientX-rect.left<rect.width*0.56&&joyId===null){
+        e.preventDefault();joyStart(t.clientX,t.clientY,t.identifier);
       }
     }
-  }
-  document.addEventListener('click',e=>{if(e.target===document.getElementById('tac-gc'))onTacTap(e);});
-  document.addEventListener('touchend',e=>{
-    if(e.target===document.getElementById('tac-gc')){e.preventDefault();const t=e.changedTouches[0];onTacTap({clientX:t.clientX,clientY:t.clientY});}
   },{passive:false});
+  wrap.addEventListener('touchmove',e=>{
+    for(const t of e.changedTouches){
+      if(t.identifier===joyId){e.preventDefault();joyMove(t.clientX,t.clientY);}
+    }
+  },{passive:false});
+  wrap.addEventListener('touchend',e=>{
+    for(const t of e.changedTouches){if(t.identifier===joyId){e.preventDefault();joyEnd();}}
+  },{passive:false});
+  wrap.addEventListener('mousedown',e=>{
+    const rect=wrap.getBoundingClientRect();
+    if(e.clientX-rect.left<rect.width*0.56){mouseDown=true;joyStart(e.clientX,e.clientY,'m');}
+  });
+  document.addEventListener('mousemove',e=>{if(mouseDown)joyMove(e.clientX,e.clientY);});
+  document.addEventListener('mouseup',()=>{if(mouseDown){mouseDown=false;joyEnd();}});
+
+  function addBtn(id,onPress,onRelease){
+    const btn=document.getElementById(id);if(!btn)return;
+    const dn=e=>{e.preventDefault();e.stopPropagation();if(tac&&tac.gstate==='playing')onPress();};
+    const up=e=>{e.preventDefault();if(onRelease)onRelease();};
+    btn.addEventListener('touchstart',dn,{passive:false});
+    btn.addEventListener('touchend',up,{passive:false});
+    btn.addEventListener('mousedown',dn);
+    btn.addEventListener('mouseup',up);
+  }
+  addBtn('tac-btn-shoot',
+    ()=>{if(tac){tac.actions.shoot=true;if(tac.player.fireCD<=0)tacPlayerShoot();}},
+    ()=>{if(tac)tac.actions.shoot=false;}
+  );
+  addBtn('tac-btn-melee',()=>tacPlayerMelee(),null);
+  addBtn('tac-btn-gren',()=>tacPlayerGrenade(),null);
+
   window.addEventListener('resize',()=>{if(tac)tacResize();});
 })();
 
