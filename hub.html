@@ -2230,22 +2230,15 @@ function tacDrawMinimap(ctx,canvasW){
 // ── REAL-TIME BATTLE ENGINE v5 ────────────────────────────────────────────
 
 function tacIsBlocked(r,c){
-  const tr=Math.floor(r),tc=Math.floor(c);
-  if(tr<0||tr>=tac.ROWS||tc<0||tc>=tac.COLS)return true;
-  return tac.grid[tr][tc]===1; // только стены блокируют движение, укрытия (2-6) проходимы
-}
-// Character collision radius (tile units). Prevents clipping into covers/walls.
-const CHAR_R=0.35;
-function tacIsBlockedAt(r,c){
-  return tacIsBlocked(r-CHAR_R,c-CHAR_R)||tacIsBlocked(r-CHAR_R,c+CHAR_R)||
-         tacIsBlocked(r+CHAR_R,c-CHAR_R)||tacIsBlocked(r+CHAR_R,c+CHAR_R);
+  // Только границы карты (тип 1) блокируют. Укрытия (2-6) — полностью проходимы.
+  if(r<0.5||r>=tac.ROWS-0.5||c<0.5||c>=tac.COLS-0.5)return true;
+  return false;
 }
 function tacTryMove(unit,dr,dc){
   const nr=unit.r+dr, nc=unit.c+dc;
-  if(!tacIsBlockedAt(nr,nc)){unit.r=nr;unit.c=nc;return;}
-  // slide along each axis independently — fixes corner-catching
-  if(!tacIsBlockedAt(nr,unit.c))unit.r=nr;
-  if(!tacIsBlockedAt(unit.r,nc))unit.c=nc;
+  if(!tacIsBlocked(nr,nc)){unit.r=nr;unit.c=nc;return;}
+  if(!tacIsBlocked(nr,unit.c))unit.r=nr;
+  if(!tacIsBlocked(unit.r,nc))unit.c=nc;
 }
 
 function tacGameLoop(ts){
