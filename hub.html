@@ -1965,6 +1965,16 @@ function _lc(hex,amt){
   return '#'+((1<<24)|(r<<16)|(g<<8)|b).toString(16).slice(1);
 }
 
+
+function _drawName(ctx,vx,vy,TS,label,color){
+  const fs=Math.max(9,Math.round(TS*0.19));
+  ctx.save();ctx.font='bold '+fs+'px Arial';ctx.textAlign='center';ctx.textBaseline='alphabetic';
+  const tw=ctx.measureText(label).width,pad=4,bh=fs+4;
+  const bx=vx-tw/2-pad,by=vy-TS*0.92-bh;
+  ctx.fillStyle='rgba(0,0,0,0.72)';ctx.beginPath();
+  ctx.roundRect?ctx.roundRect(bx,by,tw+pad*2,bh,3):ctx.fillRect(bx,by,tw+pad*2,bh);
+  ctx.fill();ctx.fillStyle=color;ctx.fillText(label,vx,by+bh-3);ctx.restore();
+}
 function tacDrawPlayerChar(ctx,vx,vy,TS,charData,phase){
   const sk=TAC_SKINS[Math.min(4,(charData.skin||0))];
   const hr=TAC_HAIR[(charData.hair||0)%TAC_HAIR.length];
@@ -1974,14 +1984,20 @@ function tacDrawPlayerChar(ctx,vx,vy,TS,charData,phase){
   ctx.save();ctx.translate(cx,cy);ctx.scale(sc,sc);
   ctx.save();ctx.globalAlpha=0.4;
   ctx.beginPath();ctx.ellipse(0,36,16,5,0,0,Math.PI*2);ctx.fillStyle='#000';ctx.fill();ctx.restore();
-  ctx.fillStyle='#0A0A0A';_rr(ctx,-13,26,11,8,2);ctx.fill();_rr(ctx,2,26,11,8,2);ctx.fill();
-  ctx.fillStyle='#282828';_rr(ctx,-12,26,5,3,1);ctx.fill();_rr(ctx,3,26,5,3,1);ctx.fill();
+  const sw=Math.sin(phase),bob=Math.abs(sw)*1.5;ctx.translate(0,bob);
   const pantsC=top.sty==='suit'?'#22222E':top.sty==='mil'?'#1E2A10':top.sty==='track'?top.c:'#1A1A2A';
-  ctx.fillStyle=_grd(ctx,-10,6,6,26,_lc(pantsC,18),pantsC);
-  ctx.fillRect(-12,8,10,20);ctx.fillRect(2,8,10,20);
-  ctx.strokeStyle='rgba(0,0,0,.2)';ctx.lineWidth=0.8;
-  ctx.beginPath();ctx.moveTo(-7,10);ctx.lineTo(-7,27);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(7,10);ctx.lineTo(7,27);ctx.stroke();
+  ctx.save();ctx.translate(0,sw*6);
+  ctx.fillStyle='#0A0A0A';_rr(ctx,-13,26,11,8,2);ctx.fill();
+  ctx.fillStyle='#282828';_rr(ctx,-12,26,5,3,1);ctx.fill();
+  ctx.fillStyle=_grd(ctx,-10,6,6,26,_lc(pantsC,18),pantsC);ctx.fillRect(-12,8,10,20);
+  ctx.strokeStyle='rgba(0,0,0,.2)';ctx.lineWidth=0.8;ctx.beginPath();ctx.moveTo(-7,10);ctx.lineTo(-7,27);ctx.stroke();
+  ctx.restore();
+  ctx.save();ctx.translate(0,-sw*6);
+  ctx.fillStyle='#0A0A0A';_rr(ctx,2,26,11,8,2);ctx.fill();
+  ctx.fillStyle='#282828';_rr(ctx,3,26,5,3,1);ctx.fill();
+  ctx.fillStyle=_grd(ctx,-10,6,6,26,_lc(pantsC,18),pantsC);ctx.fillRect(2,8,10,20);
+  ctx.strokeStyle='rgba(0,0,0,.2)';ctx.lineWidth=0.8;ctx.beginPath();ctx.moveTo(7,10);ctx.lineTo(7,27);ctx.stroke();
+  ctx.restore();
   const jc=top.c,js=top.s;
   ctx.fillStyle=_grd(ctx,-13,-8,13,10,_lc(jc,22),jc);
   _rr(ctx,-13,-8,26,20,3);ctx.fill();
@@ -1993,8 +2009,10 @@ function tacDrawPlayerChar(ctx,vx,vy,TS,charData,phase){
     if(top.t){ctx.fillStyle=top.t;ctx.beginPath();ctx.moveTo(-2,-7);ctx.lineTo(2,-7);ctx.lineTo(3,8);ctx.lineTo(0,12);ctx.lineTo(-3,8);ctx.closePath();ctx.fill();}
   }
   ctx.strokeStyle='rgba(0,0,0,.35)';ctx.lineWidth=1.2;_rr(ctx,-13,-8,26,20,3);ctx.stroke();
-  ctx.fillStyle=_grd(ctx,-18,-6,-12,12,_lc(jc,20),jc);_rr(ctx,-19,-6,7,18,2);ctx.fill();
-  ctx.fillStyle=_grd(ctx,11,-6,18,12,_lc(jc,20),jc);_rr(ctx,12,-6,7,18,2);ctx.fill();
+  ctx.save();ctx.translate(-15,4);ctx.rotate(sw*0.35);ctx.translate(15,-4);
+  ctx.fillStyle=_grd(ctx,-18,-6,-12,12,_lc(jc,20),jc);_rr(ctx,-19,-6,7,18,2);ctx.fill();ctx.restore();
+  ctx.save();ctx.translate(15,4);ctx.rotate(-sw*0.35);ctx.translate(-15,-4);
+  ctx.fillStyle=_grd(ctx,11,-6,18,12,_lc(jc,20),jc);_rr(ctx,12,-6,7,18,2);ctx.fill();ctx.restore();
   ctx.fillStyle=sk.b;ctx.fillRect(-3,-13,6,8);
   const hy=-28;
   ctx.fillStyle=_grd(ctx,-12,hy-14,12,hy+14,_lc(sk.b,15),sk.m);
@@ -2037,6 +2055,7 @@ function tacDrawPlayerChar(ctx,vx,vy,TS,charData,phase){
     else if(hat.sty==='beret'){ctx.beginPath();ctx.ellipse(3,hy-16,14,10,.15,0,Math.PI*2);ctx.fill();ctx.strokeStyle='rgba(0,0,0,.3)';ctx.lineWidth=1;ctx.stroke();ctx.fillStyle=_lc(hat.c,20);ctx.beginPath();ctx.arc(5,hy-22,2,0,Math.PI*2);ctx.fill();}
   }
   ctx.restore();
+  _drawName(ctx,vx,vy,TS,charData.name||'Игрок','#7fff7f');
 }
 
 function tacDrawEnemyChar(ctx,vx,vy,TS,enemy,selected){
@@ -2044,15 +2063,23 @@ function tacDrawEnemyChar(ctx,vx,vy,TS,enemy,selected){
   const cx=vx,cy=vy+TS*0.03;const sc=TS/72;
   ctx.save();ctx.translate(cx,cy);ctx.scale(sc,sc);
   ctx.save();ctx.globalAlpha=0.4;ctx.beginPath();ctx.ellipse(0,36,16,5,0,0,Math.PI*2);ctx.fillStyle='#000';ctx.fill();ctx.restore();
-  ctx.fillStyle='#0A0A0A';_rr(ctx,-12,26,10,7,2);ctx.fill();_rr(ctx,2,26,10,7,2);ctx.fill();
+  const phase=enemy.walkPhase||0,sw=Math.sin(phase),bob=Math.abs(sw)*1.5;ctx.translate(0,bob);
   const lc=isGuard?'#1A2228':'#1A0808';
-  ctx.fillStyle=_grd(ctx,-10,8,6,26,_lc(lc,20),lc);ctx.fillRect(-12,8,10,20);ctx.fillRect(2,8,10,20);
+  ctx.save();ctx.translate(0,sw*6);
+  ctx.fillStyle='#0A0A0A';_rr(ctx,-12,26,10,7,2);ctx.fill();
+  ctx.fillStyle=_grd(ctx,-10,8,6,26,_lc(lc,20),lc);ctx.fillRect(-12,8,10,20);ctx.restore();
+  ctx.save();ctx.translate(0,-sw*6);
+  ctx.fillStyle='#0A0A0A';_rr(ctx,2,26,10,7,2);ctx.fill();
+  ctx.fillStyle=_grd(ctx,-10,8,6,26,_lc(lc,20),lc);ctx.fillRect(2,8,10,20);ctx.restore();
   const bc=isGuard?'#1A2A3A':'#5A0808';
   ctx.fillStyle=_grd(ctx,-13,-8,13,10,_lc(bc,25),bc);_rr(ctx,-13,-8,26,20,3);ctx.fill();
   if(!isGuard){ctx.fillStyle=_grd(ctx,-12,-8,-2,8,_lc(bc,40),bc);ctx.beginPath();ctx.moveTo(-12,-8);ctx.lineTo(-4,0);ctx.lineTo(0,-8);ctx.closePath();ctx.fill();ctx.beginPath();ctx.moveTo(12,-8);ctx.lineTo(4,0);ctx.lineTo(0,-8);ctx.closePath();ctx.fill();}
   else{ctx.fillStyle='rgba(255,255,255,.15)';ctx.fillRect(-2,-7,4,15);ctx.fillStyle='#C8A820';ctx.fillRect(-10,-3,5,2);ctx.fillRect(5,-3,5,2);}
   ctx.strokeStyle='rgba(0,0,0,.35)';ctx.lineWidth=1.2;_rr(ctx,-13,-8,26,20,3);ctx.stroke();
-  ctx.fillStyle=_grd(ctx,-18,-6,-12,12,_lc(bc,25),bc);_rr(ctx,-19,-6,7,18,2);ctx.fill();_rr(ctx,12,-6,7,18,2);ctx.fill();
+  ctx.save();ctx.translate(-15,4);ctx.rotate(sw*0.35);ctx.translate(15,-4);
+  ctx.fillStyle=_grd(ctx,-18,-6,-12,12,_lc(bc,25),bc);_rr(ctx,-19,-6,7,18,2);ctx.fill();ctx.restore();
+  ctx.save();ctx.translate(15,4);ctx.rotate(-sw*0.35);ctx.translate(-15,-4);
+  _rr(ctx,12,-6,7,18,2);ctx.fill();ctx.restore();
   const nsk=isGuard?{b:'#D09878'}:{b:'#E09888'};ctx.fillStyle=nsk.b;ctx.fillRect(-3,-13,6,8);
   const hy=-28;const hc=isGuard?{b:'#D09878',m:'#A06840',d:'#784020'}:{b:'#E89870',m:'#C06838',d:'#904020'};
   ctx.fillStyle=_grd(ctx,-12,hy-14,12,hy+14,_lc(hc.b,10),hc.m);_rr(ctx,-11,hy-13,22,26,8);ctx.fill();
@@ -2080,6 +2107,8 @@ function tacDrawEnemyChar(ctx,vx,vy,TS,enemy,selected){
   }
   if(selected){ctx.strokeStyle='#FF4444';ctx.lineWidth=2.5;ctx.setLineDash([5,3]);ctx.beginPath();ctx.ellipse(0,15,18,40,0,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);}
   ctx.restore();
+  const _eName=enemy.id===1?'Мафиози':(enemy.name||'Враг');
+  _drawName(ctx,vx,vy,TS,_eName,'#ff6666');
 }
 
 // ── TILE DRAWING ──────────────────────────────────────────────────────
@@ -2202,17 +2231,16 @@ function tacDrawMinimap(ctx,canvasW){
 // ── REAL-TIME BATTLE ENGINE v5 ────────────────────────────────────────────
 
 function tacIsBlocked(r,c){
-  const R=0.36;
-  for(const[dr,dc]of[[0,0],[-R,-R],[-R,R],[R,-R],[R,R]]){
-    const tr=Math.floor(r+dr),tc=Math.floor(c+dc);
-    if(tr<0||tr>=tac.ROWS||tc<0||tc>=tac.COLS)return true;
-    if(tac.grid[tr][tc]!==0)return true;
-  }
-  return false;
+  const tr=Math.floor(r),tc=Math.floor(c);
+  if(tr<0||tr>=tac.ROWS||tc<0||tc>=tac.COLS)return true;
+  return tac.grid[tr][tc]!==0;
 }
 function tacTryMove(unit,dr,dc){
-  if(!tacIsBlocked(unit.r+dr,unit.c))unit.r+=dr;
-  if(!tacIsBlocked(unit.r,unit.c+dc))unit.c+=dc;
+  const nr=unit.r+dr, nc=unit.c+dc;
+  if(!tacIsBlocked(nr,nc)){unit.r=nr;unit.c=nc;return;}
+  // try sliding along each axis separately
+  if(!tacIsBlocked(nr,unit.c))unit.r=nr;
+  else if(!tacIsBlocked(unit.r,nc))unit.c=nc;
 }
 
 function tacGameLoop(ts){
@@ -2735,7 +2763,7 @@ function startBattle(bossId,locId){
   document.querySelectorAll('.subpage').forEach(p=>p.style.display='none');
   document.getElementById('page-battle').style.display='';
   document.getElementById('tac-result').style.display='none';
-  const cp=document.getElementById('coop-panel');if(cp)cp.style.display='flex';
+  const cp=document.getElementById('coop-panel');if(cp)cp.style.display='none';
   if(tg&&tg.BackButton)tg.BackButton.hide();
   window.scrollTo(0,0);
   tacResize();tacHud();
@@ -2887,7 +2915,8 @@ function tacSyncNetwork(ts){
 })();
 
 function afterBattle(stayInDistrict) {
-  document.getElementById('battle-result').style.display = 'none';
+  const _ovr=document.getElementById('tac-result');if(_ovr)_ovr.style.display='none';
+  const _old=document.getElementById('battle-result');if(_old)_old.style.display='none';
   if (stayInDistrict && session.hp >= 10) {
     openDistrict(tac ? tac.locId : currentLocId);
   } else {
@@ -3737,4 +3766,4 @@ drawAvatar();
 </script>
 </body>
 </html>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
+                                                                                                                                                                                                                                                                                                                                                     
