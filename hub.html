@@ -627,189 +627,46 @@ body {
   background: #333; color: #555; cursor: default; transform: none;
 }
 
-/* ── BATTLE SCREEN ── */
-.battle-screen {
-  min-height: 100vh;
-  background: #060610;
-  display: flex;
-  flex-direction: column;
-}
-.battle-header {
-  padding: 10px 16px;
-  background: #0a0a18;
-  border-bottom: 1px solid var(--border);
-  font-size: 13px;
-  color: var(--gold);
-  font-weight: 700;
-  text-align: center;
-  letter-spacing: 1px;
-}
-.battle-fighters {
-  display: flex;
-  align-items: stretch;
-  gap: 0;
-  padding: 16px;
-  background: linear-gradient(180deg, #0a0a18 0%, #060610 100%);
-}
-.fighter-side {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-.fighter-icon { font-size: 42px; line-height: 1; }
-.fighter-name {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text);
-  text-align: center;
-  max-width: 110px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.fighter-hp-wrap { width: 100%; }
-.fighter-hp-bar-bg {
-  height: 8px;
-  background: #1a1a2e;
-  border-radius: 4px;
-  overflow: hidden;
-  margin-bottom: 3px;
-}
-.fighter-hp-bar { height: 100%; border-radius: 4px; transition: width .3s ease; }
-.fighter-hp-bar.player { background: linear-gradient(90deg, #27ae60, #2ecc71); }
-.fighter-hp-bar.boss   { background: linear-gradient(90deg, #c0392b, #e74c3c); }
-.fighter-hp-text { font-size: 11px; color: var(--muted); text-align: center; }
-.vs-divider {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  font-size: 18px;
-  font-weight: 900;
-  color: var(--gold);
-  padding-top: 20px;
-}
-.battle-log-wrap {
-  flex: 1;
-  overflow-y: auto;
-  padding: 10px 16px;
-  min-height: 160px;
-  max-height: 220px;
-  background: #080814;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-}
-.battle-log-entry {
-  font-size: 13px;
-  color: #ccc;
-  padding: 3px 0;
-  line-height: 1.4;
-  animation: fadeInLog .3s ease;
-}
-.battle-log-entry.player-hit { color: #3498db; }
-.battle-log-entry.boss-hit   { color: #e74c3c; }
-.battle-log-entry.system     { color: var(--gold); font-weight: 700; }
-@keyframes fadeInLog { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-
-.battle-actions {
-  padding: 14px 16px;
-  display: flex;
-  gap: 10px;
-}
-.battle-attack-btn {
-  flex: 2;
-  padding: 14px;
-  background: linear-gradient(135deg, var(--red), #8b1a1a);
-  color: #fff;
-  font-size: 16px;
-  font-weight: 800;
-  border: none;
-  border-radius: 14px;
-  cursor: pointer;
-  letter-spacing: 0.5px;
-}
-.battle-attack-btn:active { transform: scale(0.97); }
-.battle-attack-btn:disabled { background: #2a2a3a; color: #444; cursor: default; }
-.battle-flee-btn {
-  flex: 1;
-  padding: 14px;
-  background: #1a1a2e;
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 700;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  cursor: pointer;
-}
-.battle-flee-btn:active { transform: scale(0.97); }
-.battle-flee-btn:disabled { opacity: 0.4; cursor: default; }
-
-/* Battle result overlay */
-.battle-result-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,.85);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  gap: 12px;
-  padding: 24px;
-}
-.battle-result-icon { font-size: 64px; animation: popIn .4s cubic-bezier(.34,1.56,.64,1) both; }
-.battle-result-title {
-  font-size: 28px;
-  font-weight: 900;
-  letter-spacing: 2px;
-  animation: popIn .4s .1s cubic-bezier(.34,1.56,.64,1) both;
-}
-.battle-result-title.win  { color: var(--gold); }
-.battle-result-title.lose { color: var(--red); }
-.battle-result-rewards {
-  display: flex; gap: 14px; margin-top: 4px;
-  animation: popIn .4s .2s cubic-bezier(.34,1.56,.64,1) both;
-}
-.battle-reward-chip {
-  background: #1a1a2e;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 8px 16px;
-  text-align: center;
-}
-.battle-reward-chip .rval { font-size: 18px; font-weight: 900; color: var(--gold); display: block; }
-.battle-reward-chip .rlbl { font-size: 11px; color: var(--muted); }
-.battle-result-btn {
-  margin-top: 8px;
-  padding: 14px 40px;
-  background: linear-gradient(135deg, var(--gold), var(--gold2));
-  color: #111;
-  font-size: 16px;
-  font-weight: 900;
-  border: none;
-  border-radius: 24px;
-  cursor: pointer;
-  animation: popIn .4s .3s cubic-bezier(.34,1.56,.64,1) both;
-  letter-spacing: 0.5px;
-}
-.battle-result-btn:active { transform: scale(0.96); }
-.battle-result-btn.exit-btn-r {
-  background: #1a1a2e;
-  border: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 14px;
-  padding: 12px 32px;
-}
-@keyframes popIn { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: scale(1); } }
-
-/* hit flash */
-.flash-red   { animation: flashRed   .25s ease; }
-.flash-blue  { animation: flashBlue  .25s ease; }
-@keyframes flashRed  { 0%,100%{background:transparent} 50%{background:#c0392b33} }
-@keyframes flashBlue { 0%,100%{background:transparent} 50%{background:#3498db33} }
+/* ── TACTICAL BATTLE ── */
+#tac-top{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:#12122a;border-bottom:1px solid #2a2a4a;gap:8px}
+.t-hud{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.t-name{font-size:11px;font-weight:bold;color:#f0d060;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.t-hp-wrap{height:6px;background:#2a2a3a;border-radius:3px}
+.t-hp-fill{height:100%;border-radius:3px;transition:width .3s}
+.t-hp-fill.p{background:#2ecc71}
+.t-hp-fill.e{background:#e74c3c}
+.t-hp-txt{font-size:10px;color:#888;margin-top:1px}
+#tac-badge{font-size:11px;font-weight:bold;padding:5px 10px;border-radius:8px;white-space:nowrap;flex-shrink:0;text-align:center}
+#tac-badge.pt{background:#1a3a6a;color:#4af}
+#tac-badge.et{background:#5a1a1a;color:#f66}
+#tac-canvas-wrap{flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#0a0a12}
+#tac-frame{position:relative;display:inline-block}
+#tac-gc{display:block;touch-action:none}
+#tac-dmg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:hidden}
+.dmg-pop{position:absolute;font-size:16px;font-weight:900;pointer-events:none;animation:tacPop .8s ease-out forwards;white-space:nowrap;text-shadow:0 1px 3px #000}
+@keyframes tacPop{0%{opacity:1;transform:translateY(0) scale(1)}50%{opacity:1;transform:translateY(-20px) scale(1.2)}100%{opacity:0;transform:translateY(-40px) scale(0.8)}}
+#tac-bottom{background:#12122a;border-top:1px solid #2a2a4a;padding:6px 10px;flex-shrink:0}
+#tac-log{font-size:12px;color:#b0b0c0;text-align:center;margin-bottom:6px;min-height:16px;line-height:1.3}
+#tac-btns{display:flex;gap:6px;justify-content:center}
+.tac-btn{flex:1;max-width:110px;padding:9px 4px;border:none;border-radius:10px;font-size:12px;font-weight:bold;cursor:pointer;transition:transform .1s,opacity .15s;letter-spacing:.3px}
+.tac-btn:active:not(:disabled){transform:scale(.94)}
+.tac-btn:disabled{opacity:.35;cursor:default}
+#tMove{background:#1a3a6a;color:#6cf}
+#tShoot{background:#5a1a1a;color:#f88}
+#tMelee{background:#4a3a0a;color:#fc6}
+#tEnd{background:#252535;color:#888}
+#tac-result{position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000;gap:12px;padding:24px}
+.tac-res-icon{font-size:64px;animation:tacPop .4s cubic-bezier(.34,1.56,.64,1) both}
+.tac-res-title{font-size:28px;font-weight:900;letter-spacing:2px;animation:tacPop .4s .1s cubic-bezier(.34,1.56,.64,1) both}
+.tac-res-title.win{color:#f0d060}
+.tac-res-title.lose{color:#e74c3c}
+.tac-res-rewards{display:flex;gap:14px;margin-top:4px;animation:tacPop .4s .2s cubic-bezier(.34,1.56,.64,1) both}
+.tac-reward{background:#1a1a2e;border:1px solid #2a2a4a;border-radius:12px;padding:8px 16px;text-align:center}
+.tac-reward .rv{font-size:18px;font-weight:900;color:#f0d060;display:block}
+.tac-reward .rl{font-size:11px;color:#888}
+.tac-res-btn{margin-top:8px;padding:14px 40px;background:linear-gradient(135deg,#f0d060,#c8a820);color:#111;font-size:16px;font-weight:900;border:none;border-radius:24px;cursor:pointer;animation:tacPop .4s .3s cubic-bezier(.34,1.56,.64,1) both;letter-spacing:.5px}
+.tac-res-btn.exit{background:#1a1a2e;border:1px solid #2a2a4a;color:#888;font-size:14px;padding:12px 32px}
+.tac-screen{min-height:100vh;background:#060610;display:flex;flex-direction:column;overflow:hidden}
 
 /* ── HOSPITAL ── */
 .hospital-btn {
@@ -853,92 +710,6 @@ body {
 .modal-btn-heal { background: linear-gradient(135deg, #27ae60, #2ecc71); color: #fff; }
 .modal-btn-close { background: #1a1a2e; border: 1px solid var(--border); color: var(--muted); }
 
-/* ── EXTRA BATTLE ACTIONS ── */
-.battle-special-actions {
-  padding: 0 16px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.battle-special-btn {
-  width: 100%;
-  padding: 11px 14px;
-  border: none;
-  border-radius: 12px;
-  font-size: 13px;
-  font-weight: 800;
-  cursor: pointer;
-  letter-spacing: 0.3px;
-}
-.battle-special-btn:active { transform: scale(0.97); }
-.battle-special-btn.nade  { background: linear-gradient(135deg, #e67e22, #d35400); color:#fff; }
-.battle-special-btn.medkit{ background: linear-gradient(135deg, #27ae60, #1a7a40); color:#fff; }
-.battle-special-btn.skill { background: linear-gradient(135deg, #8e44ad, #6c3483); color:#fff; }
-.battle-special-btn.prop  { background: linear-gradient(135deg, #2980b9, #1a5276); color:#fff; }
-
-/* ── INJURY INDICATORS ── */
-.fighter-injury {
-  font-size: 16px; text-align: center; min-height: 20px;
-  animation: fadeInLog .3s ease;
-}
-.fighter-icon-wrap { position: relative; display: inline-block; }
-
-/* ── BATTLE ANIMATIONS ── */
-.battle-fighters { position: relative; overflow: visible; }
-.battle-fx-layer {
-  position: absolute; inset: 0; pointer-events: none; z-index: 10;
-  overflow: hidden;
-}
-.fx-projectile {
-  position: absolute; font-size: 22px; pointer-events: none;
-  z-index: 11;
-}
-.blood-drop {
-  position: absolute; width: 6px; height: 6px; border-radius: 50%;
-  background: #c0392b; pointer-events: none; z-index: 11;
-  animation: bloodFly .55s ease-out forwards;
-}
-.crit-label {
-  position: absolute; font-size: 18px; font-weight: 900;
-  color: #f0c030; pointer-events: none; z-index: 12;
-  animation: critPop .5s ease-out forwards;
-  text-shadow: 0 0 10px #f0c030;
-}
-@keyframes flyBullet {
-  from { transform: translateX(0) scaleX(1); opacity: 1; }
-  to   { transform: translateX(140px) scaleX(0.3); opacity: 0; }
-}
-@keyframes flyKnife {
-  0%   { transform: rotate(-30deg) scale(0.8); opacity: 1; }
-  60%  { transform: rotate(15deg) scale(1.3); opacity: 1; }
-  100% { transform: rotate(40deg) scale(0.5) translateX(20px); opacity: 0; }
-}
-@keyframes flyFist {
-  0%   { transform: scale(0.6) translateX(-10px); opacity: 1; }
-  60%  { transform: scale(1.4); opacity: 1; }
-  100% { transform: scale(0.6) translateX(10px); opacity: 0; }
-}
-@keyframes bloodFly {
-  0%   { transform: translate(0,0); opacity: .9; }
-  100% { transform: translate(var(--dx), var(--dy)); opacity: 0; }
-}
-@keyframes critPop {
-  0%   { transform: scale(0.5) translateY(0); opacity: 1; }
-  60%  { transform: scale(1.3) translateY(-20px); opacity: 1; }
-  100% { transform: scale(1) translateY(-35px); opacity: 0; }
-}
-.battle-log-entry.crit { color: #f0c030 !important; font-weight: 900; }
-
-/* mana bar in battle */
-.battle-mana-row {
-  display: flex; align-items: center; gap: 8px;
-  padding: 4px 16px 0;
-}
-.battle-mana-bar-bg {
-  flex: 1; height: 5px; background: #1a1a2e; border-radius: 3px; overflow: hidden;
-}
-.battle-mana-bar { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #1a6ea0,#3498db); transition: width .3s; }
-.battle-mana-text { font-size: 10px; color: #3498db; font-weight: 700; flex-shrink: 0; }
 
 /* ── CO-OP PAGE ── */
 .coop-section { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
@@ -1250,55 +1021,41 @@ body {
 
 <!-- ══ SUB-PAGE: БИТВА ══ -->
 <div id="page-battle" class="subpage" style="display:none">
-  <div class="battle-screen" id="battle-screen">
-    <div class="battle-header" id="battle-loc-name">Битва</div>
-    <!-- Fighters -->
-    <div class="battle-fighters" id="battle-fighters-wrap">
-      <div class="battle-fx-layer" id="battle-fx-layer"></div>
-      <div class="fighter-side" id="battle-player-side">
-        <div class="fighter-icon-wrap">
-          <div class="fighter-icon">🤵</div>
-        </div>
-        <div class="fighter-injury" id="b-player-injury"></div>
-        <div class="fighter-name" id="b-player-name">Игрок</div>
-        <div class="fighter-hp-wrap">
-          <div class="fighter-hp-bar-bg"><div class="fighter-hp-bar player" id="b-player-bar" style="width:100%"></div></div>
-          <div class="fighter-hp-text" id="b-player-hp">100/100</div>
-        </div>
+  <div class="tac-screen" id="tac-screen">
+    <!-- top bar -->
+    <div id="tac-top">
+      <div class="t-hud">
+        <div class="t-name" id="tPName">Игрок</div>
+        <div class="t-hp-wrap"><div class="t-hp-fill p" id="tPBar" style="width:100%"></div></div>
+        <div class="t-hp-txt" id="tPTxt">100/100</div>
       </div>
-      <div class="vs-divider">⚔️</div>
-      <div class="fighter-side" id="battle-boss-side">
-        <div class="fighter-icon-wrap">
-          <div class="fighter-icon" id="b-boss-icon">😈</div>
-        </div>
-        <div class="fighter-injury" id="b-boss-injury"></div>
-        <div class="fighter-name" id="b-boss-name">Босс</div>
-        <div class="fighter-hp-wrap">
-          <div class="fighter-hp-bar-bg"><div class="fighter-hp-bar boss" id="b-boss-bar" style="width:100%"></div></div>
-          <div class="fighter-hp-text" id="b-boss-hp">150/150</div>
-        </div>
+      <div id="tac-badge" class="pt">ВАШ<br>ХОД</div>
+      <div class="t-hud" style="text-align:right">
+        <div class="t-name" id="tEName" style="color:#f88">Враг</div>
+        <div class="t-hp-wrap"><div class="t-hp-fill e" id="tEBar" style="width:100%"></div></div>
+        <div class="t-hp-txt" id="tETxt" style="text-align:right">100/100</div>
       </div>
     </div>
-    <!-- Mana bar -->
-    <div class="battle-mana-row">
-      <span style="font-size:10px;color:#3498db">⚡</span>
-      <div class="battle-mana-bar-bg"><div class="battle-mana-bar" id="b-mana-bar" style="width:100%"></div></div>
-      <div class="battle-mana-text" id="b-mana-text">50/50</div>
+    <!-- canvas -->
+    <div id="tac-canvas-wrap">
+      <div id="tac-frame">
+        <canvas id="tac-gc"></canvas>
+        <div id="tac-dmg"></div>
+      </div>
     </div>
-    <!-- Boss quote -->
-    <div style="padding:6px 16px;font-size:12px;color:var(--muted);font-style:italic;text-align:center" id="b-boss-quote">"..."</div>
-    <!-- Battle log -->
-    <div class="battle-log-wrap" id="battle-log"></div>
-    <!-- Main actions -->
-    <div class="battle-actions">
-      <button class="battle-attack-btn" id="battle-atk-btn" onclick="playerAttack('normal')">🔫 Атаковать</button>
-      <button class="battle-flee-btn" id="battle-flee-btn" onclick="fleeBattle()">🏃 Бежать</button>
+    <!-- bottom controls -->
+    <div id="tac-bottom">
+      <div id="tac-log">Выбери куда двигаться или атаковать</div>
+      <div id="tac-btns">
+        <button class="tac-btn" id="tMove" onclick="tacResetSel()">🚶 Движение</button>
+        <button class="tac-btn" id="tShoot" onclick="tacDoShoot()" disabled>🔫 Выстрел</button>
+        <button class="tac-btn" id="tMelee" onclick="tacDoMelee()" disabled>👊 Удар</button>
+        <button class="tac-btn" id="tEnd" onclick="tacEndPlayerTurn()">⏭ Конец</button>
+      </div>
     </div>
-    <!-- Special actions (grenade / medkit / skill / property) -->
-    <div class="battle-special-actions" id="battle-special-actions"></div>
   </div>
-  <!-- Result overlay (hidden by default) -->
-  <div class="battle-result-overlay" id="battle-result" style="display:none"></div>
+  <!-- result overlay -->
+  <div id="tac-result" style="display:none"></div>
 </div>
 
 <!-- ══ SUB-PAGE: ДОСЬЕ ══ -->
@@ -1629,11 +1386,16 @@ function nav(dest, extra) {
 
 function goBack() {
   if (document.getElementById('page-battle').style.display !== 'none') {
-    if (battleState) afterBattle(false);
+    if (tac) afterBattle(false);
     return;
   }
   if (document.getElementById('page-district').style.display !== 'none') {
     navDistrict('back');
+    return;
+  }
+  // Возвращаемся на главный экран — сохраняем и закрываем если есть несохранённые данные
+  if (session.dirty) {
+    commitSession(); // sendData закроет приложение, бот пришлёт обновлённую кнопку
     return;
   }
   document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
@@ -1685,18 +1447,9 @@ function getWeaponType() {
 }
 function getAttackLabel() {
   const t = getWeaponType();
-  let icon, label;
-  if (t === 'gun')        { icon = '🔫'; label = 'Стрелять'; }
-  else if (t === 'knife') { icon = '🔪'; label = 'Колоть'; }
-  else                    { icon = '🤜'; label = 'Бить'; }
-  if (battleState) {
-    const boss = BOSS_DATA[battleState.bossId];
-    const base = Math.max(1, battleState.playerAtk - Math.floor(boss.def / 2));
-    const lo   = Math.max(1, Math.round(base * 0.85));
-    const hi   = Math.round(base * 1.15);
-    return `${icon} ${label} (${lo}–${hi})`;
-  }
-  return `${icon} ${label}`;
+  if (t === 'gun')   return '🔫 Стрелять';
+  if (t === 'knife') return '🔪 Колоть';
+  return '🤜 Бить';
 }
 function getAttackVerb() {
   const t = getWeaponType();
@@ -1797,7 +1550,7 @@ const session = {
 };
 
 let currentLocId = null;
-let battleState  = null;
+let tac = null; // tactical battle state
 
 // ── COMBAT ENGINE ─────────────────────────────────────────────────────
 function calcDmg(atk, def) {
@@ -2008,411 +1761,582 @@ function navDistrict(dir) {
       tg.BackButton.onClick(goBack);
       tg.BackButton.show();
     }
-    if (session.dirty) commitSession();
+    // НЕ закрываем приложение — данные сохраняются при выходе из главного меню
   }
 }
 
 // ══════════════════════════════════════════════════════════════════════
-//  BATTLE SYSTEM
+//  TACTICAL BATTLE SYSTEM (canvas-based)
 // ══════════════════════════════════════════════════════════════════════
 
+// ── WEAPONS ──────────────────────────────────────────────────────────
+const WEP_TAC={
+  knuckles:{t:'melee',r:1,m:1.5,s:1,sp:0,c:'#fa8',lbl:'Кастет'},
+  zatochka:{t:'melee',r:1,m:1.6,s:1,sp:0,c:'#ddd',lbl:'Заточка'},
+  chain:   {t:'melee',r:2,m:1.4,s:1,sp:0,c:'#aaa',lbl:'Цепь'},
+  machete: {t:'melee',r:1,m:1.8,s:1,sp:0,c:'#aef',lbl:'Мачете'},
+  katana:  {t:'melee',r:1,m:2.0,s:1,sp:0,c:'#aef',lbl:'Катана'},
+  spiked_bat:{t:'melee',r:2,m:1.7,s:1,sp:0,c:'#c84',lbl:'Бита'},
+  nagan:   {t:'pistol',r:7, m:1.0,s:1,sp:0,  c:'#ff4',lbl:'Наган',thick:2},
+  tt_pistol:{t:'pistol',r:7,m:1.0,s:1,sp:0,  c:'#ff8',lbl:'ТТ',thick:2},
+  deagle:  {t:'pistol',r:8, m:1.2,s:1,sp:0,  c:'#f80',lbl:'Дезерт Игл',thick:2.5},
+  golden_colt:{t:'pistol',r:8,m:1.2,s:1,sp:0,c:'#fd0',lbl:'Золотой Кольт',thick:2.5},
+  revolver:{t:'pistol',r:7, m:1.1,s:1,sp:0,  c:'#ff4',lbl:'Револьвер',thick:2},
+  uzi:     {t:'burst', r:6, m:1.0,s:4,sp:.12,c:'#ffa',lbl:'Узи',thick:1.5},
+  golden_uzi:{t:'burst',r:6,m:1.1,s:4,sp:.12,c:'#fd0',lbl:'Золотой Узи',thick:1.5},
+  tommy_gun:{t:'burst',r:7, m:1.1,s:4,sp:.15,c:'#ffa',lbl:'Томми Ган',thick:1.5},
+  sawn_off:{t:'shotgun',r:4,m:1.5,s:6,sp:.4, c:'#f60',lbl:'Обрез',thick:3},
+  shotgun: {t:'shotgun',r:5,m:1.4,s:6,sp:.35,c:'#f80',lbl:'Дробовик',thick:3},
+  ak74:    {t:'rifle', r:10,m:1.1,s:3,sp:.05,c:'#4f8',lbl:'АК-74',thick:1.5},
+  m16:     {t:'rifle', r:10,m:1.1,s:3,sp:.05,c:'#4f8',lbl:'М-16',thick:1.5},
+  sniper:  {t:'rifle', r:14,m:1.3,s:1,sp:0,  c:'#0ff',lbl:'Снайперка',thick:1},
+  rpg:     {t:'rocket',r:12,m:2.0,s:1,sp:0,  c:'#f40',lbl:'Базука',thick:4},
+};
+
+// ── MAPS ─────────────────────────────────────────────────────────────
+const TAC_MAPS={
+  market:[
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,0,0,2,2,0,0,0,0,2,2,0,0,1],
+    [1,0,0,0,0,0,4,0,0,0,0,0,0,1],
+    [1,0,2,0,0,0,0,0,0,0,0,0,2,1],
+    [1,0,0,0,0,3,3,0,3,3,0,0,0,1],
+    [1,0,0,4,0,0,0,0,0,0,4,0,0,1],
+    [1,0,2,0,0,0,0,0,0,0,0,0,2,1],
+    [1,0,0,0,0,4,0,0,0,4,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  ],
+  port:[
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,0,0,3,3,0,0,0,0,3,3,0,0,1],
+    [1,0,0,0,0,0,4,0,0,0,0,0,0,1],
+    [1,0,4,0,0,0,0,0,0,0,0,4,0,1],
+    [1,0,0,0,0,2,2,0,2,2,0,0,0,1],
+    [1,0,0,4,0,0,0,0,0,0,4,0,0,1],
+    [1,0,3,0,0,0,0,0,0,0,0,3,0,1],
+    [1,0,0,0,0,4,0,0,0,4,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  ],
+  casino:[
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,0,0,2,0,0,3,3,0,0,2,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,2,0,0,4,0,0,4,0,0,2,0,1],
+    [1,0,0,0,0,0,3,3,0,0,0,0,0,1],
+    [1,0,4,0,0,0,0,0,0,0,0,4,0,1],
+    [1,0,0,2,0,0,0,0,0,0,2,0,0,1],
+    [1,0,0,0,0,4,0,0,0,4,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  ],
+  factory:[
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,0,0,3,0,0,3,0,3,0,0,3,0,1],
+    [1,0,0,0,0,4,0,0,0,4,0,0,0,1],
+    [1,0,3,0,0,0,0,0,0,0,0,3,0,1],
+    [1,0,0,4,0,0,3,3,0,0,4,0,0,1],
+    [1,0,0,0,0,4,0,0,4,0,0,0,0,1],
+    [1,0,3,0,0,0,0,0,0,0,0,3,0,1],
+    [1,0,0,0,4,0,0,0,0,4,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  ],
+  mansion:[
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,0,0,2,2,0,0,0,0,2,2,0,0,1],
+    [1,0,0,0,0,0,2,0,0,0,0,0,0,1],
+    [1,0,2,0,0,0,0,0,0,0,0,2,0,1],
+    [1,0,0,0,0,3,0,0,0,3,0,0,0,1],
+    [1,0,0,2,0,0,0,0,0,0,2,0,0,1],
+    [1,0,0,0,0,0,2,2,0,0,0,0,0,1],
+    [1,0,2,0,0,0,0,0,0,0,0,2,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  ],
+};
+const TAC_COV={0:0,1:0,2:1,3:2,4:1};
+
+// ── BATTLE STATE ─────────────────────────────────────────────────────
 function startBattle(bossId, locId) {
   const boss = BOSS_DATA[bossId];
   if (!boss) return;
 
-  battleState = {
-    bossId,
-    locId,
-    bossHp:      boss.hp,
-    bossMaxHp:   boss.hp,
-    playerHp:    session.hp,
-    playerMaxHp: DATA.maxhp,
-    playerMp:    session.mp,
-    playerMaxMp: DATA.maxmp,
-    playerAtk:   DATA.atk,
-    playerDef:   DATA.def,
-    propUsed:    [],
-    running:     true,
+  // Parse boss emoji from name (first char)
+  const bossEmoji = boss.name.match(/^./u)[0];
+  const bossName  = boss.name.replace(/^\S+\s*/, '');
+
+  const grid = TAC_MAPS[locId] || TAC_MAPS.market;
+  const ROWS = grid.length, COLS = grid[0].length;
+
+  tac = {
+    bossId, locId, grid, ROWS, COLS,
+    gstate: 'player',
+    player: {
+      r:8, c:1,
+      hp: session.hp, maxhp: DATA.maxhp,
+      atk: DATA.atk, def: DATA.def,
+      moved: false, attacked: false, moveRange: 4
+    },
+    enemies: [
+      {id:0, r:1, c:12, hp:boss.hp, maxhp:boss.hp, atk:boss.atk, def:boss.def,
+       name:bossName, e:bossEmoji, wep:'tt_pistol', moveRange:3, moved:false, attacked:false},
+      {id:1, r:2, c:8,
+       hp:Math.round(boss.hp*.45), maxhp:Math.round(boss.hp*.45),
+       atk:Math.round(boss.atk*.75), def:Math.round(boss.def*.6),
+       name:'Охранник', e:'👮', wep:'nagan', moveRange:3, moved:false, attacked:false},
+    ],
+    selTile: null, selEnemy: null, moveTiles: [],
+    bullets: [], meleeVfx: [], coverPulse: 0,
+    TS: 42,
+    pulseRaf: null,
+    pw: WEP_TAC[DATA.weapon] || WEP_TAC.nagan,
   };
 
-  document.getElementById('battle-atk-btn').textContent = getAttackLabel();
-  document.getElementById('battle-loc-name').textContent = LOC_DATA[locId].icon + ' ' + LOC_DATA[locId].name + ' — Бой!';
-  document.getElementById('b-player-name').textContent = DATA.name;
-  document.getElementById('b-boss-icon').textContent   = boss.name.match(/^./u)[0];
-  document.getElementById('b-boss-name').textContent   = boss.name.replace(/^\S+\s*/, '');
-  document.getElementById('b-boss-quote').textContent  = '«' + boss.quote + '»';
-  document.getElementById('battle-log').innerHTML      = '';
-  document.getElementById('battle-result').style.display = 'none';
-  document.getElementById('b-player-injury').textContent = '';
-  document.getElementById('b-boss-injury').textContent   = '';
-  document.getElementById('battle-fx-layer').innerHTML   = '';
-
-  updateBattleUI();
-  renderBattleActions();
-  enableBattleButtons();
-
-  addBattleLog('Встречаешь ' + boss.name + '! Бой начинается...', 'system');
-
+  // Show page
   document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
   document.getElementById('page-battle').style.display = '';
+  document.getElementById('tac-result').style.display = 'none';
   if (tg && tg.BackButton) tg.BackButton.hide();
   window.scrollTo(0, 0);
+
+  // Setup canvas
+  tacResize();
+  tacHud();
+  tacCalcMoveTiles();
+  tacStartPlayerTurn();
+
+  // Pulse loop
+  if (tac.pulseRaf) cancelAnimationFrame(tac.pulseRaf);
+  (function loop(){ tac.coverPulse+=.08; tacRender(); tac.pulseRaf=requestAnimationFrame(loop); })();
 }
 
-function addBattleLog(text, type) {
-  const log = document.getElementById('battle-log');
-  const el  = document.createElement('div');
-  el.className = 'battle-log-entry ' + (type || '');
-  el.textContent = text;
-  log.appendChild(el);
-  log.scrollTop = log.scrollHeight;
+// ── CANVAS SETUP ─────────────────────────────────────────────────────
+function tacResize() {
+  if (!tac) return;
+  const wrap = document.getElementById('tac-canvas-wrap');
+  const canvas = document.getElementById('tac-gc');
+  tac.TS = Math.min(Math.floor(wrap.clientWidth / tac.COLS), Math.floor(wrap.clientHeight / tac.ROWS));
+  canvas.width  = tac.TS * tac.COLS;
+  canvas.height = tac.TS * tac.ROWS;
+  const f = document.getElementById('tac-frame');
+  f.style.width  = canvas.width  + 'px';
+  f.style.height = canvas.height + 'px';
+  tacRender();
 }
 
-function updateBattleUI() {
-  const bs = battleState;
-  const pPct = Math.max(0, bs.playerHp / bs.playerMaxHp * 100);
-  document.getElementById('b-player-hp').textContent  = bs.playerHp + '/' + bs.playerMaxHp;
-  document.getElementById('b-player-bar').style.width = pPct.toFixed(1) + '%';
-  const bPct = Math.max(0, bs.bossHp / bs.bossMaxHp * 100);
-  document.getElementById('b-boss-hp').textContent  = bs.bossHp + '/' + bs.bossMaxHp;
-  document.getElementById('b-boss-bar').style.width = bPct.toFixed(1) + '%';
-  // Mana bar
-  const mPct = Math.max(0, bs.playerMp / bs.playerMaxMp * 100);
-  document.getElementById('b-mana-bar').style.width = mPct.toFixed(1) + '%';
-  document.getElementById('b-mana-text').textContent = bs.playerMp + '/' + bs.playerMaxMp;
-  // Player HP bar colour
-  const playerBar = document.getElementById('b-player-bar');
-  if (pPct < 20) playerBar.style.background = 'linear-gradient(90deg,#6b0000,#c0392b)';
-  else if (pPct < 40) playerBar.style.background = 'linear-gradient(90deg,#8b0000,#e74c3c)';
-  else playerBar.style.background = 'linear-gradient(90deg,#27ae60,#2ecc71)';
+// ── HUD ───────────────────────────────────────────────────────────────
+function tacHud() {
+  if (!tac) return;
+  const p = tac.player, e = tac.enemies[0];
+  document.getElementById('tPName').textContent = DATA.name;
+  document.getElementById('tPTxt').textContent  = p.hp + '/' + p.maxhp;
+  document.getElementById('tPBar').style.width  = Math.max(0, p.hp/p.maxhp*100) + '%';
+  document.getElementById('tEName').textContent = e.name;
+  document.getElementById('tETxt').textContent  = e.hp + '/' + e.maxhp;
+  document.getElementById('tEBar').style.width  = Math.max(0, e.hp/e.maxhp*100) + '%';
+}
+function tacLog(t) { document.getElementById('tac-log').textContent = t; }
+function tacBtns() {
+  if (!tac) return;
+  const sh=document.getElementById('tShoot'), me=document.getElementById('tMelee');
+  const mv=document.getElementById('tMove'),  en=document.getElementById('tEnd');
+  const ok = tac.gstate === 'player';
+  mv.disabled = !ok || tac.player.moved;
+  en.disabled = !ok;
+  if (ok && tac.selEnemy && !tac.player.attacked) {
+    const d = tacDist(tac.player.r, tac.player.c, tac.selEnemy.r, tac.selEnemy.c);
+    const w = tac.pw;
+    sh.disabled = (w.t==='melee') || (d > w.r);
+    me.disabled = d > Math.max(2, w.t==='melee' ? w.r : 2);
+  } else { sh.disabled = true; me.disabled = true; }
 }
 
-// ── SPECIAL ACTION BUTTONS ────────────────────────────────────────────
-function renderBattleActions() {
-  const area = document.getElementById('battle-special-actions');
-  area.innerHTML = '';
-  if (!battleState) return;
-  const bs    = battleState;
-  const skill = CLASS_SKILLS[DATA.cls];
+// ── HELPERS ───────────────────────────────────────────────────────────
+function tacDist(r1,c1,r2,c2){ return Math.abs(r1-r2)+Math.abs(c1-c2); }
+function tacWalkable(r,c){
+  if(r<0||r>=tac.ROWS||c<0||c>=tac.COLS)return false;
+  if(tac.grid[r][c]===1)return false;
+  if(tac.enemies.some(e=>e.hp>0&&e.r===r&&e.c===c))return false;
+  return true;
+}
+function tacBfs(sr,sc,range){
+  const vis=new Set([sr+','+sc]),q=[{r:sr,c:sc,n:0}],res=[];
+  while(q.length){
+    const{r,c,n}=q.shift();
+    if(n>0)res.push({r,c});
+    if(n>=range)continue;
+    for(const[dr,dc]of[[-1,0],[1,0],[0,-1],[0,1]]){
+      const nr=r+dr,nc=c+dc,k=nr+','+nc;
+      if(!vis.has(k)&&tacWalkable(nr,nc)){vis.add(k);q.push({r:nr,c:nc,n:n+1});}
+    }
+  }
+  return res;
+}
+function tacHitChance(ar,ac,tr,tc,cov){
+  const d=tacDist(ar,ac,tr,tc);
+  let b=d<=1?.98:d<=2?.92:d<=3?.85:d<=4?.75:d<=5?.65:d<=7?.55:d<=9?.48:.40;
+  if(cov===1)b*=.5; if(cov===2)b*=.2;
+  return Math.max(.05,Math.min(.98,b));
+}
+function tacDmgCalc(atk,def,mult,d,melee){
+  let b=Math.max(1,atk-def);
+  if(!melee){b*=d<=2?1.3:d<=4?1.0:d<=7?.85:.70;}
+  b*=mult; b*=.85+Math.random()*.3;
+  return Math.max(1,Math.round(b));
+}
 
-  if (session.gren > 0) {
-    _addSpecBtn(area, 'nade', '💣 Граната x' + session.gren + '  (80-130 урона, без ответки)', () => playerAttack('grenade'));
+// ── RENDER ────────────────────────────────────────────────────────────
+const TC_C=['#2d201a','#18182e','#5c3d11','#1a3a1a','#4a3218'];
+const TC_C2=['#3a2820','#22223a','#7a5218','#255225','#6a4828'];
+function tacDrawTile(ctx,r,c){
+  const t=tac.grid[r][c],TS=tac.TS,x=c*TS,y=r*TS;
+  ctx.fillStyle=TC_C[t]||TC_C[0]; ctx.fillRect(x,y,TS,TS);
+  if(t===0){
+    ctx.fillStyle=TC_C2[0];ctx.fillRect(x+1,y+1,TS-2,TS-2);
+    ctx.strokeStyle='#3a2820';ctx.lineWidth=.5;ctx.strokeRect(x+.5,y+.5,TS-1,TS-1);
+  }else if(t===1){
+    ctx.fillStyle='#1e1e30';ctx.fillRect(x+2,y+2,TS-4,TS-4);
+    ctx.strokeStyle='#141428';ctx.lineWidth=1;
+    const bw=Math.floor(TS/2),bh=Math.floor(TS/3);
+    for(let by=0;by<3;by++)for(let bx=0;bx<2;bx++){
+      const ox=(by%2)*Math.floor(bw/2);
+      ctx.strokeRect(x+bx*bw+ox+2,y+by*bh+2,bw-2,bh-1);
+    }
+  }else if(t===2){
+    ctx.fillStyle='#7a5218';ctx.fillRect(x+2,y+2,TS-4,TS-4);
+    ctx.fillStyle='#9a6828';ctx.fillRect(x+3,y+3,TS-6,Math.floor(TS*.35));
+    ctx.fillStyle='#c8a84b';
+    for(let i=0;i<3;i++)ctx.fillRect(x+5+i*Math.floor((TS-10)/3),y+5,4,4);
+    ctx.strokeStyle='#5c3010';ctx.lineWidth=1.5;ctx.strokeRect(x+2,y+2,TS-4,TS-4);
+  }else if(t===3){
+    ctx.fillStyle='#1a3a1a';ctx.fillRect(x+1,y+1,TS-2,TS-2);
+    ctx.fillStyle='#245a24';ctx.fillRect(x+4,y+3,TS-8,TS-6);
+    ctx.strokeStyle='#0f2a0f';ctx.lineWidth=1.5;ctx.strokeRect(x+1,y+1,TS-2,TS-2);
+  }else if(t===4){
+    ctx.fillStyle='#6a4828';ctx.fillRect(x+3,y+3,TS-6,TS-6);
+    ctx.strokeStyle='#4a3018';ctx.lineWidth=1.5;ctx.strokeRect(x+3,y+3,TS-6,TS-6);
+    ctx.beginPath();ctx.moveTo(x+5,y+5);ctx.lineTo(x+TS-5,y+TS-5);
+    ctx.moveTo(x+TS-5,y+5);ctx.lineTo(x+5,y+TS-5);
+    ctx.strokeStyle='#4a3018';ctx.lineWidth=1;ctx.stroke();
   }
-  if (session.med_s > 0) {
-    _addSpecBtn(area, 'medkit', '🩹 Малая аптечка x' + session.med_s + '  (+55 HP)', () => playerAttack('medkit_s'));
+}
+function tacHl(ctx,r,c,color,alpha){
+  const TS=tac.TS;
+  ctx.save();ctx.globalAlpha=alpha;ctx.fillStyle=color;
+  ctx.fillRect(c*TS,r*TS,TS,TS);ctx.restore();
+}
+function tacDrawUnit(ctx,r,c,color,emoji,sel,hasCover){
+  const TS=tac.TS,x=c*TS+TS/2,y=r*TS+TS/2,rad=TS*.36;
+  if(sel){ctx.beginPath();ctx.arc(x,y,rad+4,0,Math.PI*2);ctx.strokeStyle='#fff';ctx.lineWidth=2.5;ctx.stroke();}
+  ctx.beginPath();ctx.arc(x+1,y+2,rad,0,Math.PI*2);ctx.fillStyle='#0008';ctx.fill();
+  ctx.beginPath();ctx.arc(x,y,rad,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.2)';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.font=Math.floor(TS*.42)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(emoji,x,y);
+  if(hasCover){ctx.font=Math.floor(TS*.32)+'px serif';ctx.fillText('🛡',x+rad*.6,y-rad*.7);}
+}
+function tacDrawHPbar(ctx,r,c,hp,maxhp,col){
+  const TS=tac.TS,x=c*TS+3,y=r*TS+TS-6,w=TS-6;
+  ctx.fillStyle='#0009';ctx.fillRect(x,y,w,4);
+  ctx.fillStyle=col;ctx.fillRect(x,y,Math.round(w*hp/maxhp),4);
+}
+function tacDrawCoverHint(ctx,r,c){
+  const cv=TAC_COV[tac.grid[r][c]]||0;if(!cv)return;
+  const TS=tac.TS,x=c*TS,y=r*TS;
+  ctx.save();ctx.globalAlpha=.35+.15*Math.sin(tac.coverPulse);
+  ctx.fillStyle=cv===2?'#00aaff':'#00ff88';ctx.fillRect(x,y,TS,TS);ctx.restore();
+  ctx.font=Math.floor(TS*.45)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(cv===2?'🛡':'🪵',c*TS+TS/2,r*TS+TS/2);
+}
+function tacRender(){
+  if(!tac)return;
+  const canvas=document.getElementById('tac-gc');
+  if(!canvas.width)return;
+  const ctx=canvas.getContext('2d'),TS=tac.TS;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  for(let r=0;r<tac.ROWS;r++)for(let c=0;c<tac.COLS;c++)tacDrawTile(ctx,r,c);
+  if(tac.gstate==='player'&&!tac.player.moved){
+    tac.moveTiles.forEach(({r,c})=>tacHl(ctx,r,c,'#4af',.22));
+    tac.moveTiles.forEach(({r,c})=>tacDrawCoverHint(ctx,r,c));
   }
-  if (session.med_m > 0) {
-    _addSpecBtn(area, 'medkit', '🏥 Аптечка x' + session.med_m + '  (+130 HP)', () => playerAttack('medkit_m'));
+  if(tac.selTile&&!tac.player.moved){
+    const{r,c}=tac.selTile;
+    ctx.strokeStyle='#4af';ctx.lineWidth=3;ctx.strokeRect(c*TS+2,r*TS+2,TS-4,TS-4);
+    const cv=TAC_COV[tac.grid[r][c]]||0;
+    if(cv>0){ctx.font=Math.floor(TS*.55)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(cv===2?'🛡':'🪵',c*TS+TS/2,r*TS+TS/2);}
   }
-  if (session.med_l > 0) {
-    _addSpecBtn(area, 'medkit', '💉 Большая аптечка x' + session.med_l + '  (+280 HP)', () => playerAttack('medkit_l'));
-  }
-  if (skill && bs.playerMp >= skill.cost) {
-    _addSpecBtn(area, 'skill', skill.name + '  (⚡' + skill.cost + ' мана)', () => playerAttack('skill'));
-  }
-  DATA.prop.forEach(propId => {
-    if (bs.propUsed.includes(propId)) return;
-    const ps = PROP_SKILLS[propId];
-    if (!ps) return;
-    _addSpecBtn(area, 'prop', ps.name, () => playerAttack('prop_' + propId));
+  if(tac.selEnemy)tacHl(ctx,tac.selEnemy.r,tac.selEnemy.c,'#f44',.35);
+  const pCov=TAC_COV[tac.grid[tac.player.r][tac.player.c]]>0;
+  tacDrawUnit(ctx,tac.player.r,tac.player.c,'#1a3a6a','🤵',false,pCov);
+  tacDrawHPbar(ctx,tac.player.r,tac.player.c,tac.player.hp,tac.player.maxhp,'#2ecc71');
+  tac.enemies.forEach(e=>{
+    if(e.hp<=0)return;
+    const eCov=TAC_COV[tac.grid[e.r][e.c]]>0;
+    tacDrawUnit(ctx,e.r,e.c,'#4a1515',e.e,tac.selEnemy?.id===e.id,eCov);
+    tacDrawHPbar(ctx,e.r,e.c,e.hp,e.maxhp,'#e74c3c');
+  });
+  tac.bullets.forEach(b=>{
+    ctx.save();const p=b.prog;
+    ctx.globalAlpha=1-p*.7;ctx.beginPath();ctx.moveTo(b.sx,b.sy);
+    ctx.lineTo(b.sx+(b.ex-b.sx)*p,b.sy+(b.ey-b.sy)*p);
+    ctx.strokeStyle=b.c||'#ff0';ctx.lineWidth=b.thick||2;ctx.stroke();ctx.restore();
+  });
+  tac.meleeVfx.forEach(v=>{
+    ctx.save();ctx.globalAlpha=v.a;ctx.font=Math.floor(TS*.8)+'px serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(v.e,v.c*TS+TS/2,v.r*TS+TS/2);ctx.restore();
   });
 }
 
-function _addSpecBtn(container, type, label, onClick) {
-  const btn = document.createElement('button');
-  btn.className = 'battle-special-btn ' + type;
-  btn.textContent = label;
-  btn.onclick = onClick;
-  container.appendChild(btn);
+// ── ANIMATIONS ────────────────────────────────────────────────────────
+function tacShootAnim(sx,sy,ex,ey,wData,cb){
+  const dur=280,t0=performance.now();
+  tac.bullets=[{sx,sy,ex,ey,c:wData.c,thick:wData.thick||2,prog:0}];
+  (function step(now){
+    tac.bullets[0].prog=Math.min(1,(now-t0)/dur);
+    tacRender();
+    if(tac.bullets[0].prog<1)requestAnimationFrame(step);
+    else{tac.bullets=[];cb();}
+  })(performance.now());
 }
-
-function disableBattleButtons() {
-  document.getElementById('battle-atk-btn').disabled  = true;
-  document.getElementById('battle-flee-btn').disabled = true;
-  document.querySelectorAll('.battle-special-btn').forEach(b => b.disabled = true);
+function tacMeleeAnim(r,c,cb){
+  const EMOJIS=['💥','⚡','💫','✨'];
+  tac.meleeVfx=[{r,c,e:EMOJIS[Math.floor(Math.random()*EMOJIS.length)],a:1}];
+  let s=0;const iv=setInterval(()=>{
+    tac.meleeVfx[0].a=Math.max(0,1-s/8);tacRender();
+    if(++s>=8){clearInterval(iv);tac.meleeVfx=[];cb();}
+  },45);
 }
-function enableBattleButtons() {
-  document.getElementById('battle-atk-btn').disabled  = false;
-  document.getElementById('battle-flee-btn').disabled = false;
-  document.querySelectorAll('.battle-special-btn').forEach(b => b.disabled = false);
+function tacMoveAnim(unit,tr,tc,cb){
+  const t0=performance.now(),dur=180,or=unit.r,oc=unit.c;
+  (function step(now){
+    const p=Math.min(1,(now-t0)/dur);
+    if(p>=.5&&unit.r===or){unit.r=tr;unit.c=tc;}
+    tacRender();
+    if(p<1)requestAnimationFrame(step);
+    else{unit.r=tr;unit.c=tc;cb();}
+  })(performance.now());
 }
-
-// ── ANIMATION SYSTEM ──────────────────────────────────────────────────
-function triggerFlash(el, cls) {
-  el.classList.remove(cls);
-  void el.offsetWidth;
-  el.classList.add(cls);
-}
-
-function animateProjectile(type) {
-  const layer = document.getElementById('battle-fx-layer');
-  if (!layer) return;
-  const w = layer.offsetWidth  || 300;
-  const h = layer.offsetHeight || 120;
-  const el = document.createElement('div');
-  el.className = 'fx-projectile';
-  el.style.top  = Math.round(h * 0.28) + 'px';
-  if (type === 'gun') {
-    el.textContent = '🔸';
-    el.style.left  = Math.round(w * 0.12) + 'px';
-    el.style.animation = 'flyBullet .28s ease-out forwards';
-  } else if (type === 'knife') {
-    el.textContent = '🗡';
-    el.style.left  = Math.round(w * 0.25) + 'px';
-    el.style.animation = 'flyKnife .3s ease-out forwards';
-  } else if (type === 'fist') {
-    el.textContent = '💢';
-    el.style.left  = Math.round(w * 0.55) + 'px';
-    el.style.animation = 'flyFist .3s ease-out forwards';
-  } else if (type === 'grenade') {
-    el.textContent = '💣';
-    el.style.left  = Math.round(w * 0.1) + 'px';
-    el.style.animation = 'flyBullet .32s ease-out forwards';
-  } else if (type === 'skill') {
-    el.textContent = '✨';
-    el.style.left  = Math.round(w * 0.3) + 'px';
-    el.style.top   = Math.round(h * 0.1) + 'px';
-    el.style.animation = 'flyFist .4s ease-out forwards';
-  } else {
-    el.textContent = '💥';
-    el.style.left  = Math.round(w * 0.45) + 'px';
-    el.style.animation = 'flyFist .4s ease-out forwards';
-  }
+function tacFloatDmg(r,c,dmg,color,miss){
+  const layer=document.getElementById('tac-dmg');
+  const el=document.createElement('div');
+  el.className='dmg-pop';
+  el.style.cssText='color:'+color+';left:'+(c*tac.TS+tac.TS/2-18)+'px;top:'+(r*tac.TS+2)+'px';
+  el.textContent=miss?'МИМО!':'-'+dmg;
   layer.appendChild(el);
-  setTimeout(() => el.remove(), 500);
+  setTimeout(()=>el.remove(),900);
 }
 
-function animateBlood(side) {
-  const sideEl = document.getElementById(side === 'boss' ? 'battle-boss-side' : 'battle-player-side');
-  if (!sideEl) return;
-  const w = sideEl.offsetWidth  || 120;
-  const h = sideEl.offsetHeight || 120;
-  sideEl.style.position = 'relative';
-  sideEl.style.overflow = 'visible';
-  for (let i = 0; i < 6; i++) {
-    const drop = document.createElement('div');
-    drop.className = 'blood-drop';
-    const angle = Math.random() * Math.PI * 2;
-    const dist  = 18 + Math.random() * 28;
-    drop.style.left = (w / 2) + 'px';
-    drop.style.top  = (h * 0.35) + 'px';
-    drop.style.setProperty('--dx', (Math.cos(angle) * dist).toFixed(1) + 'px');
-    drop.style.setProperty('--dy', (Math.sin(angle) * dist).toFixed(1) + 'px');
-    sideEl.appendChild(drop);
-    setTimeout(() => drop.remove(), 650);
+// ── COMBAT ────────────────────────────────────────────────────────────
+function tacDoShoot(){
+  if(!tac||!tac.selEnemy||tac.player.attacked||tac.gstate!=='player')return;
+  const e=tac.selEnemy,w=tac.pw;
+  if(w.t==='melee'){tacDoMelee();return;}
+  const d=tacDist(tac.player.r,tac.player.c,e.r,e.c);
+  if(d>w.r){tacLog('Слишком далеко!');return;}
+  tac.gstate='anim';tac.player.attacked=true;
+  const cv=TAC_COV[tac.grid[e.r][e.c]]||0;
+  const hit=Math.random()<tacHitChance(tac.player.r,tac.player.c,e.r,e.c,cv);
+  const TS=tac.TS;
+  tacShootAnim(tac.player.c*TS+TS/2,tac.player.r*TS+TS/2,e.c*TS+TS/2,e.r*TS+TS/2,w,()=>{
+    if(hit){
+      const dmg=tacDmgCalc(tac.player.atk,e.def,w.m,d,false);
+      e.hp=Math.max(0,e.hp-dmg);
+      tacFloatDmg(e.r,e.c,dmg,'#f88',false);
+      tacLog(w.lbl+' → попал! −'+dmg+' HP'+(cv>0?' (укрытие)':''));
+    }else{tacFloatDmg(e.r,e.c,0,'#aaa',true);tacLog(w.lbl+' → мимо!'+(cv>0?' (укрытие помогло!)':''));}
+    tacHud();tacCheckDeath();tac.gstate='player';tac.selEnemy=null;tacCalcMoveTiles();tacBtns();tacRender();
+  });tacRender();
+}
+function tacDoMelee(){
+  if(!tac||!tac.selEnemy||tac.player.attacked||tac.gstate!=='player')return;
+  const e=tac.selEnemy,w=tac.pw;
+  const d=tacDist(tac.player.r,tac.player.c,e.r,e.c);
+  const mr=w.t==='melee'?w.r:2;
+  if(d>mr){tacLog('Слишком далеко для удара!');return;}
+  tac.gstate='anim';tac.player.attacked=true;
+  tacMeleeAnim(e.r,e.c,()=>{
+    const dmg=tacDmgCalc(tac.player.atk,e.def,w.m*(w.t==='melee'?1:1.2),d,true);
+    e.hp=Math.max(0,e.hp-dmg);
+    tacFloatDmg(e.r,e.c,dmg,'#fc6',false);
+    tacLog((w.t==='melee'?w.lbl:'Ближний бой')+' → −'+dmg+' HP!');
+    tacHud();tacCheckDeath();tac.gstate='player';tac.selEnemy=null;tacCalcMoveTiles();tacBtns();tacRender();
+  });
+}
+function tacCheckDeath(){
+  if(!tac)return;
+  if(tac.enemies.every(e=>e.hp<=0)){setTimeout(()=>tacEndBattle('won'),400);return;}
+  if(tac.player.hp<=0)setTimeout(()=>tacEndBattle('lost'),400);
+}
+
+// ── ENEMY AI ─────────────────────────────────────────────────────────
+function tacSleep(ms){return new Promise(r=>setTimeout(r,ms));}
+async function tacEnemyTurn(){
+  if(!tac)return;
+  tac.gstate='enemy';
+  document.getElementById('tac-badge').textContent='ХОД\nВРАГА';
+  document.getElementById('tac-badge').className='et';
+  tacLog('Ход врага...');tacBtns();
+  for(const e of tac.enemies){
+    if(e.hp<=0)continue;
+    await tacSleep(380);
+    const ew=WEP_TAC[e.wep]||WEP_TAC.nagan;
+    if(!e.moved){
+      const reach=tacBfs(e.r,e.c,e.moveRange);
+      let best=null,bsc=Infinity;
+      reach.forEach(({r,c})=>{
+        const nd=tacDist(r,c,tac.player.r,tac.player.c);
+        const cb=TAC_COV[tac.grid[r][c]]>0?-1.5:0;
+        const sc=nd+cb;
+        if(sc<bsc){bsc=sc;best={r,c};}
+      });
+      if(best&&(best.r!==e.r||best.c!==e.c)){
+        await new Promise(res=>tacMoveAnim(e,best.r,best.c,res));
+        e.moved=true;
+      }
+    }
+    const d=tacDist(e.r,e.c,tac.player.r,tac.player.c);
+    if(d<=ew.r&&!e.attacked){
+      e.attacked=true;
+      const cv=TAC_COV[tac.grid[tac.player.r][tac.player.c]]||0;
+      const hit=Math.random()<tacHitChance(e.r,e.c,tac.player.r,tac.player.c,cv);
+      const TS=tac.TS;
+      await new Promise(res=>tacShootAnim(e.c*TS+TS/2,e.r*TS+TS/2,tac.player.c*TS+TS/2,tac.player.r*TS+TS/2,ew,res));
+      if(hit){
+        const dmg=tacDmgCalc(e.atk,tac.player.def,1.0,d,false);
+        tac.player.hp=Math.max(0,tac.player.hp-dmg);
+        tacFloatDmg(tac.player.r,tac.player.c,dmg,'#f44',false);
+        tacLog(e.name+' попал в тебя: −'+dmg+' HP'+(cv>0?' (укрытие помогло!)':''));
+      }else{
+        tacFloatDmg(tac.player.r,tac.player.c,0,'#aaa',true);
+        tacLog(e.name+' промахнулся!'+(cv>0?' Укрытие спасло!':''));
+      }
+      tacHud();tacRender();
+      if(tac.player.hp<=0){tacEndBattle('lost');return;}
+    }
   }
+  await tacSleep(300);tacStartPlayerTurn();
 }
 
-function animateCrit(side) {
-  const sideEl = document.getElementById(side === 'boss' ? 'battle-boss-side' : 'battle-player-side');
-  if (!sideEl) return;
-  sideEl.style.position = 'relative';
-  const lbl = document.createElement('div');
-  lbl.className = 'crit-label';
-  lbl.textContent = 'КРИТ!';
-  lbl.style.left = '50%';
-  lbl.style.top  = '0%';
-  lbl.style.transform = 'translateX(-50%)';
-  sideEl.appendChild(lbl);
-  setTimeout(() => lbl.remove(), 600);
+// ── TURNS ─────────────────────────────────────────────────────────────
+function tacCalcMoveTiles(){if(tac)tac.moveTiles=tac.player.moved?[]:tacBfs(tac.player.r,tac.player.c,tac.player.moveRange);}
+function tacStartPlayerTurn(){
+  if(!tac)return;
+  tac.gstate='player';tac.player.moved=false;tac.player.attacked=false;
+  tac.enemies.forEach(e=>{e.moved=false;e.attacked=false;});
+  tac.selTile=null;tac.selEnemy=null;tacCalcMoveTiles();
+  document.getElementById('tac-badge').textContent='ВАШ\nХОД';
+  document.getElementById('tac-badge').className='pt';
+  tacLog('Выбери куда двигаться или кого атаковать');tacBtns();tacRender();
 }
+function tacResetSel(){if(tac){tac.selTile=null;tac.selEnemy=null;tacCalcMoveTiles();tacBtns();tacRender();}}
+function tacEndPlayerTurn(){if(!tac||tac.gstate!=='player')return;tac.selTile=null;tac.selEnemy=null;tacRender();tacEnemyTurn();}
 
-// ── INJURY INDICATORS ─────────────────────────────────────────────────
-function updateInjuryIndicators() {
-  if (!battleState) return;
-  _setInjury('b-player-injury', battleState.playerHp, battleState.playerMaxHp);
-  _setInjury('b-boss-injury',   battleState.bossHp,   battleState.bossMaxHp);
-}
-function _setInjury(elId, hp, maxHp) {
-  const el  = document.getElementById(elId);
-  if (!el) return;
-  const pct = hp / maxHp;
-  if (pct <= 0)        el.textContent = '💀';
-  else if (pct <= 0.2) el.textContent = '🩸😵';
-  else if (pct <= 0.4) el.textContent = '🩹';
-  else                 el.textContent = '';
-}
+// ── BATTLE END ────────────────────────────────────────────────────────
+function tacEndBattle(res) {
+  if (!tac) return;
+  tac.gstate = res;
+  if (tac.pulseRaf) { cancelAnimationFrame(tac.pulseRaf); tac.pulseRaf = null; }
+  ['tShoot','tMelee','tEnd','tMove'].forEach(id => { const el=document.getElementById(id); if(el)el.disabled=true; });
 
-// ── MAIN ATTACK FUNCTION ──────────────────────────────────────────────
-function playerAttack(type) {
-  if (!battleState || !battleState.running) return;
-  const boss = BOSS_DATA[battleState.bossId];
-  disableBattleButtons();
+  const boss = BOSS_DATA[tac.bossId];
+  const ov = document.getElementById('tac-result');
 
-  let dmg = 0, logMsg = '', animType = 'fist', noCounter = false;
-
-  // MEDKITS — heal, no attack
-  if (type === 'medkit_s' || type === 'medkit_m' || type === 'medkit_l') {
-    const healAmt  = type === 'medkit_s' ? 55 : type === 'medkit_m' ? 130 : 280;
-    const healName = type === 'medkit_s' ? '🩹 Малая аптечка' :
-                     type === 'medkit_m' ? '🏥 Аптечка' : '💉 Большая аптечка';
-    battleState.playerHp = Math.min(battleState.playerMaxHp, battleState.playerHp + healAmt);
-    if (type === 'medkit_s') session.med_s = Math.max(0, session.med_s - 1);
-    else if (type === 'medkit_m') session.med_m = Math.max(0, session.med_m - 1);
-    else session.med_l = Math.max(0, session.med_l - 1);
-    session.hp    = battleState.playerHp;
+  if (res === 'won') {
+    const exp  = boss.exp;
+    const cash = boss.cash + Math.floor(Math.random() * Math.round(boss.cash / 3));
+    session.hp    = Math.max(1, tac.player.hp);
+    session.cash += cash;
+    session.wins.push({boss_id: tac.bossId, loc_id: tac.locId, exp, cash});
     session.dirty = true;
-    addBattleLog(healName + ' — +' + healAmt + ' HP!', 'system');
-    updateBattleUI();
-    updateInjuryIndicators();
-    renderBattleActions();
-    enableBattleButtons();
-    return;
+    tacLog('🏆 ПОБЕДА!');
+    document.getElementById('tac-badge').textContent = '🏆 ПОБЕДА';
+    document.getElementById('tac-badge').className   = 'pt';
+    ov.innerHTML = `
+      <div class="tac-res-icon">🏆</div>
+      <div class="tac-res-title win">ПОБЕДА!</div>
+      <div class="tac-res-rewards">
+        <div class="tac-reward"><span class="rv">+${exp}</span><span class="rl">Опыт</span></div>
+        <div class="tac-reward"><span class="rv">+${cash}$</span><span class="rl">Наличные</span></div>
+      </div>
+      <div style="margin-top:8px;font-size:12px;color:#888">❤️ ${session.hp}/${DATA.maxhp}  ·  💵 ${session.cash}$</div>
+      <button class="tac-res-btn" onclick="afterBattle(true)">⚔️ Продолжить</button>
+      <button class="tac-res-btn exit" onclick="afterBattle(false)">← Выйти из района</button>
+    `;
+  } else {
+    session.hp    = 1;
+    session.dirty = true;
+    tacLog('💀 Поражение...');
+    document.getElementById('tac-badge').textContent = '💀 КОНЕЦ';
+    document.getElementById('tac-badge').className   = 'et';
+    ov.innerHTML = `
+      <div class="tac-res-icon">💀</div>
+      <div class="tac-res-title lose">ПОРАЖЕНИЕ</div>
+      <div style="color:#888;font-size:13px;margin-top:4px">Ты чудом выжил. Зализывай раны.</div>
+      <button class="tac-res-btn" style="margin-top:16px" onclick="afterBattle(false)">← Уйти</button>
+    `;
   }
-
-  // GRENADE
-  if (type === 'grenade') {
-    dmg       = 80 + Math.floor(Math.random() * 51);
-    logMsg    = '💣 Граната! — ' + dmg + ' урона! (ответки нет)';
-    animType  = 'grenade';
-    noCounter = true;
-    session.gren = Math.max(0, session.gren - 1);
-  }
-  // CLASS SKILL
-  else if (type === 'skill') {
-    const skill = CLASS_SKILLS[DATA.cls];
-    if (!skill || battleState.playerMp < skill.cost) { enableBattleButtons(); return; }
-    dmg     = Math.round(calcDmg(battleState.playerAtk, boss.def) * skill.mult);
-    logMsg  = '✨ ' + skill.name + ' — ' + dmg + ' урона!';
-    animType = 'skill';
-    battleState.playerMp = Math.max(0, battleState.playerMp - skill.cost);
-    session.mp = battleState.playerMp;
-    if (skill.heal) {
-      battleState.playerHp = Math.min(battleState.playerMaxHp, battleState.playerHp + skill.heal);
-      logMsg += ' (+' + skill.heal + ' HP)';
-    }
-  }
-  // PROPERTY SKILL
-  else if (type.startsWith('prop_')) {
-    const propId = type.replace('prop_', '');
-    const ps = PROP_SKILLS[propId];
-    if (!ps || battleState.propUsed.includes(propId)) { enableBattleButtons(); return; }
-    dmg     = Math.round(calcDmg(battleState.playerAtk, boss.def) * ps.mult);
-    logMsg  = ps.name + ' — ' + dmg + ' урона!';
-    animType = 'gun';
-    battleState.propUsed.push(propId);
-  }
-  // NORMAL ATTACK with critical hit
-  else {
-    const baseDmg = calcDmg(battleState.playerAtk, boss.def);
-    const isCrit  = Math.random() < 0.15;
-    dmg      = isCrit ? Math.round(baseDmg * 1.5) : baseDmg;
-    animType = getWeaponType();
-    if (isCrit) {
-      logMsg = '💥 КРИТ! ' + getAttackVerb() + ' — ' + dmg + ' урона!';
-      animateCrit('boss');
-    } else {
-      logMsg = '💥 ' + getAttackVerb() + ' — ' + dmg + ' урона!';
-    }
-  }
-
-  // Apply damage
-  battleState.bossHp = Math.max(0, battleState.bossHp - dmg);
-
-  // Projectile animation
-  animateProjectile(animType);
-  const flashDelay = (animType === 'gun') ? 240 : 80;
-  setTimeout(() => {
-    triggerFlash(document.getElementById('battle-boss-side'), 'flash-red');
-    animateBlood('boss');
-  }, flashDelay);
-
-  addBattleLog(logMsg, type === 'grenade' ? 'system' : 'player-hit');
-  updateBattleUI();
-  updateInjuryIndicators();
-
-  if (battleState.bossHp <= 0) { setTimeout(handleWin, 400); return; }
-
-  if (noCounter) {
-    renderBattleActions();
-    enableBattleButtons();
-    return;
-  }
-
-  // Boss counterattack
-  setTimeout(() => {
-    const bdmg = calcDmg(boss.atk, Math.floor(battleState.playerAtk / 3));
-    battleState.playerHp = Math.max(0, battleState.playerHp - bdmg);
-    const bossShortName = boss.name.replace(/^\S+\s*/, '');
-    // ~35% chance to taunt
-    if (Math.random() < 0.35) {
-      const taunt = getBossTaunt(battleState.bossId);
-      document.getElementById('b-boss-quote').textContent = '«' + taunt + '»';
-    }
-    addBattleLog('⚠️ ' + bossShortName + ' бьёт в ответ — ' + bdmg + ' урона!', 'boss-hit');
-
-    triggerFlash(document.getElementById('battle-player-side'), 'flash-blue');
-    animateBlood('player');
-
-    session.hp = battleState.playerHp;
-    session.mp = battleState.playerMp;
-    updateBattleUI();
-    updateInjuryIndicators();
-
-    if (battleState.playerHp <= 0) { setTimeout(handleLose, 400); return; }
-
-    renderBattleActions();
-    enableBattleButtons();
-  }, 500);
-}
-
-function handleWin() {
-  if (!battleState) return;
-  battleState.running = false;
-  const boss  = BOSS_DATA[battleState.bossId];
-  const exp   = boss.exp;
-  const cash  = boss.cash + Math.floor(Math.random() * Math.round(boss.cash / 3));
-  session.hp    = battleState.playerHp;
-  session.mp    = battleState.playerMp;
-  session.cash += cash;
-  session.wins.push({boss_id: battleState.bossId, loc_id: battleState.locId, exp, cash});
-  session.dirty = true;
-  addBattleLog('🏆 Победа! +' + exp + ' опыта, +' + cash + '$', 'system');
-  const ov = document.getElementById('battle-result');
-  ov.innerHTML = `
-    <div class="battle-result-icon">🏆</div>
-    <div class="battle-result-title win">ПОБЕДА!</div>
-    <div class="battle-result-rewards">
-      <div class="battle-reward-chip"><span class="rval">+${exp}</span><span class="rlbl">Опыт</span></div>
-      <div class="battle-reward-chip"><span class="rval">+${cash}$</span><span class="rlbl">Наличные</span></div>
-    </div>
-    <div style="margin-top:8px;font-size:12px;color:var(--muted)">❤️ ${session.hp}/${DATA.maxhp}  ·  💵 ${session.cash}$</div>
-    <button class="battle-result-btn" onclick="afterBattle(true)">⚔️ Продолжить</button>
-    <button class="battle-result-btn exit-btn-r" onclick="afterBattle(false)">← Выйти из района</button>
-  `;
   ov.style.display = 'flex';
 }
 
-function handleLose() {
-  if (!battleState) return;
-  battleState.running = false;
-  session.hp    = 1;
-  session.mp    = battleState.playerMp;
-  session.dirty = true;
-  addBattleLog('💀 Ты пал в бою...', 'system');
-  const ov = document.getElementById('battle-result');
-  ov.innerHTML = `
-    <div class="battle-result-icon">💀</div>
-    <div class="battle-result-title lose">ПОРАЖЕНИЕ</div>
-    <div style="color:var(--muted);font-size:13px;margin-top:4px">Ты чудом выжил. Зализывай раны.</div>
-    <button class="battle-result-btn" style="margin-top:16px" onclick="afterBattle(false)">← Уйти</button>
-  `;
-  ov.style.display = 'flex';
-}
-
-function fleeBattle() {
-  if (!battleState || !battleState.running) return;
-  battleState.running = false;
-  session.hp = battleState.playerHp;
-  session.mp = battleState.playerMp;
-  addBattleLog('🏃 Ты сбежал с поля боя.', 'system');
-  afterBattle(false);
-}
+// ── TAP INPUT ─────────────────────────────────────────────────────────
+(function(){
+  function onTacTap(evt) {
+    if(!tac||tac.gstate!=='player')return;
+    const canvas=document.getElementById('tac-gc');
+    const rect=canvas.getBoundingClientRect();
+    const sx=canvas.width/rect.width,sy=canvas.height/rect.height;
+    const cx=(evt.clientX-rect.left)*sx,cy=(evt.clientY-rect.top)*sy;
+    const c=Math.floor(cx/tac.TS),r=Math.floor(cy/tac.TS);
+    if(r<0||r>=tac.ROWS||c<0||c>=tac.COLS)return;
+    const ce=tac.enemies.find(e=>e.hp>0&&e.r===r&&e.c===c);
+    if(ce){
+      tac.selEnemy=ce;tac.selTile=null;
+      const d=tacDist(tac.player.r,tac.player.c,ce.r,ce.c);
+      const cv=TAC_COV[tac.grid[ce.r][ce.c]]||0;
+      const hp=Math.round(tacHitChance(tac.player.r,tac.player.c,ce.r,ce.c,cv)*100);
+      tacLog(ce.name+' · дист.'+d+' · шанс попасть '+hp+'%'+(cv>0?' 🛡 укрытие':''));
+      tacBtns();tacRender();return;
+    }
+    if(!tac.player.moved){
+      const inRange=tac.moveTiles.some(t=>t.r===r&&t.c===c);
+      if(!inRange){tac.selTile=null;tac.selEnemy=null;tacBtns();tacRender();return;}
+      if(tac.selTile&&tac.selTile.r===r&&tac.selTile.c===c){
+        tac.gstate='anim';
+        tacMoveAnim(tac.player,r,c,()=>{
+          tac.player.moved=true;tac.selTile=null;tacCalcMoveTiles();tac.gstate='player';
+          const cv=TAC_COV[tac.grid[tac.player.r][tac.player.c]]||0;
+          if(cv>0)tacLog('В укрытии! '+(cv===2?'Тяжёлое укрытие — 80% защита 🛡':'Лёгкое укрытие — 50% защита 🪵'));
+          else tacLog('Переместился. Атакуй или заверши ход.');
+          tacBtns();tacRender();
+        });
+      }else{
+        tac.selTile={r,c};tac.selEnemy=null;
+        const cv=TAC_COV[tac.grid[r][c]]||0;
+        tacLog((cv===2?'🛡 Тяжёлое укрытие!':(cv===1?'🪵 Лёгкое укрытие!':'Пусто'))+' — нажми ещё раз чтобы идти');
+        tacBtns();tacRender();
+      }
+    }
+  }
+  document.addEventListener('click',function(e){
+    const canvas=document.getElementById('tac-gc');
+    if(canvas&&e.target===canvas)onTacTap(e);
+  });
+  document.addEventListener('touchend',function(e){
+    const canvas=document.getElementById('tac-gc');
+    if(canvas&&e.target===canvas){
+      e.preventDefault();
+      const t=e.changedTouches[0];
+      onTacTap({clientX:t.clientX,clientY:t.clientY});
+    }
+  },{passive:false});
+  window.addEventListener('resize',function(){if(tac)tacResize();});
+})();
 
 function afterBattle(stayInDistrict) {
   document.getElementById('battle-result').style.display = 'none';
   if (stayInDistrict && session.hp >= 10) {
-    openDistrict(battleState.locId);
+    openDistrict(tac ? tac.locId : currentLocId);
   } else {
     document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
     document.getElementById('page-explore').style.display = '';
