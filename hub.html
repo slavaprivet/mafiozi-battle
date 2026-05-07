@@ -1766,94 +1766,80 @@ function navDistrict(dir) {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-//  TACTICAL BATTLE SYSTEM (canvas-based)
+//  TACTICAL BATTLE SYSTEM v2 – bigger tiles, smooth movement
 // ══════════════════════════════════════════════════════════════════════
 
 // ── WEAPONS ──────────────────────────────────────────────────────────
 const WEP_TAC={
-  knuckles:{t:'melee',r:1,m:1.5,s:1,sp:0,c:'#fa8',lbl:'Кастет'},
-  zatochka:{t:'melee',r:1,m:1.6,s:1,sp:0,c:'#ddd',lbl:'Заточка'},
-  chain:   {t:'melee',r:2,m:1.4,s:1,sp:0,c:'#aaa',lbl:'Цепь'},
-  machete: {t:'melee',r:1,m:1.8,s:1,sp:0,c:'#aef',lbl:'Мачете'},
-  katana:  {t:'melee',r:1,m:2.0,s:1,sp:0,c:'#aef',lbl:'Катана'},
-  spiked_bat:{t:'melee',r:2,m:1.7,s:1,sp:0,c:'#c84',lbl:'Бита'},
-  nagan:   {t:'pistol',r:7, m:1.0,s:1,sp:0,  c:'#ff4',lbl:'Наган',thick:2},
-  tt_pistol:{t:'pistol',r:7,m:1.0,s:1,sp:0,  c:'#ff8',lbl:'ТТ',thick:2},
-  deagle:  {t:'pistol',r:8, m:1.2,s:1,sp:0,  c:'#f80',lbl:'Дезерт Игл',thick:2.5},
-  golden_colt:{t:'pistol',r:8,m:1.2,s:1,sp:0,c:'#fd0',lbl:'Золотой Кольт',thick:2.5},
-  revolver:{t:'pistol',r:7, m:1.1,s:1,sp:0,  c:'#ff4',lbl:'Револьвер',thick:2},
-  uzi:     {t:'burst', r:6, m:1.0,s:4,sp:.12,c:'#ffa',lbl:'Узи',thick:1.5},
-  golden_uzi:{t:'burst',r:6,m:1.1,s:4,sp:.12,c:'#fd0',lbl:'Золотой Узи',thick:1.5},
-  tommy_gun:{t:'burst',r:7, m:1.1,s:4,sp:.15,c:'#ffa',lbl:'Томми Ган',thick:1.5},
-  sawn_off:{t:'shotgun',r:4,m:1.5,s:6,sp:.4, c:'#f60',lbl:'Обрез',thick:3},
-  shotgun: {t:'shotgun',r:5,m:1.4,s:6,sp:.35,c:'#f80',lbl:'Дробовик',thick:3},
-  ak74:    {t:'rifle', r:10,m:1.1,s:3,sp:.05,c:'#4f8',lbl:'АК-74',thick:1.5},
-  m16:     {t:'rifle', r:10,m:1.1,s:3,sp:.05,c:'#4f8',lbl:'М-16',thick:1.5},
-  sniper:  {t:'rifle', r:14,m:1.3,s:1,sp:0,  c:'#0ff',lbl:'Снайперка',thick:1},
-  rpg:     {t:'rocket',r:12,m:2.0,s:1,sp:0,  c:'#f40',lbl:'Базука',thick:4},
+  knuckles:{t:'melee',r:1,m:1.5,s:1,c:'#fa8',lbl:'Кастет'},
+  zatochka:{t:'melee',r:1,m:1.6,s:1,c:'#ddd',lbl:'Заточка'},
+  chain:   {t:'melee',r:2,m:1.4,s:1,c:'#aaa',lbl:'Цепь'},
+  machete: {t:'melee',r:1,m:1.8,s:1,c:'#aef',lbl:'Мачете'},
+  katana:  {t:'melee',r:1,m:2.0,s:1,c:'#aef',lbl:'Катана'},
+  spiked_bat:{t:'melee',r:2,m:1.7,s:1,c:'#c84',lbl:'Бита'},
+  nagan:   {t:'pistol',r:6, m:1.0,s:1,c:'#ff4',lbl:'Наган',  thick:2.5},
+  tt_pistol:{t:'pistol',r:6,m:1.0,s:1,c:'#ff8',lbl:'ТТ',     thick:2.5},
+  deagle:  {t:'pistol',r:7, m:1.2,s:1,c:'#f80',lbl:'Дезерт Игл',thick:3},
+  golden_colt:{t:'pistol',r:7,m:1.2,s:1,c:'#fd0',lbl:'Золотой Кольт',thick:3},
+  revolver:{t:'pistol',r:6, m:1.1,s:1,c:'#ff4',lbl:'Револьвер',thick:2.5},
+  uzi:     {t:'burst', r:5, m:1.0,s:4,c:'#ffa',lbl:'Узи',    thick:2},
+  golden_uzi:{t:'burst',r:5,m:1.1,s:4,c:'#fd0',lbl:'Золотой Узи',thick:2},
+  tommy_gun:{t:'burst',r:6, m:1.1,s:4,c:'#ffa',lbl:'Томми Ган',thick:2},
+  sawn_off:{t:'shotgun',r:3,m:1.5,s:6,c:'#f60',lbl:'Обрез',  thick:4},
+  shotgun: {t:'shotgun',r:4,m:1.4,s:6,c:'#f80',lbl:'Дробовик',thick:4},
+  ak74:    {t:'rifle', r:8, m:1.1,s:3,c:'#4f8',lbl:'АК-74',  thick:2},
+  m16:     {t:'rifle', r:8, m:1.1,s:3,c:'#4f8',lbl:'М-16',   thick:2},
+  sniper:  {t:'rifle', r:12,m:1.3,s:1,c:'#0ff',lbl:'Снайперка',thick:1.5},
+  rpg:     {t:'rocket',r:10,m:2.0,s:1,c:'#f40',lbl:'Базука', thick:5},
 };
 
-// ── MAPS ─────────────────────────────────────────────────────────────
+// ── MAPS (7×7 = bigger tiles) ─────────────────────────────────────────
+// 0=floor 1=wall 2=stall(light cover) 3=car(heavy) 4=crate(light)
 const TAC_MAPS={
   market:[
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-    [1,0,0,2,2,0,0,0,0,2,2,0,0,1],
-    [1,0,0,0,0,0,4,0,0,0,0,0,0,1],
-    [1,0,2,0,0,0,0,0,0,0,0,0,2,1],
-    [1,0,0,0,0,3,3,0,3,3,0,0,0,1],
-    [1,0,0,4,0,0,0,0,0,0,4,0,0,1],
-    [1,0,2,0,0,0,0,0,0,0,0,0,2,1],
-    [1,0,0,0,0,4,0,0,0,4,0,0,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,1,1,1,1,1,1],
+    [1,0,0,2,0,0,1],
+    [1,0,4,0,2,0,1],
+    [1,0,0,0,0,4,1],
+    [1,2,0,3,0,0,1],
+    [1,0,0,0,4,0,1],
+    [1,1,1,1,1,1,1],
   ],
   port:[
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-    [1,0,0,3,3,0,0,0,0,3,3,0,0,1],
-    [1,0,0,0,0,0,4,0,0,0,0,0,0,1],
-    [1,0,4,0,0,0,0,0,0,0,0,4,0,1],
-    [1,0,0,0,0,2,2,0,2,2,0,0,0,1],
-    [1,0,0,4,0,0,0,0,0,0,4,0,0,1],
-    [1,0,3,0,0,0,0,0,0,0,0,3,0,1],
-    [1,0,0,0,0,4,0,0,0,4,0,0,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,1,1,1,1,1,1],
+    [1,0,0,3,0,0,1],
+    [1,0,4,0,3,0,1],
+    [1,0,0,0,0,4,1],
+    [1,3,0,4,0,0,1],
+    [1,0,0,0,3,0,1],
+    [1,1,1,1,1,1,1],
   ],
   casino:[
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-    [1,0,0,2,0,0,3,3,0,0,2,0,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,2,0,0,4,0,0,4,0,0,2,0,1],
-    [1,0,0,0,0,0,3,3,0,0,0,0,0,1],
-    [1,0,4,0,0,0,0,0,0,0,0,4,0,1],
-    [1,0,0,2,0,0,0,0,0,0,2,0,0,1],
-    [1,0,0,0,0,4,0,0,0,4,0,0,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,1,1,1,1,1,1],
+    [1,0,2,0,0,2,1],
+    [1,0,0,3,0,0,1],
+    [1,2,0,0,0,2,1],
+    [1,0,0,3,0,0,1],
+    [1,0,4,0,4,0,1],
+    [1,1,1,1,1,1,1],
   ],
   factory:[
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-    [1,0,0,3,0,0,3,0,3,0,0,3,0,1],
-    [1,0,0,0,0,4,0,0,0,4,0,0,0,1],
-    [1,0,3,0,0,0,0,0,0,0,0,3,0,1],
-    [1,0,0,4,0,0,3,3,0,0,4,0,0,1],
-    [1,0,0,0,0,4,0,0,4,0,0,0,0,1],
-    [1,0,3,0,0,0,0,0,0,0,0,3,0,1],
-    [1,0,0,0,4,0,0,0,0,4,0,0,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,1,1,1,1,1,1],
+    [1,0,3,0,3,0,1],
+    [1,0,0,4,0,3,1],
+    [1,3,0,0,0,0,1],
+    [1,0,4,0,3,0,1],
+    [1,0,0,3,0,0,1],
+    [1,1,1,1,1,1,1],
   ],
   mansion:[
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-    [1,0,0,2,2,0,0,0,0,2,2,0,0,1],
-    [1,0,0,0,0,0,2,0,0,0,0,0,0,1],
-    [1,0,2,0,0,0,0,0,0,0,0,2,0,1],
-    [1,0,0,0,0,3,0,0,0,3,0,0,0,1],
-    [1,0,0,2,0,0,0,0,0,0,2,0,0,1],
-    [1,0,0,0,0,0,2,2,0,0,0,0,0,1],
-    [1,0,2,0,0,0,0,0,0,0,0,2,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,1,1,1,1,1,1],
+    [1,0,2,0,2,0,1],
+    [1,0,0,2,0,0,1],
+    [1,2,0,0,0,2,1],
+    [1,0,0,2,0,0,1],
+    [1,0,2,0,2,0,1],
+    [1,1,1,1,1,1,1],
   ],
 };
 const TAC_COV={0:0,1:0,2:1,3:2,4:1};
@@ -1863,100 +1849,97 @@ function startBattle(bossId, locId) {
   const boss = BOSS_DATA[bossId];
   if (!boss) return;
 
-  // Parse boss emoji from name (first char)
   const bossEmoji = boss.name.match(/^./u)[0];
   const bossName  = boss.name.replace(/^\S+\s*/, '');
-
   const grid = TAC_MAPS[locId] || TAC_MAPS.market;
   const ROWS = grid.length, COLS = grid[0].length;
 
+  const mkUnit = (id,r,c,hp,atk,def,name,emoji,wep,mr) => ({
+    id,r,c,vr:r,vc:c,hp,maxhp:hp,atk,def,name,e:emoji,
+    wep,moveRange:mr,moved:false,attacked:false,
+    walkPhase:0,isWalking:false,
+  });
+
   tac = {
     bossId, locId, grid, ROWS, COLS,
-    gstate: 'player',
-    player: {
-      r:8, c:1,
-      hp: session.hp, maxhp: DATA.maxhp,
-      atk: DATA.atk, def: DATA.def,
-      moved: false, attacked: false, moveRange: 4
-    },
+    gstate:'player',
+    player: mkUnit(-1,5,1, session.hp,DATA.atk,DATA.def, DATA.name,'🤵','',4),
     enemies: [
-      {id:0, r:1, c:12, hp:boss.hp, maxhp:boss.hp, atk:boss.atk, def:boss.def,
-       name:bossName, e:bossEmoji, wep:'tt_pistol', moveRange:3, moved:false, attacked:false},
-      {id:1, r:2, c:8,
-       hp:Math.round(boss.hp*.45), maxhp:Math.round(boss.hp*.45),
-       atk:Math.round(boss.atk*.75), def:Math.round(boss.def*.6),
-       name:'Охранник', e:'👮', wep:'nagan', moveRange:3, moved:false, attacked:false},
+      mkUnit(0,1,5, boss.hp,boss.atk,boss.def, bossName,bossEmoji,'tt_pistol',3),
+      mkUnit(1,2,3, Math.round(boss.hp*.4),Math.round(boss.atk*.7),Math.round(boss.def*.6),'Охранник','👮','nagan',3),
     ],
-    selTile: null, selEnemy: null, moveTiles: [],
-    bullets: [], meleeVfx: [], coverPulse: 0,
-    TS: 42,
-    pulseRaf: null,
+    player_maxhp: DATA.maxhp,
+    player_maxmp: DATA.maxmp,
+    selTile:null, selEnemy:null, moveTiles:[],
+    bullets:[], meleeVfx:[],
+    animPhase:0, pulseRaf:null,
     pw: WEP_TAC[DATA.weapon] || WEP_TAC.nagan,
+    TS:50,
   };
 
-  // Show page
-  document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
-  document.getElementById('page-battle').style.display = '';
-  document.getElementById('tac-result').style.display = 'none';
-  if (tg && tg.BackButton) tg.BackButton.hide();
-  window.scrollTo(0, 0);
+  document.querySelectorAll('.subpage').forEach(p=>p.style.display='none');
+  document.getElementById('page-battle').style.display='';
+  document.getElementById('tac-result').style.display='none';
+  if(tg&&tg.BackButton)tg.BackButton.hide();
+  window.scrollTo(0,0);
 
-  // Setup canvas
   tacResize();
   tacHud();
   tacCalcMoveTiles();
   tacStartPlayerTurn();
 
-  // Pulse loop
-  if (tac.pulseRaf) cancelAnimationFrame(tac.pulseRaf);
-  (function loop(){ tac.coverPulse+=.08; tacRender(); tac.pulseRaf=requestAnimationFrame(loop); })();
+  if(tac.pulseRaf) cancelAnimationFrame(tac.pulseRaf);
+  let last=0;
+  (function loop(now){
+    tac.animPhase += 0.06;
+    // Walk phase for moving units
+    tac.pulseRaf = requestAnimationFrame(loop);
+  })(0);
 }
 
-// ── CANVAS SETUP ─────────────────────────────────────────────────────
-function tacResize() {
-  if (!tac) return;
-  const wrap = document.getElementById('tac-canvas-wrap');
-  const canvas = document.getElementById('tac-gc');
-  tac.TS = Math.min(Math.floor(wrap.clientWidth / tac.COLS), Math.floor(wrap.clientHeight / tac.ROWS));
-  canvas.width  = tac.TS * tac.COLS;
-  canvas.height = tac.TS * tac.ROWS;
-  const f = document.getElementById('tac-frame');
-  f.style.width  = canvas.width  + 'px';
-  f.style.height = canvas.height + 'px';
-  tacRender();
+// ── CANVAS RESIZE ─────────────────────────────────────────────────────
+function tacResize(){
+  if(!tac)return;
+  const wrap=document.getElementById('tac-canvas-wrap');
+  const canvas=document.getElementById('tac-gc');
+  const W=wrap.clientWidth, H=wrap.clientHeight;
+  tac.TS=Math.floor(Math.min(W/tac.COLS, H/tac.ROWS));
+  canvas.width=tac.TS*tac.COLS; canvas.height=tac.TS*tac.ROWS;
+  const f=document.getElementById('tac-frame');
+  f.style.width=canvas.width+'px'; f.style.height=canvas.height+'px';
 }
 
 // ── HUD ───────────────────────────────────────────────────────────────
-function tacHud() {
-  if (!tac) return;
-  const p = tac.player, e = tac.enemies[0];
-  document.getElementById('tPName').textContent = DATA.name;
-  document.getElementById('tPTxt').textContent  = p.hp + '/' + p.maxhp;
-  document.getElementById('tPBar').style.width  = Math.max(0, p.hp/p.maxhp*100) + '%';
-  document.getElementById('tEName').textContent = e.name;
-  document.getElementById('tETxt').textContent  = e.hp + '/' + e.maxhp;
-  document.getElementById('tEBar').style.width  = Math.max(0, e.hp/e.maxhp*100) + '%';
+function tacHud(){
+  if(!tac)return;
+  const p=tac.player, e=tac.enemies[0];
+  document.getElementById('tPName').textContent=DATA.name;
+  document.getElementById('tPTxt').textContent=p.hp+'/'+tac.player_maxhp;
+  document.getElementById('tPBar').style.width=Math.max(0,p.hp/tac.player_maxhp*100)+'%';
+  document.getElementById('tEName').textContent=e.name;
+  document.getElementById('tETxt').textContent=e.hp+'/'+e.maxhp;
+  document.getElementById('tEBar').style.width=Math.max(0,e.hp/e.maxhp*100)+'%';
 }
-function tacLog(t) { document.getElementById('tac-log').textContent = t; }
-function tacBtns() {
-  if (!tac) return;
-  const sh=document.getElementById('tShoot'), me=document.getElementById('tMelee');
-  const mv=document.getElementById('tMove'),  en=document.getElementById('tEnd');
-  const ok = tac.gstate === 'player';
-  mv.disabled = !ok || tac.player.moved;
-  en.disabled = !ok;
-  if (ok && tac.selEnemy && !tac.player.attacked) {
-    const d = tacDist(tac.player.r, tac.player.c, tac.selEnemy.r, tac.selEnemy.c);
-    const w = tac.pw;
-    sh.disabled = (w.t==='melee') || (d > w.r);
-    me.disabled = d > Math.max(2, w.t==='melee' ? w.r : 2);
-  } else { sh.disabled = true; me.disabled = true; }
+function tacLog(t){document.getElementById('tac-log').textContent=t;}
+function tacBtns(){
+  if(!tac)return;
+  const sh=document.getElementById('tShoot'),me=document.getElementById('tMelee');
+  const mv=document.getElementById('tMove'),en=document.getElementById('tEnd');
+  const ok=tac.gstate==='player';
+  mv.disabled=!ok||tac.player.moved;
+  en.disabled=!ok;
+  if(ok&&tac.selEnemy&&!tac.player.attacked){
+    const d=tacDist(tac.player.r,tac.player.c,tac.selEnemy.r,tac.selEnemy.c);
+    const w=tac.pw;
+    sh.disabled=(w.t==='melee')||(d>w.r);
+    me.disabled=d>Math.max(2,w.t==='melee'?w.r:2);
+  }else{sh.disabled=true;me.disabled=true;}
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────
-function tacDist(r1,c1,r2,c2){ return Math.abs(r1-r2)+Math.abs(c1-c2); }
+function tacDist(r1,c1,r2,c2){return Math.abs(r1-r2)+Math.abs(c1-c2);}
 function tacWalkable(r,c){
-  if(r<0||r>=tac.ROWS||c<0||c>=tac.COLS)return false;
+  if(!tac||r<0||r>=tac.ROWS||c<0||c>=tac.COLS)return false;
   if(tac.grid[r][c]===1)return false;
   if(tac.enemies.some(e=>e.hp>0&&e.r===r&&e.c===c))return false;
   return true;
@@ -1976,122 +1959,269 @@ function tacBfs(sr,sc,range){
 }
 function tacHitChance(ar,ac,tr,tc,cov){
   const d=tacDist(ar,ac,tr,tc);
-  let b=d<=1?.98:d<=2?.92:d<=3?.85:d<=4?.75:d<=5?.65:d<=7?.55:d<=9?.48:.40;
-  if(cov===1)b*=.5; if(cov===2)b*=.2;
-  return Math.max(.05,Math.min(.98,b));
+  let b=d<=1?.97:d<=2?.90:d<=3?.82:d<=4?.72:d<=5?.60:d<=7?.50:.40;
+  if(cov===1)b*=.55;if(cov===2)b*=.22;
+  return Math.max(.05,Math.min(.95,b));
 }
 function tacDmgCalc(atk,def,mult,d,melee){
   let b=Math.max(1,atk-def);
-  if(!melee){b*=d<=2?1.3:d<=4?1.0:d<=7?.85:.70;}
-  b*=mult; b*=.85+Math.random()*.3;
+  if(!melee){b*=d<=2?1.3:d<=4?1.0:d<=6?.85:.70;}
+  b*=mult;b*=.85+Math.random()*.3;
   return Math.max(1,Math.round(b));
 }
 
-// ── RENDER ────────────────────────────────────────────────────────────
-const TC_C=['#2d201a','#18182e','#5c3d11','#1a3a1a','#4a3218'];
-const TC_C2=['#3a2820','#22223a','#7a5218','#255225','#6a4828'];
+// ── TILE DRAWING ──────────────────────────────────────────────────────
 function tacDrawTile(ctx,r,c){
   const t=tac.grid[r][c],TS=tac.TS,x=c*TS,y=r*TS;
-  ctx.fillStyle=TC_C[t]||TC_C[0]; ctx.fillRect(x,y,TS,TS);
-  if(t===0){
-    ctx.fillStyle=TC_C2[0];ctx.fillRect(x+1,y+1,TS-2,TS-2);
-    ctx.strokeStyle='#3a2820';ctx.lineWidth=.5;ctx.strokeRect(x+.5,y+.5,TS-1,TS-1);
-  }else if(t===1){
-    ctx.fillStyle='#1e1e30';ctx.fillRect(x+2,y+2,TS-4,TS-4);
-    ctx.strokeStyle='#141428';ctx.lineWidth=1;
-    const bw=Math.floor(TS/2),bh=Math.floor(TS/3);
-    for(let by=0;by<3;by++)for(let bx=0;bx<2;bx++){
-      const ox=(by%2)*Math.floor(bw/2);
-      ctx.strokeRect(x+bx*bw+ox+2,y+by*bh+2,bw-2,bh-1);
+
+  if(t===1){
+    // Solid wall with brick texture
+    ctx.fillStyle='#13132a';ctx.fillRect(x,y,TS,TS);
+    ctx.fillStyle='#1c1c38';
+    const bw=Math.ceil(TS/2.2),bh=Math.ceil(TS/2.8);
+    for(let by=0;by<3;by++)for(let bx=0;bx<3;bx++){
+      const ox=(by%2)*(bw>>1);
+      const rx=x+bx*bw+ox,ry=y+by*bh;
+      if(rx>=x&&rx<x+TS&&ry>=y&&ry<y+TS){
+        ctx.fillRect(rx+1,ry+1,Math.min(bw-2,x+TS-rx-1),Math.min(bh-2,y+TS-ry-1));
+      }
     }
-  }else if(t===2){
-    ctx.fillStyle='#7a5218';ctx.fillRect(x+2,y+2,TS-4,TS-4);
-    ctx.fillStyle='#9a6828';ctx.fillRect(x+3,y+3,TS-6,Math.floor(TS*.35));
-    ctx.fillStyle='#c8a84b';
-    for(let i=0;i<3;i++)ctx.fillRect(x+5+i*Math.floor((TS-10)/3),y+5,4,4);
-    ctx.strokeStyle='#5c3010';ctx.lineWidth=1.5;ctx.strokeRect(x+2,y+2,TS-4,TS-4);
-  }else if(t===3){
-    ctx.fillStyle='#1a3a1a';ctx.fillRect(x+1,y+1,TS-2,TS-2);
-    ctx.fillStyle='#245a24';ctx.fillRect(x+4,y+3,TS-8,TS-6);
-    ctx.strokeStyle='#0f2a0f';ctx.lineWidth=1.5;ctx.strokeRect(x+1,y+1,TS-2,TS-2);
-  }else if(t===4){
-    ctx.fillStyle='#6a4828';ctx.fillRect(x+3,y+3,TS-6,TS-6);
-    ctx.strokeStyle='#4a3018';ctx.lineWidth=1.5;ctx.strokeRect(x+3,y+3,TS-6,TS-6);
-    ctx.beginPath();ctx.moveTo(x+5,y+5);ctx.lineTo(x+TS-5,y+TS-5);
-    ctx.moveTo(x+TS-5,y+5);ctx.lineTo(x+5,y+TS-5);
-    ctx.strokeStyle='#4a3018';ctx.lineWidth=1;ctx.stroke();
+    ctx.strokeStyle='#0d0d22';ctx.lineWidth=1;ctx.strokeRect(x+.5,y+.5,TS-1,TS-1);
+  } else if(t===0){
+    // Floor — dark parquet
+    ctx.fillStyle='#1e1628';ctx.fillRect(x,y,TS,TS);
+    ctx.strokeStyle='#261e32';ctx.lineWidth=.5;
+    ctx.strokeRect(x+.5,y+.5,TS-1,TS-1);
+    // subtle diagonal grain
+    ctx.save();ctx.globalAlpha=.07;ctx.strokeStyle='#8866aa';ctx.lineWidth=.5;
+    for(let i=-TS;i<TS*2;i+=8){
+      ctx.beginPath();ctx.moveTo(x+i,y);ctx.lineTo(x+i+TS,y+TS);ctx.stroke();
+    }
+    ctx.restore();
+  } else if(t===2){
+    // Stall / market counter (light cover)
+    ctx.fillStyle='#1e1628';ctx.fillRect(x,y,TS,TS);
+    const pad=Math.floor(TS*0.10);
+    const cw=TS-pad*2,ch=Math.floor(TS*0.55);
+    ctx.fillStyle='#6b3d18';ctx.fillRect(x+pad,y+pad,cw,ch);
+    // top surface lighter
+    ctx.fillStyle='#8a5022';ctx.fillRect(x+pad,y+pad,cw,Math.floor(ch*0.3));
+    // goods on counter
+    ctx.fillStyle='#e8c84a';
+    for(let i=0;i<3;i++) ctx.beginPath(),ctx.arc(x+pad+cw*(i+1)/4,y+pad+Math.floor(ch*0.15),TS*0.07,0,Math.PI*2),ctx.fill();
+    ctx.strokeStyle='#3d1e08';ctx.lineWidth=1.5;ctx.strokeRect(x+pad,y+pad,cw,ch);
+    // cover label
+    ctx.font='bold '+Math.floor(TS*.22)+'px sans-serif';ctx.fillStyle='#4af';ctx.textAlign='center';ctx.textBaseline='bottom';
+    ctx.fillText('УКРЫТИЕ',x+TS/2,y+TS-2);
+  } else if(t===3){
+    // Car (heavy cover)
+    ctx.fillStyle='#0d1a0d';ctx.fillRect(x,y,TS,TS);
+    const cp=Math.floor(TS*0.08);
+    // car body
+    ctx.fillStyle='#1e4a1e';ctx.fillRect(x+cp,y+cp,TS-cp*2,TS-cp*2);
+    // windshield (front)
+    ctx.fillStyle='rgba(100,180,255,.35)';
+    ctx.fillRect(x+cp*2,y+cp*2,TS-cp*4,Math.floor(TS*.3));
+    // wheels at corners
+    ctx.fillStyle='#0a0a0a';
+    [[cp*.5,cp*.5],[TS-cp*2.5,cp*.5],[cp*.5,TS-cp*2.5],[TS-cp*2.5,TS-cp*2.5]].forEach(([wx,wy])=>{
+      ctx.beginPath();ctx.arc(x+wx+cp/1.5,y+wy+cp/1.5,TS*0.07,0,Math.PI*2);ctx.fill();
+    });
+    ctx.strokeStyle='#0a220a';ctx.lineWidth=2;ctx.strokeRect(x+cp+1,y+cp+1,TS-cp*2-2,TS-cp*2-2);
+    ctx.font='bold '+Math.floor(TS*.2)+'px sans-serif';ctx.fillStyle='#2f2';ctx.textAlign='center';ctx.textBaseline='bottom';
+    ctx.fillText('УКРЫТИЕ',x+TS/2,y+TS-2);
+  } else if(t===4){
+    // Wooden crate (light cover)
+    ctx.fillStyle='#1e1628';ctx.fillRect(x,y,TS,TS);
+    const cp=Math.floor(TS*0.12);
+    // 3D effect: top face, front face, right face
+    const cSize=TS-cp*2;
+    // front face
+    ctx.fillStyle='#7a4a1a';ctx.fillRect(x+cp,y+cp+Math.floor(cSize*.18),cSize,Math.floor(cSize*.82));
+    // top face (lighter)
+    ctx.fillStyle='#a06028';
+    ctx.beginPath();ctx.moveTo(x+cp,y+cp+Math.floor(cSize*.18));
+    ctx.lineTo(x+cp+Math.floor(cSize*.18),y+cp);
+    ctx.lineTo(x+cp+cSize,y+cp);
+    ctx.lineTo(x+cp+cSize,y+cp+Math.floor(cSize*.18));ctx.closePath();ctx.fill();
+    // board lines on front
+    ctx.strokeStyle='#4a2a08';ctx.lineWidth=1.2;
+    ctx.strokeRect(x+cp,y+cp+Math.floor(cSize*.18),cSize,Math.floor(cSize*.82));
+    ctx.beginPath();ctx.moveTo(x+cp+cSize/2,y+cp+Math.floor(cSize*.18));
+    ctx.lineTo(x+cp+cSize/2,y+cp+cSize);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x+cp,y+cp+Math.floor(cSize*.18)+Math.floor(cSize*.82)/2);
+    ctx.lineTo(x+cp+cSize,y+cp+Math.floor(cSize*.18)+Math.floor(cSize*.82)/2);ctx.stroke();
   }
 }
-function tacHl(ctx,r,c,color,alpha){
+
+// ── CHARACTER DRAWING ─────────────────────────────────────────────────
+function tacDrawChar(ctx,unit,isPlayer,selected){
   const TS=tac.TS;
-  ctx.save();ctx.globalAlpha=alpha;ctx.fillStyle=color;
-  ctx.fillRect(c*TS,r*TS,TS,TS);ctx.restore();
+  const cx=unit.vc*TS+TS/2;
+  const cy=unit.vr*TS+TS/2;
+
+  // Walk bob: subtle vertical offset when moving
+  const bob = unit.isWalking ? Math.sin(unit.walkPhase*8)*TS*0.04 : 0;
+
+  // Shadow under unit
+  ctx.save();ctx.globalAlpha=0.4;
+  ctx.beginPath();ctx.ellipse(cx,cy+TS*0.34+bob/2,TS*0.28,TS*0.07,0,0,Math.PI*2);
+  ctx.fillStyle='#000';ctx.fill();ctx.restore();
+
+  // Legs (two dots bobbing opposite phase when walking)
+  if(!isPlayer||true){
+    const legSpread=TS*0.09;
+    const legY=cy+TS*0.22;
+    const legBob=unit.isWalking?Math.sin(unit.walkPhase*8)*TS*0.06:0;
+    ctx.fillStyle=isPlayer?'#1a2a5a':'#3a0a0a';
+    ctx.beginPath();ctx.ellipse(cx-legSpread,legY+bob-legBob,TS*0.07,TS*0.10,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(cx+legSpread,legY+bob+legBob,TS*0.07,TS*0.10,0,0,Math.PI*2);ctx.fill();
+  }
+
+  // Body / torso
+  const bodyW=TS*0.36,bodyH=TS*0.30;
+  const bodyY=cy-TS*0.02+bob;
+  ctx.fillStyle=isPlayer?'#1a3a7a':'#6a1515';
+  ctx.beginPath();
+  if(ctx.roundRect) ctx.roundRect(cx-bodyW/2,bodyY-bodyH/2,bodyW,bodyH,TS*0.06);
+  else ctx.rect(cx-bodyW/2,bodyY-bodyH/2,bodyW,bodyH);
+  ctx.fill();
+  // lapels / shirt
+  ctx.fillStyle=isPlayer?'#ffffff22':'#ffffff15';
+  ctx.beginPath();ctx.moveTo(cx,bodyY-bodyH/2);ctx.lineTo(cx-bodyW*0.12,bodyY+bodyH*0.1);ctx.lineTo(cx,bodyY);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(cx,bodyY-bodyH/2);ctx.lineTo(cx+bodyW*0.12,bodyY+bodyH*0.1);ctx.lineTo(cx,bodyY);ctx.closePath();ctx.fill();
+
+  // Head
+  const headR=TS*0.18;
+  const headY=cy-TS*0.22+bob;
+  ctx.beginPath();ctx.arc(cx,headY,headR,0,Math.PI*2);
+  ctx.fillStyle=isPlayer?'#2a4a9a':'#8a2020';
+  ctx.fill();
+  ctx.strokeStyle=isPlayer?'#4a6aca':'#ca4040';
+  ctx.lineWidth=1.5;ctx.stroke();
+
+  // Face emoji (large, centered on head)
+  ctx.font=Math.floor(TS*0.26)+'px serif';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(unit.e||'👤',cx,headY);
+
+  // Hat / accessory
+  if(isPlayer){
+    // Fedora
+    ctx.fillStyle='#0a0a1a';
+    ctx.beginPath();ctx.ellipse(cx,headY-headR*0.85,headR*1.3,headR*0.22,0,0,Math.PI*2);ctx.fill();
+    ctx.fillRect(cx-headR*0.85,headY-headR*1.45,headR*1.7,headR*0.6);
+    ctx.fillStyle='#c8a820';
+    ctx.fillRect(cx-headR*0.85,headY-headR*0.95,headR*1.7,headR*0.15);
+  }
+
+  // Selection ring
+  if(selected){
+    ctx.beginPath();ctx.arc(cx,cy+bob,TS*0.44,0,Math.PI*2);
+    ctx.strokeStyle='#ffffff';ctx.lineWidth=2.5;ctx.setLineDash([4,3]);ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // HP bar (wide, under unit)
+  const bw=TS*0.72,bx=cx-bw/2,by=unit.vr*TS+TS-5;
+  ctx.fillStyle='#000a';ctx.fillRect(bx,by,bw,5);
+  const pct=Math.max(0,unit.hp/unit.maxhp);
+  ctx.fillStyle=pct>.6?'#2ecc71':pct>.3?'#f0c030':'#e74c3c';
+  ctx.fillRect(bx,by,bw*pct,5);
+
+  // Cover badge
+  const cv=TAC_COV[tac.grid[unit.r][unit.c]]||0;
+  if(cv>0){
+    ctx.font=Math.floor(TS*0.22)+'px serif';ctx.textAlign='center';ctx.textBaseline='top';
+    ctx.fillText(cv===2?'🛡':'🪵',cx+TS*0.3,unit.vr*TS+2);
+  }
 }
-function tacDrawUnit(ctx,r,c,color,emoji,sel,hasCover){
-  const TS=tac.TS,x=c*TS+TS/2,y=r*TS+TS/2,rad=TS*.36;
-  if(sel){ctx.beginPath();ctx.arc(x,y,rad+4,0,Math.PI*2);ctx.strokeStyle='#fff';ctx.lineWidth=2.5;ctx.stroke();}
-  ctx.beginPath();ctx.arc(x+1,y+2,rad,0,Math.PI*2);ctx.fillStyle='#0008';ctx.fill();
-  ctx.beginPath();ctx.arc(x,y,rad,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();
-  ctx.strokeStyle='rgba(255,255,255,.2)';ctx.lineWidth=1.5;ctx.stroke();
-  ctx.font=Math.floor(TS*.42)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(emoji,x,y);
-  if(hasCover){ctx.font=Math.floor(TS*.32)+'px serif';ctx.fillText('🛡',x+rad*.6,y-rad*.7);}
-}
-function tacDrawHPbar(ctx,r,c,hp,maxhp,col){
-  const TS=tac.TS,x=c*TS+3,y=r*TS+TS-6,w=TS-6;
-  ctx.fillStyle='#0009';ctx.fillRect(x,y,w,4);
-  ctx.fillStyle=col;ctx.fillRect(x,y,Math.round(w*hp/maxhp),4);
-}
+
+// ── COVER HIGHLIGHT ───────────────────────────────────────────────────
 function tacDrawCoverHint(ctx,r,c){
   const cv=TAC_COV[tac.grid[r][c]]||0;if(!cv)return;
   const TS=tac.TS,x=c*TS,y=r*TS;
-  ctx.save();ctx.globalAlpha=.35+.15*Math.sin(tac.coverPulse);
-  ctx.fillStyle=cv===2?'#00aaff':'#00ff88';ctx.fillRect(x,y,TS,TS);ctx.restore();
-  ctx.font=Math.floor(TS*.45)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';
-  ctx.fillText(cv===2?'🛡':'🪵',c*TS+TS/2,r*TS+TS/2);
+  ctx.save();
+  ctx.globalAlpha=.2+.08*Math.sin(tac.animPhase);
+  ctx.fillStyle=cv===2?'#00aaff':'#00ff88';
+  ctx.fillRect(x,y,TS,TS);ctx.restore();
 }
+
+// ── RENDER ────────────────────────────────────────────────────────────
 function tacRender(){
   if(!tac)return;
   const canvas=document.getElementById('tac-gc');
-  if(!canvas.width)return;
+  if(!canvas||!canvas.width)return;
   const ctx=canvas.getContext('2d'),TS=tac.TS;
   ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // Draw tiles
   for(let r=0;r<tac.ROWS;r++)for(let c=0;c<tac.COLS;c++)tacDrawTile(ctx,r,c);
+
+  // Move tile highlights
   if(tac.gstate==='player'&&!tac.player.moved){
-    tac.moveTiles.forEach(({r,c})=>tacHl(ctx,r,c,'#4af',.22));
-    tac.moveTiles.forEach(({r,c})=>tacDrawCoverHint(ctx,r,c));
+    tac.moveTiles.forEach(({r,c})=>{
+      ctx.save();ctx.globalAlpha=.18;ctx.fillStyle='#4aaff0';
+      ctx.fillRect(c*TS,r*TS,TS,TS);ctx.restore();
+      tacDrawCoverHint(ctx,r,c);
+    });
   }
+
+  // Selected tile outline
   if(tac.selTile&&!tac.player.moved){
     const{r,c}=tac.selTile;
-    ctx.strokeStyle='#4af';ctx.lineWidth=3;ctx.strokeRect(c*TS+2,r*TS+2,TS-4,TS-4);
-    const cv=TAC_COV[tac.grid[r][c]]||0;
-    if(cv>0){ctx.font=Math.floor(TS*.55)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(cv===2?'🛡':'🪵',c*TS+TS/2,r*TS+TS/2);}
+    ctx.strokeStyle='#4aaff0';ctx.lineWidth=3;
+    ctx.strokeRect(c*TS+2,r*TS+2,TS-4,TS-4);
+    tacDrawCoverHint(ctx,r,c);
   }
-  if(tac.selEnemy)tacHl(ctx,tac.selEnemy.r,tac.selEnemy.c,'#f44',.35);
-  const pCov=TAC_COV[tac.grid[tac.player.r][tac.player.c]]>0;
-  tacDrawUnit(ctx,tac.player.r,tac.player.c,'#1a3a6a','🤵',false,pCov);
-  tacDrawHPbar(ctx,tac.player.r,tac.player.c,tac.player.hp,tac.player.maxhp,'#2ecc71');
+
+  // Enemy highlight
+  if(tac.selEnemy){
+    ctx.save();ctx.globalAlpha=.3;ctx.fillStyle='#ff4444';
+    ctx.fillRect(tac.selEnemy.c*TS,tac.selEnemy.r*TS,TS,TS);ctx.restore();
+    // Range ring
+    ctx.beginPath();ctx.arc(tac.selEnemy.vc*TS+TS/2,tac.selEnemy.vr*TS+TS/2,TS*0.5,0,Math.PI*2);
+    ctx.strokeStyle='#ff4444';ctx.lineWidth=2;ctx.setLineDash([3,3]);ctx.stroke();ctx.setLineDash([]);
+  }
+
+  // Draw units (enemies first, then player on top)
   tac.enemies.forEach(e=>{
     if(e.hp<=0)return;
-    const eCov=TAC_COV[tac.grid[e.r][e.c]]>0;
-    tacDrawUnit(ctx,e.r,e.c,'#4a1515',e.e,tac.selEnemy?.id===e.id,eCov);
-    tacDrawHPbar(ctx,e.r,e.c,e.hp,e.maxhp,'#e74c3c');
+    tacDrawChar(ctx,e,false,tac.selEnemy?.id===e.id);
   });
+  tacDrawChar(ctx,tac.player,true,false);
+
+  // Bullets
   tac.bullets.forEach(b=>{
-    ctx.save();const p=b.prog;
-    ctx.globalAlpha=1-p*.7;ctx.beginPath();ctx.moveTo(b.sx,b.sy);
-    ctx.lineTo(b.sx+(b.ex-b.sx)*p,b.sy+(b.ey-b.sy)*p);
-    ctx.strokeStyle=b.c||'#ff0';ctx.lineWidth=b.thick||2;ctx.stroke();ctx.restore();
+    ctx.save();ctx.globalAlpha=1-b.prog*.5;
+    ctx.beginPath();ctx.moveTo(b.sx,b.sy);
+    const tx=b.sx+(b.ex-b.sx)*b.prog,ty=b.sy+(b.ey-b.sy)*b.prog;
+    // tracer glow
+    ctx.shadowColor=b.c||'#ff0';ctx.shadowBlur=8;
+    ctx.lineTo(tx,ty);ctx.strokeStyle=b.c||'#ff0';ctx.lineWidth=b.thick||2.5;ctx.stroke();
+    ctx.shadowBlur=0;ctx.restore();
+    // impact flash at tip
+    if(b.prog>.85){
+      ctx.save();ctx.globalAlpha=(1-b.prog)*5;
+      ctx.beginPath();ctx.arc(tx,ty,8,0,Math.PI*2);
+      ctx.fillStyle=b.c||'#ff0';ctx.fill();ctx.restore();
+    }
   });
+
+  // Melee VFX
   tac.meleeVfx.forEach(v=>{
-    ctx.save();ctx.globalAlpha=v.a;ctx.font=Math.floor(TS*.8)+'px serif';
-    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(v.e,v.c*TS+TS/2,v.r*TS+TS/2);ctx.restore();
+    ctx.save();ctx.globalAlpha=v.a;
+    ctx.font=Math.floor(TS*.9)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(v.e,v.vc*TS+TS/2,v.vr*TS+TS/2);ctx.restore();
   });
 }
 
 // ── ANIMATIONS ────────────────────────────────────────────────────────
+function easeInOut(t){return t<.5?2*t*t:-1+(4-2*t)*t;}
+
 function tacShootAnim(sx,sy,ex,ey,wData,cb){
-  const dur=280,t0=performance.now();
-  tac.bullets=[{sx,sy,ex,ey,c:wData.c,thick:wData.thick||2,prog:0}];
+  const dur=260,t0=performance.now();
+  tac.bullets=[{sx,sy,ex,ey,c:wData.c,thick:wData.thick||2.5,prog:0}];
   (function step(now){
     tac.bullets[0].prog=Math.min(1,(now-t0)/dur);
     tacRender();
@@ -2099,29 +2229,40 @@ function tacShootAnim(sx,sy,ex,ey,wData,cb){
     else{tac.bullets=[];cb();}
   })(performance.now());
 }
-function tacMeleeAnim(r,c,cb){
-  const EMOJIS=['💥','⚡','💫','✨'];
-  tac.meleeVfx=[{r,c,e:EMOJIS[Math.floor(Math.random()*EMOJIS.length)],a:1}];
+
+function tacMeleeAnim(tr,tc,cb){
+  const EMOJIS=['💥','⚡','💫','✨','🔥'];
+  tac.meleeVfx=[{vr:tr,vc:tc,r:tr,c:tc,e:EMOJIS[Math.floor(Math.random()*EMOJIS.length)],a:1}];
   let s=0;const iv=setInterval(()=>{
-    tac.meleeVfx[0].a=Math.max(0,1-s/8);tacRender();
-    if(++s>=8){clearInterval(iv);tac.meleeVfx=[];cb();}
-  },45);
+    tac.meleeVfx[0].a=Math.max(0,1-s/10);tacRender();
+    if(++s>=10){clearInterval(iv);tac.meleeVfx=[];cb();}
+  },40);
 }
+
 function tacMoveAnim(unit,tr,tc,cb){
-  const t0=performance.now(),dur=180,or=unit.r,oc=unit.c;
+  const dur=320,t0=performance.now();
+  const or=unit.vr,oc=unit.vc;
+  // Update logical position immediately (so pathfinding works)
+  unit.r=tr;unit.c=tc;
+  unit.isWalking=true;
   (function step(now){
-    const p=Math.min(1,(now-t0)/dur);
-    if(p>=.5&&unit.r===or){unit.r=tr;unit.c=tc;}
+    const raw=Math.min(1,(now-t0)/dur);
+    const p=easeInOut(raw);
+    unit.vr=or+(tr-or)*p;
+    unit.vc=oc+(tc-oc)*p;
+    unit.walkPhase=now/100;
     tacRender();
-    if(p<1)requestAnimationFrame(step);
-    else{unit.r=tr;unit.c=tc;cb();}
+    if(raw<1)requestAnimationFrame(step);
+    else{unit.vr=tr;unit.vc=tc;unit.isWalking=false;cb();}
   })(performance.now());
 }
-function tacFloatDmg(r,c,dmg,color,miss){
+
+function tacFloatDmg(unit,dmg,color,miss){
   const layer=document.getElementById('tac-dmg');
+  const TS=tac.TS;
   const el=document.createElement('div');
   el.className='dmg-pop';
-  el.style.cssText='color:'+color+';left:'+(c*tac.TS+tac.TS/2-18)+'px;top:'+(r*tac.TS+2)+'px';
+  el.style.cssText=`color:${color};left:${unit.vc*TS+TS/2-22}px;top:${unit.vr*TS}px;font-size:${Math.floor(TS*.38)}px`;
   el.textContent=miss?'МИМО!':'-'+dmg;
   layer.appendChild(el);
   setTimeout(()=>el.remove(),900);
@@ -2133,21 +2274,25 @@ function tacDoShoot(){
   const e=tac.selEnemy,w=tac.pw;
   if(w.t==='melee'){tacDoMelee();return;}
   const d=tacDist(tac.player.r,tac.player.c,e.r,e.c);
-  if(d>w.r){tacLog('Слишком далеко!');return;}
+  if(d>w.r){tacLog('Слишком далеко для выстрела!');return;}
   tac.gstate='anim';tac.player.attacked=true;
   const cv=TAC_COV[tac.grid[e.r][e.c]]||0;
   const hit=Math.random()<tacHitChance(tac.player.r,tac.player.c,e.r,e.c,cv);
   const TS=tac.TS;
-  tacShootAnim(tac.player.c*TS+TS/2,tac.player.r*TS+TS/2,e.c*TS+TS/2,e.r*TS+TS/2,w,()=>{
+  tacShootAnim(tac.player.vc*TS+TS/2,tac.player.vr*TS+TS/2,e.vc*TS+TS/2,e.vr*TS+TS/2,w,()=>{
     if(hit){
       const dmg=tacDmgCalc(tac.player.atk,e.def,w.m,d,false);
       e.hp=Math.max(0,e.hp-dmg);
-      tacFloatDmg(e.r,e.c,dmg,'#f88',false);
-      tacLog(w.lbl+' → попал! −'+dmg+' HP'+(cv>0?' (укрытие)':''));
-    }else{tacFloatDmg(e.r,e.c,0,'#aaa',true);tacLog(w.lbl+' → мимо!'+(cv>0?' (укрытие помогло!)':''));}
+      tacFloatDmg(e,dmg,'#ff8888',false);
+      tacLog(w.lbl+' → попал! −'+dmg+' HP'+(cv>0?' 🛡 укрытие':''));
+    }else{
+      tacFloatDmg(e,0,'#aaaaaa',true);
+      tacLog(w.lbl+' → мимо!'+(cv>0?' (укрытие помогло!)':''));
+    }
     tacHud();tacCheckDeath();tac.gstate='player';tac.selEnemy=null;tacCalcMoveTiles();tacBtns();tacRender();
   });tacRender();
 }
+
 function tacDoMelee(){
   if(!tac||!tac.selEnemy||tac.player.attacked||tac.gstate!=='player')return;
   const e=tac.selEnemy,w=tac.pw;
@@ -2155,18 +2300,19 @@ function tacDoMelee(){
   const mr=w.t==='melee'?w.r:2;
   if(d>mr){tacLog('Слишком далеко для удара!');return;}
   tac.gstate='anim';tac.player.attacked=true;
-  tacMeleeAnim(e.r,e.c,()=>{
+  tacMeleeAnim(e.vr,e.vc,()=>{
     const dmg=tacDmgCalc(tac.player.atk,e.def,w.m*(w.t==='melee'?1:1.2),d,true);
     e.hp=Math.max(0,e.hp-dmg);
-    tacFloatDmg(e.r,e.c,dmg,'#fc6',false);
-    tacLog((w.t==='melee'?w.lbl:'Ближний бой')+' → −'+dmg+' HP!');
+    tacFloatDmg(e,dmg,'#ffcc44',false);
+    tacLog((w.t==='melee'?w.lbl:'Ближний бой')+' → удар! −'+dmg+' HP!');
     tacHud();tacCheckDeath();tac.gstate='player';tac.selEnemy=null;tacCalcMoveTiles();tacBtns();tacRender();
   });
 }
+
 function tacCheckDeath(){
   if(!tac)return;
-  if(tac.enemies.every(e=>e.hp<=0)){setTimeout(()=>tacEndBattle('won'),400);return;}
-  if(tac.player.hp<=0)setTimeout(()=>tacEndBattle('lost'),400);
+  if(tac.enemies.every(e=>e.hp<=0)){setTimeout(()=>tacEndBattle('won'),500);return;}
+  if(tac.player.hp<=0)setTimeout(()=>tacEndBattle('lost'),500);
 }
 
 // ── ENEMY AI ─────────────────────────────────────────────────────────
@@ -2179,14 +2325,14 @@ async function tacEnemyTurn(){
   tacLog('Ход врага...');tacBtns();
   for(const e of tac.enemies){
     if(e.hp<=0)continue;
-    await tacSleep(380);
+    await tacSleep(420);
     const ew=WEP_TAC[e.wep]||WEP_TAC.nagan;
     if(!e.moved){
       const reach=tacBfs(e.r,e.c,e.moveRange);
       let best=null,bsc=Infinity;
       reach.forEach(({r,c})=>{
         const nd=tacDist(r,c,tac.player.r,tac.player.c);
-        const cb=TAC_COV[tac.grid[r][c]]>0?-1.5:0;
+        const cb=TAC_COV[tac.grid[r][c]]>0?-2:0;
         const sc=nd+cb;
         if(sc<bsc){bsc=sc;best={r,c};}
       });
@@ -2201,14 +2347,14 @@ async function tacEnemyTurn(){
       const cv=TAC_COV[tac.grid[tac.player.r][tac.player.c]]||0;
       const hit=Math.random()<tacHitChance(e.r,e.c,tac.player.r,tac.player.c,cv);
       const TS=tac.TS;
-      await new Promise(res=>tacShootAnim(e.c*TS+TS/2,e.r*TS+TS/2,tac.player.c*TS+TS/2,tac.player.r*TS+TS/2,ew,res));
+      await new Promise(res=>tacShootAnim(e.vc*TS+TS/2,e.vr*TS+TS/2,tac.player.vc*TS+TS/2,tac.player.vr*TS+TS/2,ew,res));
       if(hit){
         const dmg=tacDmgCalc(e.atk,tac.player.def,1.0,d,false);
         tac.player.hp=Math.max(0,tac.player.hp-dmg);
-        tacFloatDmg(tac.player.r,tac.player.c,dmg,'#f44',false);
-        tacLog(e.name+' попал в тебя: −'+dmg+' HP'+(cv>0?' (укрытие помогло!)':''));
+        tacFloatDmg(tac.player,dmg,'#ff4444',false);
+        tacLog(e.name+' попал! −'+dmg+' HP'+(cv>0?' 🛡 укрытие помогло!':''));
       }else{
-        tacFloatDmg(tac.player.r,tac.player.c,0,'#aaa',true);
+        tacFloatDmg(tac.player,0,'#aaaaaa',true);
         tacLog(e.name+' промахнулся!'+(cv>0?' Укрытие спасло!':''));
       }
       tacHud();tacRender();
@@ -2233,26 +2379,23 @@ function tacResetSel(){if(tac){tac.selTile=null;tac.selEnemy=null;tacCalcMoveTil
 function tacEndPlayerTurn(){if(!tac||tac.gstate!=='player')return;tac.selTile=null;tac.selEnemy=null;tacRender();tacEnemyTurn();}
 
 // ── BATTLE END ────────────────────────────────────────────────────────
-function tacEndBattle(res) {
-  if (!tac) return;
-  tac.gstate = res;
-  if (tac.pulseRaf) { cancelAnimationFrame(tac.pulseRaf); tac.pulseRaf = null; }
-  ['tShoot','tMelee','tEnd','tMove'].forEach(id => { const el=document.getElementById(id); if(el)el.disabled=true; });
-
-  const boss = BOSS_DATA[tac.bossId];
-  const ov = document.getElementById('tac-result');
-
-  if (res === 'won') {
-    const exp  = boss.exp;
-    const cash = boss.cash + Math.floor(Math.random() * Math.round(boss.cash / 3));
-    session.hp    = Math.max(1, tac.player.hp);
-    session.cash += cash;
-    session.wins.push({boss_id: tac.bossId, loc_id: tac.locId, exp, cash});
-    session.dirty = true;
-    tacLog('🏆 ПОБЕДА!');
-    document.getElementById('tac-badge').textContent = '🏆 ПОБЕДА';
-    document.getElementById('tac-badge').className   = 'pt';
-    ov.innerHTML = `
+function tacEndBattle(res){
+  if(!tac)return;
+  tac.gstate=res;
+  if(tac.pulseRaf){cancelAnimationFrame(tac.pulseRaf);tac.pulseRaf=null;}
+  ['tShoot','tMelee','tEnd','tMove'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=true;});
+  const boss=BOSS_DATA[tac.bossId];
+  const ov=document.getElementById('tac-result');
+  if(res==='won'){
+    const exp=boss.exp;
+    const cash=boss.cash+Math.floor(Math.random()*Math.round(boss.cash/3));
+    session.hp=Math.max(1,tac.player.hp);
+    session.cash+=cash;
+    session.wins.push({boss_id:tac.bossId,loc_id:tac.locId,exp,cash});
+    session.dirty=true;
+    document.getElementById('tac-badge').textContent='🏆 ПОБЕДА';
+    document.getElementById('tac-badge').className='pt';
+    ov.innerHTML=`
       <div class="tac-res-icon">🏆</div>
       <div class="tac-res-title win">ПОБЕДА!</div>
       <div class="tac-res-rewards">
@@ -2261,76 +2404,77 @@ function tacEndBattle(res) {
       </div>
       <div style="margin-top:8px;font-size:12px;color:#888">❤️ ${session.hp}/${DATA.maxhp}  ·  💵 ${session.cash}$</div>
       <button class="tac-res-btn" onclick="afterBattle(true)">⚔️ Продолжить</button>
-      <button class="tac-res-btn exit" onclick="afterBattle(false)">← Выйти из района</button>
-    `;
-  } else {
-    session.hp    = 1;
-    session.dirty = true;
-    tacLog('💀 Поражение...');
-    document.getElementById('tac-badge').textContent = '💀 КОНЕЦ';
-    document.getElementById('tac-badge').className   = 'et';
-    ov.innerHTML = `
+      <button class="tac-res-btn exit" onclick="afterBattle(false)">← Выйти из района</button>`;
+  }else{
+    session.hp=1;session.dirty=true;
+    document.getElementById('tac-badge').textContent='💀 КОНЕЦ';
+    document.getElementById('tac-badge').className='et';
+    ov.innerHTML=`
       <div class="tac-res-icon">💀</div>
       <div class="tac-res-title lose">ПОРАЖЕНИЕ</div>
       <div style="color:#888;font-size:13px;margin-top:4px">Ты чудом выжил. Зализывай раны.</div>
-      <button class="tac-res-btn" style="margin-top:16px" onclick="afterBattle(false)">← Уйти</button>
-    `;
+      <button class="tac-res-btn" style="margin-top:16px" onclick="afterBattle(false)">← Уйти</button>`;
   }
-  ov.style.display = 'flex';
+  ov.style.display='flex';
 }
 
 // ── TAP INPUT ─────────────────────────────────────────────────────────
 (function(){
-  function onTacTap(evt) {
+  function onTacTap(evt){
     if(!tac||tac.gstate!=='player')return;
     const canvas=document.getElementById('tac-gc');
+    if(!canvas)return;
     const rect=canvas.getBoundingClientRect();
-    const sx=canvas.width/rect.width,sy=canvas.height/rect.height;
-    const cx=(evt.clientX-rect.left)*sx,cy=(evt.clientY-rect.top)*sy;
+    const scaleX=canvas.width/rect.width,scaleY=canvas.height/rect.height;
+    const cx=(evt.clientX-rect.left)*scaleX,cy=(evt.clientY-rect.top)*scaleY;
     const c=Math.floor(cx/tac.TS),r=Math.floor(cy/tac.TS);
     if(r<0||r>=tac.ROWS||c<0||c>=tac.COLS)return;
+
+    // Clicked on an enemy?
     const ce=tac.enemies.find(e=>e.hp>0&&e.r===r&&e.c===c);
     if(ce){
       tac.selEnemy=ce;tac.selTile=null;
       const d=tacDist(tac.player.r,tac.player.c,ce.r,ce.c);
       const cv=TAC_COV[tac.grid[ce.r][ce.c]]||0;
       const hp=Math.round(tacHitChance(tac.player.r,tac.player.c,ce.r,ce.c,cv)*100);
-      tacLog(ce.name+' · дист.'+d+' · шанс попасть '+hp+'%'+(cv>0?' 🛡 укрытие':''));
+      tacLog(ce.name+' | расст. '+d+' | шанс попасть '+hp+'%'+(cv>0?' 🛡 в укрытии':''));
       tacBtns();tacRender();return;
     }
+
+    // Movement
     if(!tac.player.moved){
       const inRange=tac.moveTiles.some(t=>t.r===r&&t.c===c);
       if(!inRange){tac.selTile=null;tac.selEnemy=null;tacBtns();tacRender();return;}
       if(tac.selTile&&tac.selTile.r===r&&tac.selTile.c===c){
+        // Second tap = confirm move
         tac.gstate='anim';
         tacMoveAnim(tac.player,r,c,()=>{
           tac.player.moved=true;tac.selTile=null;tacCalcMoveTiles();tac.gstate='player';
           const cv=TAC_COV[tac.grid[tac.player.r][tac.player.c]]||0;
-          if(cv>0)tacLog('В укрытии! '+(cv===2?'Тяжёлое укрытие — 80% защита 🛡':'Лёгкое укрытие — 50% защита 🪵'));
+          if(cv>0)tacLog('В укрытии! '+(cv===2?'🛡 Тяжёлое — −80% урон':'🪵 Лёгкое — −50% урон'));
           else tacLog('Переместился. Атакуй или заверши ход.');
           tacBtns();tacRender();
         });
       }else{
+        // First tap = preview
         tac.selTile={r,c};tac.selEnemy=null;
         const cv=TAC_COV[tac.grid[r][c]]||0;
-        tacLog((cv===2?'🛡 Тяжёлое укрытие!':(cv===1?'🪵 Лёгкое укрытие!':'Пусто'))+' — нажми ещё раз чтобы идти');
+        tacLog((cv===2?'🛡 Тяжёлое укрытие!':(cv===1?'🪵 Лёгкое укрытие!':'Открытая позиция'))+' — нажми ещё раз чтобы идти');
         tacBtns();tacRender();
       }
     }
   }
+
   document.addEventListener('click',function(e){
-    const canvas=document.getElementById('tac-gc');
-    if(canvas&&e.target===canvas)onTacTap(e);
+    if(e.target===document.getElementById('tac-gc'))onTacTap(e);
   });
   document.addEventListener('touchend',function(e){
-    const canvas=document.getElementById('tac-gc');
-    if(canvas&&e.target===canvas){
-      e.preventDefault();
-      const t=e.changedTouches[0];
+    if(e.target===document.getElementById('tac-gc')){
+      e.preventDefault();const t=e.changedTouches[0];
       onTacTap({clientX:t.clientX,clientY:t.clientY});
     }
   },{passive:false});
-  window.addEventListener('resize',function(){if(tac)tacResize();});
+  window.addEventListener('resize',function(){if(tac){tacResize();tacRender();}});
 })();
 
 function afterBattle(stayInDistrict) {
@@ -3184,3 +3328,4 @@ drawAvatar();
 </script>
 </body>
 </html>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
