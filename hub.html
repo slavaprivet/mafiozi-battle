@@ -2152,8 +2152,8 @@ function tacDrawEnemyChar(ctx,vx,vy,TS,enemy,selected){
   if(enemy.hp>0){const _eName=enemy.id===1?'Мафиози':(enemy.name||'Враг');_drawName(ctx,vx,vy,TS,_eName,'#ff6666');}
 }
 
-// ── TILE DRAWING ──────────────────────────────────────────────────────
-function tacDrawTile(ctx,r,c,sx,sy){
+// ── TILE DRAWING (two-pass: base first, then 3D covers) ───────────────
+function tacDrawTileBase(ctx,r,c,sx,sy){
   const t=tac.grid[r][c],TS=tac.TS,x=sx,y=sy;
   if(t===1){
     ctx.fillStyle='#0E0E1E';ctx.fillRect(x,y,TS,TS);
@@ -2165,77 +2165,147 @@ function tacDrawTile(ctx,r,c,sx,sy){
     }
     ctx.strokeStyle='#080816';ctx.lineWidth=1;ctx.strokeRect(x+.5,y+.5,TS-1,TS-1);return;
   }
-  // Floor
+  // Floor under all non-wall tiles
   ctx.fillStyle='#1C1428';ctx.fillRect(x,y,TS,TS);
   ctx.strokeStyle='#251C32';ctx.lineWidth=.5;ctx.strokeRect(x+.5,y+.5,TS-1,TS-1);
   ctx.save();ctx.globalAlpha=.04;ctx.strokeStyle='#8866bb';ctx.lineWidth=.5;
   const step=Math.max(6,TS/8);
   for(let i=-TS;i<TS*2;i+=step){ctx.beginPath();ctx.moveTo(x+i,y);ctx.lineTo(x+i+TS,y+TS);ctx.stroke();}
   ctx.restore();
-  if(t===2){
-    const p=Math.floor(TS*.08),cw=TS-p*2,ch=Math.floor(TS*.54);
+}
+
+function tacDrawCover3d(ctx,r,c,sx,sy){
+  const t=tac.grid[r][c];if(t<2)return;
+  const TS=tac.TS,x=sx,y=sy,H=Math.max(5,Math.floor(TS*.22));
+  if(t===2){ // Ларёк/прилавок
+    const p=Math.floor(TS*.06),cw=TS-p*2,ch=Math.floor(TS*.52);
+    // тень
+    ctx.save();ctx.globalAlpha=.28;ctx.fillStyle='#000';ctx.fillRect(x+p+4,y+p+4,cw,ch+H);ctx.restore();
+    // боковая грань (юг, передняя панель)
+    const gs=ctx.createLinearGradient(x+p,y+p+ch,x+p,y+p+ch+H);
+    gs.addColorStop(0,'#3A1A06');gs.addColorStop(1,'#150800');
+    ctx.fillStyle=gs;ctx.fillRect(x+p,y+p+ch,cw,H);
+    ctx.strokeStyle='#2A1004';ctx.lineWidth=.8;
+    for(let i=1;i<3;i++){ctx.beginPath();ctx.moveTo(x+p,y+p+ch+H*i/3);ctx.lineTo(x+p+cw,y+p+ch+H*i/3);ctx.stroke();}
+    // верхняя поверхность
     ctx.fillStyle='#5A2E0E';ctx.fillRect(x+p,y+p,cw,ch);
-    ctx.fillStyle='#7A4218';ctx.fillRect(x+p,y+p,cw,Math.floor(ch*.25));
+    ctx.fillStyle='#7A4218';ctx.fillRect(x+p,y+p,cw,Math.floor(ch*.2));
     ctx.fillStyle='#E8B840';
-    for(let i=0;i<3;i++){ctx.beginPath();ctx.arc(x+p+cw*(i+1)/4,y+p+Math.floor(ch*.12),TS*.06,0,Math.PI*2);ctx.fill();}
-    // awning stripes
-    ctx.save();ctx.globalAlpha=.15;ctx.fillStyle='#ff8800';
-    for(let i=0;i<3;i++)ctx.fillRect(x+p+i*(cw/3),y+p,cw/6,Math.floor(ch*.25));
-    ctx.restore();
-    ctx.strokeStyle='#301008';ctx.lineWidth=1.5;ctx.strokeRect(x+p,y+p,cw,ch);
-  } else if(t===3){
-    const p=Math.floor(TS*.06);
-    ctx.fillStyle='#0C1C0C';ctx.fillRect(x+p,y+p,TS-p*2,TS-p*2);
-    const g2=ctx.createLinearGradient(x+p,y+p,x+TS-p,y+TS-p);
-    g2.addColorStop(0,'#2E6A2E');g2.addColorStop(1,'#142A14');
-    ctx.fillStyle=g2;ctx.fillRect(x+p*2,y+p*2,TS-p*4,TS-p*4);
-    // windshield
-    ctx.fillStyle='rgba(120,200,255,.28)';ctx.fillRect(x+p*3,y+p*2,TS-p*6,Math.floor(TS*.3));
-    // wheels
-    ctx.fillStyle='#060E06';
-    [[p*.5,p*.5],[TS-p*3,p*.5],[p*.5,TS-p*3],[TS-p*3,TS-p*3]].forEach(([wx,wy])=>{
-      ctx.beginPath();ctx.arc(x+wx+p*.8,y+wy+p*.8,TS*.07,0,Math.PI*2);ctx.fill();
-      ctx.strokeStyle='#1a2a1a';ctx.lineWidth=1;ctx.stroke();
+    for(let i=0;i<3;i++){ctx.beginPath();ctx.arc(x+p+cw*(i+1)/4,y+p+Math.floor(ch*.1),TS*.055,0,Math.PI*2);ctx.fill();}
+    // навес (полосатый)
+    const aw=Math.max(4,Math.floor(TS*.13));
+    for(let i=0;i<5;i++){ctx.fillStyle=i%2?'#C03008':'#FF5020';ctx.fillRect(x+2+i*(TS-4)/5,y+2,(TS-4)/5,aw);}
+    ctx.strokeStyle='#501008';ctx.lineWidth=1.5;ctx.strokeRect(x+2,y+2,TS-4,aw);
+    // контуры
+    ctx.strokeStyle='#1A0600';ctx.lineWidth=1.5;ctx.strokeRect(x+p,y+p,cw,ch);ctx.strokeRect(x+p,y+p+ch,cw,H);
+  } else if(t===3){ // Машина
+    const p=Math.floor(TS*.05),cw=TS-p*2,cl=TS-p*2;
+    // тень
+    ctx.save();ctx.globalAlpha=.32;ctx.fillStyle='#000';ctx.fillRect(x+p+5,y+p+5,cw,cl+H);ctx.restore();
+    // боковая грань (юг, кузов)
+    const gc=ctx.createLinearGradient(x+p,y+p+cl,x+p,y+p+cl+H);
+    gc.addColorStop(0,'#1A4A1A');gc.addColorStop(1,'#060E06');
+    ctx.fillStyle=gc;ctx.fillRect(x+p,y+p+cl,cw,H);
+    // выхлоп / дет.кузова
+    ctx.fillStyle='#0A2A0A';ctx.fillRect(x+p,y+p+cl+H-3,cw,3);
+    // кузов (вид сверху)
+    const bg=ctx.createLinearGradient(x+p,y+p,x+p+cw,y+p+cl);
+    bg.addColorStop(0,'#3A7A3A');bg.addColorStop(.5,'#2E6020');bg.addColorStop(1,'#1A4010');
+    ctx.fillStyle=bg;ctx.fillRect(x+p,y+p,cw,cl);
+    // крыша (кабина)
+    const rx=x+p+Math.floor(cw*.18),ry=y+p+Math.floor(cl*.2),rw=Math.floor(cw*.64),rh=Math.floor(cl*.52);
+    ctx.fillStyle='#4A8040';ctx.fillRect(rx,ry,rw,rh);
+    // лобовое стекло
+    ctx.fillStyle='rgba(160,230,255,.6)';ctx.fillRect(x+p+Math.floor(cw*.15),y+p+2,Math.floor(cw*.7),Math.floor(cl*.22));
+    // заднее стекло
+    ctx.fillStyle='rgba(140,210,240,.38)';ctx.fillRect(x+p+Math.floor(cw*.15),y+p+Math.floor(cl*.76),Math.floor(cw*.7),Math.floor(cl*.18));
+    // колёса
+    const wr=Math.max(3,TS*.09);
+    [[p*.2,p*.2],[cw+p*.8,p*.2],[p*.2,cl+p*.8],[cw+p*.8,cl+p*.8]].forEach(([wx,wy])=>{
+      ctx.fillStyle='#0A0A0A';ctx.beginPath();ctx.arc(x+wx,y+wy,wr,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='#2a3a2a';ctx.lineWidth=1.5;ctx.stroke();
+      ctx.fillStyle='#3a3a3a';ctx.beginPath();ctx.arc(x+wx,y+wy,wr*.45,0,Math.PI*2);ctx.fill();
     });
-    ctx.strokeStyle='#081408';ctx.lineWidth=2;ctx.strokeRect(x+p+1,y+p+1,TS-p*2-2,TS-p*2-2);
-  } else if(t===4){
-    const p=Math.floor(TS*.1),cs=TS-p*2;
-    const front=Math.floor(cs*.82),top2=Math.floor(cs*.18);
-    ctx.fillStyle='#6A3A0E';ctx.fillRect(x+p,y+p+top2,cs,front);
-    ctx.fillStyle='#8A5018';
-    ctx.beginPath();ctx.moveTo(x+p,y+p+top2);ctx.lineTo(x+p+top2,y+p);ctx.lineTo(x+p+cs,y+p);ctx.lineTo(x+p+cs,y+p+top2);ctx.closePath();ctx.fill();
-    ctx.strokeStyle='#3A1E06';ctx.lineWidth=1.2;
-    ctx.strokeRect(x+p,y+p+top2,cs,front);
-    ctx.beginPath();ctx.moveTo(x+p+cs/2,y+p+top2);ctx.lineTo(x+p+cs/2,y+p+cs);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(x+p,y+p+top2+front/2);ctx.lineTo(x+p+cs,y+p+top2+front/2);ctx.stroke();
+    ctx.strokeStyle='#0A1A0A';ctx.lineWidth=2;ctx.strokeRect(x+p,y+p,cw,cl);ctx.strokeRect(x+p,y+p+cl,cw,H);
+  } else if(t===4){ // Ящик
+    const p=Math.floor(TS*.08),cs=TS-p*2;
+    // тень
+    ctx.save();ctx.globalAlpha=.28;ctx.fillStyle='#000';ctx.fillRect(x+p+4,y+p+4,cs,cs+H);ctx.restore();
+    // боковая грань
+    const gb=ctx.createLinearGradient(x+p,y+p+cs,x+p,y+p+cs+H);
+    gb.addColorStop(0,'#4A2206');gb.addColorStop(1,'#200E02');
+    ctx.fillStyle=gb;ctx.fillRect(x+p,y+p+cs,cs,H);
+    ctx.strokeStyle='#2A1004';ctx.lineWidth=.8;
+    for(let i=1;i<3;i++){ctx.beginPath();ctx.moveTo(x+p,y+p+cs+H*i/3);ctx.lineTo(x+p+cs,y+p+cs+H*i/3);ctx.stroke();}
+    // верхняя крышка
+    ctx.fillStyle='#6A3A0E';ctx.fillRect(x+p,y+p,cs,cs);
+    // доски (горизонтальные полосы)
+    ctx.strokeStyle='#4A2608';ctx.lineWidth=.9;
+    for(let i=1;i<4;i++){ctx.beginPath();ctx.moveTo(x+p,y+p+cs*i/4);ctx.lineTo(x+p+cs,y+p+cs*i/4);ctx.stroke();}
+    // крестовые скобы
+    ctx.strokeStyle='#3A1C06';ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.moveTo(x+p+3,y+p+3);ctx.lineTo(x+p+cs-3,y+p+cs-3);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x+p+cs-3,y+p+3);ctx.lineTo(x+p+3,y+p+cs-3);ctx.stroke();
+    // верхний блик
+    ctx.fillStyle='#8A5020';ctx.fillRect(x+p,y+p,cs,Math.floor(cs*.14));
+    // металлические уголки
     ctx.fillStyle='#B09060';
-    [[0,0],[cs,0],[0,front],[cs,front]].forEach(([dx,dy])=>{ctx.beginPath();ctx.arc(x+p+dx,y+p+top2+dy,3,0,Math.PI*2);ctx.fill();});
-  } else if(t===5){
-    // Pillar — round concrete column
-    const cx2=x+TS/2,cy2=y+TS/2,r=TS*.36;
-    const g3=ctx.createRadialGradient(cx2-r*.3,cy2-r*.3,r*.1,cx2,cy2,r);
-    g3.addColorStop(0,'#6a6a7a');g3.addColorStop(0.5,'#3a3a4a');g3.addColorStop(1,'#1a1a2a');
-    ctx.fillStyle=g3;ctx.beginPath();ctx.arc(cx2,cy2,r,0,Math.PI*2);ctx.fill();
-    // capital/base ring
-    ctx.strokeStyle='#555570';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx2,cy2,r*.9,0,Math.PI*2);ctx.stroke();
-    ctx.strokeStyle='#888890';ctx.lineWidth=1;ctx.beginPath();ctx.arc(cx2,cy2,r*.7,0,Math.PI*2);ctx.stroke();
-    // highlight
-    ctx.save();ctx.globalAlpha=.25;ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(cx2-r*.22,cy2-r*.22,r*.25,r*.18,-.5,0,Math.PI*2);ctx.fill();ctx.restore();
-  } else if(t===6){
-    // Barrel
-    const bx=x+TS*.2,by=y+TS*.1,bw2=TS*.6,bh2=TS*.8;
-    const g4=ctx.createLinearGradient(bx,by,bx+bw2,by);
-    g4.addColorStop(0,'#4a2818');g4.addColorStop(.35,'#8a5028');g4.addColorStop(.65,'#6a3818');g4.addColorStop(1,'#2a1008');
-    ctx.fillStyle=g4;_rr(ctx,bx,by,bw2,bh2,bw2*.25);ctx.fill();
-    // hoops
+    [[0,0],[cs,0],[0,cs],[cs,cs]].forEach(([dx,dy])=>{ctx.fillRect(x+p+dx-2,y+p+dy-2,5,5);});
+    ctx.strokeStyle='#2A1004';ctx.lineWidth=1.5;ctx.strokeRect(x+p,y+p,cs,cs);ctx.strokeRect(x+p,y+p+cs,cs,H);
+  } else if(t===5){ // Колонна
+    const cx2=x+TS/2,cy2=y+TS*.5,rad=TS*.33;
+    // тень
+    ctx.save();ctx.globalAlpha=.28;ctx.fillStyle='#000';
+    ctx.beginPath();ctx.ellipse(cx2+4,cy2+4,rad,rad,0,0,Math.PI*2);ctx.fill();ctx.restore();
+    // цилиндрическая боковая грань (юг)
+    ctx.fillStyle='#242434';
+    ctx.fillRect(cx2-rad,cy2+rad*.85,rad*2,H+rad*.15);
+    ctx.fillStyle='#181828';ctx.fillRect(cx2-rad,cy2+rad*.85+H,rad*2,rad*.15);
+    // пьедестал/база
+    const baseH=Math.max(3,Math.floor(H*.4));
+    ctx.fillStyle='#2A2A3C';ctx.fillRect(cx2-rad*1.18,cy2+rad*.85,rad*2.36,baseH);
+    ctx.strokeStyle='#4a4a60';ctx.lineWidth=1;ctx.strokeRect(cx2-rad*1.18,cy2+rad*.85,rad*2.36,baseH);
+    // тело колонны
+    const g3=ctx.createRadialGradient(cx2-rad*.3,cy2-rad*.3,rad*.05,cx2,cy2,rad);
+    g3.addColorStop(0,'#8a8a9a');g3.addColorStop(.5,'#4e4e5e');g3.addColorStop(1,'#1e1e2e');
+    ctx.fillStyle=g3;ctx.beginPath();ctx.arc(cx2,cy2,rad,0,Math.PI*2);ctx.fill();
+    // капитель (верхний диск)
+    ctx.fillStyle='#606070';
+    ctx.beginPath();ctx.ellipse(cx2,cy2-rad*.7,rad*1.12,rad*.22,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#8888a0';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(cx2,cy2-rad*.7,rad*1.12,rad*.22,0,0,Math.PI*2);ctx.stroke();
+    // кольца
+    ctx.strokeStyle='#666680';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx2,cy2,rad*.9,0,Math.PI*2);ctx.stroke();
+    ctx.strokeStyle='#888898';ctx.lineWidth=1;ctx.beginPath();ctx.arc(cx2,cy2,rad*.7,0,Math.PI*2);ctx.stroke();
+    // блик
+    ctx.save();ctx.globalAlpha=.28;ctx.fillStyle='#fff';
+    ctx.beginPath();ctx.ellipse(cx2-rad*.22,cy2-rad*.22,rad*.22,rad*.15,-.5,0,Math.PI*2);ctx.fill();ctx.restore();
+  } else if(t===6){ // Бочка
+    const bx=x+TS*.19,by2=y+TS*.07,bw2=TS*.62,bh2=TS*.72;
+    // тень
+    ctx.save();ctx.globalAlpha=.28;ctx.fillStyle='#000';
+    _rr(ctx,bx+4,by2+4,bw2,bh2+H,bw2*.22);ctx.fill();ctx.restore();
+    // боковая грань (юг)
+    ctx.fillStyle='#2a1004';ctx.fillRect(bx,by2+bh2,bw2,H);
+    // стальной обруч снизу
+    ctx.strokeStyle='#c89040';ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.moveTo(bx,by2+bh2);ctx.lineTo(bx+bw2,by2+bh2);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(bx,by2+bh2+H-2);ctx.lineTo(bx+bw2,by2+bh2+H-2);ctx.stroke();
+    // тело бочки
+    const g4=ctx.createLinearGradient(bx,by2,bx+bw2,by2);
+    g4.addColorStop(0,'#3a2010');g4.addColorStop(.3,'#8a5028');g4.addColorStop(.6,'#6a3818');g4.addColorStop(1,'#2a1008');
+    ctx.fillStyle=g4;_rr(ctx,bx,by2,bw2,bh2,bw2*.22);ctx.fill();
+    // обручи
     ctx.strokeStyle='#c89040';ctx.lineWidth=3;
-    [.2,.5,.8].forEach(t2=>{ctx.beginPath();ctx.moveTo(bx+2,by+bh2*t2);ctx.lineTo(bx+bw2-2,by+bh2*t2);ctx.stroke();});
-    // top ellipse
-    ctx.fillStyle='#a06030';ctx.beginPath();ctx.ellipse(x+TS/2,by,bw2/2,bw2*.12,0,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle='#c89040';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(x+TS/2,by,bw2/2,bw2*.12,0,0,Math.PI*2);ctx.stroke();
-    ctx.strokeStyle='rgba(0,0,0,.4)';ctx.lineWidth=1;_rr(ctx,bx,by,bw2,bh2,bw2*.25);ctx.stroke();
+    [.18,.5,.82].forEach(t2=>{ctx.beginPath();ctx.moveTo(bx+3,by2+bh2*t2);ctx.lineTo(bx+bw2-3,by2+bh2*t2);ctx.stroke();});
+    // верхняя крышка (эллипс)
+    ctx.fillStyle='#a06030';ctx.beginPath();ctx.ellipse(x+TS/2,by2+3,bw2/2,bw2*.13,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#c89040';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(x+TS/2,by2+3,bw2/2,bw2*.13,0,0,Math.PI*2);ctx.stroke();
+    // контур
+    ctx.strokeStyle='rgba(0,0,0,.5)';ctx.lineWidth=1.5;_rr(ctx,bx,by2,bw2,bh2,bw2*.22);ctx.stroke();
   }
 }
+// Совместимость — не вызывается напрямую при двухпроходном рендере
+function tacDrawTile(ctx,r,c,sx,sy){tacDrawTileBase(ctx,r,c,sx,sy);}
 
 // ── MINIMAP ───────────────────────────────────────────────────────────
 function tacDrawMinimap(ctx,canvasW){
@@ -2510,7 +2580,7 @@ function tacUpdateBullets(dt){
     if(b.hit)return false;
     b.r+=b.vr*dt;b.c+=b.vc*dt;b.dist+=Math.hypot(b.vr,b.vc)*dt;
     const tr=Math.floor(b.r),tc=Math.floor(b.c);
-    if(tr<0||tr>=tac.ROWS||tc<0||tc>=tac.COLS||tac.grid[tr][tc]!==0){b.hit=true;return false;}
+    if(tr<0||tr>=tac.ROWS||tc<0||tc>=tac.COLS||tac.grid[tr][tc]===1){b.hit=true;return false;}
     if(b.dist>b.maxDist)return false;
     const p=tac.player;
     if(!b.isEnemy){
@@ -2556,10 +2626,18 @@ function tacRender(){
   function w2s(wr,wc){return{x:(wc-offC)*TS+sk,y:(wr-offR)*TS+skY};}
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.fillStyle='#080816';ctx.fillRect(0,0,canvas.width,canvas.height);
+  // Проход 1: пол и стены
   for(let r=0;r<tac.ROWS;r++)for(let c=0;c<tac.COLS;c++){
     const s=w2s(r,c);
     if(s.x<-TS||s.x>canvas.width+TS||s.y<-TS||s.y>canvas.height+TS)continue;
-    tacDrawTile(ctx,r,c,s.x,s.y);
+    tacDrawTileBase(ctx,r,c,s.x,s.y);
+  }
+  // Проход 2: 3D укрытия сверху вниз (правильная глубина)
+  for(let r=0;r<tac.ROWS;r++)for(let c=0;c<tac.COLS;c++){
+    if(tac.grid[r][c]<2)continue;
+    const s=w2s(r,c);
+    if(s.x<-TS||s.x>canvas.width+TS||s.y<-TS*2||s.y>canvas.height+TS)continue;
+    tacDrawCover3d(ctx,r,c,s.x,s.y);
   }
   // Blood splats
   if(tac.bloodSplats)tac.bloodSplats.forEach(sp=>{
@@ -2786,7 +2864,7 @@ function startBattle(bossId,locId){
   const bossEmoji=boss.name.match(/^./u)[0],bossName=boss.name.replace(/^\S+\s*/,'');
   const grid=TAC_MAPS[locId]||TAC_MAPS.market,ROWS=grid.length,COLS=grid[0].length;
   tac={
-    bossId,locId,grid,ROWS,COLS,VIEW_W:13,VIEW_H:17,gstate:'playing',
+    bossId,locId,grid,ROWS,COLS,VIEW_W:11,VIEW_H:15,gstate:'playing',
     player:{r:20.5,c:1.5,hp:session.hp,maxhp:DATA.maxhp,atk:DATA.atk,def:DATA.def,name:DATA.name,
       angle:0,isMoving:false,walkPhase:0,fireCD:0,meleeCD:0,grenCD:0,meleeAnim:0},
     enemies:[
