@@ -34,6 +34,24 @@ canvas{display:block;touch-action:none}
 #bShoot{background:#5a1a1a;color:#f88}
 #bMelee{background:#4a3a0a;color:#fc6}
 #bEnd{background:#252535;color:#888}
+/* ── End-battle overlay ── */
+#end-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px}
+#end-ov.show{display:flex}
+#end-icon{font-size:64px;line-height:1}
+#end-title{font-size:26px;font-weight:900;letter-spacing:2px;text-align:center}
+#end-title.win{color:#f0d060}
+#end-title.lose{color:#e74c3c}
+#end-sub{font-size:13px;color:#aaa;text-align:center;line-height:1.5}
+#end-btn{margin-top:8px;padding:14px 42px;border:none;border-radius:14px;font-size:15px;font-weight:800;cursor:pointer}
+.end-win-btn{background:#2e7d32;color:#fff}
+.end-lose-btn{background:#1a1a2e;color:#aaa;border:1px solid #444}
+/* ── Floating melee button ── */
+#bMelee{position:fixed;bottom:76px;right:12px;z-index:50;max-width:64px;min-width:64px;padding:10px 4px;border-radius:50%;font-size:20px;box-shadow:0 4px 12px #0008}
+/* ── Detection bar ── */
+#detect-bar{display:flex;align-items:center;justify-content:center;gap:6px;padding:4px 10px;font-size:11px;font-weight:700;flex-shrink:0;transition:background .4s,color .4s;letter-spacing:.3px}
+#detect-bar.hidden {background:#0a1a0a;color:#4caf50;border-bottom:1px solid #1a3a1a}
+#detect-bar.suspect{background:#1a1500;color:#fc6;  border-bottom:1px solid #3a3000}
+#detect-bar.combat {background:#1a0000;color:#f55;  border-bottom:1px solid #3a0000}
 </style>
 </head>
 <body>
@@ -42,6 +60,7 @@ canvas{display:block;touch-action:none}
     <div class="unit-name" id="pName">Игрок</div>
     <div class="hp-wrap"><div class="hp-fill p" id="pHpBar" style="width:100%"></div></div>
     <div class="hp-txt" id="pHpTxt">100/100</div>
+    <div class="hp-txt" id="pAmmoTxt" style="color:#fc6;font-weight:bold"></div>
   </div>
   <div id="turn-badge" class="pt">ВАШ<br>ХОД</div>
   <div class="unit-hud" style="text-align:right">
@@ -49,6 +68,10 @@ canvas{display:block;touch-action:none}
     <div class="hp-wrap"><div class="hp-fill e" id="eHpBar" style="width:100%"></div></div>
     <div class="hp-txt" id="eHpTxt" style="text-align:right">100/100</div>
   </div>
+</div>
+<div id="detect-bar" class="hidden">
+  <span id="detect-icon">👻</span>
+  <span id="detect-txt">Враги тебя не видят</span>
 </div>
 <div id="canvas-wrap">
   <div id="game-frame">
@@ -61,9 +84,17 @@ canvas{display:block;touch-action:none}
   <div id="btn-row">
     <button class="btn" id="bMove" onclick="resetSel()">🚶 Движение</button>
     <button class="btn" id="bShoot" onclick="doShoot()" disabled>🔫 Выстрел</button>
-    <button class="btn" id="bMelee" onclick="doMelee()" disabled>👊 Удар</button>
     <button class="btn" id="bEnd" onclick="endPlayerTurn()">⏭ Конец</button>
   </div>
+</div>
+<!-- Floating melee button -->
+<button class="btn" id="bMelee" onclick="doMelee()" disabled>👊</button>
+<!-- End-battle overlay -->
+<div id="end-ov">
+  <div id="end-icon"></div>
+  <div id="end-title"></div>
+  <div id="end-sub"></div>
+  <button id="end-btn" onclick="closeBattle()"></button>
 </div>
 <script>
 const tg=window.Telegram?.WebApp;
@@ -123,20 +154,20 @@ const WEP={
   machete: {t:'melee',r:1,m:1.8,s:1,sp:0,c:'#aef',lbl:'Мачете'},
   katana:  {t:'melee',r:1,m:2.0,s:1,sp:0,c:'#aef',lbl:'Катана'},
   spiked_bat:{t:'melee',r:2,m:1.7,s:1,sp:0,c:'#c84',lbl:'Бита'},
-  nagan:   {t:'pistol',r:7, m:1.0,s:1,sp:0,  c:'#ff4',lbl:'Наган',thick:2},
-  tt_pistol:{t:'pistol',r:7,m:1.0,s:1,sp:0,  c:'#ff8',lbl:'ТТ',thick:2},
-  deagle:  {t:'pistol',r:8, m:1.2,s:1,sp:0,  c:'#f80',lbl:'Дезерт Игл',thick:2.5},
-  golden_colt:{t:'pistol',r:8,m:1.2,s:1,sp:0,c:'#fd0',lbl:'Золотой Кольт',thick:2.5},
-  revolver:{t:'pistol',r:7, m:1.1,s:1,sp:0,  c:'#ff4',lbl:'Револьвер',thick:2},
-  uzi:     {t:'burst', r:6, m:1.0,s:4,sp:.12,c:'#ffa',lbl:'Узи',thick:1.5},
-  golden_uzi:{t:'burst',r:6,m:1.1,s:4,sp:.12,c:'#fd0',lbl:'Золотой Узи',thick:1.5},
-  tommy_gun:{t:'burst',r:7, m:1.1,s:4,sp:.15,c:'#ffa',lbl:'Томми Ган',thick:1.5},
-  sawn_off:{t:'shotgun',r:4,m:1.5,s:6,sp:.4, c:'#f60',lbl:'Обрез',thick:3},
-  shotgun: {t:'shotgun',r:5,m:1.4,s:6,sp:.35,c:'#f80',lbl:'Дробовик',thick:3},
-  ak74:    {t:'rifle', r:10,m:1.1,s:3,sp:.05,c:'#4f8',lbl:'АК-74',thick:1.5},
-  m16:     {t:'rifle', r:10,m:1.1,s:3,sp:.05,c:'#4f8',lbl:'М-16',thick:1.5},
-  sniper:  {t:'rifle', r:14,m:1.3,s:1,sp:0,  c:'#0ff',lbl:'Снайперка',thick:1},
-  rpg:     {t:'rocket',r:12,m:2.0,s:1,sp:0,  c:'#f40',lbl:'Базука',thick:4},
+  nagan:      {t:'pistol', r:7, m:1.0,s:1,sp:0,   c:'#ff4',lbl:'Наган',       thick:2,   mag:5,  aps:1, rdMs:1500},
+  tt_pistol:  {t:'pistol', r:7, m:1.0,s:1,sp:0,   c:'#ff8',lbl:'ТТ',          thick:2,   mag:6,  aps:1, rdMs:1500},
+  deagle:     {t:'pistol', r:8, m:1.2,s:1,sp:0,   c:'#f80',lbl:'Дезерт Игл', thick:2.5, mag:7,  aps:1, rdMs:1500},
+  golden_colt:{t:'pistol', r:8, m:1.2,s:1,sp:0,   c:'#fd0',lbl:'Золотой Кольт',thick:2.5,mag:7, aps:1, rdMs:1500},
+  revolver:   {t:'pistol', r:7, m:1.1,s:1,sp:0,   c:'#ff4',lbl:'Револьвер',   thick:2,   mag:6,  aps:1, rdMs:1500},
+  uzi:        {t:'burst',  r:6, m:1.0,s:4,sp:.12, c:'#ffa',lbl:'Узи',         thick:1.5, mag:15, aps:4, rdMs:1500},
+  golden_uzi: {t:'burst',  r:6, m:1.1,s:4,sp:.12, c:'#fd0',lbl:'Золотой Узи', thick:1.5, mag:20, aps:4, rdMs:1500},
+  tommy_gun:  {t:'burst',  r:7, m:1.1,s:4,sp:.15, c:'#ffa',lbl:'Томми Ган',   thick:1.5, mag:30, aps:4, rdMs:1500},
+  sawn_off:   {t:'shotgun',r:4, m:1.5,s:6,sp:.4,  c:'#f60',lbl:'Обрез',       thick:3,   mag:2,  aps:1, rdMs:1500},
+  shotgun:    {t:'shotgun',r:5, m:1.4,s:6,sp:.35, c:'#f80',lbl:'Дробовик',    thick:3,   mag:6,  aps:1, rdMs:1500},
+  ak74:       {t:'rifle',  r:10,m:1.1,s:3,sp:.05, c:'#4f8',lbl:'АК-74',       thick:1.5, mag:30, aps:3, rdMs:1500},
+  m16:        {t:'rifle',  r:10,m:1.1,s:3,sp:.05, c:'#4f8',lbl:'М-16',        thick:1.5, mag:30, aps:3, rdMs:1500},
+  sniper:     {t:'rifle',  r:14,m:1.3,s:1,sp:0,   c:'#0ff',lbl:'Снайперка',   thick:1,   mag:5,  aps:1, rdMs:2000},
+  rpg:        {t:'rocket', r:12,m:2.0,s:1,sp:0,   c:'#f40',lbl:'Базука',      thick:4,   mag:1,  aps:1, rdMs:3000},
 };
 const pw=WEP[PWEP]||WEP.nagan;
 
@@ -224,20 +255,27 @@ function resize(){
 window.addEventListener('resize',resize);
 
 // ── GAME STATE ────────────────────────────────────────────────
+const ENEMY_SIGHT = 8; // тайлы — дальность обнаружения врагом игрока
 let gstate='player'; // player|anim|enemy|won|lost
 let player={r:8,c:1,hp:PHP,maxhp:PMAXHP,atk:PATK,def:PDEF,moved:false,attacked:false,moveRange:4};
 let enemies=[
-  {id:0,r:1,c:12,hp:BD.hp,maxhp:BD.hp,atk:BD.atk,def:BD.def,name:BD.name,e:BD.e,wep:'tt_pistol',moveRange:3,moved:false,attacked:false},
-  {id:1,r:2,c:8, hp:Math.round(BD.hp*.45),maxhp:Math.round(BD.hp*.45),atk:Math.round(BD.atk*.75),def:Math.round(BD.def*.6),name:'Охранник',e:'👮',wep:'nagan',moveRange:3,moved:false,attacked:false},
+  {id:0,r:1,c:12,hp:BD.hp,maxhp:BD.hp,atk:BD.atk,def:BD.def,name:BD.name,e:BD.e,wep:'tt_pistol',moveRange:3,moved:false,attacked:false,alerted:false},
+  {id:1,r:2,c:8, hp:Math.round(BD.hp*.45),maxhp:Math.round(BD.hp*.45),atk:Math.round(BD.atk*.75),def:Math.round(BD.def*.6),name:'Охранник',e:'👮',wep:'nagan',moveRange:3,moved:false,attacked:false,alerted:false},
 ];
 let selTile=null, selEnemy=null, moveTiles=[];
 let bullets=[], meleeVfx=[], coverPulse=0;
+let playerAmmo=(pw.mag||99), playerReloading=false, reloadProgress=0, reloadTimer=null;
 
 // ── HUD ───────────────────────────────────────────────────────
 function hud(){
   document.getElementById('pName').textContent=PNAME;
   document.getElementById('pHpTxt').textContent=player.hp+'/'+player.maxhp;
   document.getElementById('pHpBar').style.width=Math.max(0,player.hp/player.maxhp*100)+'%';
+  const w_=WEP[PWEP]||pw;
+  if(w_.mag){
+    const el=document.getElementById('pAmmoTxt');
+    if(el) el.textContent=playerReloading?'🔄 Перезарядка...':'🔫 '+playerAmmo+'/'+w_.mag;
+  }
   const e=enemies[0];
   document.getElementById('eName').textContent=e.name;
   document.getElementById('eHpTxt').textContent=e.hp+'/'+e.maxhp;
@@ -253,9 +291,16 @@ function btns(){
   if(ok&&selEnemy&&!player.attacked){
     const d=dist(player.r,player.c,selEnemy.r,selEnemy.c);
     const w=WEP[PWEP]||pw;
-    sh.disabled=(w.t==='melee')||(d>w.r);
-    me.disabled=d>Math.max(2,w.t==='melee'?w.r:2);
-  } else { sh.disabled=true; me.disabled=true; }
+    const outOfAmmo=w.mag&&playerAmmo<=0&&!playerReloading;
+    const canShootRange=!playerReloading&&w.t!=='melee'&&d<=w.r;
+    sh.disabled=playerReloading||w.t==='melee'||d>w.r;
+    sh.textContent=outOfAmmo?'🔄 Перезарядить':(playerReloading?'🔄..':'🔫 Выстрел');
+    me.disabled=playerReloading||d>Math.max(2,w.t==='melee'?w.r:2);
+  } else {
+    sh.disabled=true;
+    sh.textContent=playerReloading?'🔄..':'🔫 Выстрел';
+    me.disabled=true;
+  }
 }
 
 // ── HELPERS ───────────────────────────────────────────────────
@@ -450,6 +495,21 @@ function render(){
     ctx.fillText(v.e,v.c*TS+TS/2,v.r*TS+TS/2);
     ctx.restore();
   });
+  // Reload arc animation over player
+  if(playerReloading&&reloadProgress>0){
+    const px=player.c*TS+TS/2, py=player.r*TS+TS/2, rad=TS*.5;
+    ctx.save();
+    ctx.strokeStyle='#333'; ctx.lineWidth=4;
+    ctx.beginPath(); ctx.arc(px,py,rad,0,Math.PI*2); ctx.stroke();
+    ctx.strokeStyle='#fc6'; ctx.lineWidth=4;
+    ctx.beginPath();
+    ctx.arc(px,py,rad,-Math.PI/2,-Math.PI/2+Math.PI*2*reloadProgress);
+    ctx.stroke();
+    ctx.font=Math.floor(TS*.38)+'px serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillStyle='#fc6';
+    ctx.fillText('🔄',px,py);
+    ctx.restore();
+  }
 }
 
 // ── ANIMATIONS ────────────────────────────────────────────────
@@ -497,19 +557,110 @@ function floatDmg(r,c,dmg,color,miss){
 }
 
 // ── COMBAT ────────────────────────────────────────────────────
+// ── RELOAD ────────────────────────────────────────────────────
+// ── SFX ─────────────────────────────────────────────────────
+const SFX={
+  _ctx:null,
+  ctx(){
+    if(!this._ctx)this._ctx=new(window.AudioContext||window.webkitAudioContext)();
+    if(this._ctx.state==="suspended")this._ctx.resume();
+    return this._ctx;
+  },
+  _noise(c,dur){
+    const len=Math.ceil(c.sampleRate*dur),buf=c.createBuffer(1,len,c.sampleRate),d=buf.getChannelData(0);
+    for(let i=0;i<len;i++)d[i]=Math.random()*2-1;
+    return buf;
+  },
+  reload(){
+    const c=this.ctx(),t=c.currentTime;
+    // Клик магазина
+    const s1=c.createBufferSource();s1.buffer=this._noise(c,.06);
+    const f1=c.createBiquadFilter();f1.type="highpass";f1.frequency.value=2200;
+    const g1=c.createGain();g1.gain.setValueAtTime(1.3,t);g1.gain.exponentialRampToValueAtTime(.001,t+.06);
+    s1.connect(f1);f1.connect(g1);g1.connect(c.destination);s1.start(t);s1.stop(t+.06);
+    // Скрежет затвора
+    const s2=c.createBufferSource();s2.buffer=this._noise(c,.18);
+    const f2=c.createBiquadFilter();f2.type="bandpass";f2.frequency.value=2500;f2.Q.value=1.2;
+    f2.frequency.setValueAtTime(3200,t+.08);f2.frequency.exponentialRampToValueAtTime(700,t+.26);
+    const g2=c.createGain();g2.gain.setValueAtTime(.8,t+.08);g2.gain.exponentialRampToValueAtTime(.001,t+.26);
+    s2.connect(f2);f2.connect(g2);g2.connect(c.destination);s2.start(t+.08);s2.stop(t+.26);
+    // Щелчок досылания
+    const s3=c.createBufferSource();s3.buffer=this._noise(c,.05);
+    const f3=c.createBiquadFilter();f3.type="highpass";f3.frequency.value=1800;
+    const g3=c.createGain();g3.gain.setValueAtTime(1.6,t+.28);g3.gain.exponentialRampToValueAtTime(.001,t+.33);
+    s3.connect(f3);f3.connect(g3);g3.connect(c.destination);s3.start(t+.28);s3.stop(t+.33);
+  },
+};
+
+// ── DETECTION STATUS ──────────────────────────────────────────
+function getDetectLevel(){
+  const alive=enemies.filter(e=>e.hp>0);
+  if(alive.some(e=>e.alerted)) return 2;  // combat
+  if(alive.some(e=>dist(e.r,e.c,player.r,player.c)<=ENEMY_SIGHT)) return 1; // suspect
+  return 0; // hidden
+}
+function updateDetect(){
+  const bar=document.getElementById("detect-bar");
+  const icon=document.getElementById("detect-icon");
+  const txt=document.getElementById("detect-txt");
+  if(!bar)return;
+  const lv=getDetectLevel();
+  if(lv===0){
+    bar.className="hidden";
+    icon.textContent="👻"; txt.textContent="Враги тебя не видят";
+  } else if(lv===1){
+    bar.className="suspect";
+    icon.textContent="💡"; txt.textContent="Враги заподозрили что-то";
+  } else {
+    bar.className="combat";
+    icon.textContent="🚨"; txt.textContent="Враги тебя заметили — в бою!";
+  }
+}
+
+function doReload(){
+  if(playerReloading||gstate!=='player')return;
+  const w=WEP[PWEP]||pw;
+  if(!w.mag)return;
+  playerReloading=true; gstate='anim';
+  player.attacked=true; // reload uses attack action
+  SFX.reload();
+  const dur=w.rdMs||1500;
+  const t0=performance.now();
+  log('🔄 Перезарядка '+w.lbl+'...');
+  hud(); btns();
+  function tick(now){
+    reloadProgress=Math.min(1,(now-t0)/dur);
+    render();
+    if(reloadProgress<1){ requestAnimationFrame(tick); return; }
+    // Done
+    playerAmmo=w.mag; playerReloading=false; reloadProgress=0;
+    gstate='player';
+    log(w.lbl+' перезаряжен! 🔫 '+playerAmmo+'/'+w.mag);
+    hud(); btns();
+    // Enemy gets to attack since player wasted action on reload
+    setTimeout(enemyTurn, 350);
+  }
+  requestAnimationFrame(tick);
+}
+
 function doShoot(){
   if(!selEnemy||player.attacked||gstate!=='player')return;
   const e=selEnemy,w=WEP[PWEP]||pw;
   if(w.t==='melee'){doMelee();return;}
   const d=dist(player.r,player.c,e.r,e.c);
   if(d>w.r){log('Слишком далеко!');return;}
-  gstate='anim';player.attacked=true;
+  // Auto-reload if out of ammo
+  if(w.mag&&playerAmmo<=0){doReload();return;}
+  gstate='anim'; player.attacked=true;
+  // Consume ammo
+  if(w.mag) playerAmmo=Math.max(0,playerAmmo-(w.aps||1));
   const cv=COV[grid[e.r][e.c]]||0;
   const hc=hitChance(player.r,player.c,e.r,e.c,cv);
   const hit=Math.random()<hc;
   const sx=player.c*TS+TS/2,sy=player.r*TS+TS/2;
   const ex=e.c*TS+TS/2,ey=e.r*TS+TS/2;
   shootAnim(sx,sy,ex,ey,w,()=>{
+    e.alerted=true;
     if(hit){
       const dmg=dmgCalc(player.atk,e.def,w.m,d,false);
       e.hp=Math.max(0,e.hp-dmg);
@@ -519,8 +670,8 @@ function doShoot(){
       floatDmg(e.r,e.c,0,'#aaa',true);
       log(w.lbl+' → мимо!'+(cv>0?' (укрытие помогло!)':''));
     }
-    hud();checkDeath();gstate='player';selEnemy=null;calcMoveTiles();btns();render();
-  });render();
+    hud(); checkDeath(); gstate='player'; selEnemy=null; calcMoveTiles(); btns(); render();
+  }); render();
 }
 
 function doMelee(){
@@ -531,6 +682,8 @@ function doMelee(){
   if(d>mr){log('Слишком далеко для удара!');return;}
   gstate='anim';player.attacked=true;
   meleeAnim(e.r,e.c,()=>{
+    e.alerted=true; // удар в ближнем бою
+    updateDetect();
     const dmg=dmgCalc(player.atk,e.def,w.m*(w.t==='melee'?1:1.2),d,true);
     e.hp=Math.max(0,e.hp-dmg);
     floatDmg(e.r,e.c,dmg,'#fc6',false);
@@ -556,8 +709,10 @@ async function enemyTurn(){
     if(e.hp<=0)continue;
     await sleep(380);
     const ew=WEP[e.wep]||WEP.nagan;
-    // Move toward player (prefer cover)
-    if(!e.moved){
+    const d=dist(e.r,e.c,player.r,player.c);
+    const canSee=e.alerted||(d<=ENEMY_SIGHT);
+    // Move toward player only if within sight range or already alerted
+    if(!e.moved&&canSee){
       const reach=bfs(e.r,e.c,e.moveRange);
       let best=null,bsc=Infinity;
       reach.forEach(({r,c})=>{
@@ -571,9 +726,8 @@ async function enemyTurn(){
         e.moved=true;
       }
     }
-    // Attack
-    const d=dist(e.r,e.c,player.r,player.c);
-    if(d<=ew.r&&!e.attacked){
+    // Attack (only if can see player and within weapon range)
+    if(canSee&&d<=ew.r&&!e.attacked){
       e.attacked=true;
       const cv=COV[grid[player.r][player.c]]||0;
       const hc=hitChance(e.r,e.c,player.r,player.c,cv);
@@ -606,48 +760,98 @@ function startPlayerTurn(){
   selTile=null;selEnemy=null;calcMoveTiles();
   document.getElementById('turn-badge').textContent='ВАШ\nХОД';
   document.getElementById('turn-badge').className='pt';
-  log('Выбери куда двигаться или кого атаковать');btns();render();
+  log('Выбери куда двигаться или кого атаковать');btns();updateDetect();render();
 }
 
 function resetSel(){selTile=null;selEnemy=null;calcMoveTiles();btns();render();}
-
 function endPlayerTurn(){
   if(gstate!=='player')return;
   selTile=null;selEnemy=null;render();enemyTurn();
 }
 
 // ── BATTLE END ────────────────────────────────────────────────
+let _endRes=null;
 function endBattle(res){
-  gstate=res;
-  ['bShoot','bMelee','bEnd','bMove'].forEach(id=>document.getElementById(id).disabled=true);
+  if(gstate==='won'||gstate==='lost')return;
+  gstate=res; _endRes=res;
+  ['bShoot','bMelee','bEnd','bMove'].forEach(id=>{
+    const el=document.getElementById(id); if(el)el.disabled=true;
+  });
+  const ov=document.getElementById('end-ov');
+  const icon=document.getElementById('end-icon');
+  const title=document.getElementById('end-title');
+  const sub=document.getElementById('end-sub');
+  const btn=document.getElementById('end-btn');
   if(res==='won'){
-    log('🏆 ПОБЕДА! Отличная работа, дон!');
+    icon.textContent='🏆';
+    title.textContent='ПОБЕДА!'; title.className='win';
+    sub.innerHTML='Враг повержен.<br>Отличная работа, дон!';
+    btn.textContent='✅ Получить награду'; btn.className='end-win-btn';
     document.getElementById('turn-badge').textContent='🏆 ПОБЕДА';
     document.getElementById('turn-badge').className='pt';
+    log('🏆 ПОБЕДА! Отличная работа, дон!');
   } else {
-    log('💀 Поражение... отходи!');
+    icon.textContent='💀';
+    title.textContent='ПОРАЖЕНИЕ'; title.className='lose';
+    sub.innerHTML='Ты проиграл.<br>Но можно попробовать снова.';
+    btn.textContent='🚑 В меню'; btn.className='end-lose-btn';
     document.getElementById('turn-badge').textContent='💀 КОНЕЦ';
     document.getElementById('turn-badge').className='et';
+    log('💀 Поражение... отходи!');
   }
-  setTimeout(()=>{
-    if(tg&&tg.sendData)tg.sendData(JSON.stringify({
-      a:res==='won'?'battle_won':'battle_lost',
-      php:player.hp,pmp:PMAXHP,gu:0,coop_id:COOP_ID,
-    }));
-  },2000);
+  setTimeout(()=>{ ov.classList.add('show'); }, 600);
+}
+function closeBattle(){
+  const data=JSON.stringify({
+    a:_endRes==='won'?'battle_won':'battle_lost',
+    php:player.hp, pmp:PMAXHP, gu:0, coop_id:COOP_ID,
+  });
+  if(tg&&tg.sendData) tg.sendData(data);
+  else if(tg&&tg.close) tg.close();
 }
 
 // ── INPUT ─────────────────────────────────────────────────────
 function onTap(evt){
   if(gstate!=='player')return;
+  evt.preventDefault();
+  const touch=evt.touches?evt.touches[0]:evt;
   const rect=canvas.getBoundingClientRect();
-  const sx=canvas.width/rect.width,sy=canvas.height/rect.height;
-  const cx=(evt.clientX-rect.left)*sx,cy=(evt.clientY-rect.top)*sy;
-  const c=Math.floor(cx/TS),r=Math.floor(cy/TS);
-  if(r<0||r>=ROWS||c<0||c>=COLS)return;
+  const sx=canvas.width/rect.width, sy=canvas.height/rect.height;
+  const cx=(touch.clientX-rect.left)*sx, cy=(touch.clientY-rect.top)*sy;
+  const tc=Math.floor(cx/TS), tr=Math.floor(cy/TS);
+  if(tr<0||tr>=ROWS||tc<0||tc>=COLS)return;
 
-  // Clicked enemy?
-  const ce=enemies.find(e=>e.hp>0&&e.r===r&&e.c===c);
-  if(ce){
-    selEnemy=ce;selTile=null;
-  
+  // Click on enemy — select
+  const ce=enemies.find(e=>e.hp>0&&e.r===tr&&e.c===tc);
+  if(ce){ selEnemy=ce; selTile=null; btns(); render(); return; }
+
+  // Click on move tile — preview then confirm
+  if(!player.moved){
+    const mt=moveTiles.find(t=>t.r===tr&&t.c===tc);
+    if(mt){
+      if(selTile&&selTile.r===tr&&selTile.c===tc){
+        // Second tap: confirm move
+        gstate='anim'; selTile=null;
+        moveAnim(player,tr,tc,()=>{
+          player.moved=true; gstate='player';
+          calcMoveTiles(); btns(); render();
+        });
+      } else {
+        // First tap: show preview
+        selTile={r:tr,c:tc}; selEnemy=null;
+        btns(); render();
+      }
+      return;
+    }
+  }
+  // Tap on empty space — deselect
+  selTile=null; selEnemy=null; btns(); render();
+}
+
+canvas.addEventListener('touchstart', onTap, {passive:false});
+canvas.addEventListener('click', onTap);
+resize();
+calcMoveTiles(); hud(); btns(); render();
+</script>
+</body>
+</html>
