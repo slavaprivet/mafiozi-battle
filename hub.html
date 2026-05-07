@@ -357,6 +357,7 @@ body {
 
 /* ── SUB-PAGES ── */
 .subpage { min-height: 100vh; }
+#page-battle { position: relative; }
 .subpage-header {
   display: flex;
   align-items: center;
@@ -2757,21 +2758,25 @@ function tacEndBattle(res){
   tac.gstate=res;
   if(tac.pulseRaf){cancelAnimationFrame(tac.pulseRaf);tac.pulseRaf=null;}
   tacCoopCleanup();
-  const boss=BOSS_DATA[tac.bossId],ov=document.getElementById('tac-result');
+  const boss=BOSS_DATA[tac.bossId]||null;
+  const ov=document.getElementById('tac-result');
+  if(!ov)return;
   if(res==='won'){
-    const exp=boss.exp,cash=boss.cash+Math.floor(Math.random()*Math.round(boss.cash/3));
+    const exp=boss?(boss.exp||0):0;
+    const rawCash=boss?(boss.cash||0):0;
+    const cash=rawCash+Math.floor(Math.random()*Math.max(1,Math.round(rawCash/3)));
     session.hp=Math.max(1,tac.player.hp);session.cash+=cash;
     session.wins.push({boss_id:tac.bossId,loc_id:tac.locId,exp,cash});session.dirty=true;
     ov.innerHTML=`<div class="tac-res-icon">🏆</div><div class="tac-res-title win">ПОБЕДА!</div>
       <div class="tac-res-rewards"><div class="tac-reward"><span class="rv">+${exp}</span><span class="rl">Опыт</span></div><div class="tac-reward"><span class="rv">+${cash}$</span><span class="rl">Нал</span></div></div>
       <div style="margin-top:8px;font-size:12px;color:#888">HP: ${session.hp}/${DATA.maxhp}</div>
       <button class="tac-res-btn" onclick="afterBattle(true)">Продолжить</button>
-      <button class="tac-res-btn exit" onclick="afterBattle(false)">Выход</button>`;
+      <button class="tac-res-btn exit" onclick="afterBattle(false)">В главное меню</button>`;
   }else{
     session.hp=1;session.dirty=true;
     ov.innerHTML=`<div class="tac-res-icon">💀</div><div class="tac-res-title lose">ПОРАЖЕНИЕ</div>
       <div style="color:#888;font-size:13px;margin-top:4px">Вы потеряли сознание.</div>
-      <button class="tac-res-btn" style="margin-top:16px" onclick="afterBattle(false)">Выход</button>`;
+      <button class="tac-res-btn" style="margin-top:16px" onclick="afterBattle(false)">В главное меню</button>`;
   }
   ov.style.display='flex';
 }
