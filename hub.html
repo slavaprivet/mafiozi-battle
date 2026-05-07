@@ -2232,7 +2232,7 @@ function tacDrawMinimap(ctx,canvasW){
 function tacIsBlocked(r,c){
   const tr=Math.floor(r),tc=Math.floor(c);
   if(tr<0||tr>=tac.ROWS||tc<0||tc>=tac.COLS)return true;
-  return tac.grid[tr][tc]!==0;
+  return tac.grid[tr][tc]===1; // только стены блокируют движение, укрытия (2-6) проходимы
 }
 // Character collision radius (tile units). Prevents clipping into covers/walls.
 const CHAR_R=0.35;
