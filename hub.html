@@ -2055,7 +2055,7 @@ function tacDrawPlayerChar(ctx,vx,vy,TS,charData,phase){
     else if(hat.sty==='beret'){ctx.beginPath();ctx.ellipse(3,hy-16,14,10,.15,0,Math.PI*2);ctx.fill();ctx.strokeStyle='rgba(0,0,0,.3)';ctx.lineWidth=1;ctx.stroke();ctx.fillStyle=_lc(hat.c,20);ctx.beginPath();ctx.arc(5,hy-22,2,0,Math.PI*2);ctx.fill();}
   }
   ctx.restore();
-  _drawName(ctx,vx,vy,TS,charData.name||'Игрок','#7fff7f');
+  if((charData.hp||1)>0)_drawName(ctx,vx,vy,TS,charData.name||'Игрок','#7fff7f');
 }
 
 function tacDrawEnemyChar(ctx,vx,vy,TS,enemy,selected){
@@ -2107,8 +2107,7 @@ function tacDrawEnemyChar(ctx,vx,vy,TS,enemy,selected){
   }
   if(selected){ctx.strokeStyle='#FF4444';ctx.lineWidth=2.5;ctx.setLineDash([5,3]);ctx.beginPath();ctx.ellipse(0,15,18,40,0,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);}
   ctx.restore();
-  const _eName=enemy.id===1?'Мафиози':(enemy.name||'Враг');
-  _drawName(ctx,vx,vy,TS,_eName,'#ff6666');
+  if(enemy.hp>0){const _eName=enemy.id===1?'Мафиози':(enemy.name||'Враг');_drawName(ctx,vx,vy,TS,_eName,'#ff6666');}
 }
 
 // ── TILE DRAWING ──────────────────────────────────────────────────────
@@ -2235,12 +2234,18 @@ function tacIsBlocked(r,c){
   if(tr<0||tr>=tac.ROWS||tc<0||tc>=tac.COLS)return true;
   return tac.grid[tr][tc]!==0;
 }
+// Character collision radius (tile units). Prevents clipping into covers/walls.
+const CHAR_R=0.35;
+function tacIsBlockedAt(r,c){
+  return tacIsBlocked(r-CHAR_R,c-CHAR_R)||tacIsBlocked(r-CHAR_R,c+CHAR_R)||
+         tacIsBlocked(r+CHAR_R,c-CHAR_R)||tacIsBlocked(r+CHAR_R,c+CHAR_R);
+}
 function tacTryMove(unit,dr,dc){
   const nr=unit.r+dr, nc=unit.c+dc;
-  if(!tacIsBlocked(nr,nc)){unit.r=nr;unit.c=nc;return;}
-  // try sliding along each axis separately
-  if(!tacIsBlocked(nr,unit.c))unit.r=nr;
-  else if(!tacIsBlocked(unit.r,nc))unit.c=nc;
+  if(!tacIsBlockedAt(nr,nc)){unit.r=nr;unit.c=nc;return;}
+  // slide along each axis independently — fixes corner-catching
+  if(!tacIsBlockedAt(nr,unit.c))unit.r=nr;
+  if(!tacIsBlockedAt(unit.r,nc))unit.c=nc;
 }
 
 function tacGameLoop(ts){
