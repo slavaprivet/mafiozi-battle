@@ -2612,8 +2612,14 @@ function tacUpdate(dt){
     if(p.reloadTimer<=0){p.reloading=false;p.ammo=tac.pw.mag||0;tacUpdateAmmoHud();}
   }
   tacUpdateDetectBar();
+  tacCheckBodyDiscovery();
   tac.enemies.forEach(e=>{
-    if(e.hp<=0){if(e.deathTimer>0)e.deathTimer=Math.max(0,e.deathTimer-dt*1000);return;}
+    if(e.hp<=0){
+      if(e.deathTimer>0)e.deathTimer=Math.max(0,e.deathTimer-dt*1000);
+      // Tick down stealthKillAnim (body spin on drop)
+      if(e.stealthKillAnim>0)e.stealthKillAnim=Math.max(0,e.stealthKillAnim-dt*2.5);
+      return;
+    }
     tacEnemyAI(e,dt);
   });
   tacUpdateBullets(dt);
@@ -2695,23 +2701,106 @@ function tacPlayerShoot(){
   // Auto-reload when empty
   if(w.mag&&p.ammo<=0)setTimeout(tacStartReload,200);
 }
+// ── STEALTH HELPERS ───────────────────────────────────────────────────
+function tacIsBackstab(p,e){
+  // Player must be behind enemy: angle between enemy's facing and player's position > 120°
+  const toPlayerAngle=Math.atan2(p.r-e.r,p.c-e.c);
+  let diff=Math.abs(toPlayerAngle-e.angle);
+  if(diff>Math.PI)diff=Math.PI*2-diff;
+  return diff>Math.PI*0.67; // player is in the back 120° arc
+}
+function sfxBackstab(){
+  const ac=_ac();if(!ac)return;const t=ac.currentTime;
+  // Silenced thud + neck crack
+  const nb=ac.createBuffer(1,Math.floor(ac.sampleRate*.08),ac.sampleRate);
+  const d=nb.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/(d.length*.15));
+  const ns=ac.createBufferSource();ns.buffer=nb;const ng=ac.createGain();
+  ng.gain.setValueAtTime(.55,t);ng.gain.exponentialRampToValueAtTime(.001,t+.08);
+  ns.connect(ng);ng.connect(ac.destination);ns.start(t);
+  // Low crunch
+  const o=ac.createOscillator();o.type='sine';o.frequency.setValueAtTime(140,t);
+  o.frequency.exponentialRampToValueAtTime(45,t+.07);const og=ac.createGain();
+  og.gain.setValueAtTime(.5,t);og.gain.exponentialRampToValueAtTime(.001,t+.07);
+  o.connect(og);og.connect(ac.destination);o.start(t);o.stop(t+.08);
+}
+function tacDoBackstab(p,e){
+  p.meleeAnim=2.0; // full dramatic swing for backstab
+  p.angle=Math.atan2(e.r-p.r,e.c-p.c);
+  const isBoss=e.isBoss;
+  if(isBoss){
+    // 3.5× crit on boss
+    const dmg=Math.round(p.atk*3.5*(0.9+Math.random()*.2));
+    e.hp=Math.max(0,e.hp-dmg);
+    if(tac.stats){tac.stats.dmgDealt+=dmg;if(e.hp<=0)tac.stats.kills++;}
+    tacFloatDmg(e,dmg,'#ff44ff',false);
+    tac.meleeVfx.push({r:e.r-.5,c:e.c,vy:-1.1,e:'💢',a:1,big:true});
+    tac.meleeVfx.push({r:e.r+.1,c:e.c+.2,vy:-.7,e:'⚡',a:1,big:true});
+    tac.meleeVfx.push({r:e.r-.1,c:e.c-.1,vy:-.4,e:'🩸',a:1});
+    tac.shake=0.9;e.hitRecently=1500;
+    if(e.hp<=0){tacSpawnBlood(e.r,e.c,30);e.deathTimer=1400;}
+    // Screen flash purple briefly
+    if(!tac.backstabFlash)tac.backstabFlash=0;
+    tac.backstabFlash=300;
+  }else{
+    // Instant kill — dramatic multi-stage VFX
+    const dmg=e.hp;
+    if(tac.stats){tac.stats.dmgDealt+=dmg;tac.stats.kills++;}
+    e.hp=0;e.deathTimer=1600; // slightly longer lie
+    e.stealthKillAnim=1.0;    // kill-drop animation progress
+    tacFloatDmg(e,dmg,'#dd22ff',false);
+    tacSpawnBlood(e.r,e.c,36);
+    // Multi-particle death burst
+    tac.meleeVfx.push({r:e.r-.6,c:e.c,vy:-1.5,e:'💀',a:1,big:true});
+    tac.meleeVfx.push({r:e.r+.3,c:e.c-.3,vy:-.6,e:'🩸',a:1});
+    tac.meleeVfx.push({r:e.r-.3,c:e.c+.4,vy:-.5,e:'🩸',a:.9});
+    tac.meleeVfx.push({r:e.r+.1,c:e.c+.2,vy:-.8,e:'🩸',a:1});
+    tac.meleeVfx.push({r:e.r-.1,c:e.c-.2,vy:-.9,e:'✨',a:1,big:true});
+    tac.shake=0.65;
+    // Mark as stealth kill — don't alert others through sight
+    e.stealthKill=true;
+    // Screen flash purple
+    if(!tac.backstabFlash)tac.backstabFlash=0;
+    tac.backstabFlash=450;
+  }
+  sfxBackstab();
+  // Brief stealth indicator overlay
+  const layer=document.getElementById('tac-dmg');
+  if(layer){const el=document.createElement('div');el.className='dmg-pop';
+    el.style.cssText='color:#cc44ff;left:50%;transform:translateX(-50%);top:28%;font-size:18px;font-weight:900;text-shadow:0 0 16px #aa00ff,0 0 30px #6600cc;letter-spacing:2px;pointer-events:none;position:absolute';
+    el.textContent=isBoss?'💢 КРИТ!':'🗡 СКРЫТОЕ УБИЙСТВО!';layer.appendChild(el);setTimeout(()=>el.remove(),1300);}
+}
 function tacPlayerMelee(){
   const p=tac.player,w=tac.pw;if(p.meleeCD>0)return;
   const range=(w.t==='melee'?(w.r||1.5):1.5)+0.4;
-  p.meleeCD=750;p.meleeAnim=1;let hit=false;
+  // Extended range for backstab approach
+  const backstabRange=range+0.7;
+  p.meleeCD=700;p.meleeAnim=1;let hit=false;let wasBackstab=false;
   tac.enemies.forEach(e=>{
     if(e.hp<=0)return;
-    if(Math.hypot(e.r-p.r,e.c-p.c)<=range){
+    const dist=Math.hypot(e.r-p.r,e.c-p.c);
+    if(dist<=backstabRange&&tacIsBackstab(p,e)){
+      // STEALTH BACKSTAB
+      hit=true;wasBackstab=true;tacDoBackstab(p,e);return;
+    }
+    if(dist<=range){
+      // Normal melee — bigger swing
+      p.meleeAnim=1;
       const dmg=Math.max(1,Math.round(p.atk*(w.t==='melee'?w.m:1.2)*(0.85+Math.random()*.3)));
       e.hp=Math.max(0,e.hp-dmg);tacFloatDmg(e,dmg,'#ffcc44',false);
-      tac.shake=0.35;hit=true;e.hitRecently=800;
+      tac.shake=0.4;hit=true;e.hitRecently=800;
       if(tac.stats){tac.stats.dmgDealt+=dmg;if(e.hp<=0)tac.stats.kills++;}
       p.angle=Math.atan2(e.r-p.r,e.c-p.c);
-      if(e.hp<=0){tacSpawnBlood(e.r,e.c,16);e.deathTimer=1400;}
+      if(e.hp<=0){tacSpawnBlood(e.r,e.c,20);e.deathTimer=1400;}
+      // Impact flash at hit point
+      const hr=e.r-(Math.sin(p.angle)*.3),hc=e.c-(Math.cos(p.angle)*.3);
+      tac.meleeVfx.push({r:hr,c:hc,vy:-.6,e:'⚡',a:1.2,big:true});
     }
   });
-  tac.meleeVfx.push({r:p.r+Math.sin(p.angle)*.9,c:p.c+Math.cos(p.angle)*.9,vy:-.5,e:hit?'⚡':'💨',a:1});
-  sfxMelee();
+  if(!wasBackstab){
+    // Normal melee sound + VFX
+    tac.meleeVfx.push({r:p.r+Math.sin(p.angle)*1.1,c:p.c+Math.cos(p.angle)*1.1,vy:-.5,e:hit?'💥':'💨',a:1});
+    sfxMelee();
+  }
   tacHud();tacCheckDeath();
 }
 function tacPlayerGrenade(){
@@ -2736,13 +2825,14 @@ function tacPlayerGrenade(){
 
 // ── ENEMY PHRASES ─────────────────────────────────────────────────────
 const ENEMY_PHRASES={
-  shoot:   ['Огонь!','Мочи!','Не уйдёшь!','Стоять!','Ты труп!','Пали его!','Кончай гада!','Стреляй!'],
-  grenade: ['Граната!','Лови, падла!','Кидаю!','Взрывай его!','Подарочек!','Бойся!'],
-  molotov: ['Гори, сука!','Факел летит!','Жарко станет!','Горим!'],
-  alert:   ['Вижу его!','Там он!','Хватай!','Стоять, падла!','Объявляю охоту!','Все сюда!','Вот он!','Не дай уйти!'],
-  hurt:    ['Зацепил!','Больно, падла!','Ах ты...!','Суки!','Попал!','Шустрый, с-сука!'],
-  taunt:   ['Тебе конец!','Живым не уйдёшь!','Давно тебя ждём!','За базаром следи!','Конец тебе!','Сдавайся!'],
-  cover:   ['Отхожу!','Перезаряжаюсь!','В укрытие!','Прикройте!','Назад!'],
+  shoot:      ['Огонь!','Мочи!','Не уйдёшь!','Стоять!','Ты труп!','Пали его!','Кончай гада!','Стреляй!'],
+  grenade:    ['Граната!','Лови, падла!','Кидаю!','Взрывай его!','Подарочек!','Бойся!'],
+  molotov:    ['Гори, сука!','Факел летит!','Жарко станет!','Горим!'],
+  alert:      ['Вижу его!','Там он!','Хватай!','Стоять, падла!','Объявляю охоту!','Все сюда!','Вот он!','Не дай уйти!'],
+  hurt:       ['Зацепил!','Больно, падла!','Ах ты...!','Суки!','Попал!','Шустрый, с-сука!'],
+  taunt:      ['Тебе конец!','Живым не уйдёшь!','Давно тебя ждём!','За базаром следи!','Конец тебе!','Сдавайся!'],
+  cover:      ['Отхожу!','Перезаряжаюсь!','В укрытие!','Прикройте!','Назад!'],
+  found_body: ['ТРУП! Все сюда!','Убили нашего!','Нашёл тело! Тревога!','Здесь труп — ищите!','Кто-то здесь был!','Они среди нас!'],
 };
 let _lastQuoteTime=0;
 function tacEnemyQuote(e,type){
@@ -2796,8 +2886,41 @@ function tacEnemyAI(e,dt){
   const dx=p.c-e.c,dy=p.r-e.r,dist=Math.hypot(dx,dy);
 
   // Обновляем угол поворота (патруль — медленно, в бою — к игроку)
-  if(e.alerted){
+  if(e.alerted&&!e._searchMode){
+    // Active combat: always face player
     e.angle=Math.atan2(dy,dx);
+  } else if(e.alerted&&e._searchMode){
+    // ── SUSPICIOUS / SEARCH MODE ─────────────────────────────────
+    // Enemy alerted by body discovery — wanders and searches, doesn't know where player is
+    if(!e.searchTimer)e.searchTimer=0;
+    e.searchTimer-=dt*1000;
+    if(e.searchTimer<=0){
+      // Pick a new random search heading
+      e.searchAngle=(e.angle)+Math.PI*.6*(Math.random()<.5?1:-1)+(Math.random()-.5)*.8;
+      e.searchTimer=1800+Math.random()*1400;
+      e.searchMove=Math.random()<.7; // 70% chance to walk toward that angle
+    }
+    // Smoothly rotate to search angle
+    let sad=((e.searchAngle||e.angle)-e.angle+Math.PI*3)%(Math.PI*2)-Math.PI;
+    e.angle+=Math.sign(sad)*Math.min(Math.abs(sad),dt*2.2);
+    // Check if we now see the player — switch to combat
+    if(tacCanSeePlayer(e)){
+      e._searchMode=false;
+      e.aiState='approach';
+      if(!e.alertCD){e.alertCD=3000;tacEnemyQuote(e,'alert');}
+    }
+    // Walk slowly while searching
+    if(e.searchMove){
+      const spd=1.2;
+      const sa=e.searchAngle||e.angle;
+      tacTryMove(e,Math.sin(sa)*spd*dt,Math.cos(sa)*spd*dt);
+      e.isMoving=true;e.walkPhase+=dt*5;
+    } else {e.isMoving=false;}
+    // Time out search mode after ~15s
+    if(!e._searchModeTimer)e._searchModeTimer=15000;
+    e._searchModeTimer-=dt*1000;
+    if(e._searchModeTimer<=0){e._searchMode=false;e.alerted=false;e.aiState='patrol';}
+    return; // don't attack while searching
   } else {
     // Патрулируем: плавно вращаем угол туда-сюда
     if(!e.patrolTimer)e.patrolTimer=0;
@@ -3080,24 +3203,30 @@ function tacRender(){
   }
   // Конусы видимости врагов (рисуем ДО персонажей)
   tac.enemies.forEach(e=>{
-    if(e.hp<=0||e.alerted)return;
+    if(e.hp<=0)return;
+    // Show cone for: patrolling enemies and search-mode enemies (not active combat)
+    const inActiveCombat=e.alerted&&!e._searchMode;
+    if(inActiveCombat)return;
     const s=w2s(e.r,e.c);
     if(s.x<-TS*4||s.x>canvas.width+TS*4||s.y<-TS*4||s.y>canvas.height+TS*4)return;
     const vd=(e.viewDist||7)*TS;
     const fov=e.fovAngle||Math.PI*.65;
     const cx=s.x+TS/2,cy=s.y+TS/2;
-    // Градиентный конус
+    // Gradient cone: orange-red for patrol, yellow for search mode
+    const c1=e._searchMode?'rgba(255,220,0,.22)':'rgba(255,80,0,.18)';
+    const c2=e._searchMode?'rgba(255,180,0,.11)':'rgba(255,40,0,.09)';
     const gv=ctx.createRadialGradient(cx,cy,0,cx,cy,vd);
-    gv.addColorStop(0,'rgba(255,80,0,.18)');
-    gv.addColorStop(0.6,'rgba(255,40,0,.09)');
+    gv.addColorStop(0,c1);
+    gv.addColorStop(0.6,c2);
     gv.addColorStop(1,'rgba(255,0,0,0)');
-    ctx.save();ctx.globalAlpha=1;
+    ctx.save();ctx.globalAlpha=e._searchMode?(0.85+.15*Math.sin(tac.animPhase*3)):1;
     ctx.fillStyle=gv;
     ctx.beginPath();ctx.moveTo(cx,cy);
     ctx.arc(cx,cy,vd,e.angle-fov/2,e.angle+fov/2);
     ctx.closePath();ctx.fill();
-    // Тонкий контур конуса
-    ctx.globalAlpha=.25;ctx.strokeStyle='#ff4400';ctx.lineWidth=1;
+    // Cone edge line
+    ctx.globalAlpha=e._searchMode?.35:.25;
+    ctx.strokeStyle=e._searchMode?'#ffcc00':'#ff4400';ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(cx,cy);
     ctx.arc(cx,cy,vd,e.angle-fov/2,e.angle+fov/2);
     ctx.closePath();ctx.stroke();
@@ -3110,14 +3239,23 @@ function tacRender(){
     if(e.hp<=0){
       // Труп остаётся на карте — лежит на боку
       const cx=s.x+TS/2,cy=s.y+TS/2;
-      ctx.save();ctx.globalAlpha=0.55;
-      ctx.translate(cx,cy+TS*.25);ctx.rotate(Math.PI/2);ctx.translate(-cx,-cy-TS*.25);
+      ctx.save();
+      // stealthKillAnim: body spins as it drops (1→0 over ~400ms)
+      const dropRot=e.stealthKillAnim?
+        (Math.PI/2)+(e.stealthKillAnim*Math.PI*1.2):
+        Math.PI/2;
+      const dropAlpha=e.stealthKillAnim?
+        (0.55+e.stealthKillAnim*.35):0.55;
+      ctx.globalAlpha=dropAlpha;
+      ctx.translate(cx,cy+TS*.25);ctx.rotate(dropRot);ctx.translate(-cx,-cy-TS*.25);
       tacDrawEnemyChar(ctx,cx,cy+TS*.25,TS*.75,e,false);
       ctx.restore();
-      // Метка "МЕРТВ"
-      ctx.save();ctx.globalAlpha=0.7;ctx.font=`bold ${Math.floor(TS*.22)}px sans-serif`;
-      ctx.fillStyle='#ff4444';ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.fillText('☠ МЕРТВ',s.x+TS/2,s.y+TS*.12);ctx.restore();
+      // stealthKill: no label (body hidden), else show dead marker
+      if(!e.stealthKill){
+        ctx.save();ctx.globalAlpha=0.7;ctx.font=`bold ${Math.floor(TS*.22)}px sans-serif`;
+        ctx.fillStyle='#ff4444';ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText('☠ МЕРТВ',s.x+TS/2,s.y+TS*.12);ctx.restore();
+      }
       return;
     }
     tacDrawEnemyChar(ctx,s.x+TS/2,s.y+TS/2,TS,e,false);
@@ -3130,11 +3268,12 @@ function tacRender(){
     {
       const combat=['approach','take_cover','behind_cover','peeking','throw_grenade','throw_molotov'];
       let lbl='',lc='#aaa';
-      if(e.alerted&&combat.includes(e.aiState)){lbl='⚔ атакую';lc='#ff4444';}
+      if(e.alerted&&e._searchMode){lbl='🔍 ищу...';lc='#f0c030';}
+      else if(e.alerted&&combat.includes(e.aiState)){lbl='⚔ атакую';lc='#ff4444';}
       else if(e.alerted||e.aiState==='alert'){lbl='❓ подозрительно';lc='#f0c030';}
       else{lbl='👣 патрулирую';lc='#88aacc';}
       ctx.save();ctx.font=`bold ${Math.floor(TS*.18)}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='bottom';
-      ctx.fillStyle='rgba(0,0,0,.6)';
+      ctx.fillStyle='rgba(0,0,0,.65)';
       const tw=ctx.measureText(lbl).width;
       ctx.fillRect(s.x+TS/2-tw/2-3,s.y-2-Math.floor(TS*.18),tw+6,Math.floor(TS*.18)+2);
       ctx.fillStyle=lc;ctx.fillText(lbl,s.x+TS/2,s.y-2);ctx.restore();
@@ -3180,13 +3319,23 @@ function tacRender(){
     ctx.fillText(v.e,s.x+TS/2,s.y+TS/2);ctx.restore();
   });
   tacDrawMinimap(ctx,canvas.width);
+  // ── Backstab screen flash ──────────────────────────────────────────
+  if(tac.backstabFlash>0){
+    const alpha=Math.min(0.35,tac.backstabFlash/450*0.35);
+    ctx.save();ctx.globalAlpha=alpha;
+    ctx.fillStyle='#aa00ff';ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.restore();
+    tac.backstabFlash=Math.max(0,tac.backstabFlash-16);
+  }
   tac.animPhase+=0.06;
 }
 
 function tacDrawWeaponInHand(ctx,vx,vy,TS,angle,wep,meleeAnim,isEnemy){
   if(!wep)return;
   const sc=TS/72;ctx.save();ctx.translate(vx,vy+TS*.03);ctx.scale(sc,sc);
-  ctx.rotate((angle+Math.PI/2)+Math.sin(meleeAnim*Math.PI)*.9);
+  // meleeAnim=1 for normal, 2.0 for backstab — bigger arc on backstab
+  const swingArc=meleeAnim>=1.5?Math.sin(meleeAnim*Math.PI)*1.5:Math.sin(meleeAnim*Math.PI)*.9;
+  ctx.rotate((angle+Math.PI/2)+swingArc);
   const t=wep.t;ctx.save();
   if(t==='melee'){
     ctx.fillStyle=wep.c||'#aaa';ctx.strokeStyle='rgba(0,0,0,.5)';ctx.lineWidth=1;
@@ -3240,6 +3389,7 @@ function tacHud(){
   }
   tacUpdateGrenBtn();
   tacUpdateAmmoHud();
+  tacUpdateMeleeBtn();
 }
 function tacUpdateGrenBtn(){
   const ct=document.getElementById('tac-gren-ct');if(ct)ct.textContent=session.gren||0;
@@ -3247,16 +3397,85 @@ function tacUpdateGrenBtn(){
   const hasGren=(session.gren||0)>0;
   if(btn){btn.dataset.empty=hasGren?'0':'1';btn.style.display=hasGren?'flex':'none';}
 }
+function tacUpdateMeleeBtn(){
+  if(!tac)return;
+  const btn=document.getElementById('tac-btn-melee');if(!btn)return;
+  const p=tac.player;
+  const w=tac.pw;
+  const range=(w.t==='melee'?(w.r||1.5):1.5)+0.4+0.7; // matches tacPlayerMelee backstabRange
+  const canBackstab=tac.enemies.some(e=>e.hp>0&&Math.hypot(e.r-p.r,e.c-p.c)<=range&&tacIsBackstab(p,e));
+  btn.textContent=canBackstab?'🔪':'👊';
+  btn.style.boxShadow=canBackstab?'0 0 18px #cc44ff88,0 2px 6px #0006':'';
+  btn.style.borderColor=canBackstab?'#cc44ff66':'';
+}
 function tacUpdateDetectBar(){
   if(!tac)return;
   const bar=document.getElementById('tac-detect-bar');if(!bar)return;
   const alive=tac.enemies.filter(e=>e.hp>0);
   const COMBAT=['approach','take_cover','behind_cover','peeking','throw_grenade','throw_molotov'];
-  const inCombat=alive.some(e=>e.alerted&&COMBAT.includes(e.aiState));
-  const suspicious=alive.some(e=>e.alerted&&!COMBAT.includes(e.aiState));
+  const inCombat=alive.some(e=>e.alerted&&COMBAT.includes(e.aiState)&&!e._searchMode);
+  const bodyFound=alive.some(e=>e.alerted&&e._searchMode);
+  const suspicious=alive.some(e=>e.alerted&&!COMBAT.includes(e.aiState)&&!e._searchMode);
   if(inCombat){bar.className='alert';bar.textContent='🔴 Тревога!';}
+  else if(bodyFound){bar.className='suspect';bar.textContent='🔍 Тело обнаружено!';}
   else if(suspicious){bar.className='suspect';bar.textContent='⚠️ Подозрение';}
   else{bar.className='ghost';bar.textContent='👻 Не обнаружен';}
+}
+
+// ── BODY DISCOVERY SYSTEM ────────────────────────────────────────────
+function tacCheckBodyDiscovery(){
+  if(!tac)return;
+  // Count unsilenced corpses (stealthKill bodies don't trigger unless they're in a visible spot)
+  const corpses=tac.enemies.filter(e=>e.hp<=0&&e.deathTimer>0);
+  if(!corpses.length)return;
+  tac.enemies.forEach(e=>{
+    // Skip dead, or enemies already in active combat (not search mode)
+    if(e.hp<=0)return;
+    if(e.alerted&&!e._searchMode)return; // already fighting — no need
+    // Tick down cooldown every frame
+    if(e._foundBodyCD>0){e._foundBodyCD-=16;return;}
+    corpses.forEach(c=>{
+      // stealthKill bodies are hidden — harder to spot (only in very close range)
+      const visRange=c.stealthKill?(e.viewDist*.5):(e.viewDist*1.5);
+      const dist=Math.hypot(e.r-c.r,e.c-c.c);
+      if(dist>visRange)return;
+      // Check if corpse is within vision cone (or very close = automatic)
+      if(dist>1.5){
+        const toCorpse=Math.atan2(c.r-e.r,c.c-e.c);
+        let ang=Math.abs(toCorpse-e.angle);if(ang>Math.PI)ang=Math.PI*2-ang;
+        if(ang>e.fovAngle*0.85)return;
+      }
+      // Enemy found a body!
+      e._foundBodyCD=9000; // per-enemy cooldown prevents spam
+      if(!e.alerted){
+        // Fresh discovery — this enemy shouts
+        e.alerted=true;
+        e._searchMode=true;
+        e._searchModeTimer=16000;
+        e.searchAngle=e.angle;
+        tacEnemyQuote(e,'found_body');
+      }
+      // Alert ALL nearby allies (chain radius 18 tiles)
+      tac.enemies.forEach(ally=>{
+        if(ally.hp<=0||ally===e)return;
+        if(ally.alerted&&!ally._searchMode)return; // already in combat
+        if(Math.hypot(ally.r-e.r,ally.c-e.c)<=18){
+          if(!ally.alerted){
+            ally.alerted=true;
+            ally._searchMode=true;
+            ally._searchModeTimer=14000;
+            ally.searchAngle=ally.angle;
+            ally._foundBodyCD=7000;
+          }
+        }
+      });
+      // Record that a body was found for HUD
+      if(!tac._bodyFound)tac._bodyFound=0;
+      tac._bodyFound=5000; // timer for HUD indicator
+    });
+  });
+  // Tick HUD body-found timer
+  if(tac._bodyFound>0)tac._bodyFound-=16;
 }
 
 function tacFloatDmg(unit,dmg,color,miss){
@@ -3638,44 +3857,31 @@ document.querySelectorAll('.tile').forEach(tile => {
 });
 
 // ══════════════════════════════════════════════════════════════════════
-
-// ══════════════════════════════════════════════════════════════════════
 //  CO-OP SYSTEM
 // ══════════════════════════════════════════════════════════════════════
 
-let coopState = null;       // current coop session state from server
-let coopSid   = null;       // session id string
-let coopPollTimer = null;   // setInterval handle
-let coopWaitTimer = null;   // setInterval for countdown
-let coopMyUid = null;       // my uid string (from tg or fallback)
+let coopState = null;
+let coopSid   = null;
+let coopPollTimer = null;
+let coopWaitTimer = null;
+let coopMyUid = null;
 
 function coopApi() { return DATA.api || ''; }
 
 function coopMyUidStr() {
   if (coopMyUid) return coopMyUid;
-  // try tg initDataUnsafe
   try {
     coopMyUid = String(tg?.initDataUnsafe?.user?.id || ('guest_' + Math.random().toString(36).slice(2)));
   } catch(e) { coopMyUid = 'guest_' + Math.random().toString(36).slice(2); }
   return coopMyUid;
 }
 
-// ── LOBBY ─────────────────────────────────────────────────────────────
-// ── Selected gang members for invite ─────────────────────────────────
 const _coopInviteSet = new Set();
 
 function renderCoopLobby() {
-  // If bot sent us into a coop session, skip the lobby
-  if (DATA.coopSid > 0) {
-    _coopShowFromData();
-    return;
-  }
+  if (DATA.coopSid > 0) { _coopShowFromData(); return; }
   coopShowLobby();
-
-  // Boss/district selector
   _renderCoopBossSelector();
-
-  // Gang member list with invite checkboxes
   const listEl = document.getElementById('coop-gang-list');
   if (DATA.gang && DATA.gang.length > 0) {
     listEl.innerHTML = '';
@@ -3701,7 +3907,6 @@ function _renderCoopBossSelector() {
   const wrap = document.getElementById('coop-boss-selector');
   if (!wrap) return;
   wrap.innerHTML = '';
-
   const districts = [
     {id:'market',  icon:'🏪', name:'Рынок',    minLvl:1,  bosses:['kosoy','bychok','shustryy','zhigan']},
     {id:'port',    icon:'⚓', name:'Порт',      minLvl:5,  bosses:['tolsty','kaban','kontrabas','bukhgalter']},
@@ -3710,53 +3915,39 @@ function _renderCoopBossSelector() {
     {id:'mansion', icon:'🏛', name:'Резиденция',minLvl:20, bosses:['sedoy','prizrak','vizir','don_karlo']},
   ];
   const availDist = districts.filter(d => DATA.level >= d.minLvl);
-
   const sel = document.createElement('div');
   sel.style.cssText = 'display:flex;flex-direction:column;gap:8px';
-
-  // District picker
   const distSel = document.createElement('select');
   distSel.id = 'coop-dist-sel';
   distSel.style.cssText = 'background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:#fff;padding:8px 12px;font-size:14px;width:100%';
   availDist.forEach(d => {
     const o = document.createElement('option');
-    o.value = d.id;
-    o.textContent = `${d.icon} ${d.name}`;
+    o.value = d.id; o.textContent = `${d.icon} ${d.name}`;
     distSel.appendChild(o);
   });
-
-  // Boss picker
   const bossSel = document.createElement('select');
   bossSel.id = 'coop-boss-sel';
   bossSel.style.cssText = 'background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:#fff;padding:8px 12px;font-size:14px;width:100%';
-
   function refreshBosses() {
     const dist = availDist.find(d => d.id === distSel.value) || availDist[0];
     bossSel.innerHTML = '';
+    if(!dist)return;
     dist.bosses.forEach(bid => {
-      const bd = BOSS_DATA[bid];
-      if (!bd) return;
+      const bd = BOSS_DATA[bid]; if (!bd) return;
       const o = document.createElement('option');
-      o.value = bid;
-      o.textContent = `${bd.name} — ❤️${bd.hp}`;
+      o.value = bid; o.textContent = `${bd.name} — ❤️${bd.hp}`;
       bossSel.appendChild(o);
     });
   }
-  distSel.onchange = refreshBosses;
-  refreshBosses();
-
-  sel.appendChild(distSel);
-  sel.appendChild(bossSel);
-  wrap.appendChild(sel);
+  distSel.onchange = refreshBosses; refreshBosses();
+  sel.appendChild(distSel); sel.appendChild(bossSel); wrap.appendChild(sel);
 }
 
 function _coopShowFromData() {
   const status = DATA.coopStatus;
-  if (status === 'waiting') {
-    _coopShowWaitroomFromData();
-  } else if (status === 'battle') {
-    _coopShowBattleFromData();
-  } else if (status === 'won' || status === 'lost') {
+  if (status === 'waiting') { _coopShowWaitroomFromData(); }
+  else if (status === 'battle') { _coopShowBattleFromData(); }
+  else if (status === 'won' || status === 'lost') {
     document.getElementById('coop-lobby').style.display    = 'none';
     document.getElementById('coop-battle').style.display   = 'none';
     document.getElementById('coop-waitroom').style.display = 'none';
@@ -3778,42 +3969,26 @@ function _coopShowWaitroomFromData() {
   document.getElementById('coop-waitroom').style.display = '';
   document.getElementById('coop-session-code').textContent = String(DATA.coopSid);
   document.getElementById('coop-countdown').textContent    = '';
-
-  // Render current players
   const playersEl = document.getElementById('coop-players-in');
   playersEl.innerHTML = '';
-  DATA.coopPlayers.forEach((p, i) => {
+  DATA.coopPlayers.forEach(p => {
     const slot = document.createElement('div');
     slot.className = 'coop-player-slot';
     slot.innerHTML = `<span>🤵</span> <span>${p.name}</span> <span style="color:var(--muted);font-size:11px">${p.hp}/${p.maxhp} HP</span>`;
     playersEl.appendChild(slot);
   });
-
-  // Show correct buttons based on whether I'm host (coopMyTurn used as host flag here)
   const startBtn = document.getElementById('coop-start-btn');
   if (startBtn) {
-    const amHost = (DATA.coopMyTurn === 1);  // bot sets my_turn=1 for host in waiting
+    const amHost = (DATA.coopMyTurn === 1);
     startBtn.style.display = amHost ? '' : 'none';
     startBtn.disabled = false;
-    startBtn.onclick = () => {
-      if (tg && tg.sendData) {
-        tg.sendData(JSON.stringify({a:'coop_start_hub', sid: DATA.coopSid}));
-      }
-    };
+    startBtn.onclick = () => { if(tg&&tg.sendData) tg.sendData(JSON.stringify({a:'coop_start_hub',sid:DATA.coopSid})); };
   }
-
-  // "Готов" button — replace cancel with ready
   const cancelBtn = document.querySelector('#coop-waitroom .coop-cancel-btn');
   if (cancelBtn) {
     cancelBtn.textContent = '✅ Готов к бою';
-    cancelBtn.style.background = 'linear-gradient(135deg,#27ae60,#1a7a40)';
-    cancelBtn.style.color = '#fff';
-    cancelBtn.style.border = 'none';
-    cancelBtn.onclick = () => {
-      if (tg && tg.sendData) {
-        tg.sendData(JSON.stringify({a:'coop_ready_hub', sid: DATA.coopSid}));
-      }
-    };
+    cancelBtn.style.cssText += 'background:linear-gradient(135deg,#27ae60,#1a7a40);color:#fff;border:none';
+    cancelBtn.onclick = () => { if(tg&&tg.sendData) tg.sendData(JSON.stringify({a:'coop_ready_hub',sid:DATA.coopSid})); };
   }
 }
 
@@ -3822,58 +3997,32 @@ function _coopShowBattleFromData() {
   document.getElementById('coop-waitroom').style.display = 'none';
   document.getElementById('coop-result').style.display   = 'none';
   document.getElementById('coop-battle').style.display   = '';
-
-  const boss = BOSS_DATA[DATA.coopBossId] || {name: 'Босс'};
+  const boss = BOSS_DATA[DATA.coopBossId] || {name:'Босс'};
   const bPct = DATA.coopBossMax > 0 ? Math.max(0, DATA.coopBossHp / DATA.coopBossMax * 100) : 0;
   document.getElementById('cb-boss-name').textContent = boss.name;
   document.getElementById('cb-boss-bar').style.width  = bPct.toFixed(1) + '%';
   document.getElementById('cb-boss-hp').textContent   = DATA.coopBossHp + ' / ' + DATA.coopBossMax;
-  document.getElementById('cb-boss-quote').textContent = DATA.coopTurnName
-    ? `Ход: ${DATA.coopTurnName}` : '';
-
-  // Players HP bars
+  document.getElementById('cb-boss-quote').textContent = DATA.coopTurnName ? `Ход: ${DATA.coopTurnName}` : '';
   const playersEl = document.getElementById('cb-players');
   playersEl.innerHTML = '';
   DATA.coopPlayers.forEach(pl => {
     const hpPct = pl.maxhp > 0 ? Math.max(0, pl.hp / pl.maxhp * 100) : 0;
-    const dead  = pl.hp <= 0;
-    const row   = document.createElement('div');
+    const dead = pl.hp <= 0;
+    const row = document.createElement('div');
     row.className = 'coop-player-battle-row' + (dead ? ' dead' : '');
-    row.innerHTML = `
-      <div class="cpb-avatar">${dead ? '💀' : '🤵'}</div>
-      <div class="cpb-info">
-        <div class="cpb-name">${pl.name}</div>
-        <div class="cpb-hp-bg"><div class="cpb-hp-fill" style="width:${hpPct.toFixed(1)}%"></div></div>
-      </div>
+    row.innerHTML = `<div class="cpb-avatar">${dead?'💀':'🤵'}</div>
+      <div class="cpb-info"><div class="cpb-name">${pl.name}</div>
+      <div class="cpb-hp-bg"><div class="cpb-hp-fill" style="width:${hpPct.toFixed(1)}%"></div></div></div>
       <div class="cpb-turn-badge">${pl.hp}/${pl.maxhp}</div>`;
     playersEl.appendChild(row);
   });
-
-  // Attack/wait button
   const atkBtn = document.getElementById('cb-atk-btn');
   if (DATA.coopMyTurn) {
-    atkBtn.disabled  = false;
-    atkBtn.textContent = getAttackLabel();
-    atkBtn.onclick = () => {
-      if (tg && tg.sendData) {
-        atkBtn.disabled = true;
-        tg.sendData(JSON.stringify({a:'coop_turn_hub', sid: DATA.coopSid, turn:'attack'}));
-      }
-    };
-  } else {
-    atkBtn.disabled  = true;
-    atkBtn.textContent = `⏳ Ходит ${DATA.coopTurnName || 'союзник'}...`;
-  }
-
-  // Flee button
+    atkBtn.disabled = false; atkBtn.textContent = getAttackLabel();
+    atkBtn.onclick = () => { if(tg&&tg.sendData){atkBtn.disabled=true;tg.sendData(JSON.stringify({a:'coop_turn_hub',sid:DATA.coopSid,turn:'attack'}));} };
+  } else { atkBtn.disabled=true; atkBtn.textContent=`⏳ Ходит ${DATA.coopTurnName||'союзник'}...`; }
   const fleeBtn = document.querySelector('#coop-battle .coop-flee-btn');
-  if (fleeBtn) {
-    fleeBtn.onclick = () => {
-      if (tg && tg.sendData) {
-        tg.sendData(JSON.stringify({a:'coop_turn_hub', sid: DATA.coopSid, turn:'flee'}));
-      }
-    };
-  }
+  if (fleeBtn) fleeBtn.onclick = () => { if(tg&&tg.sendData) tg.sendData(JSON.stringify({a:'coop_turn_hub',sid:DATA.coopSid,turn:'flee'})); };
 }
 
 function coopShowLobby() {
@@ -3885,96 +4034,12 @@ function coopShowLobby() {
   _coopStopPoll();
 }
 
-// ═══════════════════════════════════════════════════════ DONATE PAGE
-
-const CASH_PACKS = [
-  {stars:25,  cash:500,   label:'💵 500 баксов',    bonus:'Стартовый набор',   highlight:false},
-  {stars:75,  cash:2000,  label:'💵 2 000 баксов',  bonus:'Популярный выбор 🔥', highlight:true},
-  {stars:175, cash:6000,  label:'💵 6 000 баксов',  bonus:'+20% бонус',        highlight:false},
-  {stars:400, cash:20000, label:'💵 20 000 баксов', bonus:'+50% мега-бонус',   highlight:false},
-];
-const DIA_PACKS = [
-  {stars:50,  diamonds:100,  label:'💎 100 бриллиантов',   bonus:'Базовый набор',  highlight:false},
-  {stars:200, diamonds:500,  label:'💎 500 бриллиантов',   bonus:'Лучшая цена 🔥', highlight:true},
-  {stars:500, diamonds:1500, label:'💎 1 500 бриллиантов', bonus:'+20% бонус',     highlight:false},
-];
-
-function renderDonatePage(tab) {
-  document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
-  document.getElementById('page-donate').style.display = '';
-  history.pushState({page:'donate'}, '');
-
-  donateSwitchTab(tab === 'diamonds' ? 'diamonds' : 'cash');
-
-  // Build cash list
-  const cashList = document.getElementById('donate-cash-list');
-  cashList.innerHTML = '';
-  CASH_PACKS.forEach((p, i) => {
-    const card = document.createElement('div');
-    card.className = 'donate-pack-card' + (p.highlight ? ' highlight' : '');
-    card.onclick = () => donateConfirm('cash', i);
-    card.innerHTML = `
-      <div class="donate-pack-icon">💵</div>
-      <div class="donate-pack-info">
-        <div class="donate-pack-name">${p.label}</div>
-        <div class="donate-pack-bonus">${p.bonus}</div>
-      </div>
-      <div class="donate-pack-price">⭐ ${p.stars}</div>`;
-    cashList.appendChild(card);
-  });
-
-  // Build diamonds list
-  const diaList = document.getElementById('donate-dia-list');
-  diaList.innerHTML = '';
-  DIA_PACKS.forEach((p, i) => {
-    const card = document.createElement('div');
-    card.className = 'donate-pack-card' + (p.highlight ? ' highlight' : '');
-    card.onclick = () => donateConfirm('diamonds', i);
-    card.innerHTML = `
-      <div class="donate-pack-icon">💎</div>
-      <div class="donate-pack-info">
-        <div class="donate-pack-name">${p.label}</div>
-        <div class="donate-pack-bonus">${p.bonus}</div>
-      </div>
-      <div class="donate-pack-price">⭐ ${p.stars}</div>`;
-    diaList.appendChild(card);
-  });
-}
-
-function donateSwitchTab(tab) {
-  document.getElementById('dtab-cash').classList.toggle('active', tab === 'cash');
-  document.getElementById('dtab-diamonds').classList.toggle('active', tab === 'diamonds');
-  document.getElementById('donate-cash-packs').style.display = tab === 'cash'     ? '' : 'none';
-  document.getElementById('donate-dia-packs').style.display  = tab === 'diamonds' ? '' : 'none';
-}
-
-function donateConfirm(type, idx) {
-  const pack = type === 'cash' ? CASH_PACKS[idx] : DIA_PACKS[idx];
-  const icon  = type === 'cash' ? '💵' : '💎';
-  const amount = type === 'cash'
-    ? pack.cash + ' баксов'
-    : pack.diamonds + ' бриллиантов';
-  if (!tg) { alert('Открой в Telegram!'); return; }
-  tg.showConfirm(
-    icon + ' ' + pack.label + '\n\nСтоимость: ⭐ ' + pack.stars + ' Telegram Stars\nПолучишь: ' + amount + '\n\nПродолжить?',
-    (ok) => {
-      if (!ok) return;
-      tg.sendData(JSON.stringify({
-        a: type === 'cash' ? 'buy_cash_hub' : 'buy_dia_hub',
-        idx: idx
-      }));
-    }
-  );
-}
-
-
 function coopShowJoin() {
   document.getElementById('coop-lobby').style.display = 'none';
   document.getElementById('coop-join-view').style.display = '';
   document.getElementById('coop-join-input').value = '';
 }
 
-// ── CREATE SESSION ────────────────────────────────────────────────────
 function coopCreateSession() {
   if (!tg || !tg.sendData) { showToast('Только в Telegram', '⚠️'); return; }
   const bossEl = document.getElementById('coop-boss-sel');
@@ -3982,312 +4047,185 @@ function coopCreateSession() {
   const bossId = bossEl ? bossEl.value : 'kosoy';
   const locId  = distEl ? distEl.value : 'market';
   const inviteUids = Array.from(_coopInviteSet);
-  if (inviteUids.length === 0 && DATA.gang.length > 0) {
+  if (inviteUids.length === 0 && DATA.gang && DATA.gang.length > 0) {
     showToast('Выбери хотя бы одного союзника!', '⚠️'); return;
   }
-  tg.sendData(JSON.stringify({
-    a:           'coop_create_hub',
-    boss_id:     bossId,
-    loc_id:      locId,
-    invite_uids: inviteUids,
-  }));
+  tg.sendData(JSON.stringify({a:'coop_create_hub',boss_id:bossId,loc_id:locId,invite_uids:inviteUids}));
 }
 
-// ── JOIN SESSION ──────────────────────────────────────────────────────
 async function coopJoinSession() {
-  const code = document.getElementById('coop-join-input').value.trim().toUpperCase();
+  const code = (document.getElementById('coop-join-input')||{value:''}).value.trim().toUpperCase();
   if (!code || code.length < 4) { showToast('Введи код сессии', '⚠️'); return; }
   if (!coopApi()) { showToast('Сервер не настроен', '⚠️'); return; }
-
   try {
     const resp = await fetch(coopApi() + '/coop/' + code + '/join', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        uid:  coopMyUidStr(),
-        name: DATA.name,
-        atk:  DATA.atk,
-        def:  DATA.def,
-        hp:   session.hp,
-        maxhp: DATA.maxhp,
-        init_data: tg?.initData || '',
-      })
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({uid:coopMyUidStr(),name:DATA.name,atk:DATA.atk,def:DATA.def,hp:session.hp,maxhp:DATA.maxhp,init_data:tg?.initData||''})
     });
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      throw new Error(err.error || 'HTTP ' + resp.status);
-    }
+    if (!resp.ok) { const err=await resp.json().catch(()=>({})); throw new Error(err.error||'HTTP '+resp.status); }
     const data = await resp.json();
     coopSid = code;
-    if (data.state === 'battle') {
-      _coopEnterBattle(data);
-    } else {
-      _coopEnterWaitRoom(data);
-    }
-  } catch(e) {
-    showToast('Ошибка: ' + e.message, '❌');
-  }
+    if (data.state==='battle') _coopEnterBattle(data); else _coopEnterWaitRoom(data);
+  } catch(e) { showToast('Ошибка: '+e.message,'❌'); }
 }
 
-// ── WAIT ROOM ─────────────────────────────────────────────────────────
 function _coopEnterWaitRoom(data) {
   coopState = data;
   document.getElementById('coop-lobby').style.display    = 'none';
   document.getElementById('coop-join-view').style.display= 'none';
   document.getElementById('coop-waitroom').style.display = '';
   document.getElementById('coop-session-code').textContent = coopSid;
-
-  // Countdown timer
   let secs = 60;
   _coopStopWait();
   _coopRenderWaitPlayers(data);
-  coopWaitTimer = setInterval(() => {
-    secs--;
-    const el = document.getElementById('coop-countdown');
-    if (el) el.textContent = Math.max(0, secs);
-    if (secs <= 0) {
-      _coopStopWait();
-      coopStartBattle();
-    }
-  }, 1000);
-
-  // Poll for new joiners
+  coopWaitTimer = setInterval(()=>{ secs--;
+    const el=document.getElementById('coop-countdown'); if(el)el.textContent=Math.max(0,secs);
+    if(secs<=0){_coopStopWait();coopStartBattle();}
+  },1000);
   _coopStopPoll();
   coopPollTimer = setInterval(_coopPollWait, 2000);
 }
 
 function _coopRenderWaitPlayers(data) {
-  const el = document.getElementById('coop-players-in');
-  if (!el) return;
-  el.innerHTML = '';
-  const players = data.players || [];
-  for (let i = 0; i < 4; i++) {
-    const slot = document.createElement('div');
-    if (players[i]) {
-      slot.className = 'coop-player-slot';
-      const isMe = players[i].uid === coopMyUidStr();
-      slot.innerHTML = `<span>🤵</span> <span>${players[i].name}${isMe ? ' (ты)' : ''}</span>`;
-    } else {
-      slot.className = 'coop-player-slot empty';
-      slot.textContent = 'Слот ' + (i+1) + ' — свободен';
-    }
+  const el=document.getElementById('coop-players-in'); if(!el)return;
+  el.innerHTML='';
+  const players=data.players||[];
+  for(let i=0;i<4;i++){
+    const slot=document.createElement('div');
+    if(players[i]){
+      slot.className='coop-player-slot';
+      const isMe=players[i].uid===coopMyUidStr();
+      slot.innerHTML=`<span>🤵</span> <span>${players[i].name}${isMe?' (ты)':''}</span>`;
+    }else{slot.className='coop-player-slot empty';slot.textContent='Слот '+(i+1)+' — свободен';}
     el.appendChild(slot);
   }
-  const startBtn = document.getElementById('coop-start-btn');
-  if (startBtn) startBtn.disabled = players.length < 2;
+  const startBtn=document.getElementById('coop-start-btn');
+  if(startBtn)startBtn.disabled=players.length<2;
 }
 
 async function _coopPollWait() {
-  if (!coopSid) return;
-  try {
-    const resp = await fetch(coopApi() + '/coop/' + coopSid);
-    if (!resp.ok) return;
-    const data = await resp.json();
-    coopState = data;
-    _coopRenderWaitPlayers(data);
-    if (data.state === 'battle') {
-      _coopStopWait();
-      _coopStopPoll();
-      _coopEnterBattle(data);
-    } else if (data.state === 'cancelled') {
-      _coopStopWait();
-      _coopStopPoll();
-      showToast('Сессия отменена', '❌');
-      coopShowLobby();
-    }
-  } catch(e) {}
+  if(!coopSid)return;
+  try{
+    const resp=await fetch(coopApi()+'/coop/'+coopSid); if(!resp.ok)return;
+    const data=await resp.json(); coopState=data; _coopRenderWaitPlayers(data);
+    if(data.state==='battle'){_coopStopWait();_coopStopPoll();_coopEnterBattle(data);}
+    else if(data.state==='cancelled'){_coopStopWait();_coopStopPoll();showToast('Сессия отменена','❌');coopShowLobby();}
+  }catch(e){}
 }
 
 async function coopStartBattle() {
-  _coopStopWait();
-  _coopStopPoll();
-  if (!coopSid) return;
-  try {
-    const resp = await fetch(coopApi() + '/coop/' + coopSid + '/start', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ uid: coopMyUidStr() })
-    });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const data = await resp.json();
-    coopState = data;
-    _coopEnterBattle(data);
-  } catch(e) {
-    showToast('Ошибка старта: ' + e.message, '❌');
-  }
+  _coopStopWait(); _coopStopPoll(); if(!coopSid)return;
+  try{
+    const resp=await fetch(coopApi()+'/coop/'+coopSid+'/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:coopMyUidStr()})});
+    if(!resp.ok)throw new Error('HTTP '+resp.status);
+    const data=await resp.json(); coopState=data; _coopEnterBattle(data);
+  }catch(e){showToast('Ошибка старта: '+e.message,'❌');}
 }
 
 async function coopCancelSession() {
-  _coopStopWait();
-  _coopStopPoll();
-  if (coopSid) {
-    try {
-      await fetch(coopApi() + '/coop/' + coopSid + '/cancel', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ uid: coopMyUidStr() })
-      });
-    } catch(e) {}
-  }
-  coopSid = null;
-  coopShowLobby();
+  _coopStopWait(); _coopStopPoll();
+  if(coopSid){try{await fetch(coopApi()+'/coop/'+coopSid+'/cancel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:coopMyUidStr()})});}catch(e){}}
+  coopSid=null; coopShowLobby();
 }
 
-// ── BATTLE ────────────────────────────────────────────────────────────
 function _coopEnterBattle(data) {
-  coopState = data;
-  document.getElementById('coop-waitroom').style.display = 'none';
-  document.getElementById('coop-lobby').style.display    = 'none';
-  document.getElementById('coop-battle').style.display   = '';
-  _coopRenderBattle(data);
-  _coopStopPoll();
-  coopPollTimer = setInterval(_coopPollBattle, 1800);
+  coopState=data;
+  document.getElementById('coop-waitroom').style.display='none';
+  document.getElementById('coop-lobby').style.display='none';
+  document.getElementById('coop-battle').style.display='';
+  _coopRenderBattle(data); _coopStopPoll();
+  coopPollTimer=setInterval(_coopPollBattle,1800);
 }
 
 function _coopRenderBattle(data) {
-  if (!data) return;
-  const boss = BOSS_DATA[data.boss_id] || {};
-  // Boss
-  document.getElementById('cb-boss-name').textContent = boss.name || 'Босс';
-  const bPct = data.boss_max_hp > 0 ? Math.max(0, data.boss_hp / data.boss_max_hp * 100) : 0;
-  document.getElementById('cb-boss-bar').style.width = bPct.toFixed(1) + '%';
-  document.getElementById('cb-boss-hp').textContent = data.boss_hp + ' / ' + data.boss_max_hp;
-
-  // Players
-  const playersEl = document.getElementById('cb-players');
-  playersEl.innerHTML = '';
-  (data.players || []).forEach((pl, idx) => {
-    const isMe   = pl.uid === coopMyUidStr();
-    const isMyTurn = data.turn_uid === pl.uid;
-    const isDead = pl.hp <= 0;
-    const row = document.createElement('div');
-    row.className = 'coop-player-battle-row' + (isMyTurn ? ' my-turn' : '') + (isDead ? ' dead' : '');
-    const hpPct = pl.max_hp > 0 ? Math.max(0, pl.hp / pl.max_hp * 100) : 0;
-    row.innerHTML = `
-      <div class="cpb-avatar">${isDead ? '💀' : '🤵'}</div>
-      <div class="cpb-info">
-        <div class="cpb-name">${pl.name}${isMe ? ' (ты)' : ''}</div>
-        <div class="cpb-hp-bg"><div class="cpb-hp-fill" style="width:${hpPct.toFixed(1)}%"></div></div>
-      </div>
-      <div class="cpb-turn-badge">${isMyTurn ? '⚔️ ХОД' : ''}  ${pl.hp}/${pl.max_hp} HP</div>`;
+  if(!data)return;
+  const boss=BOSS_DATA[data.boss_id]||{};
+  document.getElementById('cb-boss-name').textContent=boss.name||'Босс';
+  const bPct=data.boss_max_hp>0?Math.max(0,data.boss_hp/data.boss_max_hp*100):0;
+  document.getElementById('cb-boss-bar').style.width=bPct.toFixed(1)+'%';
+  document.getElementById('cb-boss-hp').textContent=data.boss_hp+' / '+data.boss_max_hp;
+  const playersEl=document.getElementById('cb-players'); playersEl.innerHTML='';
+  (data.players||[]).forEach(pl=>{
+    const isMe=pl.uid===coopMyUidStr(),isMyTurn=data.turn_uid===pl.uid,isDead=pl.hp<=0;
+    const row=document.createElement('div');
+    row.className='coop-player-battle-row'+(isMyTurn?' my-turn':'')+(isDead?' dead':'');
+    const hpPct=pl.max_hp>0?Math.max(0,pl.hp/pl.max_hp*100):0;
+    row.innerHTML=`<div class="cpb-avatar">${isDead?'💀':'🤵'}</div>
+      <div class="cpb-info"><div class="cpb-name">${pl.name}${isMe?' (ты)':''}</div>
+      <div class="cpb-hp-bg"><div class="cpb-hp-fill" style="width:${hpPct.toFixed(1)}%"></div></div></div>
+      <div class="cpb-turn-badge">${isMyTurn?'⚔️ ХОД':''}  ${pl.hp}/${pl.max_hp} HP</div>`;
     playersEl.appendChild(row);
   });
-
-  // Log
-  const logEl = document.getElementById('coop-log');
-  const prevLen = parseInt(logEl.dataset.loglen || '0');
-  const entries = data.log || [];
-  if (entries.length > prevLen) {
-    entries.slice(prevLen).forEach(entry => {
-      const el = document.createElement('div');
-      el.className = 'coop-log-entry ' + (entry.type || '');
-      el.textContent = entry.text;
-      logEl.appendChild(el);
-    });
-    logEl.scrollTop = logEl.scrollHeight;
-    logEl.dataset.loglen = entries.length;
+  const logEl=document.getElementById('coop-log');
+  const prevLen=parseInt(logEl.dataset.loglen||'0'),entries=data.log||[];
+  if(entries.length>prevLen){
+    entries.slice(prevLen).forEach(entry=>{const el=document.createElement('div');el.className='coop-log-entry '+(entry.type||'');el.textContent=entry.text;logEl.appendChild(el);});
+    logEl.scrollTop=logEl.scrollHeight; logEl.dataset.loglen=entries.length;
   }
-
-  // Attack button
-  const atkBtn = document.getElementById('cb-atk-btn');
-  const myTurn = data.turn_uid === coopMyUidStr() && data.state === 'battle';
-  atkBtn.disabled = !myTurn;
-  atkBtn.textContent = myTurn ? getAttackLabel() : '⏳ Ход другого';
+  const atkBtn=document.getElementById('cb-atk-btn');
+  const myTurn=data.turn_uid===coopMyUidStr()&&data.state==='battle';
+  atkBtn.disabled=!myTurn; atkBtn.textContent=myTurn?getAttackLabel():'⏳ Ход другого';
 }
 
 async function _coopPollBattle() {
-  if (!coopSid) return;
-  try {
-    const resp = await fetch(coopApi() + '/coop/' + coopSid);
-    if (!resp.ok) return;
-    const data = await resp.json();
-    coopState = data;
-    _coopRenderBattle(data);
-    if (data.state === 'won' || data.state === 'lost') {
-      _coopStopPoll();
-      _coopShowResult(data);
-    }
-  } catch(e) {}
+  if(!coopSid)return;
+  try{
+    const resp=await fetch(coopApi()+'/coop/'+coopSid); if(!resp.ok)return;
+    const data=await resp.json(); coopState=data; _coopRenderBattle(data);
+    if(data.state==='won'||data.state==='lost'){_coopStopPoll();_coopShowResult(data);}
+  }catch(e){}
 }
 
 async function coopAttack() {
-  if (!coopSid || !coopState) return;
-  document.getElementById('cb-atk-btn').disabled = true;
-  try {
-    const resp = await fetch(coopApi() + '/coop/' + coopSid + '/attack', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ uid: coopMyUidStr(), type: 'normal' })
-    });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const data = await resp.json();
-    coopState = data;
-    _coopRenderBattle(data);
-    if (data.state === 'won' || data.state === 'lost') {
-      _coopStopPoll();
-      _coopShowResult(data);
-    }
-  } catch(e) {
-    showToast('Ошибка атаки: ' + e.message, '❌');
-    document.getElementById('cb-atk-btn').disabled = false;
-  }
+  if(!coopSid||!coopState)return;
+  document.getElementById('cb-atk-btn').disabled=true;
+  try{
+    const resp=await fetch(coopApi()+'/coop/'+coopSid+'/attack',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:coopMyUidStr(),type:'normal'})});
+    if(!resp.ok)throw new Error('HTTP '+resp.status);
+    const data=await resp.json(); coopState=data; _coopRenderBattle(data);
+    if(data.state==='won'||data.state==='lost'){_coopStopPoll();_coopShowResult(data);}
+  }catch(e){showToast('Ошибка атаки: '+e.message,'❌');document.getElementById('cb-atk-btn').disabled=false;}
 }
 
 async function coopLeave() {
   _coopStopPoll();
-  if (coopSid) {
-    try {
-      await fetch(coopApi() + '/coop/' + coopSid + '/leave', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ uid: coopMyUidStr() })
-      });
-    } catch(e) {}
-  }
-  coopSid = null;
-  coopState = null;
-  coopShowLobby();
+  if(coopSid){try{await fetch(coopApi()+'/coop/'+coopSid+'/leave',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:coopMyUidStr()})});}catch(e){}}
+  coopSid=null; coopState=null; coopShowLobby();
 }
 
 function _coopShowResult(data) {
-  document.getElementById('coop-battle').style.display = 'none';
-  document.getElementById('coop-result').style.display = '';
-  const won = data.state === 'won';
-  const boss = BOSS_DATA[data.boss_id] || {};
-  document.getElementById('coop-result-inner').innerHTML = `
-    <div class="coop-result-icon">${won ? '🏆' : '💀'}</div>
-    <div class="coop-result-title ${won ? 'win' : 'lose'}">${won ? 'ПОБЕДА!' : 'ПОРАЖЕНИЕ'}</div>
-    ${won ? `<div style="color:var(--muted);font-size:13px">Босс повержен. Награды разделены.</div>` : ''}
+  document.getElementById('coop-battle').style.display='none';
+  document.getElementById('coop-result').style.display='';
+  const won=data.state==='won',boss=BOSS_DATA[data.boss_id]||{};
+  document.getElementById('coop-result-inner').innerHTML=`
+    <div class="coop-result-icon">${won?'🏆':'💀'}</div>
+    <div class="coop-result-title ${won?'win':'lose'}">${won?'ПОБЕДА!':'ПОРАЖЕНИЕ'}</div>
+    ${won?`<div style="color:var(--muted);font-size:13px">Босс повержен. Награды разделены.</div>`:''}
     <button class="coop-result-back" onclick="coopShowLobby()">← В лобби</button>`;
 }
 
-function _coopStopPoll() { if (coopPollTimer) { clearInterval(coopPollTimer); coopPollTimer = null; } }
-function _coopStopWait() { if (coopWaitTimer) { clearInterval(coopWaitTimer); coopWaitTimer = null; } }
+function _coopStopPoll(){if(coopPollTimer){clearInterval(coopPollTimer);coopPollTimer=null;}}
+function _coopStopWait(){if(coopWaitTimer){clearInterval(coopWaitTimer);coopWaitTimer=null;}}
 
 //  AVATAR DRAWING
 // ══════════════════════════════════════════════════════════════════════
 const SKINS = ['#FDDBB4','#F0C27F','#D4935A','#A0622A','#7A3B10','#C8A882'];
 
 const avatarCanvas = document.getElementById('avatar-canvas');
-const actx = avatarCanvas.getContext('2d');
+const actx = avatarCanvas ? avatarCanvas.getContext('2d') : null;
 
 function drawAvatar() {
-  const W = avatarCanvas.width, H = avatarCanvas.height;
-  const cx = W/2;
-  const sc = Math.min(W,H)/220;
-  function px(x) { return cx + x*sc; }
-  function py(y) { return H*0.92 - y*sc; }
-  const skinCol = SKINS[DATA.skin] || SKINS[0];
+  if(!actx)return;
+  const W=avatarCanvas.width,H=avatarCanvas.height,cx=W/2,sc=Math.min(W,H)/220;
+  function px(x){return cx+x*sc;} function py(y){return H*0.92-y*sc;}
+  const skinCol=SKINS[DATA.skin]||SKINS[0];
   actx.clearRect(0,0,W,H);
-  if (DATA.gender === 0) drawMaleAvatar(actx,px,py,sc,skinCol,DATA.body,DATA.face,DATA.hair,DATA.hat);
-  else                   drawFemaleAvatar(actx,px,py,sc,skinCol,DATA.body,DATA.face,DATA.hair,DATA.hat);
+  if(DATA.gender===0) drawMaleAvatar(actx,px,py,sc,skinCol,DATA.body,DATA.face,DATA.hair,DATA.hat);
+  else drawFemaleAvatar(actx,px,py,sc,skinCol,DATA.body,DATA.face,DATA.hair,DATA.hat);
 }
 
-function drawMaleAvatar(ctx,px,py,sc,skinCol,body,face,hair,hat) {
-  const bodyDefs=[
-    {sw:34,sh:80,nw:14,nh:22,hw:26},{sw:44,sh:85,nw:16,nh:22,hw:30},
-    {sw:58,sh:82,nw:18,nh:20,hw:36},{sw:52,sh:92,nw:16,nh:24,hw:32}
-  ];
+function drawMaleAvatar(ctx,px,py,sc,skinCol,body,face,hair,hat){
+  const bodyDefs=[{sw:34,sh:80,nw:14,nh:22,hw:26},{sw:44,sh:85,nw:16,nh:22,hw:30},{sw:58,sh:82,nw:18,nh:20,hw:36},{sw:52,sh:92,nw:16,nh:24,hw:32}];
   const bd=bodyDefs[body]||bodyDefs[1];
   const suitCol=['#1a1a2e','#1a2e1a','#2e1a1a','#1a1e2e'][body%4];
   const tieCol=['#c0392b','#e8c96e','#8e44ad','#2980b9'][face%4];
@@ -4333,11 +4271,8 @@ function drawMaleAvatar(ctx,px,py,sc,skinCol,body,face,hair,hat) {
   if(hat>0) drawHatSimple(ctx,hat,px,py,bd,headY,headH,sc);
 }
 
-function drawFemaleAvatar(ctx,px,py,sc,skinCol,body,face,hair,hat) {
-  const bodyDefs=[
-    {sw:30,sh:78,nw:12,nh:20,hw:24,hip:32},{sw:36,sh:80,nw:13,nh:20,hw:27,hip:40},
-    {sw:48,sh:76,nw:15,nh:18,hw:32,hip:54},{sw:34,sh:85,nw:13,nh:22,hw:26,hip:38}
-  ];
+function drawFemaleAvatar(ctx,px,py,sc,skinCol,body,face,hair,hat){
+  const bodyDefs=[{sw:30,sh:78,nw:12,nh:20,hw:24,hip:32},{sw:36,sh:80,nw:13,nh:20,hw:27,hip:40},{sw:48,sh:76,nw:15,nh:18,hw:32,hip:54},{sw:34,sh:85,nw:13,nh:22,hw:26,hip:38}];
   const bd=bodyDefs[body]||bodyDefs[1];
   const dressCol=['#3a1a3a','#1a2a3a','#3a1a1a','#1a3a2a'][body%4];
   const accentCol=['#e8c96e','#c0392b','#8e44ad','#2980b9'][face%4];
@@ -4370,50 +4305,48 @@ function drawFemaleAvatar(ctx,px,py,sc,skinCol,body,face,hair,hat) {
     ctx.beginPath();ctx.ellipse(px(0),py(headY),(bd.hw/2+3)*sc,11*sc,0,Math.PI,Math.PI*2);ctx.fill();
     ctx.beginPath();ctx.ellipse(px(-bd.hw/2-3),py(headY-headH*0.3),(bd.hw*0.18)*sc,(headH*0.55)*sc,0.1,0,Math.PI*2);ctx.fill();
     ctx.beginPath();ctx.ellipse(px(bd.hw/2+3),py(headY-headH*0.3),(bd.hw*0.18)*sc,(headH*0.55)*sc,-0.1,0,Math.PI*2);ctx.fill();
-    if(hair===3){
-      ctx.beginPath();ctx.moveTo(px(-3),py(headY));ctx.lineTo(px(-2),py(headY+30));ctx.lineTo(px(2),py(headY+30));ctx.lineTo(px(3),py(headY));ctx.fill();
-    }
+    if(hair===3){ctx.beginPath();ctx.moveTo(px(-3),py(headY));ctx.lineTo(px(-2),py(headY+30));ctx.lineTo(px(2),py(headY+30));ctx.lineTo(px(3),py(headY));ctx.fill();}
   }
   if(hat>0) drawHatSimple(ctx,hat,px,py,bd,headY,headH,sc);
 }
 
-function drawHatSimple(ctx,hatId,px,py,bd,headY,headH,sc) {
-  const hw = bd.hw;
-  const eyeY = bd.sh + bd.nh + headH * 0.55;
+function drawHatSimple(ctx,hatId,px,py,bd,headY,headH,sc){
+  const hw=bd.hw/2;
+  const eyeY=headY-headH*0.45;
   if(hatId===1){
-    ctx.fillStyle='#111';
-    ctx.beginPath();ctx.ellipse(px(0),py(headY+3),(hw+10)*sc,5*sc,0,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.roundRect(px(-hw*0.5),py(headY+3+28),(hw)*sc,28*sc,[2*sc,2*sc,0,0]);ctx.fill();
-    ctx.fillStyle='#c0392b';ctx.beginPath();ctx.roundRect(px(-hw*0.5),py(headY+3+16),(hw)*sc,5*sc);ctx.fill();
-  } else if(hatId===2){
+    ctx.fillStyle='#222';
+    ctx.beginPath();ctx.ellipse(px(0),py(headY),(hw+6)*sc,4*sc,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.roundRect(px(-hw*0.8),py(headY+30),(hw*1.6)*sc,30*sc,[3*sc,3*sc,0,0]);ctx.fill();
+  }else if(hatId===2){
     ctx.fillStyle='#8b4513';
     ctx.beginPath();ctx.ellipse(px(0),py(headY),(hw+8)*sc,4*sc,0,0,Math.PI*2);ctx.fill();
     ctx.beginPath();ctx.roundRect(px(-hw*0.42),py(headY+18),(hw*0.84)*sc,18*sc,[4*sc,4*sc,0,0]);ctx.fill();
-  } else if(hatId===3){
+  }else if(hatId===3){
     ctx.fillStyle='#2c2c4e';
     ctx.beginPath();ctx.ellipse(px(-3),py(headY+8),(hw+3)*sc,12*sc,-0.15,Math.PI*0.05,Math.PI*1.95);ctx.fill();
     ctx.beginPath();ctx.ellipse(px(hw*0.4),py(headY),(hw+5)*sc,4*sc,0.15,0,Math.PI);ctx.fill();
-  } else if(hatId===4){
+  }else if(hatId===4){
     ctx.fillStyle='#5c3d11';
     ctx.beginPath();ctx.ellipse(px(0),py(headY+3),(hw+13)*sc,5*sc,0,0,Math.PI*2);ctx.fill();
     ctx.beginPath();ctx.moveTo(px(-hw+2),py(headY+3));ctx.lineTo(px(-hw+5),py(headY+35));ctx.lineTo(px(0),py(headY+40));ctx.lineTo(px(hw-5),py(headY+35));ctx.lineTo(px(hw-2),py(headY+3));ctx.closePath();ctx.fill();
-  } else if(hatId===5){
+  }else if(hatId===5){
     ctx.strokeStyle='#111';ctx.lineWidth=2.5*sc;ctx.fillStyle='#1a3a5a88';
     ctx.beginPath();ctx.roundRect(px(-hw*0.55),py(eyeY+5),hw*0.42*sc,9*sc,[3*sc]);ctx.fill();ctx.stroke();
     ctx.beginPath();ctx.roundRect(px(hw*0.13),py(eyeY+5),hw*0.42*sc,9*sc,[3*sc]);ctx.fill();ctx.stroke();
     ctx.beginPath();ctx.moveTo(px(-hw*0.13),py(eyeY+8));ctx.lineTo(px(hw*0.13),py(eyeY+8));ctx.stroke();
-  } else if(hatId===7){
+  }else if(hatId===7){
     ctx.fillStyle='#2c2c4e';
     ctx.beginPath();ctx.ellipse(px(-3),py(headY+8),(hw+3)*sc,12*sc,-0.15,Math.PI*0.05,Math.PI*1.95);ctx.fill();
-  } else if(hatId===8){
+  }else if(hatId===8){
     ctx.fillStyle='#0a0a0a';
     ctx.beginPath();ctx.ellipse(px(0),py(headY+2),(hw+14)*sc,5*sc,0,0,Math.PI*2);ctx.fill();
     ctx.beginPath();ctx.roundRect(px(-hw+4),py(headY+2+28),(hw*2-8)*sc,28*sc,[2*sc,2*sc,0,0]);ctx.fill();
   }
+
 }
 
 drawAvatar();
+
 </script>
 </body>
 </html>
-                                                                                                                                                                                                                                                                                                                                                     
