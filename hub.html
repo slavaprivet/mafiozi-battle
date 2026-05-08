@@ -690,7 +690,7 @@ body {
 #tac-joy-base{position:absolute;width:84px;height:84px;border-radius:50%;background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.18);pointer-events:none;z-index:15;display:none}
 #tac-joy-knob{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.3);border:2.5px solid rgba(255,255,255,.55);box-shadow:0 0 10px rgba(255,255,255,.15)}
 /* Action buttons */
-#tac-actions{position:absolute;right:10px;bottom:20px;display:flex;flex-direction:column;align-items:center;gap:10px;z-index:15;pointer-events:auto}
+#tac-actions{position:absolute;right:10px;bottom:80px;display:flex;flex-direction:column;align-items:center;gap:10px;z-index:15;pointer-events:auto}
 .tac-act-btn{width:66px;height:66px;border-radius:50%;border:none;font-size:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;-webkit-tap-highlight-color:transparent;user-select:none;transition:transform .08s,box-shadow .08s;touch-action:manipulation}
 .tac-act-btn:active{transform:scale(.88)}
 .tac-act-btn.shoot{background:radial-gradient(circle at 40% 35%,#e05050,#7b1c1c);box-shadow:0 0 18px #c0392b99,0 2px 6px #0006;border:2px solid #e74c3c66}
@@ -985,7 +985,7 @@ body {
     <div class="tile-label">Моя банда</div>
   </div>
 
-  <div class="tile tile-diamonds" onclick="nav('diamonds')">
+  <div class="tile tile-diamonds" onclick="nav('donate','diamonds')">
     <div class="tile-icon">💎</div>
     <div class="tile-label">Бриллианты</div>
   </div>
@@ -1109,7 +1109,9 @@ body {
     <div style="font-size:13px;color:#f90">🎯 Правая зона — прицел и стрельба</div>
     <div style="font-size:13px;color:#ccc">👊 Кнопка — удар в ближнем бою</div>
     <div style="font-size:13px;color:#ccc">💣 Кнопка — граната (авто-цель)</div>
-    <div style="font-size:13px;color:#adf">👥 Кооп — играй с другом онлайн</div>
+    <div style="font-size:13px;color:#cc88ff;margin-top:4px">🗡 Подойди <b>сзади</b> — кнопка станет 🔪</div>
+    <div style="font-size:12px;color:#aa66dd">Тихое убийство не поднимет тревогу!</div>
+    <div style="font-size:12px;color:#f0c030;margin-top:2px">⚠️ В режиме тревоги стелс недоступен</div>
   </div>
 </div>
 
@@ -1541,7 +1543,11 @@ function goBack() {
   // If battle result overlay is visible — ignore back, let user press buttons
   const _res=document.getElementById('tac-result');
   if(_res&&_res.style.display==='flex')return;
+  // Guard: don't commit session within 2s of leaving battle (Telegram queued back event)
+  if(_afterBattleTs && Date.now()-_afterBattleTs < 2000)return;
   if (document.getElementById('page-battle').style.display !== 'none') {
+    // If battle is ending (gstate not 'playing') wait for overlay — don't interrupt
+    if (tac && tac.gstate !== 'playing') return;
     if (tac) afterBattle(false);
     return;
   }
@@ -3556,13 +3562,18 @@ function tacExplodeAnim(tr,tc,cb){
 }
 function tacCheckDeath(){
   if(!tac||tac.gstate!=='playing')return;
-  if(tac.enemies.every(e=>e.hp<=0)){setTimeout(()=>tacEndBattle('won'),900);return;}
-  if(tac.player.hp<=0)setTimeout(()=>tacEndBattle('lost'),500);
+  if(tac.enemies.every(e=>e.hp<=0)){
+    tac.gstate='won'; // set immediately so goBack can't interrupt
+    setTimeout(()=>tacEndBattle('won'),900);return;
+  }
+  if(tac.player.hp<=0){
+    tac.gstate='lost'; // set immediately so goBack can't interrupt
+    setTimeout(()=>tacEndBattle('lost'),500);
+  }
 }
 
 function tacEndBattle(res){
-  if(!tac||tac.gstate===res)return;
-  tac.gstate=res;
+  if(!tac||tac.gstate!==res)return;
   if(tac.pulseRaf){cancelAnimationFrame(tac.pulseRaf);tac.pulseRaf=null;}
   setTimeout(()=>{if(res==='won')sfxWin();else sfxLose();},100);
   tacCoopCleanup();
@@ -3843,21 +3854,30 @@ function tacSyncNetwork(ts){
   window.addEventListener('resize',()=>{if(tac)tacResize();});
 })();
 
+let _afterBattleTs = 0; // timestamp to guard against instant goBack after battle
+
 function afterBattle(stayInDistrict) {
   const _ovr=document.getElementById('tac-result');if(_ovr)_ovr.style.display='none';
   const _old=document.getElementById('battle-result');if(_old)_old.style.display='none';
   // Stop the game loop
   if(tac&&tac.pulseRaf){cancelAnimationFrame(tac.pulseRaf);tac.pulseRaf=null;}
   document.getElementById('page-battle').style.display='none';
-  if(tg&&tg.BackButton)tg.BackButton.hide();
+  // Disable & detach BackButton so Telegram can't fire queued events
+  if(tg&&tg.BackButton){tg.BackButton.offClick(goBack);tg.BackButton.hide();}
+  _afterBattleTs = Date.now(); // mark when we left battle
   if (stayInDistrict && session.hp >= 10) {
     openDistrict(tac ? tac.locId : currentLocId);
   } else {
     document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
     document.getElementById('page-main').style.display = '';
     window.scrollTo(0,0);
-    // DO NOT call commitSession() here — it calls tg.sendData() which closes the app.
-    // Session will be committed when user presses back on main page (goBack).
+    // Re-attach BackButton after a safe delay
+    setTimeout(()=>{
+      if(tg&&tg.BackButton&&session.dirty){
+        tg.BackButton.onClick(goBack);
+        tg.BackButton.show();
+      }
+    }, 1500);
   }
 }
 
@@ -4392,12 +4412,16 @@ function drawHatSimple(ctx,hatId,px,py,bd,headY,headH,sc){
     ctx.beginPath();ctx.ellipse(px(hw*0.4),py(headY),(hw+5)*sc,4*sc,0.15,0,Math.PI);ctx.fill();
   }else if(hatId===4){
     ctx.fillStyle='#5c3d11';
-    ctx.beginPath();ctx.ellipse(px(0),py(headY+3),(hw+13)*sc,5*sc,0,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.moveTo(px(-hw+2),py(headY+3));ctx.lineTo(px(-hw+5),py(headY+35));ctx.lineTo(px(0),py(headY+40));ctx.lineTo(px(hw-5),py(headY+35));ctx.lineTo(px(hw-2),py(headY+3));ctx.closePath();ctx.fill();
+    ctx.beginPath();ctx.ellipse(px(0),py(headY+3),(hw+13)*sc,5*sc,0,0,Math.PI*2);ctx.fill();    ctx.beginPath();ctx.moveTo(px(-hw+2),py(headY+3));ctx.lineTo(px(-hw+5),py(headY+35));ctx.lineTo(px(0),py(headY+40));ctx.lineTo(px(hw-5),py(headY+35));ctx.lineTo(px(hw-2),py(headY+3));ctx.closePath();ctx.fill();
   }else if(hatId===5){
     ctx.strokeStyle='#111';ctx.lineWidth=2.5*sc;ctx.fillStyle='#1a3a5a88';
     ctx.beginPath();ctx.roundRect(px(-hw*0.55),py(eyeY+5),hw*0.42*sc,9*sc,[3*sc]);ctx.fill();ctx.stroke();
     ctx.beginPath();ctx.roundRect(px(hw*0.13),py(eyeY+5),hw*0.42*sc,9*sc,[3*sc]);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.moveTo(px(-hw*0.13),py(eyeY+8));ctx.lineTo(px(hw*0.13),py(eyeY+8));ctx.stroke();
+  }else if(hatId===7){
+    ctx.fillStyle='#2c2c4e';
+    ctx.beginPath();ctx.ellipse(px(-3),py(headY+8),(hw+3)*sc,12*sc,-0.15,Math.PI*0.05,Math.PI*1.95);ctx.fill();
+  }else if(hatId===8){    ctx.fillStyle='#0a0a0a';
     ctx.beginPath();ctx.ellipse(px(0),py(headY+2),(hw+14)*sc,5*sc,0,0,Math.PI*2);ctx.fill();
     ctx.beginPath();ctx.roundRect(px(-hw+4),py(headY+2+28),(hw*2-8)*sc,28*sc,[2*sc,2*sc,0,0]);ctx.fill();
   }
