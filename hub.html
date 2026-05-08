@@ -1420,16 +1420,16 @@ try { localStorage.setItem('hubUrl', location.href); } catch(e) {}
 
 // ── DONATE PAGE ───────────────────────────────────────────────────────
 const CASH_PACKS=[
-  {id:'cash_1',icon:'💵',name:'Стартовый',amount:'5 000',bonus:'',price:'⭐ 25',highlight:false},
-  {id:'cash_2',icon:'💵💵',name:'Базовый',amount:'15 000',bonus:'+10% бонус',price:'⭐ 70',highlight:false},
-  {id:'cash_3',icon:'💵💵💵',name:'Солидный',amount:'40 000',bonus:'+20% бонус',price:'⭐ 180',highlight:true},
-  {id:'cash_4',icon:'🤑',name:'Дон',amount:'100 000',bonus:'+35% бонус',price:'⭐ 420',highlight:false},
+  {id:'cash_1',icon:'💵',  name:'Стартовый', cash:5000,   bonus:'',          stars:25,  highlight:false},
+  {id:'cash_2',icon:'💵💵', name:'Базовый',   cash:15000,  bonus:'+10% бонус',stars:70,  highlight:false},
+  {id:'cash_3',icon:'💵💵💵',name:'Солидный',  cash:40000,  bonus:'+20% бонус',stars:180, highlight:true},
+  {id:'cash_4',icon:'🤑',  name:'Дон',       cash:100000, bonus:'+35% бонус',stars:420, highlight:false},
 ];
 const DIA_PACKS=[
-  {id:'dia_1',icon:'💎',name:'Горсть',amount:'50',bonus:'',price:'⭐ 30',highlight:false},
-  {id:'dia_2',icon:'💎💎',name:'Мешочек',amount:'150',bonus:'+15% бонус',price:'⭐ 85',highlight:false},
-  {id:'dia_3',icon:'💎💎💎',name:'Сундук',amount:'400',bonus:'+30% бонус',price:'⭐ 210',highlight:true},
-  {id:'dia_4',icon:'👑',name:'Казна',amount:'1 000',bonus:'+50% бонус',price:'⭐ 490',highlight:false},
+  {id:'dia_1',icon:'💎',   name:'Горсть',  dia:50,   bonus:'',          stars:30,  highlight:false},
+  {id:'dia_2',icon:'💎💎',  name:'Мешочек', dia:150,  bonus:'+15% бонус',stars:85,  highlight:false},
+  {id:'dia_3',icon:'💎💎💎', name:'Сундук',  dia:400,  bonus:'+30% бонус',stars:210, highlight:true},
+  {id:'dia_4',icon:'👑',   name:'Казна',   dia:1000, bonus:'+50% бонус',stars:490, highlight:false},
 ];
 function renderDonatePage(tab){
   const pg=document.getElementById('page-donate');if(!pg)return;
@@ -1438,26 +1438,26 @@ function renderDonatePage(tab){
   const cashList=document.getElementById('donate-cash-list');
   const diaList=document.getElementById('donate-dia-list');
   if(cashList&&!cashList.dataset.rendered){
-    cashList.innerHTML=CASH_PACKS.map(p=>`
-      <div class="donate-pack-card${p.highlight?' highlight':''}" onclick="buyPack('${p.id}')">
-        <div class="donate-pack-icon">${p.icon}</div>
+    cashList.innerHTML=CASH_PACKS.map(pk=>`
+      <div class="donate-pack-card${pk.highlight?' highlight':''}" onclick="buyPack('${pk.id}')">
+        <div class="donate-pack-icon">${pk.icon}</div>
         <div class="donate-pack-info">
-          <div class="donate-pack-name">${p.name} — ${p.amount}$</div>
-          ${p.bonus?`<div class="donate-pack-bonus">${p.bonus}</div>`:''}
+          <div class="donate-pack-name">${pk.name} — ${fmtNum(pk.cash)}$</div>
+          ${pk.bonus?`<div class="donate-pack-bonus">${pk.bonus}</div>`:''}
         </div>
-        <div class="donate-pack-price">${p.price}</div>
+        <div class="donate-pack-price">⭐ ${pk.stars}</div>
       </div>`).join('');
     cashList.dataset.rendered='1';
   }
   if(diaList&&!diaList.dataset.rendered){
-    diaList.innerHTML=DIA_PACKS.map(p=>`
-      <div class="donate-pack-card${p.highlight?' highlight':''}" onclick="buyPack('${p.id}')">
-        <div class="donate-pack-icon">${p.icon}</div>
+    diaList.innerHTML=DIA_PACKS.map(pk=>`
+      <div class="donate-pack-card${pk.highlight?' highlight':''}" onclick="buyPack('${pk.id}')">
+        <div class="donate-pack-icon">${pk.icon}</div>
         <div class="donate-pack-info">
-          <div class="donate-pack-name">${p.name} — ${p.amount} 💎</div>
-          ${p.bonus?`<div class="donate-pack-bonus">${p.bonus}</div>`:''}
+          <div class="donate-pack-name">${pk.name} — ${fmtNum(pk.dia)} 💎</div>
+          ${pk.bonus?`<div class="donate-pack-bonus">${pk.bonus}</div>`:''}
         </div>
-        <div class="donate-pack-price">${p.price}</div>
+        <div class="donate-pack-price">⭐ ${pk.stars}</div>
       </div>`).join('');
     diaList.dataset.rendered='1';
   }
@@ -1477,9 +1477,40 @@ function donateSwitchTab(tab,skipToggle){
   if(tabCash)tabCash.classList.toggle('active',!isDia);
   if(tabDia)tabDia.classList.toggle('active',isDia);
 }
+
 function buyPack(packId){
-  // В реальной игре здесь вызов Telegram Stars Invoice
-  showToast('Оплата через Telegram Stars — скоро!','⭐');
+  const allPacks=[...CASH_PACKS,...DIA_PACKS];
+  const pk=allPacks.find(p=>p.id===packId);
+  if(!pk)return;
+  // Show bottom-sheet confirmation
+  document.getElementById('buy-overlay')?.remove();
+  const isCash=packId.startsWith('cash');
+  const amountStr=isCash?`${fmtNum(pk.cash)}$`:`${fmtNum(pk.dia)} 💎`;
+  const overlay=document.createElement('div');
+  overlay.id='buy-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9999;display:flex;align-items:flex-end;justify-content:center;';
+  overlay.innerHTML=`
+    <div style="background:#13132a;border-radius:24px 24px 0 0;padding:28px 20px 32px;width:100%;max-width:440px;text-align:center;border-top:2px solid #c8a84b44;">
+      <div style="font-size:52px;margin-bottom:10px;line-height:1">${pk.icon}</div>
+      <div style="font-size:20px;font-weight:800;color:#fff;margin-bottom:4px">${pk.name}</div>
+      <div style="font-size:28px;font-weight:900;color:#f0d060;margin-bottom:4px">${amountStr}</div>
+      ${pk.bonus?`<div style="font-size:13px;color:#2ecc71;margin-bottom:14px">${pk.bonus}</div>`:`<div style="height:14px"></div>`}
+      <div style="font-size:14px;color:#888;margin-bottom:22px">Оплата через Telegram Stars</div>
+      <button onclick="confirmBuyPack('${packId}')" style="width:100%;padding:16px;border:none;border-radius:14px;background:linear-gradient(135deg,#c8a84b,#f0d060);color:#000;font-size:17px;font-weight:800;cursor:pointer;margin-bottom:10px;">⭐ Купить за ${pk.stars} Stars</button>
+      <button onclick="document.getElementById('buy-overlay').remove()" style="width:100%;padding:12px;border:1px solid #ffffff22;border-radius:14px;background:transparent;color:#aaa;font-size:15px;cursor:pointer;">Отмена</button>
+    </div>`;
+  // Close on backdrop tap
+  overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove();});
+  document.body.appendChild(overlay);
+}
+
+function confirmBuyPack(packId){
+  document.getElementById('buy-overlay')?.remove();
+  if(!tg||typeof tg.sendData!=='function'){
+    showToast('Доступно только в Telegram','⚠️');return;
+  }
+  // Send buy request to bot — bot will send Stars invoice in chat
+  tg.sendData(JSON.stringify({a:'buy_stars',pack:packId}));
 }
 
 function nav(dest, extra) {
@@ -1507,6 +1538,9 @@ function nav(dest, extra) {
 }
 
 function goBack() {
+  // If battle result overlay is visible — ignore back, let user press buttons
+  const _res=document.getElementById('tac-result');
+  if(_res&&_res.style.display==='flex')return;
   if (document.getElementById('page-battle').style.display !== 'none') {
     if (tac) afterBattle(false);
     return;
@@ -2593,7 +2627,7 @@ function tacGameLoop(ts){
 function tacUpdate(dt){
   const p=tac.player,joy=tac.joy,aim=tac.aimJoy;
   if(joy.dx||joy.dy){
-    const spd=3.5;
+    const spd=2.4; // reduced player speed
     tacTryMove(p,joy.dy*spd*dt,joy.dx*spd*dt);
     p.angle=Math.atan2(joy.dy,joy.dx);
     p.isMoving=true;p.walkPhase+=dt*9;
@@ -2613,6 +2647,18 @@ function tacUpdate(dt){
   }
   tacUpdateDetectBar();
   tacCheckBodyDiscovery();
+  // ── ALERT CASCADE: if any enemy is in active combat, all others join ──
+  {
+    const COMBAT_ST=['approach','take_cover','behind_cover','peeking','throw_grenade','throw_molotov'];
+    const anyFighting=tac.enemies.some(e=>e.hp>0&&e.alerted&&!e._searchMode&&COMBAT_ST.includes(e.aiState));
+    if(anyFighting){
+      tac.enemies.forEach(e=>{
+        if(e.hp<=0||e.alerted)return;
+        e.alerted=true;e.aiState='approach';
+        e._searchMode=false;
+      });
+    }
+  }
   tac.enemies.forEach(e=>{
     if(e.hp<=0){
       if(e.deathTimer>0)e.deathTimer=Math.max(0,e.deathTimer-dt*1000);
@@ -2703,6 +2749,12 @@ function tacPlayerShoot(){
 }
 // ── STEALTH HELPERS ───────────────────────────────────────────────────
 function tacIsBackstab(p,e){
+  // No backstab in active COMBAT mode (🔴) — only in 👻 ghost or ⚠️ suspicious
+  if(tac){
+    const COMBAT_STATES=['approach','take_cover','behind_cover','peeking','throw_grenade','throw_molotov'];
+    const inCombat=tac.enemies.some(en=>en.hp>0&&en.alerted&&!en._searchMode&&COMBAT_STATES.includes(en.aiState));
+    if(inCombat)return false;
+  }
   // Player must be behind enemy: angle between enemy's facing and player's position > 120°
   const toPlayerAngle=Math.atan2(p.r-e.r,p.c-e.c);
   let diff=Math.abs(toPlayerAngle-e.angle);
@@ -2982,7 +3034,7 @@ function tacEnemyAI(e,dt){
 
       if(dist>2.0){
         // Умное движение: боковое уклонение во время сближения
-        const spd=isBoss?1.6:2.0;
+        const spd=isBoss?1.1:1.45;
         let mr=dy/dist,mc=dx/dist;
         // добавляем небольшой страфинг
         if(!e.strafeDir)e.strafeDir=Math.random()<.5?1:-1;
@@ -3000,7 +3052,7 @@ function tacEnemyAI(e,dt){
       if(!e.coverPos){e.aiState='approach';break;}
       const cd=Math.hypot(e.coverPos.r-e.r,e.coverPos.c-e.c);
       if(cd<0.4){e.aiState='behind_cover';e.coverTimer=1400+Math.random()*800;e.isMoving=false;}
-      else{const spd=3.2;tacTryMove(e,(e.coverPos.r-e.r)/cd*spd*dt,(e.coverPos.c-e.c)/cd*spd*dt);e.isMoving=true;e.walkPhase+=dt*10;}
+      else{const spd=2.2;tacTryMove(e,(e.coverPos.r-e.r)/cd*spd*dt,(e.coverPos.c-e.c)/cd*spd*dt);e.isMoving=true;e.walkPhase+=dt*10;}
       break;
     }
     case 'behind_cover':{
@@ -3614,7 +3666,7 @@ function startBattle(bossId,locId){
 
   const _pw=WEP_TAC[DATA.weapon]||WEP_TAC.nagan;
   tac={
-    bossId,locId,grid,ROWS,COLS,VIEW_W:11,VIEW_H:15,gstate:'playing',
+    bossId,locId,grid,ROWS,COLS,VIEW_W:9,VIEW_H:13,gstate:'playing',
     player:{r:ROWS-1.5,c:1.5,hp:session.hp,maxhp:DATA.maxhp,atk:DATA.atk,def:DATA.def,name:DATA.name,
       angle:0,isMoving:false,walkPhase:0,fireCD:0,meleeCD:0,grenCD:0,meleeAnim:0,
       ammo:_pw.mag||0,reloading:false,reloadTimer:0},
@@ -4342,7 +4394,6 @@ function drawHatSimple(ctx,hatId,px,py,bd,headY,headH,sc){
     ctx.beginPath();ctx.ellipse(px(0),py(headY+2),(hw+14)*sc,5*sc,0,0,Math.PI*2);ctx.fill();
     ctx.beginPath();ctx.roundRect(px(-hw+4),py(headY+2+28),(hw*2-8)*sc,28*sc,[2*sc,2*sc,0,0]);ctx.fill();
   }
-
 }
 
 drawAvatar();
