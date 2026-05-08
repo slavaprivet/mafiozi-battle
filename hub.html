@@ -1111,7 +1111,6 @@ body {
     <div style="font-size:13px;color:#ccc">💣 Кнопка — граната (авто-цель)</div>
     <div style="font-size:13px;color:#adf">👥 Кооп — играй с другом онлайн</div>
   </div>
-  <div id="tac-result" style="display:none"></div>
 </div>
 
 <!-- ══ SUB-PAGE: ДОСЬЕ ══ -->
@@ -1284,6 +1283,9 @@ body {
   </div>
 </div>
 
+<!-- Оверлей результата боя — вне page-battle чтобы position:fixed работал везде -->
+<div id="tac-result" style="display:none"></div>
+
 <script>
 // ── Telegram WebApp ───────────────────────────────────────────────────
 const tg = window.Telegram?.WebApp;
@@ -1415,6 +1417,70 @@ const BOT_PAGES = {
 let pendingBotDest = null;
 
 try { localStorage.setItem('hubUrl', location.href); } catch(e) {}
+
+// ── DONATE PAGE ───────────────────────────────────────────────────────
+const CASH_PACKS=[
+  {id:'cash_1',icon:'💵',name:'Стартовый',amount:'5 000',bonus:'',price:'⭐ 25',highlight:false},
+  {id:'cash_2',icon:'💵💵',name:'Базовый',amount:'15 000',bonus:'+10% бонус',price:'⭐ 70',highlight:false},
+  {id:'cash_3',icon:'💵💵💵',name:'Солидный',amount:'40 000',bonus:'+20% бонус',price:'⭐ 180',highlight:true},
+  {id:'cash_4',icon:'🤑',name:'Дон',amount:'100 000',bonus:'+35% бонус',price:'⭐ 420',highlight:false},
+];
+const DIA_PACKS=[
+  {id:'dia_1',icon:'💎',name:'Горсть',amount:'50',bonus:'',price:'⭐ 30',highlight:false},
+  {id:'dia_2',icon:'💎💎',name:'Мешочек',amount:'150',bonus:'+15% бонус',price:'⭐ 85',highlight:false},
+  {id:'dia_3',icon:'💎💎💎',name:'Сундук',amount:'400',bonus:'+30% бонус',price:'⭐ 210',highlight:true},
+  {id:'dia_4',icon:'👑',name:'Казна',amount:'1 000',bonus:'+50% бонус',price:'⭐ 490',highlight:false},
+];
+function renderDonatePage(tab){
+  const pg=document.getElementById('page-donate');if(!pg)return;
+  tab=tab||'cash';
+  donateSwitchTab(tab,true);
+  const cashList=document.getElementById('donate-cash-list');
+  const diaList=document.getElementById('donate-dia-list');
+  if(cashList&&!cashList.dataset.rendered){
+    cashList.innerHTML=CASH_PACKS.map(p=>`
+      <div class="donate-pack-card${p.highlight?' highlight':''}" onclick="buyPack('${p.id}')">
+        <div class="donate-pack-icon">${p.icon}</div>
+        <div class="donate-pack-info">
+          <div class="donate-pack-name">${p.name} — ${p.amount}$</div>
+          ${p.bonus?`<div class="donate-pack-bonus">${p.bonus}</div>`:''}
+        </div>
+        <div class="donate-pack-price">${p.price}</div>
+      </div>`).join('');
+    cashList.dataset.rendered='1';
+  }
+  if(diaList&&!diaList.dataset.rendered){
+    diaList.innerHTML=DIA_PACKS.map(p=>`
+      <div class="donate-pack-card${p.highlight?' highlight':''}" onclick="buyPack('${p.id}')">
+        <div class="donate-pack-icon">${p.icon}</div>
+        <div class="donate-pack-info">
+          <div class="donate-pack-name">${p.name} — ${p.amount} 💎</div>
+          ${p.bonus?`<div class="donate-pack-bonus">${p.bonus}</div>`:''}
+        </div>
+        <div class="donate-pack-price">${p.price}</div>
+      </div>`).join('');
+    diaList.dataset.rendered='1';
+  }
+  pg.style.display='';
+  if(tg&&tg.BackButton){tg.BackButton.onClick(goBack);tg.BackButton.show();}
+  window.scrollTo(0,0);
+}
+function donateSwitchTab(tab,skipToggle){
+  const cashPacks=document.getElementById('donate-cash-packs');
+  const diaPacks=document.getElementById('donate-dia-packs');
+  const tabCash=document.getElementById('dtab-cash');
+  const tabDia=document.getElementById('dtab-diamonds');
+  if(!cashPacks||!diaPacks)return;
+  const isDia=tab==='diamonds';
+  cashPacks.style.display=isDia?'none':'';
+  diaPacks.style.display=isDia?'':'none';
+  if(tabCash)tabCash.classList.toggle('active',!isDia);
+  if(tabDia)tabDia.classList.toggle('active',isDia);
+}
+function buyPack(packId){
+  // В реальной игре здесь вызов Telegram Stars Invoice
+  showToast('Оплата через Telegram Stars — скоро!','⭐');
+}
 
 function nav(dest, extra) {
   document.getElementById('page-main').style.display = 'none';
@@ -1864,72 +1930,105 @@ function _noise(ac,dur,decay){
 }
 function sfxShoot(wepType){
   const ac=_ac();if(!ac)return;
-  const g=ac.createGain();g.connect(ac.destination);
+  const t=ac.currentTime;
+  function bang(dur,decayFrac,vol,freqStart,freqEnd,noiseMix){
+    // Noise crack layer
+    const nb=ac.createBuffer(1,Math.floor(ac.sampleRate*dur),ac.sampleRate);
+    const nd=nb.getChannelData(0);
+    for(let i=0;i<nd.length;i++)nd[i]=(Math.random()*2-1)*Math.exp(-i/(nd.length*decayFrac));
+    const ns=ac.createBufferSource();ns.buffer=nb;
+    const ng=ac.createGain();ng.gain.setValueAtTime(vol*noiseMix,t);ng.gain.exponentialRampToValueAtTime(.0001,t+dur);
+    ns.connect(ng);ng.connect(ac.destination);ns.start(t);
+    // Tone body layer
+    const osc=ac.createOscillator();osc.type='sine';
+    osc.frequency.setValueAtTime(freqStart,t);osc.frequency.exponentialRampToValueAtTime(freqEnd,t+dur*.5);
+    const og=ac.createGain();og.gain.setValueAtTime(vol*(1-noiseMix),t);og.gain.exponentialRampToValueAtTime(.0001,t+dur*.6);
+    osc.connect(og);og.connect(ac.destination);osc.start(t);osc.stop(t+dur*.6+.01);
+    // High-pass click at attack
+    const click=ac.createBuffer(1,Math.floor(ac.sampleRate*.008),ac.sampleRate);
+    const cd=click.getChannelData(0);for(let i=0;i<cd.length;i++)cd[i]=(Math.random()*2-1);
+    const cs=ac.createBufferSource();cs.buffer=click;
+    const cg=ac.createGain();cg.gain.setValueAtTime(vol*.9,t);
+    cs.connect(cg);cg.connect(ac.destination);cs.start(t);
+  }
   if(wepType==='shotgun'){
-    const n=_noise(ac,.25,.28);n.connect(g);
-    g.gain.setValueAtTime(.8,ac.currentTime);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.25);n.start();
-    // low thud
-    const o=ac.createOscillator();o.type='sine';o.frequency.setValueAtTime(120,ac.currentTime);
-    o.frequency.exponentialRampToValueAtTime(40,ac.currentTime+.12);const g2=ac.createGain();
-    g2.gain.setValueAtTime(.55,ac.currentTime);g2.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.12);
-    o.connect(g2);g2.connect(ac.destination);o.start();o.stop(ac.currentTime+.12);
+    bang(.35,.22,1.0,130,38,.72);
+    // second barrel echo
+    setTimeout(()=>{const a2=_ac();if(a2){const nb=a2.createBuffer(1,Math.floor(a2.sampleRate*.2),a2.sampleRate);const d=nb.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/(d.length*.3));const s=a2.createBufferSource();s.buffer=nb;const g=a2.createGain();g.gain.setValueAtTime(.3,a2.currentTime);g.gain.exponentialRampToValueAtTime(.0001,a2.currentTime+.2);s.connect(g);g.connect(a2.destination);s.start();}},65);
   }else if(wepType==='rifle'){
-    const n=_noise(ac,.18,.14);n.connect(g);
-    g.gain.setValueAtTime(.65,ac.currentTime);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.18);n.start();
-    const o=ac.createOscillator();o.type='sawtooth';o.frequency.setValueAtTime(300,ac.currentTime);
-    o.frequency.exponentialRampToValueAtTime(80,ac.currentTime+.08);const g2=ac.createGain();
-    g2.gain.setValueAtTime(.4,ac.currentTime);g2.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.08);
-    o.connect(g2);g2.connect(ac.destination);o.start();o.stop(ac.currentTime+.08);
-  }else if(wepType==='rocket'){
-    const n=_noise(ac,.45,.38);n.connect(g);
-    g.gain.setValueAtTime(1.1,ac.currentTime);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.45);n.start();
+    bang(.22,.13,.85,320,65,.68);
   }else if(wepType==='burst'){
-    const n=_noise(ac,.12,.12);n.connect(g);
-    g.gain.setValueAtTime(.45,ac.currentTime);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.12);n.start();
+    bang(.14,.11,.6,280,90,.65);
+  }else if(wepType==='rocket'){
+    // Deep whoosh + boom
+    bang(.5,.4,1.2,80,22,.8);
+    setTimeout(()=>sfxExplosion(),180);
   }else{
-    // pistol
-    const n=_noise(ac,.15,.11);n.connect(g);
-    g.gain.setValueAtTime(.55,ac.currentTime);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.15);n.start();
-    const o=ac.createOscillator();o.type='square';o.frequency.setValueAtTime(250,ac.currentTime);
-    o.frequency.exponentialRampToValueAtTime(70,ac.currentTime+.1);const g2=ac.createGain();
-    g2.gain.setValueAtTime(.3,ac.currentTime);g2.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.1);
-    o.connect(g2);g2.connect(ac.destination);o.start();o.stop(ac.currentTime+.1);
+    // Pistol — sharp crack + body resonance
+    bang(.2,.10,.75,260,75,.6);
   }
 }
 function sfxReload(){
   const ac=_ac();if(!ac)return;
-  // clack-clack of magazine
-  [0,220].forEach((ms,i)=>{
-    setTimeout(()=>{
-      const a=ac.currentTime,g=ac.createGain();g.connect(ac.destination);
-      const o=ac.createOscillator();o.type='square';
-      o.frequency.value=i===0?750:550;o.connect(g);
-      g.gain.setValueAtTime(.18,a);g.gain.exponentialRampToValueAtTime(.001,a+.09);
-      o.start(a);o.stop(a+.09);
-    },ms);
-  });
+  // mag out click
+  const mk=(t,freq,dur,vol)=>{
+    const o=ac.createOscillator();o.type='square';o.frequency.value=freq;
+    const g=ac.createGain();g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.001,t+dur);
+    o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+dur+.001);
+    const nb=ac.createBuffer(1,Math.floor(ac.sampleRate*dur*.5),ac.sampleRate);
+    const d=nb.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*.3;
+    const ns=ac.createBufferSource();ns.buffer=nb;const ng=ac.createGain();
+    ng.gain.setValueAtTime(vol*.4,t);ng.gain.exponentialRampToValueAtTime(.001,t+dur*.5);
+    ns.connect(ng);ng.connect(ac.destination);ns.start(t);
+  };
+  mk(ac.currentTime,900,.06,.22);        // mag eject
+  mk(ac.currentTime+.18,600,.05,.18);    // mag in
+  mk(ac.currentTime+.35,1100,.04,.25);   // slide/bolt rack
 }
 function sfxExplosion(){
   const ac=_ac();if(!ac)return;
-  const n=_noise(ac,.8,.6);const g=ac.createGain();
-  g.gain.setValueAtTime(1.3,ac.currentTime);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.8);
-  n.connect(g);g.connect(ac.destination);n.start();
-  // sub boom
-  const o=ac.createOscillator();o.type='sine';o.frequency.setValueAtTime(90,ac.currentTime);
-  o.frequency.exponentialRampToValueAtTime(25,ac.currentTime+.35);const g2=ac.createGain();
-  g2.gain.setValueAtTime(.9,ac.currentTime);g2.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.35);
-  o.connect(g2);g2.connect(ac.destination);o.start();o.stop(ac.currentTime+.35);
+  const t=ac.currentTime;
+  // Body rumble
+  const nb=ac.createBuffer(1,Math.floor(ac.sampleRate*1.0),ac.sampleRate);
+  const nd=nb.getChannelData(0);
+  for(let i=0;i<nd.length;i++){const r=i/nd.length;nd[i]=(Math.random()*2-1)*Math.exp(-r*3.5)*(1+.3*Math.sin(r*60));}
+  const ns=ac.createBufferSource();ns.buffer=nb;
+  const ng=ac.createGain();ng.gain.setValueAtTime(1.4,t);ng.gain.exponentialRampToValueAtTime(.0001,t+1.0);
+  ns.connect(ng);ng.connect(ac.destination);ns.start(t);
+  // Sub thud
+  const o=ac.createOscillator();o.type='sine';o.frequency.setValueAtTime(100,t);o.frequency.exponentialRampToValueAtTime(20,t+.4);
+  const og=ac.createGain();og.gain.setValueAtTime(1.0,t);og.gain.exponentialRampToValueAtTime(.0001,t+.4);
+  o.connect(og);og.connect(ac.destination);o.start(t);o.stop(t+.41);
+  // High snap
+  const hb=ac.createBuffer(1,Math.floor(ac.sampleRate*.05),ac.sampleRate);
+  const hd=hb.getChannelData(0);for(let i=0;i<hd.length;i++)hd[i]=(Math.random()*2-1)*Math.exp(-i/(hd.length*.1));
+  const hs=ac.createBufferSource();hs.buffer=hb;const hg=ac.createGain();
+  hg.gain.setValueAtTime(1.1,t);hg.gain.exponentialRampToValueAtTime(.0001,t+.05);
+  hs.connect(hg);hg.connect(ac.destination);hs.start(t);
 }
 function sfxMelee(){
   const ac=_ac();if(!ac)return;
-  const g=ac.createGain();g.connect(ac.destination);
-  const o=ac.createOscillator();o.type='sawtooth';
-  o.frequency.setValueAtTime(220,ac.currentTime);
-  o.frequency.exponentialRampToValueAtTime(70,ac.currentTime+.13);o.connect(g);
-  g.gain.setValueAtTime(.4,ac.currentTime);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.13);
-  o.start(ac.currentTime);o.stop(ac.currentTime+.13);
+  const t=ac.currentTime;
+  // Flesh thud — layered
+  const nb=ac.createBuffer(1,Math.floor(ac.sampleRate*.12),ac.sampleRate);
+  const d=nb.getChannelData(0);
+  for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/(d.length*.18));
+  const ns=ac.createBufferSource();ns.buffer=nb;
+  const ng=ac.createGain();ng.gain.setValueAtTime(.7,t);ng.gain.exponentialRampToValueAtTime(.001,t+.12);
+  ns.connect(ng);ng.connect(ac.destination);ns.start(t);
+  // Low body impact
+  const o=ac.createOscillator();o.type='sine';o.frequency.setValueAtTime(180,t);o.frequency.exponentialRampToValueAtTime(55,t+.09);
+  const og=ac.createGain();og.gain.setValueAtTime(.55,t);og.gain.exponentialRampToValueAtTime(.001,t+.09);
+  o.connect(og);og.connect(ac.destination);o.start(t);o.stop(t+.1);
+  // Knuckle crack
+  const kb=ac.createBuffer(1,Math.floor(ac.sampleRate*.012),ac.sampleRate);
+  const kd=kb.getChannelData(0);for(let i=0;i<kd.length;i++)kd[i]=(Math.random()*2-1);
+  const ks=ac.createBufferSource();ks.buffer=kb;const kg=ac.createGain();
+  kg.gain.setValueAtTime(.5,t);kg.gain.exponentialRampToValueAtTime(.001,t+.012);
+  ks.connect(kg);kg.connect(ac.destination);ks.start(t);
 }
 function sfxWin(){
+  // User liked this one — keeping it
   const ac=_ac();if(!ac)return;
   [523,659,784,1047].forEach((f,i)=>setTimeout(()=>{
     const g=ac.createGain();g.connect(ac.destination);
@@ -1940,12 +2039,24 @@ function sfxWin(){
 }
 function sfxLose(){
   const ac=_ac();if(!ac)return;
-  [400,330,250,160].forEach((f,i)=>setTimeout(()=>{
-    const g=ac.createGain();g.connect(ac.destination);
-    const o=ac.createOscillator();o.type='sawtooth';o.frequency.value=f;o.connect(g);
-    g.gain.setValueAtTime(.28,ac.currentTime);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.42);
-    o.start(ac.currentTime);o.stop(ac.currentTime+.42);
-  },i*220));
+  // Flat power-down: minor chord stabs + low drone
+  [[220,.0],[174,.25],[130,.5]].forEach(([f,delay])=>{
+    setTimeout(()=>{
+      const t=ac.currentTime;
+      const o=ac.createOscillator();o.type='sawtooth';o.frequency.setValueAtTime(f,t);o.frequency.exponentialRampToValueAtTime(f*.7,t+.55);
+      const g=ac.createGain();g.gain.setValueAtTime(.22,t);g.gain.exponentialRampToValueAtTime(.001,t+.55);
+      o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+.56);
+    },delay*1000);
+  });
+  // Low drone hit
+  setTimeout(()=>{
+    const t=ac.currentTime;
+    const nb=ac.createBuffer(1,Math.floor(ac.sampleRate*.6),ac.sampleRate);
+    const d=nb.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/(d.length*.5))*.5;
+    const ns=ac.createBufferSource();ns.buffer=nb;const ng=ac.createGain();
+    ng.gain.setValueAtTime(.5,t);ng.gain.exponentialRampToValueAtTime(.001,t+.6);
+    ns.connect(ng);ng.connect(ac.destination);ns.start(t);
+  },200);
 }
 
 // ── MAPS 18×14 ────────────────────────────────────────────────────────
@@ -2562,6 +2673,7 @@ function tacPlayerShoot(){
   const angle=p.angle;
   const spd=17,maxD=(w.r||8)*1.6;
   sfxShoot(w.t);
+  if(tac.stats)tac.stats.shots++;
   tac.muzzleFlash.push({r:p.r+Math.sin(angle)*0.6,c:p.c+Math.cos(angle)*0.6,a:1,enemy:false});
   spawnSmoke(p.r,p.c,angle+Math.PI,3);
   // Alert all enemies who can hear the shot (within 12 tiles)
@@ -2593,6 +2705,7 @@ function tacPlayerMelee(){
       const dmg=Math.max(1,Math.round(p.atk*(w.t==='melee'?w.m:1.2)*(0.85+Math.random()*.3)));
       e.hp=Math.max(0,e.hp-dmg);tacFloatDmg(e,dmg,'#ffcc44',false);
       tac.shake=0.35;hit=true;e.hitRecently=800;
+      if(tac.stats){tac.stats.dmgDealt+=dmg;if(e.hp<=0)tac.stats.kills++;}
       p.angle=Math.atan2(e.r-p.r,e.c-p.c);
       if(e.hp<=0){tacSpawnBlood(e.r,e.c,16);e.deathTimer=1400;}
     }
@@ -2868,6 +2981,7 @@ function tacUpdateBullets(dt){
         if(Math.hypot(e.r-b.r,e.c-b.c)<.45){
           b.hit=true;e.hp=Math.max(0,e.hp-b.dmg);tacFloatDmg(e,b.dmg,'#ff9999',false);
           e.hitRecently=800;tac.shake=.18;if(Math.random()<.45)tacEnemyQuote(e,'hurt');
+          if(tac.stats){tac.stats.dmgDealt+=b.dmg;if(e.hp<=0)tac.stats.kills++;}
           if(e.hp<=0){tacSpawnBlood(e.r,e.c,14);e.deathTimer=1400;}
           tacHud();tacCheckDeath();return false;
         }
@@ -2875,6 +2989,7 @@ function tacUpdateBullets(dt){
     }else{
       if(Math.hypot(p.r-b.r,p.c-b.c)<.45){
         b.hit=true;p.hp=Math.max(0,p.hp-b.dmg);tacFloatDmg(p,b.dmg,'#ff4444',false);
+        if(tac.stats)tac.stats.dmgTaken+=b.dmg;
         tac.shake=.28;tacHud();if(p.hp<=0)tacEndBattle('lost');return false;
       }
     }
@@ -3136,8 +3251,9 @@ function tacUpdateDetectBar(){
   if(!tac)return;
   const bar=document.getElementById('tac-detect-bar');if(!bar)return;
   const alive=tac.enemies.filter(e=>e.hp>0);
-  const inCombat=alive.some(e=>['approach','take_cover','behind_cover','peeking','throw_grenade','throw_molotov'].includes(e.aiState));
-  const suspicious=alive.some(e=>e.aiState==='alert'||e.alerted);
+  const COMBAT=['approach','take_cover','behind_cover','peeking','throw_grenade','throw_molotov'];
+  const inCombat=alive.some(e=>e.alerted&&COMBAT.includes(e.aiState));
+  const suspicious=alive.some(e=>e.alerted&&!COMBAT.includes(e.aiState));
   if(inCombat){bar.className='alert';bar.textContent='🔴 Тревога!';}
   else if(suspicious){bar.className='suspect';bar.textContent='⚠️ Подозрение';}
   else{bar.className='ghost';bar.textContent='👻 Не обнаружен';}
@@ -3174,24 +3290,47 @@ function tacEndBattle(res){
   const boss=BOSS_DATA[tac.bossId]||null;
   const ov=document.getElementById('tac-result');
   if(!ov)return;
+  const st=tac.stats||{dmgDealt:0,dmgTaken:0,kills:0,shots:0};
+  const totalEnemy=tac.enemies.length;
+  const accuracy=st.shots>0?Math.round(st.kills/(st.shots||1)*100):0;
+  const statsHtml=`<div style="background:#0d0d20;border:1px solid #2a2a4a;border-radius:14px;padding:12px 18px;width:100%;max-width:280px;margin-top:4px">
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#555;margin-bottom:8px">Статистика боя</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:13px">
+      <div style="color:#aaa">⚔ Урон нанесён</div><div style="color:#f0d060;text-align:right;font-weight:700">${st.dmgDealt}</div>
+      <div style="color:#aaa">🛡 Урон получен</div><div style="color:#e74c3c;text-align:right;font-weight:700">${st.dmgTaken}</div>
+      <div style="color:#aaa">💀 Убито врагов</div><div style="color:#2ecc71;text-align:right;font-weight:700">${st.kills} / ${totalEnemy}</div>
+      <div style="color:#aaa">🔫 Выстрелов</div><div style="color:#88aaff;text-align:right;font-weight:700">${st.shots}</div>
+    </div>
+  </div>`;
   if(res==='won'){
     const exp=boss?(boss.exp||0):0;
     const rawCash=boss?(boss.cash||0):0;
     const cash=rawCash+Math.floor(Math.random()*Math.max(1,Math.round(rawCash/3)));
     session.hp=Math.max(1,tac.player.hp);session.cash+=cash;
     session.wins.push({boss_id:tac.bossId,loc_id:tac.locId,exp,cash});session.dirty=true;
-    ov.innerHTML=`<div class="tac-res-icon">🏆</div><div class="tac-res-title win">ПОБЕДА!</div>
-      <div class="tac-res-rewards"><div class="tac-reward"><span class="rv">+${exp}</span><span class="rl">Опыт</span></div><div class="tac-reward"><span class="rv">+${cash}$</span><span class="rl">Нал</span></div></div>
-      <div style="margin-top:8px;font-size:12px;color:#888">HP: ${session.hp}/${DATA.maxhp}</div>
+    ov.innerHTML=`
+      <div class="tac-res-icon">🏆</div>
+      <div class="tac-res-title win">ПОБЕДА!</div>
+      <div class="tac-res-rewards">
+        <div class="tac-reward"><span class="rv">+${exp}</span><span class="rl">Опыт</span></div>
+        <div class="tac-reward"><span class="rv">+${cash}$</span><span class="rl">Нал</span></div>
+        <div class="tac-reward"><span class="rv">${session.hp}/${DATA.maxhp}</span><span class="rl">HP</span></div>
+      </div>
+      ${statsHtml}
       <button class="tac-res-btn" onclick="afterBattle(true)">Продолжить</button>
       <button class="tac-res-btn exit" onclick="afterBattle(false)">В главное меню</button>`;
   }else{
     session.hp=1;session.dirty=true;
-    ov.innerHTML=`<div class="tac-res-icon">💀</div><div class="tac-res-title lose">ПОРАЖЕНИЕ</div>
-      <div style="color:#888;font-size:13px;margin-top:4px">Вы потеряли сознание.</div>
-      <button class="tac-res-btn" style="margin-top:16px" onclick="afterBattle(false)">В главное меню</button>`;
+    ov.innerHTML=`
+      <div class="tac-res-icon">💀</div>
+      <div class="tac-res-title lose">ПОРАЖЕНИЕ</div>
+      <div style="color:#888;font-size:13px;margin-top:2px">Вы потеряли сознание.</div>
+      ${statsHtml}
+      <button class="tac-res-btn" style="margin-top:8px" onclick="afterBattle(false)">В главное меню</button>`;
   }
   ov.style.display='flex';
+  // Принудительно показываем — на случай если page-battle скрыт
+  ov.style.zIndex='99999';
 }
 
 // Генератор врагов-миньонов
@@ -3260,6 +3399,7 @@ function startBattle(bossId,locId){
     player:{r:ROWS-1.5,c:1.5,hp:session.hp,maxhp:DATA.maxhp,atk:DATA.atk,def:DATA.def,name:DATA.name,
       angle:0,isMoving:false,walkPhase:0,fireCD:0,meleeCD:0,grenCD:0,meleeAnim:0,
       ammo:_pw.mag||0,reloading:false,reloadTimer:0},
+    stats:{dmgDealt:0,dmgTaken:0,kills:0,shots:0,startHp:session.hp},
     enemies,
     player_maxhp:DATA.maxhp,
     bullets:[],meleeVfx:[],muzzleFlash:[],bloodParts:[],bloodSplats:[],
