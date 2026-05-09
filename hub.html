@@ -1546,8 +1546,8 @@ function goBack() {
   // Guard: don't commit session within 2s of leaving battle (Telegram queued back event)
   if(_afterBattleTs && Date.now()-_afterBattleTs < 2000)return;
   if (document.getElementById('page-battle').style.display !== 'none') {
-    // If battle is ending (gstate not 'playing') wait for overlay — don't interrupt
-    if (tac && tac.gstate !== 'playing') return;
+    // Battle is ending (enemies dead or player dead) — wait for result overlay
+    if (tac && (tac._ending || tac.gstate !== 'playing')) return;
     if (tac) afterBattle(false);
     return;
   }
@@ -1555,14 +1555,29 @@ function goBack() {
     navDistrict('back');
     return;
   }
-  // Возвращаемся на главный экран — сохраняем и закрываем если есть несохранённые данные
-  if (session.dirty) {
-    commitSession(); // sendData закроет приложение, бот пришлёт обновлённую кнопку
+  // From explore page → go to main menu (don't commit here)
+  if (document.getElementById('page-explore').style.display !== 'none') {
+    document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
+    document.getElementById('page-main').style.display = '';
+    window.scrollTo(0, 0);
+    if (tg && tg.BackButton) tg.BackButton.hide();
     return;
   }
-  document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
-  document.getElementById('page-main').style.display = '';
-  window.scrollTo(0, 0);
+  // From any other subpage → go to main menu
+  const anySubpage = Array.from(document.querySelectorAll('.subpage'))
+    .some(p => p.style.display !== 'none');
+  if (anySubpage) {
+    document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
+    document.getElementById('page-main').style.display = '';
+    window.scrollTo(0, 0);
+    if (tg && tg.BackButton) tg.BackButton.hide();
+    return;
+  }
+  // Already on main page — commit & close if dirty
+  if (session.dirty) {
+    commitSession();
+    return;
+  }
   if (tg && tg.BackButton) tg.BackButton.hide();
 }
 
@@ -2837,7 +2852,7 @@ function tacDoBackstab(p,e){
 }
 function tacPlayerMelee(){
   const p=tac.player,w=tac.pw;if(p.meleeCD>0)return;
-  const range=(w.t==='melee'?(w.r||1.5):1.5)+0.4;
+  const range=(w.t==='melee'?(w.r||1.5):1.5)+0.9; // wider sweep hits multiple nearby enemies
   // Extended range for backstab approach
   const backstabRange=range+0.7;
   p.meleeCD=700;p.meleeAnim=1;let hit=false;let wasBackstab=false;
@@ -3563,17 +3578,18 @@ function tacExplodeAnim(tr,tc,cb){
 function tacCheckDeath(){
   if(!tac||tac.gstate!=='playing')return;
   if(tac.enemies.every(e=>e.hp<=0)){
-    tac.gstate='won'; // set immediately so goBack can't interrupt
+    if(tac._ending)return;tac._ending=true; // guard goBack during delay
     setTimeout(()=>tacEndBattle('won'),900);return;
   }
   if(tac.player.hp<=0){
-    tac.gstate='lost'; // set immediately so goBack can't interrupt
+    if(tac._ending)return;tac._ending=true;
     setTimeout(()=>tacEndBattle('lost'),500);
   }
 }
 
 function tacEndBattle(res){
-  if(!tac||tac.gstate!==res)return;
+  if(!tac||tac.gstate===res)return; // skip if already ended
+  tac.gstate=res;tac._ending=false;
   if(tac.pulseRaf){cancelAnimationFrame(tac.pulseRaf);tac.pulseRaf=null;}
   setTimeout(()=>{if(res==='won')sfxWin();else sfxLose();},100);
   tacCoopCleanup();
@@ -3704,7 +3720,7 @@ function startBattle(bossId,locId){
   document.getElementById('page-battle').style.display='';
   document.getElementById('tac-result').style.display='none';
   const cp=document.getElementById('coop-panel');if(cp)cp.style.display='none';
-  if(tg&&tg.BackButton)tg.BackButton.hide();
+  if(tg&&tg.BackButton){tg.BackButton.offClick(goBack);tg.BackButton.hide();}
   window.scrollTo(0,0);
   tacResize();tacHud();
   const tutEl=document.getElementById('tac-tutorial');
@@ -4423,8 +4439,7 @@ function drawHatSimple(ctx,hatId,px,py,bd,headY,headH,sc){
     ctx.beginPath();ctx.ellipse(px(-3),py(headY+8),(hw+3)*sc,12*sc,-0.15,Math.PI*0.05,Math.PI*1.95);ctx.fill();
   }else if(hatId===8){    ctx.fillStyle='#0a0a0a';
     ctx.beginPath();ctx.ellipse(px(0),py(headY+2),(hw+14)*sc,5*sc,0,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.roundRect(px(-hw+4),py(headY+2+28),(hw*2-8)*sc,28*sc,[2*sc,2*sc,0,0]);ctx.fill();
-  }
+    ctx.beginPath();ctx.roundRect(px(-hw+4),py(headY+2+28),(hw*2-8)*sc,28*sc,[2*sc,2*sc,0,0]);ctx.fill();  }
 }
 
 drawAvatar();
