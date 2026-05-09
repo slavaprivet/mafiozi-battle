@@ -672,7 +672,7 @@ body {
 #coop-panel input{background:#1a1a3a;border:1px solid #3a3a6a;border-radius:8px;color:#eee;padding:6px 10px;font-size:13px;width:140px;text-align:center}
 .coop-btn{background:linear-gradient(135deg,#2a4a8a,#1a2a5a);color:#adf;border:1px solid #3a5a9a;border-radius:10px;padding:7px 14px;font-size:12px;font-weight:bold;cursor:pointer;white-space:nowrap}
 #coop-status{font-size:11px;color:#88aadd;text-align:center}
-#tac-result{position:fixed;inset:0;background:rgba(0,0,0,.93);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:12px;padding:24px}
+#tac-result{position:fixed;inset:0;background:rgba(0,0,0,.95);display:none;flex-direction:column;align-items:center;justify-content:flex-start;z-index:9999;gap:10px;padding:20px 16px;overflow-y:auto;overflow-x:hidden}
 .tac-res-icon{font-size:64px;animation:tacPop .4s cubic-bezier(.34,1.56,.64,1) both}
 .tac-res-title{font-size:28px;font-weight:900;letter-spacing:2px;animation:tacPop .4s .1s cubic-bezier(.34,1.56,.64,1) both}
 .tac-res-title.win{color:#f0d060}.tac-res-title.lose{color:#e74c3c}
@@ -699,7 +699,7 @@ body {
 .tac-act-btn.gren[data-empty="1"]{opacity:.4}
 #tac-gren-ct{font-size:11px;font-weight:900;position:absolute;bottom:5px;right:9px;color:#f0d060;line-height:1}
 /* Result */
-#tac-result{position:fixed;inset:0;background:rgba(0,0,0,.93);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:12px;padding:24px}
+#tac-result{position:fixed;inset:0;background:rgba(0,0,0,.95);display:none;flex-direction:column;align-items:center;justify-content:flex-start;z-index:9999;gap:10px;padding:20px 16px;overflow-y:auto;overflow-x:hidden}
 .tac-res-icon{font-size:64px;animation:tacPop .4s cubic-bezier(.34,1.56,.64,1) both}
 .tac-res-title{font-size:28px;font-weight:900;letter-spacing:2px;animation:tacPop .4s .1s cubic-bezier(.34,1.56,.64,1) both}
 .tac-res-title.win{color:#f0d060}
@@ -1464,7 +1464,7 @@ function renderDonatePage(tab){
     diaList.dataset.rendered='1';
   }
   pg.style.display='';
-  if(tg&&tg.BackButton){tg.BackButton.onClick(goBack);tg.BackButton.show();}
+  if(tg&&tg.BackButton){tg.BackButton.offClick(goBack);tg.BackButton.onClick(goBack);tg.BackButton.show();}
   window.scrollTo(0,0);
 }
 function donateSwitchTab(tab,skipToggle){
@@ -1534,6 +1534,7 @@ function nav(dest, extra) {
   window.scrollTo(0, 0);
 
   if (tg && tg.BackButton) {
+    tg.BackButton.offClick(goBack);
     tg.BackButton.onClick(goBack);
     tg.BackButton.show();
   }
@@ -1793,7 +1794,8 @@ function openDistrict(locId) {
   document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
   document.getElementById('page-district').style.display = '';
   if (tg && tg.BackButton) {
-    tg.BackButton.onClick(() => navDistrict('back'));
+    tg.BackButton.offClick(goBack);
+    tg.BackButton.onClick(goBack);
     tg.BackButton.show();
   }
   window.scrollTo(0, 0);
@@ -1935,6 +1937,7 @@ function navDistrict(dir) {
     document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
     document.getElementById('page-explore').style.display = '';
     if (tg && tg.BackButton) {
+      tg.BackButton.offClick(goBack);
       tg.BackButton.onClick(goBack);
       tg.BackButton.show();
     }
@@ -3175,10 +3178,16 @@ function tacUpdateBullets(dt){
   tac.bullets=tac.bullets.filter(b=>{
     if(b.hit)return false;
     b.r+=b.vr*dt;b.c+=b.vc*dt;b.dist+=Math.hypot(b.vr,b.vc)*dt;
-    const tr=Math.floor(b.r),tc=Math.floor(b.c);
-    if(tr<0||tr>=tac.ROWS||tc<0||tc>=tac.COLS||tac.grid[tr][tc]===1){b.hit=true;return false;}
     if(b.dist>b.maxDist)return false;
+    const tr=Math.floor(b.r),tc=Math.floor(b.c);
     const p=tac.player;
+    // Check player hit BEFORE wall — prevents map-edge immunity bug
+    if(b.isEnemy&&Math.hypot(p.r-b.r,p.c-b.c)<.45){
+      b.hit=true;p.hp=Math.max(0,p.hp-b.dmg);tacFloatDmg(p,b.dmg,'#ff4444',false);
+      if(tac.stats)tac.stats.dmgTaken+=b.dmg;
+      tac.shake=.28;tacHud();if(p.hp<=0)tacEndBattle('lost');return false;
+    }
+    if(tr<0||tr>=tac.ROWS||tc<0||tc>=tac.COLS||tac.grid[tr][tc]===1){b.hit=true;return false;}
     if(!b.isEnemy){
       for(const e of tac.enemies){
         if(e.hp<=0)continue;
@@ -3189,12 +3198,6 @@ function tacUpdateBullets(dt){
           if(e.hp<=0){tacSpawnBlood(e.r,e.c,14);e.deathTimer=1400;}
           tacHud();tacCheckDeath();return false;
         }
-      }
-    }else{
-      if(Math.hypot(p.r-b.r,p.c-b.c)<.45){
-        b.hit=true;p.hp=Math.max(0,p.hp-b.dmg);tacFloatDmg(p,b.dmg,'#ff4444',false);
-        if(tac.stats)tac.stats.dmgTaken+=b.dmg;
-        tac.shake=.28;tacHud();if(p.hp<=0)tacEndBattle('lost');return false;
       }
     }
     return true;
@@ -3218,25 +3221,36 @@ function tacSpawnBlood(r,c,count){
 function tacRender(){
   if(!tac)return;
   const canvas=document.getElementById('tac-gc');if(!canvas||!canvas.width)return;
+  const dpr=tac.dpr||1,cW=canvas.width/dpr,cH=canvas.height/dpr;
   const ctx=canvas.getContext('2d'),TS=tac.TS,VW=tac.VIEW_W,VH=tac.VIEW_H;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
   const sk=tac.shake?(Math.random()-.5)*tac.shake*TS*.1:0,skY=tac.shake?(Math.random()-.5)*tac.shake*TS*.1:0;
   const offC=tac.camC-VW/2,offR=tac.camR-VH/2;
   function w2s(wr,wc){return{x:(wc-offC)*TS+sk,y:(wr-offR)*TS+skY};}
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle='#080816';ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.clearRect(0,0,cW,cH);
+  ctx.fillStyle='#080816';ctx.fillRect(0,0,cW,cH);
   // Проход 1: пол и стены
   for(let r=0;r<tac.ROWS;r++)for(let c=0;c<tac.COLS;c++){
     const s=w2s(r,c);
-    if(s.x<-TS||s.x>canvas.width+TS||s.y<-TS||s.y>canvas.height+TS)continue;
+    if(s.x<-TS||s.x>cW+TS||s.y<-TS||s.y>cH+TS)continue;
     tacDrawTileBase(ctx,r,c,s.x,s.y);
   }
   // Проход 2: 3D укрытия сверху вниз (правильная глубина)
+  {const _pr=tac.player.r,_pc=tac.player.c;
   for(let r=0;r<tac.ROWS;r++)for(let c=0;c<tac.COLS;c++){
     if(tac.grid[r][c]<2)continue;
     const s=w2s(r,c);
-    if(s.x<-TS||s.x>canvas.width+TS||s.y<-TS*2||s.y>canvas.height+TS)continue;
+    if(s.x<-TS||s.x>cW+TS||s.y<-TS*2||s.y>cH+TS)continue;
+    const _inCover=Math.hypot(_pr-(r+.5),_pc-(c+.5))<1.35;
+    if(_inCover){ctx.save();ctx.globalAlpha=.42;}
     tacDrawCover3d(ctx,r,c,s.x,s.y);
-  }
+    if(_inCover){
+      ctx.restore();
+      ctx.save();ctx.font=Math.floor(TS*.58)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.globalAlpha=0.82+.12*Math.sin(tac.animPhase*5);
+      ctx.fillText('🛡',s.x+TS/2,s.y+TS*.4);ctx.restore();
+    }
+  }}
   // Blood splats
   if(tac.bloodSplats)tac.bloodSplats.forEach(sp=>{
     const s=w2s(sp.r,sp.c);
@@ -3289,7 +3303,7 @@ function tacRender(){
     const inActiveCombat=e.alerted&&!e._searchMode;
     if(inActiveCombat)return;
     const s=w2s(e.r,e.c);
-    if(s.x<-TS*4||s.x>canvas.width+TS*4||s.y<-TS*4||s.y>canvas.height+TS*4)return;
+    if(s.x<-TS*4||s.x>cW+TS*4||s.y<-TS*4||s.y>cH+TS*4)return;
     const vd=(e.viewDist||7)*TS;
     const fov=e.fovAngle||Math.PI*.65;
     const cx=s.x+TS/2,cy=s.y+TS/2;
@@ -3316,7 +3330,7 @@ function tacRender(){
   // Enemies
   tac.enemies.forEach(e=>{
     const s=w2s(e.r,e.c);
-    if(s.x<-TS*2||s.x>canvas.width+TS*2||s.y<-TS*2||s.y>canvas.height+TS*2)return;
+    if(s.x<-TS*2||s.x>cW+TS*2||s.y<-TS*2||s.y>cH+TS*2)return;
     if(e.hp<=0){
       // Труп остаётся на карте — лежит на боку
       const cx=s.x+TS/2,cy=s.y+TS/2;
@@ -3399,12 +3413,12 @@ function tacRender(){
     ctx.font=Math.floor(TS*.95)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillText(v.e,s.x+TS/2,s.y+TS/2);ctx.restore();
   });
-  tacDrawMinimap(ctx,canvas.width);
+  tacDrawMinimap(ctx,cW);
   // ── Backstab screen flash ──────────────────────────────────────────
   if(tac.backstabFlash>0){
     const alpha=Math.min(0.35,tac.backstabFlash/450*0.35);
     ctx.save();ctx.globalAlpha=alpha;
-    ctx.fillStyle='#aa00ff';ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle='#aa00ff';ctx.fillRect(0,0,cW,cH);
     ctx.restore();
     tac.backstabFlash=Math.max(0,tac.backstabFlash-16);
   }
@@ -3450,8 +3464,12 @@ function tacResize(){
   if(!tac)return;
   const wrap=document.getElementById('tac-canvas-wrap'),canvas=document.getElementById('tac-gc');
   if(!wrap||!canvas)return;
-  canvas.width=wrap.clientWidth;canvas.height=wrap.clientHeight;
-  tac.TS=Math.floor(Math.min(canvas.width/tac.VIEW_W,canvas.height/tac.VIEW_H));
+  const dpr=window.devicePixelRatio||1;
+  const W=wrap.clientWidth,H=wrap.clientHeight;
+  canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);
+  canvas.style.width=W+'px';canvas.style.height=H+'px';
+  tac.dpr=dpr;
+  tac.TS=Math.floor(Math.min(W/tac.VIEW_W,H/tac.VIEW_H));
 }
 
 function tacHud(){
@@ -3599,13 +3617,13 @@ function tacEndBattle(res){
   const st=tac.stats||{dmgDealt:0,dmgTaken:0,kills:0,shots:0};
   const totalEnemy=tac.enemies.length;
   const accuracy=st.shots>0?Math.round(st.kills/(st.shots||1)*100):0;
-  const statsHtml=`<div style="background:#0d0d20;border:1px solid #2a2a4a;border-radius:14px;padding:12px 18px;width:100%;max-width:280px;margin-top:4px">
-    <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#555;margin-bottom:8px">Статистика боя</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:13px">
-      <div style="color:#aaa">⚔ Урон нанесён</div><div style="color:#f0d060;text-align:right;font-weight:700">${st.dmgDealt}</div>
-      <div style="color:#aaa">🛡 Урон получен</div><div style="color:#e74c3c;text-align:right;font-weight:700">${st.dmgTaken}</div>
-      <div style="color:#aaa">💀 Убито врагов</div><div style="color:#2ecc71;text-align:right;font-weight:700">${st.kills} / ${totalEnemy}</div>
-      <div style="color:#aaa">🔫 Выстрелов</div><div style="color:#88aaff;text-align:right;font-weight:700">${st.shots}</div>
+  const statsHtml=`<div style="background:#0d0d20;border:1px solid #2a2a4a;border-radius:12px;padding:10px 14px;width:100%;max-width:300px">
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#555;margin-bottom:6px">Статистика боя</div>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:4px 10px;font-size:13px">
+      <div style="color:#aaa">⚔ Урон нанесён</div><div style="color:#f0d060;font-weight:700">${st.dmgDealt}</div>
+      <div style="color:#aaa">🛡 Урон получен</div><div style="color:#e74c3c;font-weight:700">${st.dmgTaken}</div>
+      <div style="color:#aaa">💀 Убито врагов</div><div style="color:#2ecc71;font-weight:700">${st.kills}/${totalEnemy}</div>
+      <div style="color:#aaa">🔫 Выстрелов</div><div style="color:#88aaff;font-weight:700">${st.shots}</div>
     </div>
   </div>`;
   if(res==='won'){
@@ -3615,27 +3633,27 @@ function tacEndBattle(res){
     session.hp=Math.max(1,tac.player.hp);session.cash+=cash;
     session.wins.push({boss_id:tac.bossId,loc_id:tac.locId,exp,cash});session.dirty=true;
     ov.innerHTML=`
-      <div class="tac-res-icon">🏆</div>
-      <div class="tac-res-title win">ПОБЕДА!</div>
-      <div class="tac-res-rewards">
+      <div class="tac-res-icon" style="font-size:42px;margin:4px 0">🏆</div>
+      <div class="tac-res-title win" style="margin:0">ПОБЕДА!</div>
+      <div class="tac-res-rewards" style="margin:4px 0">
         <div class="tac-reward"><span class="rv">+${exp}</span><span class="rl">Опыт</span></div>
         <div class="tac-reward"><span class="rv">+${cash}$</span><span class="rl">Нал</span></div>
         <div class="tac-reward"><span class="rv">${session.hp}/${DATA.maxhp}</span><span class="rl">HP</span></div>
       </div>
       ${statsHtml}
-      <button class="tac-res-btn" onclick="afterBattle(true)">Продолжить</button>
-      <button class="tac-res-btn exit" onclick="afterBattle(false)">В главное меню</button>`;
+      <button class="tac-res-btn" style="margin-top:6px;width:100%;max-width:300px" onclick="afterBattle(true,true)">▶ Продолжить</button>
+      <button class="tac-res-btn exit" style="width:100%;max-width:300px" onclick="afterBattle(false,true)">🏠 В главное меню</button>`;
   }else{
     session.hp=1;session.dirty=true;
     ov.innerHTML=`
-      <div class="tac-res-icon">💀</div>
-      <div class="tac-res-title lose">ПОРАЖЕНИЕ</div>
-      <div style="color:#888;font-size:13px;margin-top:2px">Вы потеряли сознание.</div>
+      <div class="tac-res-icon" style="font-size:42px;margin:4px 0">💀</div>
+      <div class="tac-res-title lose" style="margin:0">ПОРАЖЕНИЕ</div>
+      <div style="color:#888;font-size:13px;margin:2px 0">Вы потеряли сознание.</div>
       ${statsHtml}
-      <button class="tac-res-btn" style="margin-top:8px" onclick="afterBattle(false)">В главное меню</button>`;
+      <button class="tac-res-btn" style="margin-top:6px;width:100%;max-width:300px" onclick="afterBattle(false,true)">🏠 В главное меню</button>`;
   }
+  window._tacResultActive=true; // lock: only button clicks can close this
   ov.style.display='flex';
-  // Принудительно показываем — на случай если page-battle скрыт
   ov.style.zIndex='99999';
 }
 
@@ -3872,7 +3890,10 @@ function tacSyncNetwork(ts){
 
 let _afterBattleTs = 0; // timestamp to guard against instant goBack after battle
 
-function afterBattle(stayInDistrict) {
+function afterBattle(stayInDistrict, fromButton) {
+  // Block all calls except from result overlay buttons
+  if(window._tacResultActive && !fromButton) return;
+  window._tacResultActive = false;
   const _ovr=document.getElementById('tac-result');if(_ovr)_ovr.style.display='none';
   const _old=document.getElementById('battle-result');if(_old)_old.style.display='none';
   // Stop the game loop
@@ -3890,10 +3911,11 @@ function afterBattle(stayInDistrict) {
     // Re-attach BackButton after a safe delay
     setTimeout(()=>{
       if(tg&&tg.BackButton&&session.dirty){
+        tg.BackButton.offClick(goBack);
         tg.BackButton.onClick(goBack);
         tg.BackButton.show();
       }
-    }, 1500);
+    }, 2500);
   }
 }
 
@@ -4420,24 +4442,11 @@ function drawHatSimple(ctx,hatId,px,py,bd,headY,headH,sc){
     ctx.beginPath();ctx.roundRect(px(-hw*0.8),py(headY+30),(hw*1.6)*sc,30*sc,[3*sc,3*sc,0,0]);ctx.fill();
   }else if(hatId===2){
     ctx.fillStyle='#8b4513';
-    ctx.beginPath();ctx.ellipse(px(0),py(headY),(hw+8)*sc,4*sc,0,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.roundRect(px(-hw*0.42),py(headY+18),(hw*0.84)*sc,18*sc,[4*sc,4*sc,0,0]);ctx.fill();
+    ctx.beginPath();ctx.ellipse(px(0),py(headY),(hw+8)*sc,4*sc,0,0,Math.PI*2);ctx.fill();    ctx.beginPath();ctx.roundRect(px(-hw*0.42),py(headY+18),(hw*0.84)*sc,18*sc,[4*sc,4*sc,0,0]);ctx.fill();
   }else if(hatId===3){
     ctx.fillStyle='#2c2c4e';
-    ctx.beginPath();ctx.ellipse(px(-3),py(headY+8),(hw+3)*sc,12*sc,-0.15,Math.PI*0.05,Math.PI*1.95);ctx.fill();
-    ctx.beginPath();ctx.ellipse(px(hw*0.4),py(headY),(hw+5)*sc,4*sc,0.15,0,Math.PI);ctx.fill();
-  }else if(hatId===4){
-    ctx.fillStyle='#5c3d11';
-    ctx.beginPath();ctx.ellipse(px(0),py(headY+3),(hw+13)*sc,5*sc,0,0,Math.PI*2);ctx.fill();    ctx.beginPath();ctx.moveTo(px(-hw+2),py(headY+3));ctx.lineTo(px(-hw+5),py(headY+35));ctx.lineTo(px(0),py(headY+40));ctx.lineTo(px(hw-5),py(headY+35));ctx.lineTo(px(hw-2),py(headY+3));ctx.closePath();ctx.fill();
-  }else if(hatId===5){
-    ctx.strokeStyle='#111';ctx.lineWidth=2.5*sc;ctx.fillStyle='#1a3a5a88';
-    ctx.beginPath();ctx.roundRect(px(-hw*0.55),py(eyeY+5),hw*0.42*sc,9*sc,[3*sc]);ctx.fill();ctx.stroke();
-    ctx.beginPath();ctx.roundRect(px(hw*0.13),py(eyeY+5),hw*0.42*sc,9*sc,[3*sc]);ctx.fill();ctx.stroke();
-    ctx.beginPath();ctx.moveTo(px(-hw*0.13),py(eyeY+8));ctx.lineTo(px(hw*0.13),py(eyeY+8));ctx.stroke();
-  }else if(hatId===7){
-    ctx.fillStyle='#2c2c4e';
-    ctx.beginPath();ctx.ellipse(px(-3),py(headY+8),(hw+3)*sc,12*sc,-0.15,Math.PI*0.05,Math.PI*1.95);ctx.fill();
-  }else if(hatId===8){    ctx.fillStyle='#0a0a0a';
+    ctx.beginPath();ctx.ellipse(px(-3),py(headY+8),(hw+3)*sc,12*sc,-0.15,Math.PI*0.05,Math.PI*1.95);ctx.fill();  }else if(hatId===8){
+    ctx.fillStyle='#0a0a0a';
     ctx.beginPath();ctx.ellipse(px(0),py(headY+2),(hw+14)*sc,5*sc,0,0,Math.PI*2);ctx.fill();
     ctx.beginPath();ctx.roundRect(px(-hw+4),py(headY+2+28),(hw*2-8)*sc,28*sc,[2*sc,2*sc,0,0]);ctx.fill();  }
 }
