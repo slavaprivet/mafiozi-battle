@@ -1520,7 +1520,11 @@ function nav(dest, extra) {
   document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
 
   if (dest === 'donate') { renderDonatePage(extra); return; }
-  if (CLIENT_PAGES.includes(dest)) {
+
+  if (dest === 'my_contacts') {
+    document.getElementById('page-contacts').style.display = '';
+  }
+  else if (CLIENT_PAGES.includes(dest)) {
     if (dest === 'explore')    renderDistricts();
     if (dest === 'character')  renderCharacter();
     if (dest === 'coop')       renderCoopLobby();
