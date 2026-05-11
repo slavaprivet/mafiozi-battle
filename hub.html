@@ -1152,7 +1152,7 @@ body {
   </div>
   <div class="bot-section-body">
     <div class="bot-section-icon" id="bot-page-icon">📋</div>
-    <div class="bot-section-text">Этот раздел открывается в чате бота.<br>Нажми кнопку ниже — бот покажет информацию.</div>
+    <div class="bot-section-text"><br></div>
     <button class="bot-section-btn" onclick="openInBot()">Открыть в чате ↗</button>
   </div>
 </div>
@@ -1522,9 +1522,14 @@ function nav(dest, extra) {
   if (dest === 'donate') { renderDonatePage(extra); return; }
 
   if (dest === 'my_contacts') {
-    document.getElementById('page-contacts').style.display = '';
-  }
-  else if (CLIENT_PAGES.includes(dest)) {
+    hideAllPages && hideAllPages();
+    const pg = document.getElementById('page-contacts');
+    if (pg) {
+      pg.style.display = '';
+      return;
+    }
+}
+else if (CLIENT_PAGES.includes(dest)) {
     if (dest === 'explore')    renderDistricts();
     if (dest === 'character')  renderCharacter();
     if (dest === 'coop')       renderCoopLobby();
