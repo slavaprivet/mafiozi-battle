@@ -995,7 +995,6 @@
       if (taunt) addLog('💬 ' + eName + ': «' + taunt + '»', 'log-enemy');
       const defNote = aliveBruisers > 0 ? ' (−' + Math.round((1-defMult)*100) + '% от Здоровяка)' : '';
       addLog('😤 ' + eName + ' бьёт тебя: ' + dmg + ' урона!' + defNote, 'log-enemy');
-      SFX.hit();
       shakeEl('player-side');
       showFloatDmg('player-side', dmg, 'player');
       spawnBlood('player-side', 10, true);
@@ -1085,7 +1084,6 @@
         addLog('💥 ' + pname + ': ' + actionLabel + ' — ' + dmg + ' урона!', 'log-player');
         shakeEl('enemy-side');
         showFloatDmg('enemy-side', dmg, 'enemy');
-        SFX.attack(wt);
         spawnBlood('enemy-side', 10, false);
         if (wt === 2) spawnBullets('player-side', 'enemy-side', 3);
         else spawnStrike('enemy-side', wt);
@@ -1108,7 +1106,6 @@
         addLog(logTxt, 'log-player');
         shakeEl('enemy-side');
         showFloatDmg('enemy-side', dmg, 'enemy');
-        SFX.attack(wt);
         spawnBlood('enemy-side', 12, false);
         if (wt === 2) spawnBullets('player-side', 'enemy-side', 4);
         else spawnStrike('enemy-side', wt);
@@ -1122,7 +1119,6 @@
         stats.push({turn: turnNum, who: pname, cls:'sl-player', action: actionLabel, damage: 0, heal: healAmt});
         addLog('💬 ' + pname + ': «' + pick(PLAYER_PHRASES.potion) + '»', 'log-player');
         addLog('🩹 ' + pname + ' использует аптечку: +' + healAmt + ' HP!', 'log-player');
-        SFX.heal();
         showFloatDmg('player-side', healAmt, 'heal');
         updateBars();
         if (enemyHp <= 0) { endBattle('win'); return; }
@@ -1140,7 +1136,6 @@
         stats.push({turn: turnNum, who: pname, cls:'sl-special', action: actionLabel, damage: nadeDmg, heal: 0});
         addLog('💬 ' + pname + ': «' + pick(PLAYER_PHRASES.grenade) + '»', 'log-special');
         addLog('💣 ' + pname + ' бросает гранату — ' + nadeDmg + ' урона! (без ответки)', 'log-special');
-        SFX.explosion();
         shakeEl('enemy-side');
         showFloatDmg('enemy-side', nadeDmg, 'enemy');
         spawnBlood('enemy-side', 20, false);
@@ -1160,7 +1155,6 @@
         stats.push({turn: turnNum, who: pname, cls:'sl-special', action: actionLabel, damage: dmg, heal: 0});
         addLog('💬 ' + pname + ': «' + pick(PLAYER_PHRASES.property) + '»', 'log-special');
         addLog('🎯 ' + pname + ': ' + actionLabel + ' — ' + dmg + ' урона! (без ответки)', 'log-special');
-        SFX.gun();
         shakeEl('enemy-side');
         showFloatDmg('enemy-side', dmg, 'enemy');
         spawnBlood('enemy-side', 14, false);
@@ -1196,7 +1190,6 @@
         stats.push({turn:turnNum, who:m.name, cls:'sl-special', action:'💥 ВЗРЫВ', damage:bombDmg, heal:0});
         addLog('💬 ' + m.name + ': «За всех!»', 'log-special');
         addLog('💥 ' + m.name + ' ВЗРЫВАЕТСЯ — ' + bombDmg + ' урона! Подрывник погиб.', 'log-special');
-        SFX.explosion();
         shakeEl('enemy-side'); showFloatDmg('enemy-side', bombDmg, 'enemy');
         spawnBlood('enemy-side', 20, false);
 
@@ -1215,7 +1208,6 @@
         stats.push({turn:turnNum, who:m.name, cls:'sl-party', action:'🎯 Прицел', damage:sDmg, heal:0});
         addLog('💬 ' + m.name + ': «Вижу цель.»', 'log-party');
         addLog('🎯 ' + m.name + ' берёт прицел: ' + sDmg + ' урона!', 'log-party');
-        SFX.gun();
         shakeEl('enemy-side'); showFloatDmg('enemy-side', sDmg, 'enemy');
         spawnBlood('enemy-side', 14, false);
         spawnBullets('player-side', 'enemy-side', 2);
@@ -1228,7 +1220,6 @@
         stats.push({turn:turnNum, who:m.name, cls:'sl-party', action:'🩹 Лечит', damage:0, heal:healAmt});
         addLog('💬 ' + m.name + ': «Держись, перевяжу.»', 'log-party');
         addLog('🩹 ' + m.name + ' лечит тебя: +' + healAmt + ' HP', 'log-party');
-        SFX.heal();
         showFloatDmg('player-side', healAmt, 'heal');
 
       } else if (role === 'scout') {
@@ -1246,7 +1237,6 @@
         stats.push({turn:turnNum, who:m.name, cls:'sl-party', action:'⚔️ Удар', damage:dmg, heal:0});
         addLog('💬 ' + m.name + ': «' + phrase + '»', 'log-party');
         addLog('⚔️ ' + m.name + ' атакует: ' + dmg + ' урона!', 'log-party');
-        SFX.attack(wt);
         shakeEl('enemy-side'); showFloatDmg('enemy-side', dmg, 'enemy');
         spawnBlood('enemy-side', 8, false);
         if (wt === 2) spawnBullets('player-side', 'enemy-side', 2);
@@ -1323,7 +1313,6 @@
       const closeBtn = document.getElementById('btn-end-close');
 
       if (result === 'win') {
-        SFX.win();
         icon.textContent = '🏆';
         title.textContent = 'ПОБЕДА!'; title.className='end-title win';
         sub.textContent = 'Враг повержен. Трофеи ждут.';
@@ -1333,7 +1322,6 @@
         // Уведомляем партнёра через Firebase что босс мёртв
         if (coopId) { fbWriteTime = Date.now(); fbPatch({bossHp: 0, status: 'won'}); }
       } else if (result === 'lose') {
-        SFX.lose();
         icon.textContent = '💀';
         title.textContent = 'ПОРАЖЕНИЕ'; title.className='end-title lose';
         sub.textContent = 'Ты проиграл. Но можно попробовать снова.';
@@ -1493,114 +1481,6 @@
 
     updateBars();
     fbConnect(); // Подключаем Firebase для co-op (в соло-бою не делает ничего)
-
-  // ── SFX: процедурные звуки через Web Audio API ─────────────────
-  const SFX = {
-    _ctx: null,
-    ctx() {
-      if (!this._ctx) this._ctx = new (window.AudioContext || window.webkitAudioContext)();
-      if (this._ctx.state === 'suspended') this._ctx.resume();
-      return this._ctx;
-    },
-    _noise(c, dur) {
-      const len = Math.ceil(c.sampleRate * dur);
-      const buf = c.createBuffer(1, len, c.sampleRate);
-      const d = buf.getChannelData(0);
-      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-      return buf;
-    },
-    gun() {                        // 🔫 Выстрел
-      const c = this.ctx(), t = c.currentTime;
-      const src = c.createBufferSource(); src.buffer = this._noise(c, 0.18);
-      const bpf = c.createBiquadFilter(); bpf.type='bandpass'; bpf.frequency.value=500; bpf.Q.value=0.6;
-      const g = c.createGain(); g.gain.setValueAtTime(2, t); g.gain.exponentialRampToValueAtTime(0.001, t+0.18);
-      src.connect(bpf); bpf.connect(g); g.connect(c.destination);
-      const osc = c.createOscillator();
-      osc.frequency.setValueAtTime(200, t); osc.frequency.exponentialRampToValueAtTime(35, t+0.1);
-      const og = c.createGain(); og.gain.setValueAtTime(1, t); og.gain.exponentialRampToValueAtTime(0.001, t+0.1);
-      osc.connect(og); og.connect(c.destination);
-      src.start(t); src.stop(t+0.18); osc.start(t); osc.stop(t+0.1);
-    },
-    punch() {                      // 🤜 Удар кулаком
-      const c = this.ctx(), t = c.currentTime;
-      const src = c.createBufferSource(); src.buffer = this._noise(c, 0.1);
-      const lpf = c.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=700;
-      const g = c.createGain(); g.gain.setValueAtTime(1.5, t); g.gain.exponentialRampToValueAtTime(0.001, t+0.1);
-      src.connect(lpf); lpf.connect(g); g.connect(c.destination);
-      const osc = c.createOscillator();
-      osc.frequency.setValueAtTime(120, t); osc.frequency.exponentialRampToValueAtTime(55, t+0.06);
-      const og = c.createGain(); og.gain.setValueAtTime(0.7, t); og.gain.exponentialRampToValueAtTime(0.001, t+0.06);
-      osc.connect(og); og.connect(c.destination);
-      src.start(t); src.stop(t+0.1); osc.start(t); osc.stop(t+0.06);
-    },
-    knife() {                      // 🔪 Удар ножом
-      const c = this.ctx(), t = c.currentTime;
-      const osc = c.createOscillator(); osc.type='sawtooth';
-      osc.frequency.setValueAtTime(1400, t); osc.frequency.exponentialRampToValueAtTime(250, t+0.07);
-      const og = c.createGain(); og.gain.setValueAtTime(0.25, t); og.gain.exponentialRampToValueAtTime(0.001, t+0.07);
-      osc.connect(og); og.connect(c.destination);
-      const src = c.createBufferSource(); src.buffer = this._noise(c, 0.05);
-      const hpf = c.createBiquadFilter(); hpf.type='highpass'; hpf.frequency.value=2500;
-      const g = c.createGain(); g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.001, t+0.05);
-      src.connect(hpf); hpf.connect(g); g.connect(c.destination);
-      osc.start(t); osc.stop(t+0.07); src.start(t); src.stop(t+0.05);
-    },
-    explosion() {                  // 💣 Взрыв гранаты
-      const c = this.ctx(), t = c.currentTime;
-      const src = c.createBufferSource(); src.buffer = this._noise(c, 1.5);
-      const lpf = c.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=350;
-      const g = c.createGain(); g.gain.setValueAtTime(3.5, t); g.gain.exponentialRampToValueAtTime(0.001, t+1.5);
-      src.connect(lpf); lpf.connect(g); g.connect(c.destination);
-      const osc = c.createOscillator();
-      osc.frequency.setValueAtTime(70, t); osc.frequency.exponentialRampToValueAtTime(18, t+0.35);
-      const og = c.createGain(); og.gain.setValueAtTime(2.5, t); og.gain.exponentialRampToValueAtTime(0.001, t+0.35);
-      osc.connect(og); og.connect(c.destination);
-      src.start(t); src.stop(t+1.5); osc.start(t); osc.stop(t+0.35);
-    },
-    heal() {                       // 🩹 Аптечка
-      const c = this.ctx(), t = c.currentTime;
-      [0, 0.07, 0.14].forEach((dt, i) => {
-        const o = c.createOscillator(); o.type='sine'; o.frequency.value = 480 + i*160;
-        const g = c.createGain();
-        g.gain.setValueAtTime(0, t+dt); g.gain.linearRampToValueAtTime(0.25, t+dt+0.03);
-        g.gain.exponentialRampToValueAtTime(0.001, t+dt+0.18);
-        o.connect(g); g.connect(c.destination); o.start(t+dt); o.stop(t+dt+0.18);
-      });
-    },
-    hit() {                        // 😤 Враг бьёт игрока
-      const c = this.ctx(), t = c.currentTime;
-      const src = c.createBufferSource(); src.buffer = this._noise(c, 0.12);
-      const bpf = c.createBiquadFilter(); bpf.type='bandpass'; bpf.frequency.value=550; bpf.Q.value=2.5;
-      const g = c.createGain(); g.gain.setValueAtTime(1, t); g.gain.exponentialRampToValueAtTime(0.001, t+0.12);
-      src.connect(bpf); bpf.connect(g); g.connect(c.destination);
-      src.start(t); src.stop(t+0.12);
-    },
-    win() {                        // 🏆 Победа
-      const c = this.ctx(), t = c.currentTime;
-      [523,659,784,1047].forEach((f,i) => {
-        const o = c.createOscillator(); o.type='square'; o.frequency.value=f;
-        const g = c.createGain();
-        g.gain.setValueAtTime(0, t+i*0.13); g.gain.linearRampToValueAtTime(0.25, t+i*0.13+0.02);
-        g.gain.exponentialRampToValueAtTime(0.001, t+i*0.13+0.28);
-        o.connect(g); g.connect(c.destination); o.start(t+i*0.13); o.stop(t+i*0.13+0.28);
-      });
-    },
-    lose() {
-      const c = this.ctx(), t = c.currentTime;
-      [380,320,260,180].forEach((f,i) => {
-        const o = c.createOscillator(); o.type='sawtooth'; o.frequency.value=f;
-        const g = c.createGain();
-        g.gain.setValueAtTime(0, t+i*0.18); g.gain.linearRampToValueAtTime(0.22, t+i*0.18+0.02);
-        g.gain.exponentialRampToValueAtTime(0.001, t+i*0.18+0.35);
-        o.connect(g); g.connect(c.destination); o.start(t+i*0.18); o.stop(t+i*0.18+0.35);
-      });
-    },
-    attack(wtType) {
-      if (wtType === 2) this.gun();
-      else if (wtType === 1) this.knife();
-      else this.punch();
-    },
-  };
   </script>
 </body>
 </html>
