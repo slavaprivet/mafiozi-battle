@@ -1,8 +1,12 @@
 <!DOCTYPE html>
+<!-- BUILD: 2026-05-12 16:26 UTC -->
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
 <title>Мафиози</title>
@@ -1152,7 +1156,7 @@ body {
   </div>
   <div class="bot-section-body">
     <div class="bot-section-icon" id="bot-page-icon">📋</div>
-    <div class="bot-section-text"><br></div>
+    <div class="bot-section-text">Этот раздел открывается в чате бота.<br>Нажми кнопку ниже — бот покажет информацию.</div>
     <button class="bot-section-btn" onclick="openInBot()">Открыть в чате ↗</button>
   </div>
 </div>
@@ -1520,16 +1524,7 @@ function nav(dest, extra) {
   document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
 
   if (dest === 'donate') { renderDonatePage(extra); return; }
-
-  if (dest === 'my_contacts') {
-    hideAllPages && hideAllPages();
-    const pg = document.getElementById('page-contacts');
-    if (pg) {
-      pg.style.display = '';
-      return;
-    }
-}
-else if (CLIENT_PAGES.includes(dest)) {
+  if (CLIENT_PAGES.includes(dest)) {
     if (dest === 'explore')    renderDistricts();
     if (dest === 'character')  renderCharacter();
     if (dest === 'coop')       renderCoopLobby();
