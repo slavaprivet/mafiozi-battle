@@ -898,6 +898,55 @@ body {
 }
 .donate-footer { text-align:center; color:var(--muted); font-size:12px; padding:16px; line-height:1.6; }
 
+
+.time-info-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #1f2235;
+    border: 1px solid #444;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: 0.2s;
+    font-size: 14px;
+}
+.time-info-btn:hover { background:#35395a; }
+.time-info-modal {
+    position: fixed;
+    top:0; left:0;
+    width:100%; height:100%;
+    background:rgba(0,0,0,0.75);
+    z-index:9999;
+    display:none;
+    align-items:center;
+    justify-content:center;
+}
+.time-info-content {
+    width:420px;
+    background:#101322;
+    border-radius:18px;
+    border:1px solid #2d3555;
+    padding:20px;
+    color:white;
+}
+.time-info-header {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-size:22px;
+    margin-bottom:15px;
+    font-weight:bold;
+}
+.time-info-section {
+    margin-bottom:14px;
+    padding:12px;
+    border-radius:12px;
+    background:rgba(255,255,255,0.03);
+}
+
 </style>
 </head>
 <body>
@@ -1520,6 +1569,12 @@ function nav(dest, extra) {
   document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
 
   if (dest === 'donate') { renderDonatePage(extra); return; }
+
+  if (dest === 'my_contacts') {
+    document.getElementById('page-contacts').style.display = '';
+    window.scrollTo(0,0);
+    return;
+  }
   if (CLIENT_PAGES.includes(dest)) {
     if (dest === 'explore')    renderDistricts();
     if (dest === 'character')  renderCharacter();
@@ -1825,164 +1880,6 @@ function updateHospitalBtn() {
   btn.textContent = hosp.name + (needsHeal ? '' : ' (здоров)');
   btn.style.opacity = needsHeal ? '1' : '0.5';
 }
-
-
-
-// ═════════ RANDOM EVENTS SYSTEM ═════════
-
-window.inBattle = false;
-window.lastRandomEvent = 0;
-
-const mafiaEvents = [
-  { text:'👧 Увидел красивую девушку', effect:'+50 энергии', run(){ session.mp=Math.min(DATA.maxmp,session.mp+50);} },
-  { text:'🐕 Тебя покусала собака', effect:'-30 HP', run(){ DATA.hp=Math.max(1,DATA.hp-30);} },
-  { text:'💰 Нашёл кошелёк возле клуба', effect:'+250$', run(){ DATA.cash+=250;} },
-  { text:'🚬 Перекурил с братвой', effect:'+15 энергии', run(){ DATA.mp=Math.min(DATA.maxmp,DATA.mp+15);} },
-  { text:'🍺 Перепил с братвой', effect:'-20 энергии', run(){ DATA.mp=Math.max(0,DATA.mp-20);} },
-  { text:'🔪 Тебя подрезали в переулке', effect:'-15 HP', run(){ DATA.hp=Math.max(1,DATA.hp-15);} },
-  { text:'💸 Проиграл деньги в казино', effect:'-200$', run(){ DATA.cash=Math.max(0,DATA.cash-200);} },
-  { text:'🍔 Вкусно поел в забегаловке', effect:'+20 HP', run(){ DATA.hp=Math.min(DATA.maxhp,DATA.hp+20);} },
-  { text:'🚕 Таксист тебя обманул', effect:'-120$', run(){ DATA.cash=Math.max(0,DATA.cash-120);} },
-  { text:'🧃 Выпил энергетик', effect:'+35 энергии', run(){ DATA.mp=Math.min(DATA.maxmp,DATA.mp+35);} },
-
-  { text:'📸 Тебя зафоткали возле клуба', effect:'+1 ⭐', run(){ DATA.wanted=Math.min(5,(DATA.wanted||0)+1);} },
-  { text:'🚔 Копы заметили тебя', effect:'+1 ⭐', run(){ DATA.wanted=Math.min(5,(DATA.wanted||0)+1);} },
-  { text:'💊 Нашёл аптечку', effect:'+40 HP', run(){ DATA.hp=Math.min(DATA.maxhp,DATA.hp+40);} },
-  { text:'🩸 Старые раны открылись', effect:'-25 HP', run(){ DATA.hp=Math.max(1,DATA.hp-25);} },
-  { text:'💵 Нашёл тайник', effect:'+400$', run(){ DATA.cash+=400;} },
-  { text:'😤 Адреналин ударил в голову', effect:'+30 энергии', run(){ DATA.mp=Math.min(DATA.maxmp,DATA.mp+30);} },
-  { text:'👮 Свидетель вызвал полицию', effect:'+2 ⭐', run(){ DATA.wanted=Math.min(5,(DATA.wanted||0)+2);} },
-  { text:'🧥 Потерял куртку', effect:'-150$', run(){ DATA.cash=Math.max(0,DATA.cash-150);} },
-  { text:'🎲 Повезло в подпольной игре', effect:'+300$', run(){ DATA.cash+=300;} },
-  { text:'🧨 В районе началась стрельба', effect:'-10 HP', run(){ DATA.hp=Math.max(1,DATA.hp-10);} }
-];
-
-
-function updateRandomEventUI(){
-
-  try{
-
-    if(typeof updateDistHPBar==='function'){
-      updateDistHPBar();
-    }
-
-    if(typeof updateHospitalBtn==='function'){
-      updateHospitalBtn();
-    }
-
-    const hpVal=document.getElementById('hp-val');
-    if(hpVal){
-      hpVal.textContent=`${DATA.hp} / ${DATA.maxhp}`;
-    }
-
-    const mpVal=document.getElementById('mp-val');
-    if(mpVal){
-      mpVal.textContent=`${DATA.mp} / ${DATA.maxmp}`;
-    }
-
-    const cashVal=document.getElementById('cash-val');
-    if(cashVal){
-      cashVal.textContent=typeof fmtNum==='function'
-        ? fmtNum(DATA.cash)
-        : DATA.cash;
-    }
-
-    const hpBar=document.getElementById('hp-bar');
-    if(hpBar){
-      hpBar.style.width=
-        Math.min(100, DATA.hp / DATA.maxhp * 100).toFixed(1)+'%';
-    }
-
-    const mpBar=document.getElementById('mp-bar');
-    if(mpBar){
-      mpBar.style.width=
-        Math.min(100, DATA.mp / DATA.maxmp * 100).toFixed(1)+'%';
-    }
-
-    const wantedEl=document.getElementById('top-wanted');
-
-    if(wantedEl){
-
-      if((DATA.wanted||0)>0){
-        wantedEl.textContent='⭐'.repeat(DATA.wanted);
-        wantedEl.style.display='';
-      }else{
-        wantedEl.style.display='none';
-      }
-
-    }
-
-    if(typeof saveData==='function'){
-      saveData();
-    }
-
-  }catch(e){
-    console.log('ui update error', e);
-  }
-}
-
-
-
-function triggerRandomEvent(){
-
-  try{
-
-    if(window.inBattle) return;
-
-    const now = Date.now();
-
-    if(!window.lastRandomEvent){
-      window.lastRandomEvent = 0;
-    }
-
-    // cooldown 45 sec
-    if(now - window.lastRandomEvent < 45000) return;
-
-    // 25% chance
-    if(Math.random() > 0.25) return;
-
-    window.lastRandomEvent = now;
-
-    const ev = mafiaEvents[Math.floor(Math.random()*mafiaEvents.length)];
-
-    ev.run();
-
-    updateRandomEventUI();
-
-    showToast(ev.text + ' (' + ev.effect + ')','🎲');
-
-  }catch(e){
-    console.log('event error', e);
-  }
-}
-
-document.addEventListener('click', function(e){
-
-
-  const txt=(e.target.innerText||'').toLowerCase();
-
-  if(
-    txt.includes('удар') ||
-    txt.includes('атака') ||
-    txt.includes('бой') ||
-    txt.includes('fight')
-  ){
-    window.inBattle=true;
-
-    setTimeout(()=>{
-      window.inBattle=false;
-    },15000);
-
-    return;
-  }
-
-  setTimeout(()=>{
-    triggerRandomEvent();
-  },500);
-
-});
-
-
 
 // ── HOSPITAL ──────────────────────────────────────────────────────────
 function showHospital() {
@@ -4613,305 +4510,38 @@ drawAvatar();
 
 </script>
 
-<style>
-#game-time-box{
-position:absolute;
-top:18px;
-right:18px;
-display:flex;
-align-items:center;
-gap:10px;
-background:rgba(10,10,30,.92);
-border:1px solid rgba(255,255,255,.12);
-padding:8px 14px;
-border-radius:14px;
-font-weight:700;
-font-size:15px;
-z-index:9999;
-box-shadow:0 0 15px rgba(0,0,0,.35);
-}
-#game-time-icon{
-font-size:22px;
-}
-#game-time-text{
-display:flex;
-flex-direction:column;
-line-height:1.1;
-}
-#game-time-period{
-font-size:11px;
-opacity:.75;
-}
-</style>
+<div class="time-info-btn" onclick="toggleTimeInfo()">ⓘ</div>
 
-<div id="game-time-box">
-  <div id="game-time-icon">☀️</div>
-  <div id="game-time-text">
-    <div id="game-time-clock">12:00</div>
-    <div id="game-time-period">ДЕНЬ</div>
-  </div>
+<div id="timeInfoModal" class="time-info-modal">
+<div class="time-info-content">
+<div class="time-info-header">
+🌆 Игровое время
+<button onclick="toggleTimeInfo()">✖</button>
 </div>
 
-<script>
+<div class="time-info-section">
+<h3>🌅 Утро</h3>
+<p>Больше позитивных событий и восстановления энергии.</p>
+</div>
 
-window.GAME_TIME = {
-  hour: 12,
-  minute: 0
-};
+<div class="time-info-section">
+<h3>☀ День</h3>
+<p>Работа, сделки, обычные события районов.</p>
+</div>
 
-function updateGameClock(){
+<div class="time-info-section">
+<h3>🌆 Вечер</h3>
+<p>Повышается шанс муток, конфликтов и драк.</p>
+</div>
 
-  const icon=document.getElementById('game-time-icon');
-  const clock=document.getElementById('game-time-clock');
-  const period=document.getElementById('game-time-period');
+<div class="time-info-section">
+<h3>🌙 Ночь</h3>
+<p>Самое опасное время: нападения, розыск и редкие мафия-события.</p>
+</div>
 
-  if(!icon || !clock || !period) return;
-
-  GAME_TIME.minute++;
-
-  if(GAME_TIME.minute>=60){
-    GAME_TIME.minute=0;
-    GAME_TIME.hour++;
-  }
-
-  if(GAME_TIME.hour>=24){
-    GAME_TIME.hour=0;
-  }
-
-  const hh=String(GAME_TIME.hour).padStart(2,'0');
-  const mm=String(GAME_TIME.minute).padStart(2,'0');
-
-  clock.textContent=`${hh}:${mm}`;
-
-  if(GAME_TIME.hour>=6 && GAME_TIME.hour<12){
-    icon.textContent='🌅';
-    period.textContent='УТРО';
-  }
-  else if(GAME_TIME.hour>=12 && GAME_TIME.hour<18){
-    icon.textContent='☀️';
-    period.textContent='ДЕНЬ';
-  }
-  else if(GAME_TIME.hour>=18 && GAME_TIME.hour<22){
-    icon.textContent='🌇';
-    period.textContent='ВЕЧЕР';
-  }
-  else{
-    icon.textContent='🌙';
-    period.textContent='НОЧЬ';
-  }
-
-}
-
-setInterval(updateGameClock,1000);
-
-function mafiaNightBonus(){
-
-  return (
-    GAME_TIME.hour >= 22 ||
-    GAME_TIME.hour < 6
-  );
-
-}
-
-</script>
+<div class="time-info-footer">⏰ 1 минута = 1 игровой час</div>
+</div>
+</div>
 
 </body>
 </html>
-
-
-<script>
-
-// ════════════════════════════════════════════════
-// ADVANCED MAFIA EVENT SYSTEM
-// ════════════════════════════════════════════════
-
-window.inBattle = false;
-
-window.eventCooldowns = {
-  small: 0,
-  medium: 0,
-  rare: 0
-};
-
-const SMALL_EVENTS = [
-  { text:'👧 Увидел красивую девушку', effect:'+50 энергии', run(){ DATA.mp=Math.min(DATA.maxmp,DATA.mp+50);} },
-  { text:'🐕 Тебя покусала собака', effect:'-30 HP', run(){ DATA.hp=Math.max(1,DATA.hp-30);} },
-  { text:'🚬 Перекурил с братвой', effect:'+15 энергии', run(){ DATA.mp=Math.min(DATA.maxmp,DATA.mp+15);} },
-  { text:'🍺 Перепил с братвой', effect:'-20 энергии', run(){ DATA.mp=Math.max(0,DATA.mp-20);} },
-  { text:'🍔 Поел в забегаловке', effect:'+20 HP', run(){ DATA.hp=Math.min(DATA.maxhp,DATA.hp+20);} },
-  { text:'🧃 Выпил энергетик', effect:'+35 энергии', run(){ DATA.mp=Math.min(DATA.maxmp,DATA.mp+35);} }
-];
-
-const MEDIUM_EVENTS = [
-  { text:'💰 Нашёл кошелёк возле клуба', effect:'+250$', run(){ DATA.cash+=250;} },
-  { text:'💸 Проиграл деньги в казино', effect:'-200$', run(){ DATA.cash=Math.max(0,DATA.cash-200);} },
-  { text:'🚕 Таксист тебя обманул', effect:'-120$', run(){ DATA.cash=Math.max(0,DATA.cash-120);} },
-  { text:'📸 Тебя зафоткали возле клуба', effect:'+1 ⭐', run(){ DATA.wanted=Math.min(5,(DATA.wanted||0)+1);} },
-  { text:'🚔 Копы заметили тебя', effect:'+1 ⭐', run(){ DATA.wanted=Math.min(5,(DATA.wanted||0)+1);} },
-  { text:'💊 Нашёл аптечку', effect:'+40 HP', run(){ DATA.hp=Math.min(DATA.maxhp,DATA.hp+40);} }
-];
-
-const RARE_EVENTS = [
-  { text:'🎲 Повезло в подпольной игре', effect:'+300$', run(){ DATA.cash+=300;} },
-  { text:'👮 Свидетель вызвал полицию', effect:'+2 ⭐', run(){ DATA.wanted=Math.min(5,(DATA.wanted||0)+2);} },
-  { text:'🧨 В районе началась стрельба', effect:'-10 HP', run(){ DATA.hp=Math.max(1,DATA.hp-10);} },
-  { text:'💵 Нашёл тайник мафии', effect:'+400$', run(){ DATA.cash+=400;} }
-];
-
-function mafiaNightBonus(){
-  const h = new Date().getHours();
-  return (h >= 22 || h <= 5);
-}
-
-function updateRandomEventUI(){
-
-  try{
-
-    const hpVal=document.getElementById('hp-val');
-    if(hpVal){
-      hpVal.textContent=`${DATA.hp} / ${DATA.maxhp}`;
-    }
-
-    const mpVal=document.getElementById('mp-val');
-    if(mpVal){
-      mpVal.textContent=`${DATA.mp} / ${DATA.maxmp}`;
-    }
-
-    const cashVal=document.getElementById('cash-val');
-    if(cashVal){
-      cashVal.textContent=(typeof fmtNum==='function')
-        ? fmtNum(DATA.cash)
-        : DATA.cash;
-    }
-
-    const hpBar=document.getElementById('hp-bar');
-    if(hpBar){
-      hpBar.style.width=
-        Math.min(100, DATA.hp / DATA.maxhp * 100).toFixed(1)+'%';
-    }
-
-    const mpBar=document.getElementById('mp-bar');
-    if(mpBar){
-      mpBar.style.width=
-        Math.min(100, DATA.mp / DATA.maxmp * 100).toFixed(1)+'%';
-    }
-
-    const wantedEl=document.getElementById('top-wanted');
-
-    if(wantedEl){
-
-      if((DATA.wanted||0)>0){
-        wantedEl.textContent='⭐'.repeat(DATA.wanted);
-        wantedEl.style.display='';
-      }else{
-        wantedEl.style.display='none';
-      }
-
-    }
-
-    if(typeof saveData==='function'){
-      saveData();
-    }
-
-  }catch(e){
-    console.log(e);
-  }
-}
-
-function pickRandom(arr){
-  return arr[Math.floor(Math.random()*arr.length)];
-}
-
-function tryEvent(type){
-
-  if(window.inBattle) return;
-
-  const now = Date.now();
-
-  if(type==='small'){
-
-    if(now - window.eventCooldowns.small < 60000) return;
-
-    if(Math.random() > 0.20) return;
-
-    window.eventCooldowns.small = now;
-
-    const ev = pickRandom(SMALL_EVENTS);
-
-    ev.run();
-    updateRandomEventUI();
-    showToast(ev.text + ' (' + ev.effect + ')','🎲');
-  }
-
-  if(type==='medium'){
-
-    const cd = mafiaNightBonus() ? 300000 : 420000;
-
-    if(now - window.eventCooldowns.medium < cd) return;
-
-    const chance = mafiaNightBonus() ? 0.18 : 0.12;
-
-    if(Math.random() > chance) return;
-
-    window.eventCooldowns.medium = now;
-
-    const ev = pickRandom(MEDIUM_EVENTS);
-
-    ev.run();
-    updateRandomEventUI();
-    showToast(ev.text + ' (' + ev.effect + ')','💰');
-  }
-
-  if(type==='rare'){
-
-    const cd = mafiaNightBonus() ? 1200000 : 1800000;
-
-    if(now - window.eventCooldowns.rare < cd) return;
-
-    const chance = mafiaNightBonus() ? 0.10 : 0.05;
-
-    if(Math.random() > chance) return;
-
-    window.eventCooldowns.rare = now;
-
-    const ev = pickRandom(RARE_EVENTS);
-
-    ev.run();
-    updateRandomEventUI();
-    showToast(ev.text + ' (' + ev.effect + ')','🔥');
-  }
-}
-
-document.addEventListener('click', function(e){
-
-  const txt=(e.target.innerText||'').toLowerCase();
-
-  if(
-    txt.includes('удар') ||
-    txt.includes('атака') ||
-    txt.includes('бой') ||
-    txt.includes('fight')
-  ){
-
-    window.inBattle=true;
-
-    setTimeout(()=>{
-      window.inBattle=false;
-    },15000);
-
-    return;
-  }
-
-  setTimeout(()=>{
-
-    tryEvent('small');
-    tryEvent('medium');
-    tryEvent('rare');
-
-  },400);
-
-});
-
-// ════════════════════════════════════════════════
-
-</script>
