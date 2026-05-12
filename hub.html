@@ -4612,6 +4612,109 @@ function drawHatSimple(ctx,hatId,px,py,bd,headY,headH,sc){
 drawAvatar();
 
 </script>
+
+<style>
+#game-time-box{
+position:absolute;
+top:18px;
+right:18px;
+display:flex;
+align-items:center;
+gap:10px;
+background:rgba(10,10,30,.92);
+border:1px solid rgba(255,255,255,.12);
+padding:8px 14px;
+border-radius:14px;
+font-weight:700;
+font-size:15px;
+z-index:9999;
+box-shadow:0 0 15px rgba(0,0,0,.35);
+}
+#game-time-icon{
+font-size:22px;
+}
+#game-time-text{
+display:flex;
+flex-direction:column;
+line-height:1.1;
+}
+#game-time-period{
+font-size:11px;
+opacity:.75;
+}
+</style>
+
+<div id="game-time-box">
+  <div id="game-time-icon">☀️</div>
+  <div id="game-time-text">
+    <div id="game-time-clock">12:00</div>
+    <div id="game-time-period">ДЕНЬ</div>
+  </div>
+</div>
+
+<script>
+
+window.GAME_TIME = {
+  hour: 12,
+  minute: 0
+};
+
+function updateGameClock(){
+
+  const icon=document.getElementById('game-time-icon');
+  const clock=document.getElementById('game-time-clock');
+  const period=document.getElementById('game-time-period');
+
+  if(!icon || !clock || !period) return;
+
+  GAME_TIME.minute++;
+
+  if(GAME_TIME.minute>=60){
+    GAME_TIME.minute=0;
+    GAME_TIME.hour++;
+  }
+
+  if(GAME_TIME.hour>=24){
+    GAME_TIME.hour=0;
+  }
+
+  const hh=String(GAME_TIME.hour).padStart(2,'0');
+  const mm=String(GAME_TIME.minute).padStart(2,'0');
+
+  clock.textContent=`${hh}:${mm}`;
+
+  if(GAME_TIME.hour>=6 && GAME_TIME.hour<12){
+    icon.textContent='🌅';
+    period.textContent='УТРО';
+  }
+  else if(GAME_TIME.hour>=12 && GAME_TIME.hour<18){
+    icon.textContent='☀️';
+    period.textContent='ДЕНЬ';
+  }
+  else if(GAME_TIME.hour>=18 && GAME_TIME.hour<22){
+    icon.textContent='🌇';
+    period.textContent='ВЕЧЕР';
+  }
+  else{
+    icon.textContent='🌙';
+    period.textContent='НОЧЬ';
+  }
+
+}
+
+setInterval(updateGameClock,1000);
+
+function mafiaNightBonus(){
+
+  return (
+    GAME_TIME.hour >= 22 ||
+    GAME_TIME.hour < 6
+  );
+
+}
+
+</script>
+
 </body>
 </html>
 
