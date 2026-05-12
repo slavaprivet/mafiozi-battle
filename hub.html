@@ -1835,70 +1835,129 @@ window.lastRandomEvent = 0;
 
 const mafiaEvents = [
   { text:'👧 Увидел красивую девушку', effect:'+50 энергии', run(){ session.mp=Math.min(DATA.maxmp,session.mp+50);} },
-  { text:'🐕 Тебя покусала собака', effect:'-30 HP', run(){ session.hp=Math.max(1,session.hp-30);} },
-  { text:'💰 Нашёл кошелёк возле клуба', effect:'+250$', run(){ session.cash+=250;} },
-  { text:'🚬 Перекурил с братвой', effect:'+15 энергии', run(){ session.mp=Math.min(DATA.maxmp,session.mp+15);} },
-  { text:'🍺 Перепил с братвой', effect:'-20 энергии', run(){ session.mp=Math.max(0,session.mp-20);} },
-  { text:'🔪 Тебя подрезали в переулке', effect:'-15 HP', run(){ session.hp=Math.max(1,session.hp-15);} },
-  { text:'💸 Проиграл деньги в казино', effect:'-200$', run(){ session.cash=Math.max(0,session.cash-200);} },
-  { text:'🍔 Вкусно поел в забегаловке', effect:'+20 HP', run(){ session.hp=Math.min(DATA.maxhp,session.hp+20);} },
-  { text:'🚕 Таксист тебя обманул', effect:'-120$', run(){ session.cash=Math.max(0,session.cash-120);} },
-  { text:'🧃 Выпил энергетик', effect:'+35 энергии', run(){ session.mp=Math.min(DATA.maxmp,session.mp+35);} },
+  { text:'🐕 Тебя покусала собака', effect:'-30 HP', run(){ DATA.hp=Math.max(1,DATA.hp-30);} },
+  { text:'💰 Нашёл кошелёк возле клуба', effect:'+250$', run(){ DATA.cash+=250;} },
+  { text:'🚬 Перекурил с братвой', effect:'+15 энергии', run(){ DATA.mp=Math.min(DATA.maxmp,DATA.mp+15);} },
+  { text:'🍺 Перепил с братвой', effect:'-20 энергии', run(){ DATA.mp=Math.max(0,DATA.mp-20);} },
+  { text:'🔪 Тебя подрезали в переулке', effect:'-15 HP', run(){ DATA.hp=Math.max(1,DATA.hp-15);} },
+  { text:'💸 Проиграл деньги в казино', effect:'-200$', run(){ DATA.cash=Math.max(0,DATA.cash-200);} },
+  { text:'🍔 Вкусно поел в забегаловке', effect:'+20 HP', run(){ DATA.hp=Math.min(DATA.maxhp,DATA.hp+20);} },
+  { text:'🚕 Таксист тебя обманул', effect:'-120$', run(){ DATA.cash=Math.max(0,DATA.cash-120);} },
+  { text:'🧃 Выпил энергетик', effect:'+35 энергии', run(){ DATA.mp=Math.min(DATA.maxmp,DATA.mp+35);} },
 
   { text:'📸 Тебя зафоткали возле клуба', effect:'+1 ⭐', run(){ DATA.wanted=Math.min(5,(DATA.wanted||0)+1);} },
   { text:'🚔 Копы заметили тебя', effect:'+1 ⭐', run(){ DATA.wanted=Math.min(5,(DATA.wanted||0)+1);} },
-  { text:'💊 Нашёл аптечку', effect:'+40 HP', run(){ session.hp=Math.min(DATA.maxhp,session.hp+40);} },
-  { text:'🩸 Старые раны открылись', effect:'-25 HP', run(){ session.hp=Math.max(1,session.hp-25);} },
-  { text:'💵 Нашёл тайник', effect:'+400$', run(){ session.cash+=400;} },
-  { text:'😤 Адреналин ударил в голову', effect:'+30 энергии', run(){ session.mp=Math.min(DATA.maxmp,session.mp+30);} },
+  { text:'💊 Нашёл аптечку', effect:'+40 HP', run(){ DATA.hp=Math.min(DATA.maxhp,DATA.hp+40);} },
+  { text:'🩸 Старые раны открылись', effect:'-25 HP', run(){ DATA.hp=Math.max(1,DATA.hp-25);} },
+  { text:'💵 Нашёл тайник', effect:'+400$', run(){ DATA.cash+=400;} },
+  { text:'😤 Адреналин ударил в голову', effect:'+30 энергии', run(){ DATA.mp=Math.min(DATA.maxmp,DATA.mp+30);} },
   { text:'👮 Свидетель вызвал полицию', effect:'+2 ⭐', run(){ DATA.wanted=Math.min(5,(DATA.wanted||0)+2);} },
-  { text:'🧥 Потерял куртку', effect:'-150$', run(){ session.cash=Math.max(0,session.cash-150);} },
-  { text:'🎲 Повезло в подпольной игре', effect:'+300$', run(){ session.cash+=300;} },
-  { text:'🧨 В районе началась стрельба', effect:'-10 HP', run(){ session.hp=Math.max(1,session.hp-10);} }
+  { text:'🧥 Потерял куртку', effect:'-150$', run(){ DATA.cash=Math.max(0,DATA.cash-150);} },
+  { text:'🎲 Повезло в подпольной игре', effect:'+300$', run(){ DATA.cash+=300;} },
+  { text:'🧨 В районе началась стрельба', effect:'-10 HP', run(){ DATA.hp=Math.max(1,DATA.hp-10);} }
 ];
 
+
 function updateRandomEventUI(){
+
   try{
-    if(typeof updateDistHPBar==='function') updateDistHPBar();
-    if(typeof updateHospitalBtn==='function') updateHospitalBtn();
+
+    if(typeof updateDistHPBar==='function'){
+      updateDistHPBar();
+    }
+
+    if(typeof updateHospitalBtn==='function'){
+      updateHospitalBtn();
+    }
+
+    const hpVal=document.getElementById('hp-val');
+    if(hpVal){
+      hpVal.textContent=`${DATA.hp} / ${DATA.maxhp}`;
+    }
+
+    const mpVal=document.getElementById('mp-val');
+    if(mpVal){
+      mpVal.textContent=`${DATA.mp} / ${DATA.maxmp}`;
+    }
+
+    const cashVal=document.getElementById('cash-val');
+    if(cashVal){
+      cashVal.textContent=typeof fmtNum==='function'
+        ? fmtNum(DATA.cash)
+        : DATA.cash;
+    }
+
+    const hpBar=document.getElementById('hp-bar');
+    if(hpBar){
+      hpBar.style.width=
+        Math.min(100, DATA.hp / DATA.maxhp * 100).toFixed(1)+'%';
+    }
+
+    const mpBar=document.getElementById('mp-bar');
+    if(mpBar){
+      mpBar.style.width=
+        Math.min(100, DATA.mp / DATA.maxmp * 100).toFixed(1)+'%';
+    }
 
     const wantedEl=document.getElementById('top-wanted');
+
     if(wantedEl){
+
       if((DATA.wanted||0)>0){
         wantedEl.textContent='⭐'.repeat(DATA.wanted);
         wantedEl.style.display='';
       }else{
         wantedEl.style.display='none';
       }
+
     }
-  }catch(e){}
+
+    if(typeof saveData==='function'){
+      saveData();
+    }
+
+  }catch(e){
+    console.log('ui update error', e);
+  }
 }
+
+
 
 function triggerRandomEvent(){
 
-  if(window.inBattle) return;
-
-  const now = Date.now();
-
-  if(now - window.lastRandomEvent < 120000) return;
-
-  if(Math.random() > 0.12) return;
-
-  window.lastRandomEvent = now;
-
-  const ev = mafiaEvents[Math.floor(Math.random()*mafiaEvents.length)];
-
   try{
+
+    if(window.inBattle) return;
+
+    const now = Date.now();
+
+    if(!window.lastRandomEvent){
+      window.lastRandomEvent = 0;
+    }
+
+    // cooldown 45 sec
+    if(now - window.lastRandomEvent < 45000) return;
+
+    // 25% chance
+    if(Math.random() > 0.25) return;
+
+    window.lastRandomEvent = now;
+
+    const ev = mafiaEvents[Math.floor(Math.random()*mafiaEvents.length)];
+
     ev.run();
-    session.dirty=true;
+
     updateRandomEventUI();
+
     showToast(ev.text + ' (' + ev.effect + ')','🎲');
+
   }catch(e){
-    console.log(e);
+    console.log('event error', e);
   }
 }
 
 document.addEventListener('click', function(e){
+
 
   const txt=(e.target.innerText||'').toLowerCase();
 
@@ -4555,3 +4614,201 @@ drawAvatar();
 </script>
 </body>
 </html>
+
+
+<script>
+
+// ════════════════════════════════════════════════
+// ADVANCED MAFIA EVENT SYSTEM
+// ════════════════════════════════════════════════
+
+window.inBattle = false;
+
+window.eventCooldowns = {
+  small: 0,
+  medium: 0,
+  rare: 0
+};
+
+const SMALL_EVENTS = [
+  { text:'👧 Увидел красивую девушку', effect:'+50 энергии', run(){ DATA.mp=Math.min(DATA.maxmp,DATA.mp+50);} },
+  { text:'🐕 Тебя покусала собака', effect:'-30 HP', run(){ DATA.hp=Math.max(1,DATA.hp-30);} },
+  { text:'🚬 Перекурил с братвой', effect:'+15 энергии', run(){ DATA.mp=Math.min(DATA.maxmp,DATA.mp+15);} },
+  { text:'🍺 Перепил с братвой', effect:'-20 энергии', run(){ DATA.mp=Math.max(0,DATA.mp-20);} },
+  { text:'🍔 Поел в забегаловке', effect:'+20 HP', run(){ DATA.hp=Math.min(DATA.maxhp,DATA.hp+20);} },
+  { text:'🧃 Выпил энергетик', effect:'+35 энергии', run(){ DATA.mp=Math.min(DATA.maxmp,DATA.mp+35);} }
+];
+
+const MEDIUM_EVENTS = [
+  { text:'💰 Нашёл кошелёк возле клуба', effect:'+250$', run(){ DATA.cash+=250;} },
+  { text:'💸 Проиграл деньги в казино', effect:'-200$', run(){ DATA.cash=Math.max(0,DATA.cash-200);} },
+  { text:'🚕 Таксист тебя обманул', effect:'-120$', run(){ DATA.cash=Math.max(0,DATA.cash-120);} },
+  { text:'📸 Тебя зафоткали возле клуба', effect:'+1 ⭐', run(){ DATA.wanted=Math.min(5,(DATA.wanted||0)+1);} },
+  { text:'🚔 Копы заметили тебя', effect:'+1 ⭐', run(){ DATA.wanted=Math.min(5,(DATA.wanted||0)+1);} },
+  { text:'💊 Нашёл аптечку', effect:'+40 HP', run(){ DATA.hp=Math.min(DATA.maxhp,DATA.hp+40);} }
+];
+
+const RARE_EVENTS = [
+  { text:'🎲 Повезло в подпольной игре', effect:'+300$', run(){ DATA.cash+=300;} },
+  { text:'👮 Свидетель вызвал полицию', effect:'+2 ⭐', run(){ DATA.wanted=Math.min(5,(DATA.wanted||0)+2);} },
+  { text:'🧨 В районе началась стрельба', effect:'-10 HP', run(){ DATA.hp=Math.max(1,DATA.hp-10);} },
+  { text:'💵 Нашёл тайник мафии', effect:'+400$', run(){ DATA.cash+=400;} }
+];
+
+function mafiaNightBonus(){
+  const h = new Date().getHours();
+  return (h >= 22 || h <= 5);
+}
+
+function updateRandomEventUI(){
+
+  try{
+
+    const hpVal=document.getElementById('hp-val');
+    if(hpVal){
+      hpVal.textContent=`${DATA.hp} / ${DATA.maxhp}`;
+    }
+
+    const mpVal=document.getElementById('mp-val');
+    if(mpVal){
+      mpVal.textContent=`${DATA.mp} / ${DATA.maxmp}`;
+    }
+
+    const cashVal=document.getElementById('cash-val');
+    if(cashVal){
+      cashVal.textContent=(typeof fmtNum==='function')
+        ? fmtNum(DATA.cash)
+        : DATA.cash;
+    }
+
+    const hpBar=document.getElementById('hp-bar');
+    if(hpBar){
+      hpBar.style.width=
+        Math.min(100, DATA.hp / DATA.maxhp * 100).toFixed(1)+'%';
+    }
+
+    const mpBar=document.getElementById('mp-bar');
+    if(mpBar){
+      mpBar.style.width=
+        Math.min(100, DATA.mp / DATA.maxmp * 100).toFixed(1)+'%';
+    }
+
+    const wantedEl=document.getElementById('top-wanted');
+
+    if(wantedEl){
+
+      if((DATA.wanted||0)>0){
+        wantedEl.textContent='⭐'.repeat(DATA.wanted);
+        wantedEl.style.display='';
+      }else{
+        wantedEl.style.display='none';
+      }
+
+    }
+
+    if(typeof saveData==='function'){
+      saveData();
+    }
+
+  }catch(e){
+    console.log(e);
+  }
+}
+
+function pickRandom(arr){
+  return arr[Math.floor(Math.random()*arr.length)];
+}
+
+function tryEvent(type){
+
+  if(window.inBattle) return;
+
+  const now = Date.now();
+
+  if(type==='small'){
+
+    if(now - window.eventCooldowns.small < 60000) return;
+
+    if(Math.random() > 0.20) return;
+
+    window.eventCooldowns.small = now;
+
+    const ev = pickRandom(SMALL_EVENTS);
+
+    ev.run();
+    updateRandomEventUI();
+    showToast(ev.text + ' (' + ev.effect + ')','🎲');
+  }
+
+  if(type==='medium'){
+
+    const cd = mafiaNightBonus() ? 300000 : 420000;
+
+    if(now - window.eventCooldowns.medium < cd) return;
+
+    const chance = mafiaNightBonus() ? 0.18 : 0.12;
+
+    if(Math.random() > chance) return;
+
+    window.eventCooldowns.medium = now;
+
+    const ev = pickRandom(MEDIUM_EVENTS);
+
+    ev.run();
+    updateRandomEventUI();
+    showToast(ev.text + ' (' + ev.effect + ')','💰');
+  }
+
+  if(type==='rare'){
+
+    const cd = mafiaNightBonus() ? 1200000 : 1800000;
+
+    if(now - window.eventCooldowns.rare < cd) return;
+
+    const chance = mafiaNightBonus() ? 0.10 : 0.05;
+
+    if(Math.random() > chance) return;
+
+    window.eventCooldowns.rare = now;
+
+    const ev = pickRandom(RARE_EVENTS);
+
+    ev.run();
+    updateRandomEventUI();
+    showToast(ev.text + ' (' + ev.effect + ')','🔥');
+  }
+}
+
+document.addEventListener('click', function(e){
+
+  const txt=(e.target.innerText||'').toLowerCase();
+
+  if(
+    txt.includes('удар') ||
+    txt.includes('атака') ||
+    txt.includes('бой') ||
+    txt.includes('fight')
+  ){
+
+    window.inBattle=true;
+
+    setTimeout(()=>{
+      window.inBattle=false;
+    },15000);
+
+    return;
+  }
+
+  setTimeout(()=>{
+
+    tryEvent('small');
+    tryEvent('medium');
+    tryEvent('rare');
+
+  },400);
+
+});
+
+// ════════════════════════════════════════════════
+
+</script>
