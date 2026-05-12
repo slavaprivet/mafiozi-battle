@@ -1,12 +1,8 @@
 <!DOCTYPE html>
-<!-- BUILD: 2026-05-12 16:26 UTC -->
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
 <title>Мафиози</title>
@@ -1829,6 +1825,105 @@ function updateHospitalBtn() {
   btn.textContent = hosp.name + (needsHeal ? '' : ' (здоров)');
   btn.style.opacity = needsHeal ? '1' : '0.5';
 }
+
+
+
+// ═════════ RANDOM EVENTS SYSTEM ═════════
+
+window.inBattle = false;
+window.lastRandomEvent = 0;
+
+const mafiaEvents = [
+  { text:'👧 Увидел красивую девушку', effect:'+50 энергии', run(){ session.mp=Math.min(DATA.maxmp,session.mp+50);} },
+  { text:'🐕 Тебя покусала собака', effect:'-30 HP', run(){ session.hp=Math.max(1,session.hp-30);} },
+  { text:'💰 Нашёл кошелёк возле клуба', effect:'+250$', run(){ session.cash+=250;} },
+  { text:'🚬 Перекурил с братвой', effect:'+15 энергии', run(){ session.mp=Math.min(DATA.maxmp,session.mp+15);} },
+  { text:'🍺 Перепил с братвой', effect:'-20 энергии', run(){ session.mp=Math.max(0,session.mp-20);} },
+  { text:'🔪 Тебя подрезали в переулке', effect:'-15 HP', run(){ session.hp=Math.max(1,session.hp-15);} },
+  { text:'💸 Проиграл деньги в казино', effect:'-200$', run(){ session.cash=Math.max(0,session.cash-200);} },
+  { text:'🍔 Вкусно поел в забегаловке', effect:'+20 HP', run(){ session.hp=Math.min(DATA.maxhp,session.hp+20);} },
+  { text:'🚕 Таксист тебя обманул', effect:'-120$', run(){ session.cash=Math.max(0,session.cash-120);} },
+  { text:'🧃 Выпил энергетик', effect:'+35 энергии', run(){ session.mp=Math.min(DATA.maxmp,session.mp+35);} },
+
+  { text:'📸 Тебя зафоткали возле клуба', effect:'+1 ⭐', run(){ DATA.wanted=Math.min(5,(DATA.wanted||0)+1);} },
+  { text:'🚔 Копы заметили тебя', effect:'+1 ⭐', run(){ DATA.wanted=Math.min(5,(DATA.wanted||0)+1);} },
+  { text:'💊 Нашёл аптечку', effect:'+40 HP', run(){ session.hp=Math.min(DATA.maxhp,session.hp+40);} },
+  { text:'🩸 Старые раны открылись', effect:'-25 HP', run(){ session.hp=Math.max(1,session.hp-25);} },
+  { text:'💵 Нашёл тайник', effect:'+400$', run(){ session.cash+=400;} },
+  { text:'😤 Адреналин ударил в голову', effect:'+30 энергии', run(){ session.mp=Math.min(DATA.maxmp,session.mp+30);} },
+  { text:'👮 Свидетель вызвал полицию', effect:'+2 ⭐', run(){ DATA.wanted=Math.min(5,(DATA.wanted||0)+2);} },
+  { text:'🧥 Потерял куртку', effect:'-150$', run(){ session.cash=Math.max(0,session.cash-150);} },
+  { text:'🎲 Повезло в подпольной игре', effect:'+300$', run(){ session.cash+=300;} },
+  { text:'🧨 В районе началась стрельба', effect:'-10 HP', run(){ session.hp=Math.max(1,session.hp-10);} }
+];
+
+function updateRandomEventUI(){
+  try{
+    if(typeof updateDistHPBar==='function') updateDistHPBar();
+    if(typeof updateHospitalBtn==='function') updateHospitalBtn();
+
+    const wantedEl=document.getElementById('top-wanted');
+    if(wantedEl){
+      if((DATA.wanted||0)>0){
+        wantedEl.textContent='⭐'.repeat(DATA.wanted);
+        wantedEl.style.display='';
+      }else{
+        wantedEl.style.display='none';
+      }
+    }
+  }catch(e){}
+}
+
+function triggerRandomEvent(){
+
+  if(window.inBattle) return;
+
+  const now = Date.now();
+
+  if(now - window.lastRandomEvent < 120000) return;
+
+  if(Math.random() > 0.12) return;
+
+  window.lastRandomEvent = now;
+
+  const ev = mafiaEvents[Math.floor(Math.random()*mafiaEvents.length)];
+
+  try{
+    ev.run();
+    session.dirty=true;
+    updateRandomEventUI();
+    showToast(ev.text + ' (' + ev.effect + ')','🎲');
+  }catch(e){
+    console.log(e);
+  }
+}
+
+document.addEventListener('click', function(e){
+
+  const txt=(e.target.innerText||'').toLowerCase();
+
+  if(
+    txt.includes('удар') ||
+    txt.includes('атака') ||
+    txt.includes('бой') ||
+    txt.includes('fight')
+  ){
+    window.inBattle=true;
+
+    setTimeout(()=>{
+      window.inBattle=false;
+    },15000);
+
+    return;
+  }
+
+  setTimeout(()=>{
+    triggerRandomEvent();
+  },500);
+
+});
+
+
 
 // ── HOSPITAL ──────────────────────────────────────────────────────────
 function showHospital() {
@@ -4458,115 +4553,5 @@ function drawHatSimple(ctx,hatId,px,py,bd,headY,headH,sc){
 drawAvatar();
 
 </script>
-
-<script>
-/* ===== MAFIA RANDOM EVENTS SYSTEM ===== */
-
-window.inBattle = false;
-window.lastRandomEvent = 0;
-
-const mafiaEvents = [
-  { text:"😍 Увидел красивую девушку — настроение поднялось", effect:"+50 энергии" },
-  { text:"🐕 Тебя покусала собака", effect:"-30 HP" },
-  { text:"💵 Нашёл кошелёк возле клуба", effect:"+250 наличных" },
-  { text:"⭐ Тебя зафоткали в драке", effect:"+1 уровень розыска" },
-  { text:"🚬 Перекурил с братвой", effect:"+20 энергии" },
-  { text:"🚓 Копы услышали выстрелы", effect:"+1 розыск" },
-  { text:"🍺 Кто-то угостил тебя пивом", effect:"+10 энергии" },
-  { text:"🩸 После драки открылось кровотечение", effect:"-25 HP" },
-  { text:"💊 После боя нашёл аптечку", effect:"+40 HP" },
-  { text:"🧤 Карманник пытался тебя обокрасть", effect:"-120 наличных" },
-  { text:"🔫 Нашёл старый патрон", effect:"+15 энергии" },
-  { text:"🚕 Таксист тебя обманул", effect:"-80 наличных" },
-  { text:"🥊 После удара заболела рука", effect:"-15 HP" },
-  { text:"🍔 Сытно поел в забегаловке", effect:"+20 HP" },
-  { text:"🕶 Авторитеты заметили тебя", effect:"+1 уважение" },
-  { text:"📸 Тебя сняли камеры возле клуба", effect:"+1 розыск" },
-  { text:"💰 Старик дал чаевые", effect:"+100 наличных" },
-  { text:"🚬 Подобрал пачку сигарет", effect:"+5 энергии" },
-  { text:"🧨 В районе началась стрельба", effect:"-10 HP" },
-  { text:"🎲 Тебе повезло в подпольной игре", effect:"+300 наличных" }
-];
-
-function mafiaToast(text) {
-    let toast = document.createElement("div");
-    toast.innerHTML = text;
-
-    toast.style.position = "fixed";
-    toast.style.left = "50%";
-    toast.style.bottom = "90px";
-    toast.style.transform = "translateX(-50%)";
-    toast.style.background = "rgba(10,10,20,0.95)";
-    toast.style.border = "1px solid #e8c96e";
-    toast.style.color = "#fff";
-    toast.style.padding = "12px 18px";
-    toast.style.borderRadius = "14px";
-    toast.style.zIndex = "999999";
-    toast.style.fontSize = "15px";
-    toast.style.fontWeight = "700";
-    toast.style.boxShadow = "0 0 20px rgba(0,0,0,0.4)";
-    toast.style.maxWidth = "90%";
-    toast.style.textAlign = "center";
-
-    document.body.appendChild(toast);
-
-    setTimeout(() => {
-        toast.style.transition = "0.4s";
-        toast.style.opacity = "0";
-    }, 2600);
-
-    setTimeout(() => {
-        toast.remove();
-    }, 3200);
-}
-
-function triggerRandomEvent(type="normal") {
-
-    if(window.inBattle) return;
-
-    const now = Date.now();
-
-    // cooldown 2 minutes
-    if(now - window.lastRandomEvent < 120000) return;
-
-    // rare chance
-    if(Math.random() > 0.12) return;
-
-    window.lastRandomEvent = now;
-
-    const ev = mafiaEvents[Math.floor(Math.random() * mafiaEvents.length)];
-
-    mafiaToast(ev.text + "<br><span style='color:#7CFC00'>" + ev.effect + "</span>");
-}
-
-// button clicks
-document.addEventListener("click", function(e){
-
-    const txt = (e.target.innerText || "").toLowerCase();
-
-    // no events during battle buttons
-    if(
-        txt.includes("удар") ||
-        txt.includes("бой") ||
-        txt.includes("атака") ||
-        txt.includes("fight")
-    ){
-        window.inBattle = true;
-
-        setTimeout(() => {
-            window.inBattle = false;
-        }, 15000);
-
-        return;
-    }
-
-    setTimeout(() => {
-        triggerRandomEvent("normal");
-    }, 400);
-
-});
-
-</script>
-
 </body>
 </html>
