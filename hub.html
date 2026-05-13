@@ -948,6 +948,58 @@ color:white;
 cursor:pointer;
 }
 
+
+/* === JOBS SECTION === */
+.jobs-list { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+.job-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  position: relative;
+  transition: background .15s;
+}
+.job-card.locked { opacity: 0.55; }
+.job-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.job-card-name { color: var(--gold); font-weight: 700; font-size: 15px; flex: 1; }
+.job-card-tier { font-size: 10px; padding: 2px 6px; border-radius: 6px; background: var(--bg3); color: var(--muted); white-space: nowrap; }
+.job-card-tier.t1 { background: #1c2c1c; color: #6ec76e; }
+.job-card-tier.t2 { background: #2b2515; color: #d4a04a; }
+.job-card-tier.t3 { background: #2c1515; color: #d05050; }
+.job-card-desc { color: var(--muted); font-size: 12px; margin-top: 6px; line-height: 1.35; }
+.job-card-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.job-meta-chip { font-size: 11px; padding: 3px 8px; border-radius: 12px; background: var(--bg3); color: var(--text); }
+.job-meta-chip.pay { color: #6ec76e; }
+.job-meta-chip.cop { color: #ff8a4a; }
+.job-meta-chip.gang { color: #d05050; }
+.job-meta-chip.rank { color: #d4a04a; }
+.job-card-action { margin-top: 12px; display: flex; gap: 8px; }
+.job-btn {
+  flex: 1;
+  background: linear-gradient(180deg, var(--gold) 0%, var(--gold2) 100%);
+  color: #1a1208;
+  border: none;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+.job-btn.secondary { background: var(--bg3); color: var(--text); }
+.job-btn.danger { background: #4a1a1a; color: #ff8888; }
+.job-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.jobs-status-box {
+  margin: 12px;
+  padding: 14px;
+  border-radius: 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+}
+.jobs-status-box.warn { border-color: #d4a04a; }
+.jobs-status-box.danger { border-color: #c0392b; }
+.jobs-status-title { color: var(--gold); font-weight: 700; margin-bottom: 6px; }
+.jobs-status-text { color: var(--text); font-size: 13px; line-height: 1.4; }
+.jobs-countdown { color: #ff8a4a; font-weight: 700; font-size: 14px; }
 </style>
 </head>
 <body>
@@ -1221,6 +1273,15 @@ cursor:pointer;
 </div>
 
 <!-- ══ SUB-PAGE: ОТКРЫТЬ В ЧАТЕ (для разделов с данными из БД) ══ -->
+<div id="page-jobs" class="subpage" style="display:none">
+  <div class="subpage-header">
+    <button class="back-btn" onclick="goBack()">← Назад</button>
+    <div class="subpage-title">💼 Работа</div>
+  </div>
+  <div id="jobs-status"></div>
+  <div id="jobs-list" class="jobs-list"></div>
+</div>
+
 <div id="page-bot" class="subpage" style="display:none">
   <div class="subpage-header">
     <button class="back-btn" onclick="goBack()">← Назад</button>
@@ -1388,6 +1449,11 @@ const DATA = {
   wanted:  pi('wanted', 0),
   contacts:pi('contacts', 0),
   job:     p('job',''),
+  job_until:  pi('job_until', 0),
+  srv_now:    pi('srv_now', 0),
+  wanted_g:   pi('wanted_g', 0),
+  jail_until: pi('jail_until', 0),
+  cap_until:  pi('cap_until', 0),
   gender:  pi('gender', 0),
   skin:    pi('skin', 0),
   body:    pi('body', 1),
@@ -1483,11 +1549,10 @@ function fmtNum(n) {
 }
 
 // ── SPA Navigation ────────────────────────────────────────────────────
-const CLIENT_PAGES = ['explore', 'district', 'battle', 'character', 'coop', 'donate'];
+const CLIENT_PAGES = ['explore', 'district', 'battle', 'character', 'coop', 'donate', 'jobs'];
 const BOT_PAGES = {
   inventory:   { title: '🎒 Барахло',        icon: '🎒' },
   shop:        { title: '🏪 Чёрный рынок',   icon: '🏪' },
-  jobs:        { title: '💼 Работа',          icon: '💼' },
   gang_menu:   { title: '🔱 Моя банда',       icon: '🔱' },
   diamonds:    { title: '💎 Бриллианты',      icon: '💎' },
   my_contacts: { title: '🤝 Мои связи',       icon: '🤝' },
@@ -1606,6 +1671,7 @@ function nav(dest, extra) {
     if (dest === 'explore')    renderDistricts();
     if (dest === 'character')  renderCharacter();
     if (dest === 'coop')       renderCoopLobby();
+    if (dest === 'jobs')       renderJobs();
     document.getElementById('page-' + dest).style.display = '';
   } else if (BOT_PAGES[dest]) {
     pendingBotDest = dest;
@@ -4567,6 +4633,203 @@ function toggleTimeInfo(){
 const modal = document.getElementById('timeInfoModal');
 modal.style.display = modal.style.display === 'flex' ? 'none' : 'flex';
 }
+
+// === JOBS v2 (mini-app) ============================================
+const JOBS_CATALOG = [
+  // TIER 1
+  { id:'newspapers', name:'🗞 Раздавать газеты с компроматом', rank:1, tier:1, pay_min:50, pay_max:100, cop:10, gang:5,
+    desc:'Газеты разносишь, в каждом выпуске чёрный нал и компромат. Менты иногда заметят.' },
+  { id:'bikes', name:'🚲 Угонять велосипеды у школьников', rank:2, tier:1, pay_min:70, pay_max:130, cop:10, gang:5,
+    desc:'BMX и складники из подъездов. Мелочь, но капает.' },
+  { id:'shawarma_runner', name:'🥡 Развозить шаурму на стрёме', rank:2, tier:1, pay_min:90, pay_max:160, cop:8, gang:7,
+    desc:'В сумке мясо, в подкладке — порошок для клуба.' },
+  { id:'lookout', name:'👀 Стоять на шухере у склада', rank:3, tier:1, pay_min:120, pay_max:200, cop:8, gang:10,
+    desc:'Сидишь на ящике, свистишь если едут чужие.' },
+  { id:'stall_tax', name:'💰 Собирать дань с ларьков', rank:4, tier:1, pay_min:160, pay_max:260, cop:10, gang:10,
+    desc:'Конверт от торгашей. Чужая братва может вмешаться.' },
+  { id:'thimblerig', name:'🃏 Крутить напёрстки на вокзале', rank:5, tier:1, pay_min:200, pay_max:320, cop:12, gang:8,
+    desc:'Три стаканчика, шарик и народ с пустыми карманами.' },
+  // TIER 2
+  { id:'moonshine', name:'🍾 Гнать самогон в гараже', rank:6, tier:2, pay_min:350, pay_max:550, cop:25, gang:10,
+    desc:'Подпольный завод в боксе. Соседи иногда стучат.' },
+  { id:'car_jacker', name:'🚗 Угонять тачки на заказ', rank:8, tier:2, pay_min:500, pay_max:800, cop:30, gang:15,
+    desc:'Открыть, завести, отогнать. ГАИ работает быстро.' },
+  { id:'blackmail', name:'📞 Шантажировать чиновника', rank:10, tier:2, pay_min:700, pay_max:1100, cop:25, gang:10,
+    desc:'Фото из бани + телефон. Деньги к четвергу.' },
+  { id:'arson', name:'🔥 Поджечь магазин конкурентов', rank:12, tier:2, pay_min:900, pay_max:1400, cop:15, gang:40,
+    desc:'Канистра, тряпка, спичка. Хозяин свяжется со своими.' },
+  { id:'smuggling', name:'📦 Контрабанда стволов из порта', rank:13, tier:2, pay_min:1200, pay_max:1800, cop:30, gang:30,
+    desc:'Ящики с маркировкой «детали». Чужие крыши не любят это.' },
+  { id:'forger', name:'📜 Подделка паспортов на потоке', rank:14, tier:2, pay_min:1500, pay_max:2200, cop:30, gang:10,
+    desc:'Печать в типографии. ФСБ периодически проверяет.' },
+  // TIER 3 — SPECIALS
+  { id:'boss_car', name:'🏎 Угнать спорткар Босса', rank:15, tier:3, pay_min:4000, pay_max:8000, cop:15, gang:95,
+    success:50, stars_gang:2,
+    desc:'Ferrari, ключи у валета. Шанс выполнить — 50/50. Босс узнает быстро.' },
+  { id:'bank_heist', name:'🏦 Ограбление банка', rank:18, tier:3, pay_min:7000, pay_max:15000, cop:95, gang:15,
+    success:40, stars_cop:2,
+    desc:'Маски, обрезы, фургон. 4 минуты у кассы. Шанс — 40%.' },
+  { id:'prosecutor_car', name:'💣 Взорвать машину прокурора', rank:22, tier:3, pay_min:12000, pay_max:25000, cop:100, gang:10,
+    success:30, stars_cop:3,
+    desc:'Растяжка под капотом. Шанс — 30%. После этого ищут не штрафами — отделом по особо тяжким.' },
+];
+
+function _fmtMins(sec){
+  if(sec<=0) return '0 мин';
+  const m = Math.ceil(sec/60);
+  if(m < 60) return m + ' мин';
+  const h = Math.floor(m/60); const r = m%60;
+  return r ? `${h}ч ${r}м` : `${h}ч`;
+}
+
+function _serverNow(){
+  // Если бот прислал srv_now, считаем что (его now == момент сборки URL).
+  // Можно подкорректировать локальным дрейфом, но проще: брать большее из локального и серверного.
+  const local = Math.floor(Date.now()/1000);
+  return Math.max(local, DATA.srv_now || 0);
+}
+
+function renderJobs(){
+  const root = document.getElementById('jobs-list');
+  const statusBox = document.getElementById('jobs-status');
+  root.innerHTML = '';
+  statusBox.innerHTML = '';
+  const now = _serverNow();
+
+  // 1) В плену у банд
+  if ((DATA.cap_until || 0) > now){
+    const mins = _fmtMins(DATA.cap_until - now);
+    statusBox.innerHTML = `
+      <div class="jobs-status-box danger">
+        <div class="jobs-status-title">👊 Ты в плену у банды</div>
+        <div class="jobs-status-text">
+          Тебя поймали с поличным. Сидишь в подвале.<br>
+          ⏳ До освобождения: <span class="jobs-countdown">${mins}</span><br>
+          Или выкупись за 💎 (бот спросит подтверждение).
+        </div>
+        <div class="job-card-action">
+          <button class="job-btn" onclick="actCaptivityBail()">💰 Выкупиться (💎)</button>
+        </div>
+      </div>`;
+    return;
+  }
+
+  // 2) В тюрьме
+  if ((DATA.jail_until || 0) > now){
+    const mins = _fmtMins(DATA.jail_until - now);
+    statusBox.innerHTML = `
+      <div class="jobs-status-box danger">
+        <div class="jobs-status-title">🚔 Ты в тюрьме</div>
+        <div class="jobs-status-text">
+          Менты накрыли. Сидишь в КПЗ.<br>
+          ⏳ До освобождения: <span class="jobs-countdown">${mins}</span><br>
+          Адвокат — через главное меню (💎).
+        </div>
+      </div>`;
+    return;
+  }
+
+  // 3) Активный контракт
+  if (DATA.job && DATA.job_until > 0){
+    const job = JOBS_CATALOG.find(j => j.id === DATA.job);
+    if (job){
+      const remaining = (DATA.job_until || 0) - now;
+      if (remaining > 0){
+        statusBox.innerHTML = `
+          <div class="jobs-status-box warn">
+            <div class="jobs-status-title">🛠 ${job.name}</div>
+            <div class="jobs-status-text">
+              Идёт работа.<br>
+              ⏳ Осталось: <span class="jobs-countdown">${_fmtMins(remaining)}</span><br>
+              💵 Выплата: ${job.pay_min}–${job.pay_max}$
+              ${job.success ? `<br>🎲 Шанс выполнить: ${job.success}%` : ''}
+            </div>
+            <div class="job-card-action">
+              <button class="job-btn danger" onclick="actAbandon()">🚪 Сорвать</button>
+            </div>
+          </div>`;
+      } else {
+        statusBox.innerHTML = `
+          <div class="jobs-status-box">
+            <div class="jobs-status-title">💼 ${job.name}</div>
+            <div class="jobs-status-text">
+              ✅ Контракт выполнен! Можно забирать выплату.<br>
+              💵 ${job.pay_min}–${job.pay_max}$ (случайно)
+              ${job.success ? `<br>🎲 Шанс выполнить: ${job.success}%` : ''}
+            </div>
+            <div class="job-card-action">
+              <button class="job-btn" onclick="actCollect()">💰 Забрать выплату</button>
+              <button class="job-btn danger" onclick="actAbandon()">🚪 Сорвать</button>
+            </div>
+          </div>`;
+      }
+      return;
+    }
+  }
+
+  // 4) Список всех 15 работ
+  const stars = [];
+  if ((DATA.wanted   || 0) > 0) stars.push(`🚓 копы ${('⭐').repeat(DATA.wanted)}/3`);
+  if ((DATA.wanted_g || 0) > 0) stars.push(`👊 банды ${('⭐').repeat(DATA.wanted_g)}/3`);
+  if (stars.length){
+    statusBox.innerHTML = `
+      <div class="jobs-status-box">
+        <div class="jobs-status-title">⚠️ Твой розыск</div>
+        <div class="jobs-status-text">${stars.join(' &nbsp;·&nbsp; ')}</div>
+        <div class="jobs-status-text" style="opacity:.7;margin-top:4px;font-size:11px">
+          При 3-х звёздах копов — тюрьма. При 3-х звёздах банд — плен. Звёзды снимаются адвокатом/выкупом.
+        </div>
+      </div>`;
+  }
+
+  for (const j of JOBS_CATALOG){
+    const locked = (DATA.level || 1) < j.rank;
+    const card = document.createElement('div');
+    card.className = 'job-card' + (locked ? ' locked' : '');
+    const tierLabel = j.tier === 1 ? 'мелочёвка' : (j.tier === 2 ? 'серьёзка' : 'СПЕЦ');
+    const tierClass = 't' + j.tier;
+    const successChip = j.success ? `<div class="job-meta-chip" style="color:#ff8a4a">🎲 шанс ${j.success}%</div>` : '';
+    card.innerHTML = `
+      <div class="job-card-head">
+        <div class="job-card-name">${j.name}</div>
+        <div class="job-card-tier ${tierClass}">${tierLabel}</div>
+      </div>
+      <div class="job-card-desc">${j.desc}</div>
+      <div class="job-card-meta">
+        <div class="job-meta-chip rank">${locked ? '🔒 ранг ' + j.rank : '★ ранг ' + j.rank}</div>
+        <div class="job-meta-chip pay">💵 ${j.pay_min}–${j.pay_max}$</div>
+        ${j.cop  ? `<div class="job-meta-chip cop">🚓 +1⭐ ${j.cop}%</div>`  : ''}
+        ${j.gang ? `<div class="job-meta-chip gang">👊 +1⭐ ${j.gang}%</div>` : ''}
+        ${successChip}
+      </div>
+      <div class="job-card-action">
+        <button class="job-btn" ${locked ? 'disabled' : ''}>${locked ? '🔒 Закрыто' : '🛠 Приступить'}</button>
+      </div>`;
+    if (!locked){
+      card.querySelector('.job-btn').onclick = () => actTake(j.id);
+    }
+    root.appendChild(card);
+  }
+}
+
+function actTake(jobId){
+  if (!tg || !tg.sendData){ alert('Только в Telegram'); return; }
+  tg.sendData(JSON.stringify({ a: 'job_take', id: jobId }));
+}
+function actCollect(){
+  if (!tg || !tg.sendData) return;
+  tg.sendData(JSON.stringify({ a: 'job_collect' }));
+}
+function actAbandon(){
+  if (!tg || !tg.sendData) return;
+  if (!confirm('Сорвать контракт без оплаты?')) return;
+  tg.sendData(JSON.stringify({ a: 'job_abandon' }));
+}
+function actCaptivityBail(){
+  if (!tg || !tg.sendData) return;
+  tg.sendData(JSON.stringify({ a: 'captivity_bail_wa' }));
+}
+
 </script>
 
 </body>
