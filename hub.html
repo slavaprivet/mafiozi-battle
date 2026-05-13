@@ -1532,41 +1532,47 @@ if (DATA.contacts > 0) {
   tc.innerHTML += `<div class="tile-badge">${DATA.contacts}</div>`;
 }
 
-const sb = document.getElementById('status-bar');
-// Job chip: shows job name (lookup in JOBS_CATALOG) or "Безработный"
-(function(){
-  const chip = document.createElement('div');
-  chip.className = 'status-chip active';
-  chip.style.cursor = 'pointer';
-  chip.onclick = () => nav('jobs');
-  if (DATA.job) {
-    // Try to find friendly name in catalog (loaded later, may be undefined here)
-    const friendly = (typeof JOBS_CATALOG !== 'undefined')
-      ? (JOBS_CATALOG.find(j => j.id === DATA.job) || {}).name
-      : null;
-    chip.textContent = friendly ? `💼 ${friendly}` : `💼 ${DATA.job}`;
-  } else {
-    chip.textContent = '💼 Безработный';
-    chip.style.opacity = '0.7';
+function renderStatusBar(){
+  const sb = document.getElementById('status-bar');
+  sb.innerHTML = '';
+  // Job chip
+  {
+    const chip = document.createElement('div');
+    chip.className = 'status-chip active';
+    chip.style.cursor = 'pointer';
+    chip.onclick = () => nav('jobs');
+    if (DATA.job) {
+      const friendly = (typeof JOBS_CATALOG !== 'undefined')
+        ? (JOBS_CATALOG.find(j => j.id === DATA.job) || {}).name
+        : null;
+      chip.textContent = friendly ? `💼 ${friendly}` : `💼 ${DATA.job}`;
+    } else {
+      chip.textContent = '💼 Безработный';
+      chip.style.opacity = '0.7';
+    }
+    sb.appendChild(chip);
   }
-  sb.appendChild(chip);
-})();
-if (DATA.wanted > 0) {
-  const chip = document.createElement('div');
-  chip.className = 'status-chip active';
-  chip.style.color = '#ff4444';
-  chip.style.borderColor = '#ff444444';
-  chip.textContent = `🚓 Розыск копов: ${'⭐'.repeat(DATA.wanted)}/3`;
-  sb.appendChild(chip);
+  // Wanted by cops
+  if ((DATA.wanted || 0) > 0) {
+    const chip = document.createElement('div');
+    chip.className = 'status-chip active';
+    chip.style.color = '#ff4444';
+    chip.style.borderColor = '#ff444444';
+    chip.textContent = `🚓 Розыск копов: ${'⭐'.repeat(DATA.wanted)}/3`;
+    sb.appendChild(chip);
+  }
+  // Wanted by gangs
+  if ((DATA.wanted_g || 0) > 0) {
+    const chip = document.createElement('div');
+    chip.className = 'status-chip active';
+    chip.style.color = '#ff8888';
+    chip.style.borderColor = '#ff888844';
+    chip.textContent = `👊 Розыск банд: ${'👊'.repeat(DATA.wanted_g)}/3`;
+    sb.appendChild(chip);
+  }
 }
-if ((DATA.wanted_g || 0) > 0) {
-  const chip = document.createElement('div');
-  chip.className = 'status-chip active';
-  chip.style.color = '#ff8888';
-  chip.style.borderColor = '#ff888844';
-  chip.textContent = `👊 Розыск банд: ${'👊'.repeat(DATA.wanted_g)}/3`;
-  sb.appendChild(chip);
-}
+// Initial render
+renderStatusBar();
 
 // ── Format number ─────────────────────────────────────────────────────
 function fmtNum(n) {
@@ -1718,6 +1724,7 @@ function nav(dest, extra) {
 
 function goBack() {
   document.body.classList.remove('on-subpage');
+  if (typeof renderStatusBar === 'function') renderStatusBar();
   // If battle result overlay is visible — ignore back, let user press buttons
   const _res=document.getElementById('tac-result');
   if(_res&&_res.style.display==='flex')return;
@@ -4865,6 +4872,7 @@ function actTake(jobId){
   DATA.job = jobId;
   DATA.job_until = _serverNow() + 3600;  // 60 минут
   renderJobs();
+  if (typeof renderStatusBar === 'function') renderStatusBar();
   // Отправляем боту (мини-приложение закроется — это ограничение Telegram)
   setTimeout(() => tg.sendData(JSON.stringify({ a: 'job_take', id: jobId })), 250);
 }
@@ -4879,6 +4887,7 @@ function actAbandon(){
   DATA.job = '';
   DATA.job_until = 0;
   renderJobs();
+  if (typeof renderStatusBar === 'function') renderStatusBar();
   setTimeout(() => tg.sendData(JSON.stringify({ a: 'job_abandon' })), 250);
 }
 function actCaptivityBail(){
