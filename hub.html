@@ -1000,6 +1000,8 @@ cursor:pointer;
 .jobs-status-title { color: var(--gold); font-weight: 700; margin-bottom: 6px; }
 .jobs-status-text { color: var(--text); font-size: 13px; line-height: 1.4; }
 .jobs-countdown { color: #ff8a4a; font-weight: 700; font-size: 14px; }
+
+body.on-subpage .time-display-box { display: none !important; }
 </style>
 </head>
 <body>
@@ -1035,8 +1037,8 @@ cursor:pointer;
 <div class="top-bar">
   <div class="game-title">🤵 Мафиози</div>
   <div class="top-bar-right">
-    <span id="top-kills">💀 0</span>
     <span id="top-wanted" class="wanted-stars" style="display:none"></span>
+    <span id="top-wanted-g" class="wanted-stars" style="display:none;color:#ff5050"></span>
   </div>
 </div>
 
@@ -1503,7 +1505,7 @@ document.getElementById('hp-val').textContent  = `${DATA.hp} / ${DATA.maxhp}`;
 document.getElementById('mp-val').textContent  = `${DATA.mp} / ${DATA.maxmp}`;
 document.getElementById('cash-val').textContent = fmtNum(DATA.cash);
 document.getElementById('dia-val').textContent  = fmtNum(DATA.dia);
-document.getElementById('top-kills').textContent = `💀 ${DATA.kills}`;
+// (skull removed)
 
 const cls = CLASSES[DATA.cls] || CLASSES.fixer;
 document.getElementById('class-badge').textContent = cls.label;
@@ -1520,24 +1522,49 @@ if (DATA.wanted > 0) {
   el.textContent = '⭐'.repeat(DATA.wanted);
   el.style.display = '';
 }
+if ((DATA.wanted_g || 0) > 0) {
+  const eg = document.getElementById('top-wanted-g');
+  eg.textContent = '👊'.repeat(DATA.wanted_g);
+  eg.style.display = '';
+}
 if (DATA.contacts > 0) {
   const tc = document.getElementById('tile-contacts');
   tc.innerHTML += `<div class="tile-badge">${DATA.contacts}</div>`;
 }
 
 const sb = document.getElementById('status-bar');
-if (DATA.job) {
+// Job chip: shows job name (lookup in JOBS_CATALOG) or "Безработный"
+(function(){
   const chip = document.createElement('div');
   chip.className = 'status-chip active';
-  chip.textContent = `💼 ${DATA.job}`;
+  chip.style.cursor = 'pointer';
+  chip.onclick = () => nav('jobs');
+  if (DATA.job) {
+    // Try to find friendly name in catalog (loaded later, may be undefined here)
+    const friendly = (typeof JOBS_CATALOG !== 'undefined')
+      ? (JOBS_CATALOG.find(j => j.id === DATA.job) || {}).name
+      : null;
+    chip.textContent = friendly ? `💼 ${friendly}` : `💼 ${DATA.job}`;
+  } else {
+    chip.textContent = '💼 Безработный';
+    chip.style.opacity = '0.7';
+  }
   sb.appendChild(chip);
-}
+})();
 if (DATA.wanted > 0) {
   const chip = document.createElement('div');
   chip.className = 'status-chip active';
   chip.style.color = '#ff4444';
   chip.style.borderColor = '#ff444444';
-  chip.textContent = `🔍 В розыске: ${'⭐'.repeat(DATA.wanted)}`;
+  chip.textContent = `🚓 Розыск копов: ${'⭐'.repeat(DATA.wanted)}/3`;
+  sb.appendChild(chip);
+}
+if ((DATA.wanted_g || 0) > 0) {
+  const chip = document.createElement('div');
+  chip.className = 'status-chip active';
+  chip.style.color = '#ff8888';
+  chip.style.borderColor = '#ff888844';
+  chip.textContent = `👊 Розыск банд: ${'👊'.repeat(DATA.wanted_g)}/3`;
   sb.appendChild(chip);
 }
 
@@ -1673,6 +1700,7 @@ function nav(dest, extra) {
     if (dest === 'coop')       renderCoopLobby();
     if (dest === 'jobs')       renderJobs();
     document.getElementById('page-' + dest).style.display = '';
+    document.body.classList.add('on-subpage');
   } else if (BOT_PAGES[dest]) {
     pendingBotDest = dest;
     document.getElementById('bot-page-title').textContent = BOT_PAGES[dest].title;
@@ -1689,6 +1717,7 @@ function nav(dest, extra) {
 }
 
 function goBack() {
+  document.body.classList.remove('on-subpage');
   // If battle result overlay is visible — ignore back, let user press buttons
   const _res=document.getElementById('tac-result');
   if(_res&&_res.style.display==='flex')return;
@@ -4695,6 +4724,7 @@ function renderJobs(){
   root.innerHTML = '';
   statusBox.innerHTML = '';
   const now = _serverNow();
+  _startJobsTick();
 
   // 1) В плену у банд
   if ((DATA.cap_until || 0) > now){
@@ -4812,18 +4842,44 @@ function renderJobs(){
   }
 }
 
+// Optimistic UI: обновляем DATA локально, перерисовываем,
+// чтобы пользователь увидел изменение ДО того как мини-приложение закроется.
+// Re-render jobs page every 30s while it's visible (live timer)
+let _jobsTickTimer = null;
+function _startJobsTick(){
+  if (_jobsTickTimer) return;
+  _jobsTickTimer = setInterval(() => {
+    const visible = document.getElementById('page-jobs');
+    if (visible && visible.style.display !== 'none') renderJobs();
+  }, 30000);
+}
+function _stopJobsTick(){
+  if (_jobsTickTimer){ clearInterval(_jobsTickTimer); _jobsTickTimer = null; }
+}
+
 function actTake(jobId){
   if (!tg || !tg.sendData){ alert('Только в Telegram'); return; }
-  tg.sendData(JSON.stringify({ a: 'job_take', id: jobId }));
+  const job = JOBS_CATALOG.find(j => j.id === jobId);
+  if (!job) return;
+  // Локальный апдейт
+  DATA.job = jobId;
+  DATA.job_until = _serverNow() + 3600;  // 60 минут
+  renderJobs();
+  // Отправляем боту (мини-приложение закроется — это ограничение Telegram)
+  setTimeout(() => tg.sendData(JSON.stringify({ a: 'job_take', id: jobId })), 250);
 }
 function actCollect(){
   if (!tg || !tg.sendData) return;
+  // Не оптимизируем здесь — пускай бот сам бросит кубик и пришлёт результат
   tg.sendData(JSON.stringify({ a: 'job_collect' }));
 }
 function actAbandon(){
   if (!tg || !tg.sendData) return;
   if (!confirm('Сорвать контракт без оплаты?')) return;
-  tg.sendData(JSON.stringify({ a: 'job_abandon' }));
+  DATA.job = '';
+  DATA.job_until = 0;
+  renderJobs();
+  setTimeout(() => tg.sendData(JSON.stringify({ a: 'job_abandon' })), 250);
 }
 function actCaptivityBail(){
   if (!tg || !tg.sendData) return;
