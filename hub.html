@@ -4830,6 +4830,7 @@ function renderJobs(){
               ${job.success ? `<br>🎲 Шанс выполнить: ${job.success}%` : ''}
             </div>
             <div class="job-card-action">
+              ${job.id === 'newspapers' ? '<button class="job-btn" onclick="openGazetGame()">⚡ Выполнить быстрее</button>' : ''}
               <button class="job-btn danger" onclick="actAbandon()">🚪 Сорвать</button>
             </div>
           </div>`;
@@ -5035,7 +5036,195 @@ function actCaptivityBail(){
   tg.sendData(JSON.stringify({ a: 'captivity_bail_wa' }));
 }
 
+
+// ===== МИНИ-ИГРА: Раздача газет =====
+let gzState = null;
+function openGazetGame(){
+  if (DATA.job !== 'newspapers'){ showToast('Не на этой работе','⚠️'); return; }
+  const root = document.getElementById('gazet-game');
+  if (!root) return;
+  gzState = { timeLeft: 10, count: 0, npcs: [], running: true };
+  document.getElementById('gz-timer').textContent = '10';
+  document.getElementById('gz-count').textContent = '0';
+  document.getElementById('gz-npcs').innerHTML = '';
+  document.getElementById('gz-fx').innerHTML = '';
+  document.getElementById('gz-final').style.display = 'none';
+  root.style.display = 'block';
+  _gzTick();
+  _gzSpawn();
+}
+function _gzCloseGame(){
+  const root = document.getElementById('gazet-game');
+  if (root) root.style.display = 'none';
+  if (gzState) gzState.running = false;
+  gzState = null;
+}
+function _gzSpawn(){
+  if (!gzState || !gzState.running) return;
+  const npcsLayer = document.getElementById('gz-npcs');
+  const fromLeft = Math.random() < 0.5;
+  const emojis = ['🚶','🚶‍♂️','🚶‍♀️','🕴','👨','👩','🧓','👴','👵'];
+  const emoji = emojis[Math.floor(Math.random()*emojis.length)];
+  const el = document.createElement('div');
+  el.textContent = emoji;
+  el.style.cssText = 'position:absolute;bottom:0;font-size:54px;line-height:1;' +
+    'transition:transform 1.6s linear, opacity 0.4s;' +
+    'filter:drop-shadow(0 4px 4px rgba(0,0,0,0.4));';
+  el.style.left = fromLeft ? '-70px' : 'calc(100% + 70px)';
+  el.style.transform = fromLeft ? 'translateX(0) scaleX(1)' : 'translateX(0) scaleX(-1)';
+  npcsLayer.appendChild(el);
+  const targetX = (window.innerWidth/2) - (fromLeft ? 100 : -100);
+  requestAnimationFrame(() => {
+    el.style.transform = (fromLeft ? 'translateX(' + targetX + 'px)' : 'translateX(-' + targetX + 'px) scaleX(-1)');
+  });
+  const npc = { el: el, fromLeft: fromLeft, given: false, arriveAt: Date.now()+1600 };
+  gzState.npcs.push(npc);
+  setTimeout(_gzSpawn, 700 + Math.random()*500);
+}
+function _gzTick(){
+  if (!gzState || !gzState.running) return;
+  gzState.timeLeft -= 0.1;
+  if (gzState.timeLeft <= 0){
+    gzState.timeLeft = 0;
+    document.getElementById('gz-timer').textContent = '0';
+    _gzFinish();
+    return;
+  }
+  document.getElementById('gz-timer').textContent = gzState.timeLeft.toFixed(1);
+  setTimeout(_gzTick, 100);
+}
+async function _gzFinish(){
+  if (!gzState) return;
+  gzState.running = false;
+  const api = (typeof coopApi === 'function') ? coopApi() : (DATA.api || '');
+  if (api){
+    try {
+      const resp = await fetch(api + '/job/' + jobUidStr() + '/complete', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({})
+      });
+      const j = await resp.json().catch(()=>({}));
+      if (resp.ok && j.ok){
+        DATA.job_until = _serverNow() - 1;
+        if (typeof renderJobs === 'function') renderJobs();
+      }
+    } catch(e) {}
+  }
+  document.getElementById('gz-final-text').textContent =
+    'Газеты разданы: ' + gzState.count + '. Иди забирай выплату.';
+  document.getElementById('gz-final').style.display = 'flex';
+}
+document.addEventListener('click', function(e){
+  const close = e.target.closest('#gz-close-final');
+  if (close){ _gzCloseGame(); return; }
+  const quit = e.target.closest('#gz-quit');
+  if (quit){ if (confirm('Прервать раздачу?')) _gzCloseGame(); return; }
+  const btn = e.target.closest('#gz-btn');
+  if (!btn || !gzState || !gzState.running) return;
+  const now = Date.now();
+  const candidates = gzState.npcs.filter(n => !n.given && (now - n.arriveAt) > -400);
+  if (!candidates.length){ _gzFlash('❌'); return; }
+  const npc = candidates[0];
+  npc.given = true;
+  gzState.count++;
+  document.getElementById('gz-count').textContent = gzState.count;
+  _gzPaperFlight(npc);
+  setTimeout(() => {
+    npc.el.style.opacity = '0';
+    npc.el.style.transform = (npc.fromLeft
+      ? 'translateX(' + (window.innerWidth + 100) + 'px)'
+      : 'translateX(-' + (window.innerWidth + 100) + 'px) scaleX(-1)');
+    setTimeout(() => npc.el.remove(), 500);
+  }, 250);
+});
+function _gzPaperFlight(npc){
+  const fx = document.getElementById('gz-fx');
+  const p = document.createElement('div');
+  p.textContent = '📰';
+  p.style.cssText = 'position:absolute;font-size:28px;left:50%;bottom:200px;' +
+    'transform:translateX(-50%);transition:all 0.3s ease-in;pointer-events:none;';
+  fx.appendChild(p);
+  const rect = npc.el.getBoundingClientRect();
+  requestAnimationFrame(() => {
+    p.style.left = rect.left + 'px';
+    p.style.bottom = (window.innerHeight - rect.bottom + 30) + 'px';
+    p.style.transform = 'translateX(0) rotate(360deg)';
+    p.style.opacity = '0.6';
+  });
+  setTimeout(() => p.remove(), 320);
+}
+function _gzFlash(emoji){
+  const fx = document.getElementById('gz-fx');
+  const p = document.createElement('div');
+  p.textContent = emoji;
+  p.style.cssText = 'position:absolute;font-size:36px;left:50%;top:50%;' +
+    'transform:translate(-50%,-50%);transition:all 0.4s;pointer-events:none;';
+  fx.appendChild(p);
+  requestAnimationFrame(() => {
+    p.style.opacity = '0';
+    p.style.transform = 'translate(-50%,-80%)';
+  });
+  setTimeout(() => p.remove(), 400);
+}
+
 </script>
+
+
+<!-- ===== МИНИ-ИГРА: РАЗДАЧА ГАЗЕТ ===== -->
+<div id="gazet-game" style="display:none;position:fixed;inset:0;z-index:9998;
+     background:linear-gradient(to bottom, #6b8e9a 0%, #5d7a85 30%, #8b7d6b 60%, #6d5a4a 100%);
+     overflow:hidden;font-family:inherit;">
+  <!-- HUD -->
+  <div style="position:absolute;top:0;left:0;right:0;padding:10px 14px;
+              background:rgba(0,0,0,0.55);color:#fff;display:flex;
+              justify-content:space-between;align-items:center;font-weight:700;">
+    <div>🗞 Раздача газет</div>
+    <div>⏱ <span id="gz-timer">10</span>s · 📰 <span id="gz-count">0</span></div>
+  </div>
+  <!-- Тротуар -->
+  <div style="position:absolute;bottom:120px;left:0;right:0;height:120px;
+              background:#3d3d3d;border-top:6px solid #555;
+              box-shadow:inset 0 8px 0 #4a4a4a;"></div>
+  <!-- Полоса для NPC -->
+  <div id="gz-stage" style="position:absolute;bottom:140px;left:0;right:0;height:100px;">
+    <!-- Игрок -->
+    <div id="gz-player" style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+                                font-size:64px;line-height:1;text-align:center;
+                                filter:drop-shadow(0 4px 6px rgba(0,0,0,0.5));">🧑‍💼</div>
+    <!-- NPC слой -->
+    <div id="gz-npcs" style="position:absolute;inset:0;"></div>
+  </div>
+  <!-- Облако газет в воздухе для эффекта -->
+  <div id="gz-fx" style="position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;"></div>
+  <!-- Кнопка "Выдать" -->
+  <button id="gz-btn" style="position:absolute;bottom:18px;left:50%;transform:translateX(-50%);
+          width:80%;max-width:340px;padding:18px;
+          background:linear-gradient(180deg,#ffd76b,#e0a020);color:#1a1a2e;
+          border:none;border-radius:28px;font-size:22px;font-weight:900;
+          box-shadow:0 6px 0 #8a6010, 0 10px 18px rgba(0,0,0,0.4);
+          cursor:pointer;letter-spacing:1px;">📰 ВЫДАТЬ</button>
+  <!-- Финальный экран -->
+  <div id="gz-final" style="display:none;position:absolute;inset:0;
+       background:rgba(0,0,0,0.7);align-items:center;justify-content:center;
+       color:#fff;text-align:center;">
+    <div style="background:#1a1a2e;border:2px solid var(--gold,#ffd76b);
+                border-radius:18px;padding:24px 28px;max-width:320px;">
+      <div style="font-size:48px;line-height:1.2;">✅</div>
+      <div style="font-size:20px;font-weight:800;margin:8px 0 4px;">Готово!</div>
+      <div id="gz-final-text" style="font-size:14px;opacity:0.85;margin-bottom:14px;">
+        Газеты разданы. Иди забирай выплату.
+      </div>
+      <button id="gz-close-final" style="width:100%;padding:14px;background:var(--gold,#ffd76b);
+              color:#1a1a2e;border:none;border-radius:14px;font-size:16px;
+              font-weight:800;cursor:pointer;">Закрыть</button>
+    </div>
+  </div>
+  <!-- Кнопка выхода (X) -->
+  <div id="gz-quit" style="position:absolute;top:8px;right:10px;font-size:22px;
+       color:#fff;cursor:pointer;padding:6px 10px;
+       background:rgba(0,0,0,0.4);border-radius:50%;line-height:1;">✕</div>
+</div>
 
 </body>
 </html>
