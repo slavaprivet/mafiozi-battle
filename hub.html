@@ -50,12 +50,9 @@ body {
   background-clip: text;
 }
 .top-bar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--gold);
-  font-weight: 700;
+  /* Скрыто: эти звёзды дублировали статус-чипы и налезали на бэйдж времени.
+     Розыск показывается ниже как «Розыск копов: ⭐/3». */
+  display: none !important;
 }
 .wanted-stars { color: #ff4444; font-size: 14px; }
 
@@ -901,8 +898,8 @@ body {
 
 .time-display-box{
 position:absolute;
-top:20px;
-right:20px;
+top:14px;
+right:14px;
 display:flex;
 align-items:center;
 gap:10px;
