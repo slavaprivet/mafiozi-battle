@@ -1439,6 +1439,7 @@ const DATA = {
   level:   pi('lvl', 1),
   cls:     p('cls','fixer'),
   uid:     pi('uid', 0),
+  job_cd:  (function(){ try { return JSON.parse(p('job_cd','') || '{}'); } catch(e){ return {}; } })(),
   hp:      pi('hp', 100),
   maxhp:   pi('maxhp', 100),
   mp:      pi('mp', 50),
@@ -4750,6 +4751,9 @@ async function _syncJobStateFromBot(){
     if (!resp.ok) return;
     const j = await resp.json();
     if (!j || !j.ok) return;
+    if (j.cooldowns){
+      DATA.job_cd = j.cooldowns;
+    }
     const realJob = j.job || '';
     if ((DATA.job || '') !== realJob){
       DATA.job = realJob;
@@ -4842,7 +4846,6 @@ function renderJobs(){
             </div>
             <div class="job-card-action">
               <button class="job-btn" onclick="actCollect()">💰 Забрать выплату</button>
-              <button class="job-btn danger" onclick="actAbandon()">🚪 Сорвать</button>
             </div>
           </div>`;
       }
@@ -4886,10 +4889,20 @@ function renderJobs(){
         ${successChip}
       </div>
       <div class="job-card-action">
-        <button class="job-btn" ${locked ? 'disabled' : ''}>${locked ? '🔒 Закрыто' : '🛠 Приступить'}</button>
+        ${(function(){
+          const cdUntil = (DATA.job_cd && DATA.job_cd[j.id]) || 0;
+          const cdLeft = cdUntil - _serverNow();
+          if (locked) return '<button class="job-btn" disabled>🔒 Закрыто</button>';
+          if (cdLeft > 0) return '<button class="job-btn" disabled>⏳ Кулдаун: ' + _fmtMins(cdLeft) + '</button>';
+          return '<button class="job-btn">🛠 Приступить</button>';
+        })()}
       </div>`;
-    if (!locked){
-      card.querySelector('.job-btn').onclick = () => actTake(j.id);
+    {
+      const _cdU = (DATA.job_cd && DATA.job_cd[j.id]) || 0;
+      const _cdL = _cdU - _serverNow();
+      if (!locked && _cdL <= 0){
+        card.querySelector('.job-btn').onclick = () => actTake(j.id);
+      }
     }
     root.appendChild(card);
   }
@@ -4976,8 +4989,14 @@ async function actTake(jobId){
         'jailed':'Ты в тюрьме',
         'already working':'Контракт уже взят',
         'no job':'Такой работы нет',
-        'low rank':'Низкий ранг'
+        'low rank':'Низкий ранг',
+        'cooldown':'Кулдаун — попробуй позже'
       };
+      if (j.error === 'cooldown' && j.cooldown_until){
+        DATA.job_cd = DATA.job_cd || {};
+        DATA.job_cd[jobId] = j.cooldown_until;
+        renderJobs();
+      }
       showToast(errMap[j.error] || ('Ошибка: ' + (j.error || 'неизвестно')), '❌');
       return;
     } catch(e){
@@ -5011,8 +5030,16 @@ async function actCollect(){
           showToast('💥 Сорвалось — выплаты нет', '❌');
         }
         DATA.cash = (DATA.cash||0) + (j.pay||0);
+        const _prevJobId = DATA.job;
         DATA.job = ''; DATA.job_until = 0;
-        DATA.lastGazetCount = 0;       // сбросили после получения денег
+        DATA.lastGazetCount = 0;
+        if (j.cooldown_until && j.cooldown_job){
+          DATA.job_cd = DATA.job_cd || {};
+          DATA.job_cd[j.cooldown_job] = j.cooldown_until;
+        } else if (_prevJobId && j.cooldown_until){
+          DATA.job_cd = DATA.job_cd || {};
+          DATA.job_cd[_prevJobId] = j.cooldown_until;
+        }
         if (j.wanted_stars!=null) DATA.wanted = j.wanted_stars;
         if (j.wanted_gangs!=null) DATA.wanted_g = j.wanted_gangs;
         renderJobs();
