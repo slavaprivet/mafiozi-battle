@@ -4950,7 +4950,13 @@ async function actAbandon(){
         showToast('Контракт сорван', '🚪');
         return;
       }
-      // Откат
+      // Особый случай: бот говорит "no job" — у него и так нет работы.
+      // Значит цель достигнута (рассинхрон с локальным DATA).
+      if (j.error === 'no job'){
+        showToast('Контракт сорван', '🚪');
+        return;
+      }
+      // Откат остальных ошибок
       DATA.job = _prevJob; DATA.job_until = _prevUntil;
       renderJobs();
       if (typeof renderStatusBar === 'function') renderStatusBar();
