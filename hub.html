@@ -5008,14 +5008,28 @@ async function actTake(jobId){
       return;
     }
   }
-  // Туннель не настроен — fallback на sendData (старое поведение)
-  if (tg && tg.sendData){
-    setTimeout(() => tg.sendData(JSON.stringify({ a: 'job_take', id: jobId })), 250);
-  }
+  // Туннель недоступен — мини-апп закрывать нельзя, откатываем UI и просим перезапустить бота
+  DATA.job = _prevJob; DATA.job_until = _prevUntil;
+  renderJobs();
+  if (typeof renderStatusBar === 'function') renderStatusBar();
+  showToast('Сервер недоступен. Перезапусти бота через ЗАПУСТИТЬ_БОТА.bat', '⚠️');
 }
 async function actCollect(){
   const api = (typeof coopApi === 'function') ? coopApi() : (DATA.api || '');
-  if (api){
+  if (!api){
+    showToast('Сервер недоступен. Перезапусти бота через ЗАПУСТИТЬ_БОТА.bat', '⚠️');
+    return;
+  }
+  // До 2 повторов на случай флапа Cloudflare-туннеля
+  const errMap = {
+    'too early':  'Ещё рано, контракт не завершён',
+    'no job':     'Активного контракта нет',
+    'stale job':  'Эта работа больше не доступна',
+    'bad uid':    'Не удалось определить игрока — переоткрой мини-апп',
+    'unknown job':'Неизвестный тип работы',
+  };
+  let lastErr = '';
+  for (let attempt = 0; attempt < 2; attempt++){
     try {
       const resp = await fetch(api + '/job/' + jobUidStr() + '/collect', {
         method:'POST',
@@ -5046,16 +5060,21 @@ async function actCollect(){
         if (typeof renderStatusBar === 'function') renderStatusBar();
         return;
       }
-      showToast('Ещё рано или ошибка', '⚠️');
+      // Бэк вернул валидный JSON с ошибкой — не ретраим, показываем причину
+      const msg = errMap[j.error] || ('Ошибка: ' + (j.error || ('HTTP ' + resp.status)));
+      if (j.error === 'too early' && j.remaining){
+        showToast(msg + ' (' + j.remaining + ' c)', '⏳');
+      } else {
+        showToast(msg, '⚠️');
+      }
       return;
     } catch(e){
-      showToast('Сеть барахлит, попробуй ещё раз', '📡');
-      return;
+      lastErr = String(e && e.message || e);
+      console.warn('actCollect attempt', attempt, 'failed:', lastErr);
+      if (attempt === 0) await new Promise(r => setTimeout(r, 600));
     }
   }
-  if (tg && tg.sendData){
-    tg.sendData(JSON.stringify({ a: 'job_collect' }));
-  }
+  showToast('Сеть барахлит: ' + lastErr.slice(0, 60), '📡');
 }
 async function actAbandon(){
   const okQuit = await askConfirm('Сорвать контракт?\nДеньги не получишь.');
@@ -5096,9 +5115,11 @@ async function actAbandon(){
       return;
     }
   }
-  if (tg && tg.sendData){
-    setTimeout(() => tg.sendData(JSON.stringify({ a: 'job_abandon' })), 250);
-  }
+  // Туннель недоступен — откатываем UI, не закрываем мини-апп
+  DATA.job = _prevJob; DATA.job_until = _prevUntil;
+  renderJobs();
+  if (typeof renderStatusBar === 'function') renderStatusBar();
+  showToast('Сервер недоступен. Перезапусти бота через ЗАПУСТИТЬ_БОТА.bat', '⚠️');
 }
 function actCaptivityBail(){
   if (!tg || !tg.sendData) return;
@@ -5998,10 +6019,10 @@ function saveChar() {
 // ===== МИНИ-ИГРА: Раздача газет (v2) =====
 // Игрок слева, NPC встают в очередь справа и не загораживают центр.
 // 0 газет в конце = не маркируется выполненной.
-const GZ_PLAYER_X    = 70;        // позиция игрока от левого края (px)
-const GZ_QUEUE_START = 180;       // где встанет первый NPC
-const GZ_QUEUE_GAP   = 70;        // расстояние между NPC в очереди
-const GZ_MAX_VISIBLE = 6;         // не более N в очереди (остальные ждут)
+const GZ_PLAYER_X    = 100;       // центр игрока от левого края (px)
+const GZ_QUEUE_START = 210;       // где встанет первый NPC (с учётом ширины спрайта)
+const GZ_QUEUE_GAP   = 85;        // расстояние между NPC в очереди
+const GZ_MAX_VISIBLE = 5;         // не более N в очереди (остальные ждут)
 const GZ_NPC_EMOJIS  = ['🚶','🚶‍♂️','🚶‍♀️','🕴','👨','👩','🧓','👴','👵','👮‍♂️','👨‍🔧','🧔'];
 const GZ_PHRASES = [
   'Спасибо!', 'Мерси, мсье', 'Прочту позже', 'О, свежий выпуск!',
@@ -6094,26 +6115,52 @@ function _gzCloseGame(){
   gzState = null;
 }
 
+// Сгенерировать рандомного NPC: gender/skin/body/face/hair/hat
+function _gzRandomNpcLook(){
+  const g = Math.random() < 0.5 ? 0 : 1;
+  return {
+    gender: g,
+    skin:   Math.floor(Math.random() * 6),
+    body:   Math.floor(Math.random() * 4),
+    face:   Math.floor(Math.random() * 10),
+    hair:   Math.floor(Math.random() * 10),
+    // у мужчин чуть чаще шляпа/кепка (придаёт криминальный антураж)
+    hat:    Math.random() < (g === 0 ? 0.55 : 0.25)
+              ? 1 + Math.floor(Math.random() * 9)
+              : 0,
+  };
+}
+
+const GZ_NPC_W = 90;
+const GZ_NPC_H = 150;
+
 function _gzSpawn(){
   if (!gzState || !gzState.running) return;
   if (gzState.queue.length >= GZ_MAX_VISIBLE){
-    // Подождём, пока очередь рассосётся
     setTimeout(_gzSpawn, 400);
     return;
   }
   const npcsLayer = document.getElementById('gz-npcs');
-  const emoji = GZ_NPC_EMOJIS[Math.floor(Math.random()*GZ_NPC_EMOJIS.length)];
-  const el = document.createElement('div');
-  el.textContent = emoji;
-  el.style.cssText = 'position:absolute;bottom:0;font-size:54px;line-height:1;' +
+  const canvas = document.createElement('canvas');
+  canvas.width  = GZ_NPC_W;
+  canvas.height = GZ_NPC_H;
+  // bobbing-анимация для иллюзии шага
+  const bobDelay = (Math.random() * 0.6).toFixed(2);
+  canvas.style.cssText =
+    'position:absolute;bottom:0;width:' + GZ_NPC_W + 'px;height:' + GZ_NPC_H + 'px;' +
     'transition:left 1.2s linear, opacity 0.4s;' +
-    'filter:drop-shadow(0 4px 4px rgba(0,0,0,0.4));' +
-    'transform:scaleX(-1);'; // лицом влево (идут к игроку)
-  // стартуем справа за экраном
-  el.style.left = (window.innerWidth + 80) + 'px';
-  npcsLayer.appendChild(el);
+    'filter:drop-shadow(0 6px 4px rgba(0,0,0,0.45));' +
+    'transform:scaleX(-1);' +  // лицом влево (идут к игроку)
+    'animation:gzBob 0.55s ease-in-out ' + bobDelay + 's infinite alternate;';
+  canvas.style.left = (window.innerWidth + 80) + 'px';
+  npcsLayer.appendChild(canvas);
 
-  const npc = { el: el, given: false };
+  const look = _gzRandomNpcLook();
+  try {
+    gz_drawChar(canvas.getContext('2d'), GZ_NPC_W, GZ_NPC_H, look);
+  } catch(e){ console.warn('NPC render failed:', e); }
+
+  const npc = { el: canvas, given: false, look: look };
   gzState.queue.push(npc);
   _gzRepositionQueue();
 
@@ -6164,21 +6211,34 @@ async function _gzFinish(){
       }
     } catch(e){}
   }
+  const collectBtn = document.getElementById('gz-collect-final');
   if (count > 0 && completed){
     document.getElementById('gz-final-text').textContent =
-      'Газеты разданы: ' + count + ' 📰. Чем больше — тем больше денег! Иди забирай выплату.';
+      'Газеты разданы: ' + count + ' 📰. Чем больше — тем больше денег!';
+    if (collectBtn) collectBtn.style.display = 'block';
   } else if (count > 0 && !completed){
     document.getElementById('gz-final-text').textContent =
       'Газеты разданы: ' + count + ', но сервер не подтвердил. Попробуй открыть мини-игру ещё раз.';
+    if (collectBtn) collectBtn.style.display = 'none';
   } else {
     document.getElementById('gz-final-text').textContent =
       'Ноль газет — выплаты не будет. Жми «⚡ Выполнить быстрее» и попробуй снова.';
+    if (collectBtn) collectBtn.style.display = 'none';
   }
   if (typeof renderJobs === 'function') renderJobs();
   document.getElementById('gz-final').style.display = 'flex';
 }
 
 document.addEventListener('click', function(e){
+  const collect = e.target.closest('#gz-collect-final');
+  if (collect){
+    collect.disabled = true;
+    collect.textContent = '⏳ Забираю...';
+    Promise.resolve().then(actCollect).finally(() => {
+      _gzCloseGame();
+    });
+    return;
+  }
   const close = e.target.closest('#gz-close-final');
   if (close){ _gzCloseGame(); return; }
   const quit = e.target.closest('#gz-quit');
@@ -6240,6 +6300,16 @@ function _gzFlash(emoji){
 
 
 <!-- ===== МИНИ-ИГРА: РАЗДАЧА ГАЗЕТ ===== -->
+<style>
+  @keyframes gzBob {
+    0%   { transform: scaleX(-1) translateY(0); }
+    100% { transform: scaleX(-1) translateY(-4px); }
+  }
+  @keyframes gzPlayerIdle {
+    0%   { transform: translateY(0); }
+    100% { transform: translateY(-3px); }
+  }
+</style>
 <div id="gazet-game" style="display:none;position:fixed;inset:0;z-index:9998;
      background:linear-gradient(to bottom, #6b8e9a 0%, #5d7a85 30%, #8b7d6b 60%, #6d5a4a 100%);
      overflow:hidden;font-family:inherit;">
@@ -6255,11 +6325,12 @@ function _gzFlash(emoji){
               background:#3d3d3d;border-top:6px solid #555;
               box-shadow:inset 0 8px 0 #4a4a4a;"></div>
   <!-- Полоса для NPC -->
-  <div id="gz-stage" style="position:absolute;bottom:140px;left:0;right:0;height:100px;">
+  <div id="gz-stage" style="position:absolute;bottom:140px;left:0;right:0;height:170px;">
     <!-- Игрок -->
-    <canvas id="gz-player-canvas" width="120" height="160"
-            style="position:absolute;bottom:0;left:30px;
-                   filter:drop-shadow(0 4px 6px rgba(0,0,0,0.5));image-rendering:pixelated;"></canvas>
+    <canvas id="gz-player-canvas" width="160" height="220"
+            style="position:absolute;bottom:0;left:20px;
+                   filter:drop-shadow(0 6px 8px rgba(0,0,0,0.55));
+                   animation:gzPlayerIdle 0.7s ease-in-out infinite alternate;"></canvas>
     <!-- NPC слой -->
     <div id="gz-npcs" style="position:absolute;inset:0;"></div>
   </div>
@@ -6283,6 +6354,13 @@ function _gzFlash(emoji){
       <div id="gz-final-text" style="font-size:14px;opacity:0.85;margin-bottom:14px;">
         Газеты разданы. Иди забирай выплату.
       </div>
+      <button id="gz-collect-final" style="display:none;width:100%;padding:14px;
+              background:linear-gradient(180deg,#5fdc7a,#2e9a45);color:#0a1f12;
+              border:none;border-radius:14px;font-size:16px;font-weight:800;
+              cursor:pointer;margin-bottom:10px;
+              box-shadow:0 4px 0 #1f6b30, 0 6px 14px rgba(0,0,0,0.4);">
+        💰 Забрать выплату
+      </button>
       <button id="gz-close-final" style="width:100%;padding:14px;background:var(--gold,#ffd76b);
               color:#1a1a2e;border:none;border-radius:14px;font-size:16px;
               font-weight:800;cursor:pointer;">Закрыть</button>
