@@ -4112,9 +4112,12 @@ function showToast(msg, icon) {
     t.id = 'toast-msg';
     Object.assign(t.style, {
       position:'fixed', bottom:'80px', left:'50%', transform:'translateX(-50%)',
-      background:'#1a1a2e', border:'1px solid var(--border)', borderRadius:'24px',
-      padding:'10px 20px', fontSize:'14px', color:'#eee', fontWeight:'700',
-      zIndex:'9999', display:'none', whiteSpace:'nowrap', boxShadow:'0 4px 20px #000a'
+      background:'#1a1a2e', border:'1px solid var(--border)', borderRadius:'18px',
+      padding:'10px 18px', fontSize:'14px', color:'#eee', fontWeight:'700',
+      zIndex:'9999', display:'none',
+      whiteSpace:'normal', wordBreak:'break-word',
+      maxWidth:'calc(100vw - 32px)', textAlign:'center',
+      boxShadow:'0 4px 20px #000a'
     });
     document.body.appendChild(t);
   }
