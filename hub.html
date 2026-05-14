@@ -4725,6 +4725,37 @@ function _serverNow(){
   return Math.max(local, DATA.srv_now || 0);
 }
 
+// Тихая синхронизация с ботом — на случай рассинхрона между DATA и БД.
+// Вызывается при открытии страницы работ. Никаких всплываний пользователю.
+let _jobsSyncDone = false;
+async function _syncJobStateFromBot(){
+  if (_jobsSyncDone) return;
+  const api = (typeof coopApi === 'function') ? coopApi() : (DATA.api || '');
+  if (!api) return;
+  try {
+    const resp = await fetch(api + '/job/' + coopMyUidStr() + '/state', { method:'GET' });
+    if (!resp.ok) return;
+    const j = await resp.json();
+    if (!j || !j.ok) return;
+    const realJob = j.job || '';
+    if ((DATA.job || '') !== realJob){
+      DATA.job = realJob;
+      if (realJob && j.job_started){
+        const job = (typeof JOBS_CATALOG !== 'undefined') ? JOBS_CATALOG.find(x => x.id === realJob) : null;
+        const dur = job ? (job.duration || 3600) : 3600;
+        DATA.job_until = j.job_started + dur;
+      } else {
+        DATA.job_until = 0;
+      }
+      _jobsSyncDone = true;
+      renderJobs();
+      if (typeof renderStatusBar === 'function') renderStatusBar();
+    } else {
+      _jobsSyncDone = true;
+    }
+  } catch(e) { /* офлайн / туннель не работает — ну и ладно */ }
+}
+
 function renderJobs(){
   const root = document.getElementById('jobs-list');
   const statusBox = document.getElementById('jobs-status');
@@ -4732,6 +4763,7 @@ function renderJobs(){
   statusBox.innerHTML = '';
   const now = _serverNow();
   _startJobsTick();
+  _syncJobStateFromBot();  // тихо синкаем с реальным состоянием в БД
 
   // 1) В плену у банд
   if ((DATA.cap_until || 0) > now){
