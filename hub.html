@@ -4654,6 +4654,10 @@ drawAvatar();
 </script>
 
 <script>
+// === GLOBAL state for mini-games (hoist via var to avoid TDZ) ===
+// gzState ниже объявлена через var и хоистится — это устраняет
+// ошибку "Cannot access 'gzState' before initialization".
+var gzState = null;
 let gameHour = 12;
 
 function updateGameClock(){
@@ -6085,7 +6089,7 @@ function gzPlayerEmoji(){
   return '🧑‍💼';
 }
 
-let gzState = null;
+// gzState объявлена через var в самом начале второго скрипта — TDZ исключён
 function openGazetGame(){
   console.log('[gazet] openGazetGame() called. DATA.job =', DATA && DATA.job);
   // Сначала пробуем тихо синкнуться с сервером (если оптимистичный UI разошёлся с БД)
