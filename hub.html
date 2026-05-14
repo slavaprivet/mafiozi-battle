@@ -1441,6 +1441,7 @@ const DATA = {
   name:    p('name','Гангстер'),
   level:   pi('lvl', 1),
   cls:     p('cls','fixer'),
+  uid:     pi('uid', 0),
   hp:      pi('hp', 100),
   maxhp:   pi('maxhp', 100),
   mp:      pi('mp', 50),
@@ -4175,6 +4176,18 @@ let coopMyUid = null;
 
 function coopApi() { return DATA.api || ''; }
 
+// Возвращает реальный Telegram-ID. Приоритет: DATA.uid (из URL от бота) →
+// tg.initDataUnsafe.user.id → гость. Для HTTP-API нужен int — гостевой
+// id-фолбек тут не подойдёт, лучше DATA.uid.
+function jobUidStr() {
+  if (DATA.uid) return String(DATA.uid);
+  try {
+    const tid = tg?.initDataUnsafe?.user?.id;
+    if (tid) return String(tid);
+  } catch(e) {}
+  return '';
+}
+
 function coopMyUidStr() {
   if (coopMyUid) return coopMyUid;
   try {
@@ -4733,7 +4746,7 @@ async function _syncJobStateFromBot(){
   const api = (typeof coopApi === 'function') ? coopApi() : (DATA.api || '');
   if (!api) return;
   try {
-    const resp = await fetch(api + '/job/' + coopMyUidStr() + '/state', { method:'GET' });
+    const resp = await fetch(api + '/job/' + jobUidStr() + '/state', { method:'GET' });
     if (!resp.ok) return;
     const j = await resp.json();
     if (!j || !j.ok) return;
@@ -4922,7 +4935,7 @@ async function actTake(jobId){
   const api = (typeof coopApi === 'function') ? coopApi() : (DATA.api || '');
   if (api){
     try {
-      const resp = await fetch(api + '/job/' + coopMyUidStr() + '/take', {
+      const resp = await fetch(api + '/job/' + jobUidStr() + '/take', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ id: jobId, init_data: tg?.initData || '' })
@@ -4958,7 +4971,6 @@ async function actTake(jobId){
 }
 function actCollect(){
   if (!tg || !tg.sendData) return;
-  // Не оптимизируем здесь — пускай бот сам бросит кубик и пришлёт результат
   tg.sendData(JSON.stringify({ a: 'job_collect' }));
 }
 async function actAbandon(){
@@ -4972,7 +4984,7 @@ async function actAbandon(){
   const api = (typeof coopApi === 'function') ? coopApi() : (DATA.api || '');
   if (api){
     try {
-      const resp = await fetch(api + '/job/' + coopMyUidStr() + '/abandon', {
+      const resp = await fetch(api + '/job/' + jobUidStr() + '/abandon', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ init_data: tg?.initData || '' })
@@ -4982,13 +4994,10 @@ async function actAbandon(){
         showToast('Контракт сорван', '🚪');
         return;
       }
-      // Особый случай: бот говорит "no job" — у него и так нет работы.
-      // Значит цель достигнута (рассинхрон с локальным DATA).
       if (j.error === 'no job'){
         showToast('Контракт сорван', '🚪');
         return;
       }
-      // Откат остальных ошибок
       DATA.job = _prevJob; DATA.job_until = _prevUntil;
       renderJobs();
       if (typeof renderStatusBar === 'function') renderStatusBar();
