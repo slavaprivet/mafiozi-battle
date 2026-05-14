@@ -4916,9 +4916,26 @@ function _stopJobsTick(){
 // и в чат бот ничего не шлёт. Если api не настроен (COOP_API_BASE пуст) —
 // fallback через sendData (мини-приложение закроется, но чат остаётся чистым,
 // т.к. бот не отвечает текстом).
+// Подтверждение через нативный Telegram-диалог (если доступен),
+// иначе браузерный confirm — для совместимости.
+function askConfirm(text){
+  return new Promise(resolve => {
+    if (tg && typeof tg.showConfirm === 'function'){
+      try {
+        tg.showConfirm(text, ok => resolve(!!ok));
+        return;
+      } catch(e) {}
+    }
+    resolve(window.confirm(text));
+  });
+}
+
 async function actTake(jobId){
   const job = JOBS_CATALOG.find(j => j.id === jobId);
   if (!job) return;
+  // Подтверждение перед устройством на работу
+  const okGo = await askConfirm('Устроиться на работу:\n' + job.name + '?');
+  if (!okGo) return;
   // Локальные защиты — чтобы UI не дёргался
   if (DATA.job){ showToast('Контракт уже взят', '⚠️'); return; }
   if (DATA.captivity_until && DATA.captivity_until > _serverNow()){
@@ -4977,7 +4994,8 @@ function actCollect(){
   tg.sendData(JSON.stringify({ a: 'job_collect' }));
 }
 async function actAbandon(){
-  if (!confirm('Сорвать контракт без оплаты?')) return;
+  const okQuit = await askConfirm('Сорвать контракт?\nДеньги не получишь.');
+  if (!okQuit) return;
   const _prevJob = DATA.job, _prevUntil = DATA.job_until;
   DATA.job = '';
   DATA.job_until = 0;
