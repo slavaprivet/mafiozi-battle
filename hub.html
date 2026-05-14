@@ -4864,31 +4864,103 @@ function _stopJobsTick(){
   if (_jobsTickTimer){ clearInterval(_jobsTickTimer); _jobsTickTimer = null; }
 }
 
-function actTake(jobId){
-  if (!tg || !tg.sendData){ alert('Только в Telegram'); return; }
+// Найм/увольнение работают через HTTP API — мини-приложение НЕ закрывается,
+// и в чат бот ничего не шлёт. Если api не настроен (COOP_API_BASE пуст) —
+// fallback через sendData (мини-приложение закроется, но чат остаётся чистым,
+// т.к. бот не отвечает текстом).
+async function actTake(jobId){
   const job = JOBS_CATALOG.find(j => j.id === jobId);
   if (!job) return;
-  // Локальный апдейт
+  // Локальные защиты — чтобы UI не дёргался
+  if (DATA.job){ showToast('Контракт уже взят', '⚠️'); return; }
+  if (DATA.captivity_until && DATA.captivity_until > _serverNow()){
+    showToast('Ты в плену — сначала выберись', '👊'); return;
+  }
+  if (DATA.jail_until && DATA.jail_until > _serverNow()){
+    showToast('Ты в тюрьме — сначала выйди', '🚔'); return;
+  }
+  // Optimistic UI
+  const _prevJob = DATA.job, _prevUntil = DATA.job_until;
   DATA.job = jobId;
-  DATA.job_until = _serverNow() + 3600;  // 60 минут
+  DATA.job_until = _serverNow() + (job.duration || 3600);
   renderJobs();
   if (typeof renderStatusBar === 'function') renderStatusBar();
-  // Отправляем боту (мини-приложение закроется — это ограничение Telegram)
-  setTimeout(() => tg.sendData(JSON.stringify({ a: 'job_take', id: jobId })), 250);
+
+  // 1) Пытаемся через HTTP — мини-приложение остаётся открытым
+  const api = (typeof coopApi === 'function') ? coopApi() : (DATA.api || '');
+  if (api){
+    try {
+      const resp = await fetch(api + '/job/' + coopMyUidStr() + '/take', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ id: jobId, init_data: tg?.initData || '' })
+      });
+      const j = await resp.json().catch(()=>({}));
+      if (resp.ok && j.ok){
+        if (j.job_started && j.duration){
+          DATA.job_until = j.job_started + j.duration;
+          renderJobs();
+        }
+        showToast('Принят на работу: ' + job.name, '🛠');
+        return;
+      }
+      // Откат optimistic UI + показ ошибки
+      DATA.job = _prevJob; DATA.job_until = _prevUntil;
+      renderJobs();
+      if (typeof renderStatusBar === 'function') renderStatusBar();
+      const errMap = {
+        'captive':'Ты в плену',
+        'jailed':'Ты в тюрьме',
+        'already working':'Контракт уже взят',
+        'no job':'Такой работы нет',
+        'low rank':'Низкий ранг'
+      };
+      showToast(errMap[j.error] || ('Ошибка: ' + (j.error || 'неизвестно')), '❌');
+      return;
+    } catch(e){ /* fall through to sendData */ }
+  }
+  // 2) Fallback: sendData (мини-апп закроется, но бот тих)
+  if (tg && tg.sendData){
+    setTimeout(() => tg.sendData(JSON.stringify({ a: 'job_take', id: jobId })), 250);
+  }
 }
 function actCollect(){
   if (!tg || !tg.sendData) return;
   // Не оптимизируем здесь — пускай бот сам бросит кубик и пришлёт результат
   tg.sendData(JSON.stringify({ a: 'job_collect' }));
 }
-function actAbandon(){
-  if (!tg || !tg.sendData) return;
+async function actAbandon(){
   if (!confirm('Сорвать контракт без оплаты?')) return;
+  const _prevJob = DATA.job, _prevUntil = DATA.job_until;
   DATA.job = '';
   DATA.job_until = 0;
   renderJobs();
   if (typeof renderStatusBar === 'function') renderStatusBar();
-  setTimeout(() => tg.sendData(JSON.stringify({ a: 'job_abandon' })), 250);
+
+  const api = (typeof coopApi === 'function') ? coopApi() : (DATA.api || '');
+  if (api){
+    try {
+      const resp = await fetch(api + '/job/' + coopMyUidStr() + '/abandon', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ init_data: tg?.initData || '' })
+      });
+      const j = await resp.json().catch(()=>({}));
+      if (resp.ok && j.ok){
+        showToast('Контракт сорван', '🚪');
+        return;
+      }
+      // Откат
+      DATA.job = _prevJob; DATA.job_until = _prevUntil;
+      renderJobs();
+      if (typeof renderStatusBar === 'function') renderStatusBar();
+      showToast('Не удалось сорвать: ' + (j.error || 'ошибка'), '❌');
+      return;
+    } catch(e){ /* fall through */ }
+  }
+  if (tg && tg.sendData){
+    setTimeout(() => tg.sendData(JSON.stringify({ a: 'job_abandon' })), 250);
+  }
 }
 function actCaptivityBail(){
   if (!tg || !tg.sendData) return;
