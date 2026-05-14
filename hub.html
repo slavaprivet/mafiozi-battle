@@ -4831,10 +4831,33 @@ function renderJobs(){
               ${job.success ? `<br>🎲 Шанс выполнить: ${job.success}%` : ''}
             </div>
             <div class="job-card-action">
-              ${job.id === 'newspapers' ? '<button class="job-btn" onclick="openGazetGame()">⚡ Выполнить быстрее</button>' : ''}
-              <button class="job-btn danger" onclick="actAbandon()">🚪 Сорвать</button>
+              ${job.id === 'newspapers' ? '<button id="job-fast-btn" type="button" class="job-btn">⚡ Выполнить быстрее</button>' : ''}
+              <button id="job-abandon-btn" type="button" class="job-btn danger">🚪 Сорвать</button>
             </div>
           </div>`;
+        // Биндим обработчики напрямую — без inline onclick (надёжнее в Telegram WebView,
+        // не зависит от того, успел ли скрипт инициализироваться к моменту парсинга innerHTML)
+        const fastBtn = document.getElementById('job-fast-btn');
+        if (fastBtn){
+          fastBtn.addEventListener('click', function(e){
+            e.preventDefault();
+            e.stopPropagation();
+            try { if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium'); } catch(_){}
+            try { openGazetGame(); }
+            catch(err){
+              console.error('[gazet] openGazetGame threw:', err);
+              showToast('Ошибка: ' + (err && err.message || err), '❌');
+            }
+          });
+        }
+        const abBtn = document.getElementById('job-abandon-btn');
+        if (abBtn){
+          abBtn.addEventListener('click', function(e){
+            e.preventDefault();
+            e.stopPropagation();
+            actAbandon();
+          });
+        }
       } else {
         statusBox.innerHTML = `
           <div class="jobs-status-box">
@@ -4845,9 +4868,17 @@ function renderJobs(){
               ${job.success ? `<br>🎲 Шанс выполнить: ${job.success}%` : ''}
             </div>
             <div class="job-card-action">
-              <button class="job-btn" onclick="actCollect()">💰 Забрать выплату</button>
+              <button id="job-collect-btn" type="button" class="job-btn">💰 Забрать выплату</button>
             </div>
           </div>`;
+        const cBtn = document.getElementById('job-collect-btn');
+        if (cBtn){
+          cBtn.addEventListener('click', function(e){
+            e.preventDefault();
+            e.stopPropagation();
+            actCollect();
+          });
+        }
       }
       return;
     }
@@ -6056,9 +6087,18 @@ function gzPlayerEmoji(){
 
 let gzState = null;
 function openGazetGame(){
-  if (DATA.job !== 'newspapers'){ showToast('Не на этой работе','⚠️'); return; }
+  console.log('[gazet] openGazetGame() called. DATA.job =', DATA && DATA.job);
+  // Сначала пробуем тихо синкнуться с сервером (если оптимистичный UI разошёлся с БД)
+  if (DATA.job !== 'newspapers'){
+    // Не блокируем по строгому равенству. Если статус-бокс показал кнопку — игрок ДОЛЖЕН быть на этой работе.
+    // Просто предупредим в консоли и пойдём дальше; сервер всё равно валидирует /job/.../complete.
+    console.warn('[gazet] DATA.job is not "newspapers" (got:', DATA && DATA.job, '). Продолжаем — сервер всё равно проверит.');
+  }
   const root = document.getElementById('gazet-game');
-  if (!root) return;
+  if (!root){
+    showToast('Не нашёл элемент мини-игры — обнови мини-апп','❌');
+    return;
+  }
   gzState = { timeLeft: 10, count: 0, queue: [], running: true };
   document.getElementById('gz-timer').textContent = '10';
   document.getElementById('gz-count').textContent = '0';
