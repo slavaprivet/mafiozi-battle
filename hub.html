@@ -5004,7 +5004,7 @@ async function actCollect(){
       const resp = await fetch(api + '/job/' + jobUidStr() + '/collect', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({})
+        body: JSON.stringify({ count: (DATA.lastGazetCount|0) })
       });
       const j = await resp.json().catch(()=>({}));
       if (resp.ok && j.ok){
@@ -5015,6 +5015,7 @@ async function actCollect(){
         }
         DATA.cash = (DATA.cash||0) + (j.pay||0);
         DATA.job = ''; DATA.job_until = 0;
+        DATA.lastGazetCount = 0;       // сбросили после получения денег
         if (j.wanted_stars!=null) DATA.wanted = j.wanted_stars;
         if (j.wanted_gangs!=null) DATA.wanted_g = j.wanted_gangs;
         renderJobs();
@@ -5978,6 +5979,46 @@ const GZ_QUEUE_START = 180;       // где встанет первый NPC
 const GZ_QUEUE_GAP   = 70;        // расстояние между NPC в очереди
 const GZ_MAX_VISIBLE = 6;         // не более N в очереди (остальные ждут)
 const GZ_NPC_EMOJIS  = ['🚶','🚶‍♂️','🚶‍♀️','🕴','👨','👩','🧓','👴','👵','👮‍♂️','👨‍🔧','🧔'];
+const GZ_PHRASES = [
+  'Спасибо!', 'Мерси, мсье', 'Прочту позже', 'О, свежий выпуск!',
+  'Благодарю', 'Хорошего дня', 'Ох, спасибо', 'Любопытно...',
+  'Дай-ка гляну', 'А что там пишут?', 'Спасибо, парень', 'Угу...',
+  'Гран мерси', 'Гм, занятно', 'То что надо!', 'Класс!',
+  'Ну-ка ну-ка', 'Подкинь ещё', 'Ха, забавно', 'Передам жене',
+  'Сейчас почитаю', 'Чёрт, интересно', 'Шеф будет рад', 'Спасибо, малой',
+  'Мммм, газетка', 'Ну спасибочки', 'А, газетка', 'Класс, разверну',
+];
+function _gzSayBubble(npc){
+  const phrase = GZ_PHRASES[Math.floor(Math.random()*GZ_PHRASES.length)];
+  const b = document.createElement('div');
+  b.textContent = phrase;
+  b.style.cssText = 'position:absolute;background:#fff;color:#1a1a2e;' +
+    'padding:5px 10px;border-radius:12px;font-size:12px;font-weight:700;' +
+    'white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.35);' +
+    'transition:transform 0.6s ease-out, opacity 0.5s ease-out;' +
+    'pointer-events:none;z-index:20;';
+  const npcRect = npc.el.getBoundingClientRect();
+  const stage   = document.getElementById('gz-stage');
+  const stageRect = stage.getBoundingClientRect();
+  // позиция относительно слоя NPC
+  b.style.left = (npcRect.left - stageRect.left) + 'px';
+  b.style.bottom = '70px';
+  // хвостик
+  const tail = document.createElement('div');
+  tail.style.cssText = 'position:absolute;bottom:-6px;left:14px;width:0;height:0;' +
+    'border-left:6px solid transparent;border-right:6px solid transparent;' +
+    'border-top:8px solid #fff;';
+  b.appendChild(tail);
+  document.getElementById('gz-fx').appendChild(b);
+  requestAnimationFrame(() => {
+    b.style.transform = 'translateY(-14px)';
+  });
+  setTimeout(() => {
+    b.style.opacity = '0';
+    b.style.transform = 'translateY(-30px)';
+  }, 900);
+  setTimeout(() => b.remove(), 1400);
+}
 
 // Эмодзи персонажа игрока по классу (используется как заглушка, пока не нарисуешь свой спрайт)
 function gzPlayerEmoji(){
@@ -6094,13 +6135,14 @@ async function _gzFinish(){
       const j = await resp.json().catch(()=>({}));
       if (resp.ok && j.ok && j.completed){
         DATA.job_until = _serverNow() - 1;
+        DATA.lastGazetCount = count;   // <- запомним для выплаты
         completed = true;
       }
     } catch(e){}
   }
   if (count > 0 && completed){
     document.getElementById('gz-final-text').textContent =
-      'Газеты разданы: ' + count + '. Иди забирай выплату.';
+      'Газеты разданы: ' + count + ' 📰. Чем больше — тем больше денег! Иди забирай выплату.';
   } else if (count > 0 && !completed){
     document.getElementById('gz-final-text').textContent =
       'Газеты разданы: ' + count + ', но сервер не подтвердил. Попробуй открыть мини-игру ещё раз.';
@@ -6126,6 +6168,7 @@ document.addEventListener('click', function(e){
   gzState.count++;
   document.getElementById('gz-count').textContent = gzState.count;
   _gzPaperFlight(npc);
+  setTimeout(() => _gzSayBubble(npc), 280);
   // NPC через 250мс уходит влево, очередь сдвигается
   setTimeout(() => {
     npc.el.style.transition = 'left 0.7s ease-out, opacity 0.5s';
