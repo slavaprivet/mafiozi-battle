@@ -9,21 +9,6 @@
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; user-select: none; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #0b0d12; font-family: -apple-system,Segoe UI,Roboto,sans-serif; color: #fff; touch-action: none; }
   #wrap { position: fixed; inset: 0; display: flex; flex-direction: column; }
-  #topbar {
-    flex: 0 0 auto; display: flex; gap: 4px; padding: 6px;
-    background: linear-gradient(180deg, #1a1f2c 0%, #12161e 100%);
-    border-bottom: 1px solid #2a3142;
-    overflow-x: auto; scrollbar-width: none;
-  }
-  #topbar::-webkit-scrollbar { display: none; }
-  .wbtn {
-    flex: 0 0 auto; padding: 6px 10px; border-radius: 8px;
-    background: #232a3a; border: 1px solid #2e3648;
-    color: #cfd6e6; font-size: 12px; font-weight: 600;
-    white-space: nowrap; cursor: pointer; transition: all .12s;
-  }
-  .wbtn.active { background: #ffd76b; color: #1a1a1a; border-color: #ffe080; box-shadow: 0 0 12px rgba(255,215,107,.4); }
-  .wbtn:active { transform: scale(.95); }
   #stage { flex: 1 1 auto; position: relative; overflow: hidden; background: #0b0d12; }
   canvas#gc { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   /* Джойстики */
@@ -139,21 +124,6 @@
 </head>
 <body>
 <div id="wrap">
-  <div id="topbar">
-    <button class="wbtn" data-wep="fists">кулаки</button>
-    <button class="wbtn" data-wep="brass">кастет</button>
-    <button class="wbtn" data-wep="bat">бита</button>
-    <button class="wbtn" data-wep="blade_short">нож</button>
-    <button class="wbtn" data-wep="blade_long">катана</button>
-    <button class="wbtn active" data-wep="pistol">пистолет</button>
-    <button class="wbtn" data-wep="pistol_heavy">тяж.пистолет</button>
-    <button class="wbtn" data-wep="pistol_gold">золотой</button>
-    <button class="wbtn" data-wep="shotgun">дробовик</button>
-    <button class="wbtn" data-wep="smg">ПП</button>
-    <button class="wbtn" data-wep="rifle">винтовка</button>
-    <button class="wbtn" data-wep="sniper">снайперка</button>
-    <button class="wbtn" data-wep="rpg">РПГ</button>
-  </div>
   <div id="stage">
     <canvas id="gc"></canvas>
     <div class="joy-base" id="joyBase"><div class="joy-knob" id="joyKnob"></div></div>
@@ -211,6 +181,8 @@
         <div style="text-align:left;color:#8a92a8">💀 Убито:</div><div id="resKills" style="text-align:right;font-weight:bold">0</div>
         <div style="text-align:left;color:#8a92a8">🔫 Выстрелов:</div><div id="resShots" style="text-align:right;font-weight:bold">0</div>
         <div style="text-align:left;color:#8a92a8">❤️ HP остаток:</div><div id="resHP" style="text-align:right;font-weight:bold">0/0</div>
+        <div style="text-align:left;color:#8a92a8">⭐ Опыт:</div><div id="resExp" style="text-align:right;font-weight:bold;color:#7bb6ff">+0</div>
+        <div style="text-align:left;color:#8a92a8">💵 Деньги:</div><div id="resCash" style="text-align:right;font-weight:bold;color:#ffd76b">+0$</div>
       </div>
       <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;justify-content:center">
         <button id="btnBackDistrict" style="padding:12px 18px;background:linear-gradient(180deg,#2a4a30,#1a3020);border:2px solid #4a7a4a;border-radius:10px;color:#5dd55d;font-size:13px;font-weight:bold;cursor:pointer;min-width:150px">↩ К району</button>
@@ -344,7 +316,13 @@ const QP = {
   bossNameRaw: _qStr('bname', ''),
   bossHPRaw:   _qInt('bhp', 0),
   bossEmoji:   _qStr('bemoji', ''),
+  baseExp:     _qInt('exp',  0),   // базовый опыт за босса (из BOSS_DATA в хабе)
+  baseCash:    _qInt('cash', 0),   // базовые деньги за босса
+  mlvl:        _qInt('mlvl', 1),   // минимальный уровень района — даёт множитель наград
+  minions:     _qInt('minions', 3),// сколько миньонов у босса (2..18) — от этого размер карты
 };
+// Множитель района: ×1.0 (рынок, mlvl=1) → ×2.9 (резиденция, mlvl=20)
+const LOC_REWARD_MUL = 1 + 0.10 * Math.max(0, QP.mlvl - 1);
 
 // ── Реестр всех 20 боссов (имя, hp, оружие, внешность, район) ──────
 const BOSS_REGISTRY = {
@@ -407,132 +385,72 @@ const ISO_WEAPONS = new Set(['fists','brass','bat','blade_short','blade_long','p
 const WEAPON_ALIASES = { nagan:'pistol', tt:'pistol', pm:'pistol', glock:'pistol', revolver:'pistol_heavy', desert_eagle:'pistol_heavy', knife:'blade_short', katana:'blade_long', ak:'rifle', m4:'rifle', ump:'smg', mp5:'smg' };
 const INITIAL_WEAPON = (QP.weapon && (ISO_WEAPONS.has(QP.weapon) ? QP.weapon : (WEAPON_ALIASES[QP.weapon] || 'pistol'))) || 'pistol';
 
-// ── Спавны: вычислим ПОСЛЕ MAP (нужны для findOpenSpot). Босс занимает
-//    индекс по boss_id из BOSS_CORNER_IDX — 4 разных стартовых раскладки
-//    в каждом районе (по числу боссов).
-const BOSS_CORNER_IDX = {
-  // Рынок
-  kosoy: 0, bychok: 1, zhigan: 2, shustryy: 3,
-  // Порт
-  tolsty: 0, kaban: 1, bukhgalter: 2, kontrabas: 3,
-  // Казино
-  legenda: 0, professor: 1, artist: 2, svalshchik: 3,
-  // Промзона
-  buryy: 0, khirurg: 1, tigr: 2, palach: 3,
-  // Резиденция
-  sedoy: 0, prizrak: 1, don_karlo: 2, vizir: 3,
-};
-
-// Карта (17 рядов × 12 столбцов) — расширенная арена
-const COLS = 12, ROWS = 17;
+// ── Сложность арены ────────────────────────────────────────────────
+// Размер карты и число миньонов растут от силы босса (BOSS_DATA.minions: 2..18).
+// Минимум — 3× прежней карты (12×17=204), у Дона Карло — ~7-8×.
+const MINION_COUNT = Math.max(2, Math.min(18, QP.minions || 3));
+const COLS = 22 + Math.floor(MINION_COUNT * 0.7);
+const ROWS = 30 + MINION_COUNT;
 // 0=пол, 1=стена, 2=ящик, 3=бочка, 4=машина
 
-// ── 5 районных карт ─────────────────────────────────────────────────
-const DISTRICT_MAPS = {
-  // Рынок — россыпь ларьков и бочек
-  market: [
-    [1,1,1,1,1,1,1,1,1,1,1,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,2,2,0,0,0,2,2,0,0,1],
-    [1,0,2,0,3,0,0,2,0,3,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,3,0,0,2,2,0,0,3,0,1],
-    [1,0,0,0,2,2,2,2,0,0,0,1],
-    [1,0,0,0,2,0,0,2,0,0,0,1],
-    [1,0,2,0,0,0,0,0,0,2,0,1],
-    [1,0,3,0,0,0,0,0,0,3,0,1],
-    [1,0,0,0,2,0,0,2,0,0,0,1],
-    [1,0,0,2,0,0,0,0,2,0,0,1],
-    [1,0,2,0,0,3,3,0,0,2,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,3,0,2,0,0,2,0,3,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1],
-  ],
-  // Порт — длинные ряды контейнеров, машины-фуры по краям
-  port: [
-    [1,1,1,1,1,1,1,1,1,1,1,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,2,2,2,0,0,2,2,2,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,4,4,0,0,0,0,4,4,0,1],
-    [1,0,0,0,0,3,3,0,0,0,0,1],
-    [1,0,2,2,2,0,0,2,2,2,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,3,0,0,0,0,0,0,0,0,3,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,2,2,2,0,0,2,2,2,0,1],
-    [1,0,0,0,0,3,3,0,0,0,0,1],
-    [1,0,4,4,0,0,0,0,4,4,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,2,2,2,0,0,2,2,2,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1],
-  ],
-  // Казино — комнаты со стенами-перегородками
-  casino: [
-    [1,1,1,1,1,1,1,1,1,1,1,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,2,0,0,0,0,0,0,2,0,1],
-    [1,0,0,0,0,1,1,0,0,0,0,1],
-    [1,0,0,0,0,1,1,0,0,0,0,1],
-    [1,0,3,0,0,0,0,0,0,3,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,1,1,0,0,0,0,0,0,1,1,1],
-    [1,0,0,0,0,2,2,0,0,0,0,1],
-    [1,1,1,0,0,0,0,0,0,1,1,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,3,0,0,0,0,0,0,3,0,1],
-    [1,0,0,0,0,1,1,0,0,0,0,1],
-    [1,0,0,0,0,1,1,0,0,0,0,1],
-    [1,0,2,0,0,0,0,0,0,2,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1],
-  ],
-  // Промзона — кластеры техники, узкие проходы между трубами
-  factory: [
-    [1,1,1,1,1,1,1,1,1,1,1,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,2,2,0,3,3,0,2,2,0,1],
-    [1,0,2,2,0,3,3,0,2,2,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,1,1,0,0,1,1,0,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,3,0,2,2,2,2,0,3,0,1],
-    [1,0,3,0,0,0,0,0,0,3,0,1],
-    [1,0,3,0,2,2,2,2,0,3,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,1,1,0,0,1,1,0,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,2,2,0,3,3,0,2,2,0,1],
-    [1,0,2,2,0,3,3,0,2,2,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1],
-  ],
-  // Резиденция Дона — формальная планировка, лимузины, стены-залы
-  mansion: [
-    [1,1,1,1,1,1,1,1,1,1,1,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,4,0,0,0,0,0,0,4,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,2,0,1,1,1,1,0,2,0,1],
-    [1,0,0,0,1,0,0,1,0,0,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,1,0,0,0,2,2,0,0,0,1,1],
-    [1,0,0,0,0,2,2,0,0,0,0,1],
-    [1,1,0,0,0,0,0,0,0,0,1,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,0,1,0,0,1,0,0,0,1],
-    [1,0,2,0,1,1,1,1,0,2,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,4,0,0,0,0,0,0,4,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1],
-  ],
-};
+// Лагерь босса — отдельная комната с одной дверью на юг (в сторону игрока).
+// Босс с охраной сидят там «в кабинете» до первой тревоги, потом выходят.
+let BOSS_ROOM = null;
 
-// Берём карту района как ОСНОВУ (mutable копия — она будет разрушаться)
-const MAP = (DISTRICT_MAPS[CURRENT_LOC] || DISTRICT_MAPS.market).map(r => r.slice());
+function buildArenaMap() {
+  const m = [];
+  for (let r = 0; r < ROWS; r++) m.push(new Array(COLS).fill(0));
+  // Внешний периметр стен
+  for (let r = 0; r < ROWS; r++) { m[r][0] = 1; m[r][COLS - 1] = 1; }
+  for (let c = 0; c < COLS; c++) { m[0][c] = 1; m[ROWS - 1][c] = 1; }
+  // Кабинет босса — наверху по центру
+  const roomW = Math.min(11, Math.max(7, Math.floor(COLS * 0.45)));
+  const roomH = Math.min(8,  Math.max(6, Math.floor(ROWS * 0.22)));
+  const roomC0 = Math.floor((COLS - roomW) / 2);
+  const roomC1 = roomC0 + roomW;
+  const roomR0 = 2;
+  const roomR1 = roomR0 + roomH;
+  for (let c = roomC0; c <= roomC1; c++) { m[roomR0][c] = 1; m[roomR1][c] = 1; }
+  for (let r = roomR0; r <= roomR1; r++) { m[r][roomC0] = 1; m[r][roomC1] = 1; }
+  // Дверь — 2 тайла в южной стене
+  const doorC = Math.floor((roomC0 + roomC1) / 2);
+  m[roomR1][doorC]     = 0;
+  m[roomR1][doorC - 1] = 0;
+  // «Стол» босса (2 ящика спереди от его спавна)
+  const deskR = Math.floor((roomR0 + roomR1) / 2);
+  m[deskR][doorC - 1] = 2;
+  m[deskR][doorC]     = 2;
+  // Бочки в углах кабинета
+  if (m[roomR0 + 1][roomC0 + 1] === 0) m[roomR0 + 1][roomC0 + 1] = 3;
+  if (m[roomR0 + 1][roomC1 - 1] === 0) m[roomR0 + 1][roomC1 - 1] = 3;
+  // Препятствия снаружи кабинета — россыпь ящиков/бочек/машин
+  const obsCount = Math.floor((ROWS * COLS) * 0.07);
+  let placed = 0, tries = 0;
+  while (placed < obsCount && tries < obsCount * 8) {
+    tries++;
+    const r = (roomR1 + 3) + Math.floor(Math.random() * Math.max(1, ROWS - roomR1 - 5));
+    const c = 2 + Math.floor(Math.random() * Math.max(1, COLS - 4));
+    if (r < 1 || r >= ROWS - 1 || c < 1 || c >= COLS - 1) continue;
+    if (m[r][c] !== 0) continue;
+    // не создаём «тупик» (3+ занятых соседа)
+    const nb = (
+      (m[r - 1] && m[r - 1][c] !== 0 ? 1 : 0) +
+      (m[r + 1] && m[r + 1][c] !== 0 ? 1 : 0) +
+      (m[r][c - 1] !== 0 ? 1 : 0) +
+      (m[r][c + 1] !== 0 ? 1 : 0)
+    );
+    if (nb >= 3) continue;
+    const t = Math.random();
+    if      (t < 0.55) m[r][c] = 2;   // ящик
+    else if (t < 0.85) m[r][c] = 3;   // бочка
+    else               m[r][c] = 4;   // машина
+    placed++;
+  }
+  BOSS_ROOM = { r0: roomR0, r1: roomR1, c0: roomC0, c1: roomC1, doorR: roomR1, doorC, deskR };
+  return m;
+}
+
+const MAP = buildArenaMap();
 
 // ── Поиск ближайшего открытого тайла (нужен для безопасного спавна) ─
 function findOpenSpot(targetR, targetC, taken, maxRadius) {
@@ -562,28 +480,53 @@ function findOpenSpot(targetR, targetC, taken, maxRadius) {
   return [targetR, targetC]; // fallback
 }
 
-// Стартовые позиции: игрок в центре, 4 точки вокруг на расстоянии ~3-4 тайла —
-// сразу видны на мобильном вьюпорте. Если позиция упирается в укрытие, берём
-// ближайший открытый тайл.
+// Спавны: игрок снизу карты (вдалеке от кабинета), босс — в кабинете у стола.
+// Охрана сидит вместе с боссом, остальные миньоны разбросаны в основной зоне.
 const SPAWNS = (function getSpawns() {
-  const playerPos = findOpenSpot(8.5, 5.5, []);
+  const playerPos = findOpenSpot(ROWS - 4, Math.floor(COLS / 2), [], 8);
   const taken = [playerPos];
-  // 4 диагональных направления вокруг игрока
-  const dirs = [
-    [playerPos[0] - 3, playerPos[1] - 2], // СЗ — corner 0
-    [playerPos[0] - 3, playerPos[1] + 2], // СВ — corner 1
-    [playerPos[0] + 4, playerPos[1] - 2], // ЮЗ — corner 2
-    [playerPos[0] + 4, playerPos[1] + 2], // ЮВ — corner 3
-  ];
-  const spots = dirs.map(([r, c]) => {
-    const s = findOpenSpot(r, c, taken);
-    taken.push(s);
-    return s;
-  });
-  const idx = (BOSS_CORNER_IDX[QP.boss] != null) ? BOSS_CORNER_IDX[QP.boss] : 0;
-  const bossPos = spots[idx];
-  const minionPositions = spots.filter((_, i) => i !== idx);
-  return { player: playerPos, boss: bossPos, minions: minionPositions };
+  const room = BOSS_ROOM;
+  // Босс — у стола, лицом к двери
+  const bossPos = findOpenSpot(room.deskR - 1, Math.floor((room.c0 + room.c1) / 2), taken, 3);
+  taken.push(bossPos);
+  // Охрана внутри кабинета (растёт с количеством миньонов, но не больше 5)
+  const guardsInside = Math.min(MINION_COUNT, Math.min(Math.floor(MINION_COUNT / 2) + 1, 5));
+  const guards = [];
+  outer:
+  for (let dr = -2; dr <= 2; dr++) {
+    for (let dc = -3; dc <= 3; dc++) {
+      if (guards.length >= guardsInside) break outer;
+      const r = Math.floor(bossPos[0]) + dr;
+      const c = Math.floor(bossPos[1]) + dc;
+      if (r <= room.r0 || r >= room.r1 || c <= room.c0 || c >= room.c1) continue;
+      if (MAP[r][c] !== 0) continue;
+      const tooClose = taken.some(([tr, tc]) =>
+        Math.abs(tr - r - 0.5) < 1.2 && Math.abs(tc - c - 0.5) < 1.2);
+      if (tooClose) continue;
+      const p = [r + 0.5, c + 0.5];
+      guards.push(p); taken.push(p);
+    }
+  }
+  // Остальные миньоны — снаружи (между кабинетом и игроком)
+  const outside = [];
+  const outsideCount = MINION_COUNT - guards.length;
+  for (let t = 0; t < outsideCount * 60 && outside.length < outsideCount; t++) {
+    const r = (room.r1 + 3) + Math.floor(Math.random() * Math.max(1, ROWS - room.r1 - 6));
+    const c = 2 + Math.floor(Math.random() * Math.max(1, COLS - 4));
+    if (r < 1 || r >= ROWS - 1 || c < 1 || c >= COLS - 1) continue;
+    if (MAP[r][c] !== 0) continue;
+    const tooClose = taken.some(([tr, tc]) =>
+      Math.abs(tr - r - 0.5) < 2.5 && Math.abs(tc - c - 0.5) < 2.5);
+    if (tooClose) continue;
+    const p = [r + 0.5, c + 0.5];
+    outside.push(p); taken.push(p);
+  }
+  return {
+    player: playerPos,
+    boss:   bossPos,
+    minions: [...guards, ...outside],
+    guardsInside: guards.length,
+  };
 })();
 
 // Описание типов клеток (цвета переопределяются темой района)
@@ -830,12 +773,13 @@ function isPlayerBehind(e) {
   return Math.abs(Math.abs(diff) - Math.PI) < Math.PI * 0.35;
 }
 
-// Найти врага, к которому можно подкрасться (живой, ближайший в спине, не босс)
+// Найти врага, к которому можно подкрасться (живой, ближайший в спине).
+// Босс — валидная цель: ваншота не будет, но получит большой урон.
 function findBackstabTarget() {
   if (player.hp <= 0 || alertLevel >= 2) return null;     // в бою — нельзя
   let best = null, bestD = 99;
   for (const e of enemies) {
-    if (e.hp <= 0 || e.isBoss) continue;
+    if (e.hp <= 0) continue;
     if (!isPlayerBehind(e)) continue;
     const d = Math.hypot(player.r - e.r, player.c - e.c);
     if (d < bestD) { bestD = d; best = e; }
@@ -1024,18 +968,30 @@ const _DISTRICT_MINIONS = {
   mansion: [{w:'rifle',      fc:500,  hp:130}, {w:'sniper',      fc:1700, hp:115}, {w:'shotgun',       fc:1200,hp:125}],
 };
 const _minions = _DISTRICT_MINIONS[CURRENT_LOC] || _DISTRICT_MINIONS.market;
+// Зона кабинета — используется как `confined` для босса и охраны.
+// Пока тревога < combat, они патрулируют только внутри стен кабинета.
+const _roomBounds = () => ({ r0: BOSS_ROOM.r0, r1: BOSS_ROOM.r1, c0: BOSS_ROOM.c0, c1: BOSS_ROOM.c1 });
 const enemies = [
   { r: SPAWNS.boss[0], c: SPAWNS.boss[1], hp: BOSS_CFG.hp, hpMax: BOSS_CFG.hp, angle: 0, look: BOSS_LOOK,
     isBoss: true, name: BOSS_CFG.name, emoji: BOSS_CFG.emoji,
-    weapon: BOSS_CFG.weapon, fireCD: 1500, sightR: 11, aiState: 'patrol', repositionT: 0, walkPhase: 0,
-    grenadeCD: 1800, rushCD: 5000, rushT: 0 },
-  { r: SPAWNS.minions[0][0], c: SPAWNS.minions[0][1], hp: _minions[0].hp, hpMax: _minions[0].hp, angle: 0, look: rndLook(), isBoss: false,
-    weapon: _minions[0].w, fireCD: _minions[0].fc, sightR: 8, aiState: 'patrol', repositionT: 0, walkPhase: 0 },
-  { r: SPAWNS.minions[1][0], c: SPAWNS.minions[1][1], hp: _minions[1].hp, hpMax: _minions[1].hp, angle: 0, look: rndLook(), isBoss: false,
-    weapon: _minions[1].w, fireCD: _minions[1].fc, sightR: 8, aiState: 'patrol', repositionT: 0, walkPhase: 0 },
-  { r: SPAWNS.minions[2][0], c: SPAWNS.minions[2][1], hp: _minions[2].hp, hpMax: _minions[2].hp, angle: 0, look: rndLook(), isBoss: false,
-    weapon: _minions[2].w, fireCD: _minions[2].fc, sightR: 8, aiState: 'patrol', repositionT: 0, walkPhase: 0 },
+    weapon: BOSS_CFG.weapon, fireCD: 1500, sightR: 8, aiState: 'patrol', repositionT: 0, walkPhase: 0,
+    grenadeCD: 1800, rushCD: 5000, rushT: 0,
+    confined: _roomBounds() },
 ];
+// Миньонов — сколько прислали из хаба. Архетипы оружия циклятся (3 разных
+// «класса» на район). Первые N — охрана в кабинете, остальные снаружи.
+for (let i = 0; i < SPAWNS.minions.length; i++) {
+  const cfg = _minions[i % _minions.length];
+  const pos = SPAWNS.minions[i];
+  const inRoom = i < SPAWNS.guardsInside;
+  enemies.push({
+    r: pos[0], c: pos[1], hp: cfg.hp, hpMax: cfg.hp, angle: 0,
+    look: rndLook(), isBoss: false,
+    weapon: cfg.w, fireCD: cfg.fc, sightR: 8,
+    aiState: 'patrol', repositionT: 0, walkPhase: 0,
+    confined: inRoom ? _roomBounds() : null,
+  });
+}
 
 const grenades = []; // {r, c, tr, tc, t, T, fromTeam, kind: 'grenade'|'molotov', dmg}
 const firePuddles = []; // лужи огня от молотовых: {r, c, life, max, radius, fromTeam}
@@ -2578,9 +2534,17 @@ function render() {
   ctx.fillStyle = '#0b0d12';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // 1) Пол — все тайлы 0
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
+  // Viewport culling: на крупных картах рисуем только тайлы рядом с игроком
+  // (изометрия + камера-лерп → 14 тайлов радиуса с запасом покрывают экран).
+  const VIS_R = 14;
+  const r0v = Math.max(0, Math.floor(player.r - VIS_R));
+  const r1v = Math.min(ROWS, Math.ceil(player.r + VIS_R));
+  const c0v = Math.max(0, Math.floor(player.c - VIS_R));
+  const c1v = Math.min(COLS, Math.ceil(player.c + VIS_R));
+
+  // 1) Пол — все тайлы 0 в видимой области
+  for (let r = r0v; r < r1v; r++) {
+    for (let c = c0v; c < c1v; c++) {
       if (MAP[r][c] === 0) drawTile(r, c);
     }
   }
@@ -2594,8 +2558,8 @@ function render() {
 
   // 2) Объекты с глубиной (укрытия + персонажи + пули). Сортируем по r+c
   const items = [];
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
+  for (let r = r0v; r < r1v; r++) {
+    for (let c = c0v; c < c1v; c++) {
       const t = MAP[r][c];
       if (t > 0) items.push({ depth: r + c, draw: () => drawCover(r, c, t) });
     }
@@ -2678,6 +2642,14 @@ function showResultScene() {
   document.getElementById('resKills').textContent = fightStats.killsCounted.size + ' / ' + enemies.length;
   document.getElementById('resShots').textContent = fightStats.shots;
   document.getElementById('resHP').textContent = Math.max(0, Math.round(player.hp)) + ' / ' + player.hpMax;
+  // Награды: только при победе. База от босса × множитель района.
+  // На поражении — 0/0 (бот тоже ничего не начислит).
+  const expGain  = won ? Math.round(QP.baseExp  * LOC_REWARD_MUL) : 0;
+  const cashGain = won ? Math.round(QP.baseCash * LOC_REWARD_MUL) : 0;
+  fightStats.expGain  = expGain;
+  fightStats.cashGain = cashGain;
+  document.getElementById('resExp').textContent  = '+' + expGain;
+  document.getElementById('resCash').textContent = '+' + cashGain + '$';
   document.getElementById('resTitle').style.color = won ? '#ffd76b' : '#ff7070';
   document.getElementById('resultScene').style.display = 'flex';
   gamePaused = true;
@@ -2692,14 +2664,25 @@ function sendResultAndClose(action) {
     boss: QP.boss,
     loc: CURRENT_LOC,
     nav: action, // 'district' | 'menu' — куда вернуться (бот может игнорировать)
+    xp:   fightStats.expGain  || 0,
+    cash: fightStats.cashGain || 0,
   };
-  if (tg && tg.sendData) {
+  // 1) Шлём результат боту (он начислит HP/опыт/деньги и пришлёт сообщение).
+  //    tg.sendData() по доке САМ закрывает WebApp.
+  if (tg && typeof tg.sendData === 'function') {
     try { tg.sendData(JSON.stringify(payload)); } catch(e) {}
-    try { tg.close(); } catch(e) {}
-  } else {
-    // Демо-режим (не из Telegram): просто скрываем оверлей, чтобы можно было ещё пощёлкать
-    document.getElementById('resultScene').style.display = 'none';
   }
+  // 2) Дизейблим кнопки, чтобы повторный тап не дёргал sendData ещё раз
+  try {
+    document.getElementById('btnBackDistrict').disabled = true;
+    document.getElementById('btnBackMenu').disabled     = true;
+  } catch(e) {}
+  // 3) Fallback: если WebApp не закрылся (старый клиент, демо-режим в браузере
+  //    или sendData недоступен) — через 300мс гарантированно переезжаем в хаб,
+  //    чтобы игрок не залип на финальном экране.
+  setTimeout(() => {
+    window.location.href = 'hub.html';
+  }, 300);
 }
 
 function update(dt) {
@@ -3076,15 +3059,17 @@ function fireWeapon(p, weaponKey, team) {
   // Игрок начал бить ближним → запускаем анимацию замаха
   if (tm === 'player') p.meleeT = 0.28;
   if (cfg.melee) {
-    // === СТЕЛС-КИЛЛ: если игрок и есть цель за спиной — мгновенно ваншот ===
+    // === СТЕЛС-КИЛЛ: игрок за спиной у врага — ваншот миньона ИЛИ
+    //     сильный урон боссу (босс не ваншотится, но получает ~40% maxHP).
     if (tm === 'player') {
       const back = findBackstabTarget();
       if (back) {
-        // тихое убийство в спину: гарантированный ваншот + кровь, без шума
         p.angle = Math.atan2(back.r - p.r, back.c - p.c);
-        const slitDmg = back.hpMax + 200; // оверкилл — труп упадёт
-        damageActor(back, slitDmg, p.angle, wKey === 'blade_short' ? 'sniper' : null);
-        spawnBlood(back.r, back.c, p.angle, 80);
+        const slitDmg = back.isBoss
+          ? Math.max(80, Math.round(back.hpMax * 0.2))   // босс: ~20% HP, не ваншот
+          : back.hpMax + 200;                            // миньон: гарантированный ваншот
+        damageActor(back, slitDmg, p.angle, (!back.isBoss && wKey === 'blade_short') ? 'sniper' : null);
+        spawnBlood(back.r, back.c, p.angle, back.isBoss ? 60 : 80);
         // лёгкий звук — но НЕ повышаем тревогу: тихо
         return;
       }
@@ -3231,6 +3216,7 @@ function updateEnemyAI(e, dt) {
       maybeChat(e, 'cantShoot', 1);
     }
     // Перемещение: держим дистанцию + стрейф
+    if (e.confined) e.confined = null; // увидел игрока — выходит из кабинета
     e.aiState = 'shoot';
     if (e.repositionT <= 0) {
       // выбираем новую точку чтобы стрейфить
@@ -3244,6 +3230,7 @@ function updateEnemyAI(e, dt) {
     moveTowardsTarget(e, dt, e.isBoss ? 2.2 : 2.8);
   } else if (playerAlive && distToPlayer < e.sightR * 1.6) {
     // Слышим игрока — идём в его сторону
+    if (e.confined) e.confined = null; // выходит из кабинета на звук
     e.aiState = 'chase';
     e.angle = angleToPlayer;
     e.targetR = player.r; e.targetC = player.c;
@@ -3251,11 +3238,19 @@ function updateEnemyAI(e, dt) {
   } else {
     // патруль
     e.aiState = 'patrol';
+    // Общая тревога снимает привязку к комнате — все выходят воевать
+    if (alertLevel >= 2 && e.confined) e.confined = null;
     if (e.repositionT <= 0 || e.targetR == null) {
-      // случайная точка в открытом тайле
+      // Если враг сидит в «кабинете» — бродит только внутри его стен,
+      // иначе — случайная точка по всей карте.
+      const cb = e.confined;
+      const r0p = cb ? cb.r0 + 1 : 1;
+      const r1p = cb ? cb.r1 - 1 : ROWS - 2;
+      const c0p = cb ? cb.c0 + 1 : 1;
+      const c1p = cb ? cb.c1 - 1 : COLS - 2;
       for (let tries = 0; tries < 20; tries++) {
-        const rr = 1 + Math.random() * (ROWS - 2);
-        const cc = 1 + Math.random() * (COLS - 2);
+        const rr = r0p + Math.random() * (r1p - r0p);
+        const cc = c0p + Math.random() * (c1p - c0p);
         if (!isBlocked(rr, cc)) { e.targetR = rr; e.targetC = cc; break; }
       }
       e.repositionT = 2.5 + Math.random() * 2.5;
@@ -3346,7 +3341,14 @@ function endTouch(id) {
   }
 }
 
+// Если тач пришёл на кнопку/оверлей — НЕ перехватываем: пусть отработает обычный click.
+// Иначе preventDefault на touchstart глушит synthetic click, и кнопки внутри #stage
+// (катсцена СТЕЛС/В ЛОБ, melee, reload, респ) перестают работать на мобиле.
+function _isUiTouchTarget(t) {
+  return !!(t && t.closest && t.closest('button, #catscene, #resultScene, #gameOver, #hudBtns, #combatUI'));
+}
 stage.addEventListener('touchstart', (e) => {
+  if (_isUiTouchTarget(e.target)) return;
   e.preventDefault();
   for (const t of e.changedTouches) {
     const rect = stage.getBoundingClientRect();
@@ -3354,6 +3356,7 @@ stage.addEventListener('touchstart', (e) => {
   }
 }, { passive: false });
 stage.addEventListener('touchmove', (e) => {
+  if (_isUiTouchTarget(e.target)) return;
   e.preventDefault();
   for (const t of e.changedTouches) {
     const rect = stage.getBoundingClientRect();
@@ -3382,22 +3385,23 @@ window.addEventListener('mouseup', (e) => {
 });
 stage.addEventListener('contextmenu', (e) => e.preventDefault());
 
-// Селектор оружия
-let lastMeleeWeapon = 'fists'; // последнее выбранное melee — для кнопки ближнего боя
-let preMeleeWeapon = 'pistol'; // куда вернуться после атаки в ближнем бою с пустым магазином
-document.querySelectorAll('.wbtn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.wbtn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentWeapon = btn.dataset.wep;
-    document.getElementById('wepName').textContent = btn.textContent;
-    const cfg = WEAPON_FX_CFG[currentWeapon];
-    if (cfg && cfg.melee) lastMeleeWeapon = currentWeapon;
-    else preMeleeWeapon = currentWeapon;
-    if (cfg && cfg.sound) { try { cfg.sound(); } catch(e) {} }
-    updateMeleeBtn();
-  });
-});
+// В бою доступно ТОЛЬКО экипированное оружие (приходит в URL ?weapon=...) и кулаки.
+// Селектор пушек сверху убран — игрок выбирает оружие в инвентаре хаба и экипирует.
+const WEAPON_LABELS = {
+  fists:'кулаки', brass:'кастет', chain:'цепь', bat:'бита',
+  blade_short:'нож', blade_long:'катана',
+  pistol:'пистолет', pistol_heavy:'тяж.пистолет', pistol_gold:'золотой',
+  shotgun:'дробовик', smg:'ПП', rifle:'винтовка', sniper:'снайперка', rpg:'РПГ',
+};
+function weaponLabel(w) { return WEAPON_LABELS[w] || w; }
+// Если экипировано холодное — оно же и есть «текущий melee» для кнопки ближнего боя
+const _initCfg = WEAPON_FX_CFG[INITIAL_WEAPON];
+let lastMeleeWeapon = (_initCfg && _initCfg.melee) ? INITIAL_WEAPON : 'fists';
+// Стартовое имя в HUD — из экипировки
+{
+  const wn = document.getElementById('wepName');
+  if (wn) wn.textContent = weaponLabel(INITIAL_WEAPON);
+}
 
 // Кнопка melee — переключает на ближний бой / делает атаку если уже на melee
 const MELEE_ICONS = { fists: '👊', brass: '✊', chain: '⛓', bat: '🏏', blade_short: '🗡', blade_long: '⚔', katana: '⚔' };
@@ -3410,16 +3414,20 @@ function updateMeleeBtn() {
 }
 document.getElementById('meleeBtn').addEventListener('click', () => {
   if (player.hp <= 0) return;
-  // СТЕЛС-КИЛЛ: если есть цель за спиной — мгновенно переключаемся на melee и бьём
+  // СТЕЛС-КИЛЛ: если есть цель за спиной — на миг переключаемся на melee
+  // (для анимации удара ножом/кулаком), бьём, потом возвращаем основное оружие.
   const back = findBackstabTarget();
   if (back) {
-    currentWeapon = lastMeleeWeapon;
-    document.querySelectorAll('.wbtn').forEach(b =>
-      b.classList.toggle('active', b.dataset.wep === lastMeleeWeapon));
-    document.getElementById('wepName').textContent = MELEE_LABELS[lastMeleeWeapon] || lastMeleeWeapon;
+    const prevWeapon = currentWeapon;
+    const cfgCur = WEAPON_FX_CFG[currentWeapon];
+    const switchedToMelee = !(cfgCur && cfgCur.melee);
+    if (switchedToMelee) currentWeapon = lastMeleeWeapon;
     player.fireCD = 0;
     player.angle = Math.atan2(back.r - player.r, back.c - player.c);
-    fireWeapon(player);
+    fireWeapon(player); // внутри — instakill миньона / 40% урона боссу + кровь
+    // Возврат к основному оружию (если ты был на пушке — продолжишь стрелять)
+    if (switchedToMelee) currentWeapon = prevWeapon;
+    document.getElementById('wepName').textContent = weaponLabel(currentWeapon);
     return;
   }
   const curCfg = WEAPON_FX_CFG[currentWeapon];
@@ -3430,12 +3438,9 @@ document.getElementById('meleeBtn').addEventListener('click', () => {
       fireWeapon(player);
     }
   } else {
-    // переключение на melee
-    document.querySelectorAll('.wbtn').forEach(b => {
-      b.classList.toggle('active', b.dataset.wep === lastMeleeWeapon);
-    });
+    // переключение на melee (с экипированной пушки на кулаки/холодное)
     currentWeapon = lastMeleeWeapon;
-    document.getElementById('wepName').textContent = MELEE_LABELS[lastMeleeWeapon] || lastMeleeWeapon;
+    document.getElementById('wepName').textContent = weaponLabel(lastMeleeWeapon);
   }
 });
 
@@ -3502,14 +3507,18 @@ document.getElementById('rerollBtn').addEventListener('click', () => {
   savePlayerLook(player.look);
 });
 document.getElementById('resetBtn').addEventListener('click', () => {
-  enemies[0].hp = enemies[0].hpMax; enemies[0].r = SPAWNS.boss[0]; enemies[0].c = SPAWNS.boss[1];
+  // Босс — обратно в кабинет
+  enemies[0].hp = enemies[0].hpMax;
+  enemies[0].r = SPAWNS.boss[0]; enemies[0].c = SPAWNS.boss[1];
+  enemies[0].confined = _roomBounds();
+  // Миньоны — на свои стартовые позиции, первые N — охрана в кабинете
   for (let i = 1; i < enemies.length; i++) {
     enemies[i].hp = enemies[i].hpMax;
     enemies[i].look = rndLook();
+    const pos = SPAWNS.minions[i - 1];
+    if (pos) { enemies[i].r = pos[0]; enemies[i].c = pos[1]; }
+    enemies[i].confined = (i - 1 < SPAWNS.guardsInside) ? _roomBounds() : null;
   }
-  if (enemies[1]) { enemies[1].r = SPAWNS.minions[0][0]; enemies[1].c = SPAWNS.minions[0][1]; }
-  if (enemies[2]) { enemies[2].r = SPAWNS.minions[1][0]; enemies[2].c = SPAWNS.minions[1][1]; }
-  if (enemies[3]) { enemies[3].r = SPAWNS.minions[2][0]; enemies[3].c = SPAWNS.minions[2][1]; }
   enemies.forEach(e => {
     e.aiState = 'patrol'; e.targetR = null; e.targetC = null;
     e.repositionT = 0; e.fireCD = 0;
@@ -3745,6 +3754,10 @@ function loop(t) {
 }
 
 resize();
+// Снэп камеры на игрока — на крупных картах с дальним спавном иначе
+// первые кадры (катсцена паузит update) показывали бы пустоту.
+cam.x = (player.c - player.r) * TS * 0.5;
+cam.y = (player.c + player.r) * TS * 0.5 * ISO_Y;
 initCoverHP();
 updateMeleeBtn();
 // Сохраняем оригинальную карту для респа
@@ -3757,10 +3770,6 @@ const MAP_ORIGINAL = MAP.map(row => row.slice());
   document.getElementById('catBossName').textContent  = BOSS_CFG.name;
   document.getElementById('catBossHP').textContent    = '❤️ ' + BOSS_CFG.hp + ' HP';
   document.getElementById('catQuote').textContent     = '«' + BOSS_CFG.quote + '»';
-  // подсвечиваем нужное оружие в топбаре
-  document.querySelectorAll('.wbtn').forEach(b => {
-    b.classList.toggle('active', b.dataset.wep === INITIAL_WEAPON);
-  });
   const cat = document.getElementById('catscene');
   const startGame = (mode) => {
     cat.style.display = 'none';
