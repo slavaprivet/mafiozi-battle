@@ -80,21 +80,26 @@ body {
   background: linear-gradient(90deg, transparent, var(--gold), transparent);
 }
 
-/* ── WANTED indicator inside hero-card (top-right corner) ── */
-.hero-wanted {
-  position: absolute;
-  top: 10px;
-  right: 10px;
+/* ── WANTED indicator inside hero-info (рядом с рангом) ── */
+.hero-meta-row {
   display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.hero-meta-row .hero-rank { margin-bottom: 0; }
+.hero-wanted {
+  display: inline-flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 5px 7px;
-  border-radius: 10px;
+  gap: 2px;
+  padding: 3px 7px;
+  border-radius: 8px;
   background: rgba(10, 10, 24, 0.55);
-  border: 1px solid #ffffff14;
+  border: 1px solid #ffffff18;
   cursor: pointer;
-  z-index: 3;
   transition: background .15s, border-color .15s, transform .15s;
+  line-height: 1;
 }
 .hero-wanted:hover, .hero-wanted:active {
   background: rgba(255, 255, 255, 0.08);
@@ -103,8 +108,8 @@ body {
 }
 .hero-wanted-row {
   display: flex;
-  gap: 2px;
-  font-size: 13px;
+  gap: 1px;
+  font-size: 11px;
   line-height: 1;
 }
 .hero-wanted-slot {
@@ -115,12 +120,12 @@ body {
 .hero-wanted-slot.active.cop {
   opacity: 1;
   filter: none;
-  text-shadow: 0 0 6px #ffd76b, 0 0 12px #e8c96e80;
+  text-shadow: 0 0 5px #ffd76b, 0 0 10px #e8c96e80;
 }
 .hero-wanted-slot.active.gang {
   opacity: 1;
   filter: none;
-  text-shadow: 0 0 6px #ff5050, 0 0 12px #ff404080;
+  text-shadow: 0 0 5px #ff5050, 0 0 10px #ff404080;
 }
 
 /* ── WANTED INFO modal ── */
@@ -185,8 +190,313 @@ body {
   cursor: pointer;
   margin-top: 4px;
 }
-.hero-info { padding-right: 56px; }
 
+/* ── EVENT MODAL (случайные события по игровому времени) ── */
+.event-modal-bg {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.78);
+  z-index: 10000;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.event-modal-bg.open { display: flex; }
+.event-modal-box {
+  background: linear-gradient(135deg, #1a1a2e, #12122a);
+  border: 2px solid var(--gold);
+  border-radius: 16px;
+  padding: 22px 22px 18px;
+  max-width: 360px;
+  width: 100%;
+  color: #fff;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.7);
+  animation: eventModalIn 0.25s cubic-bezier(.4,1.7,.5,1);
+}
+@keyframes eventModalIn {
+  from { transform: scale(0.85); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+.event-modal-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--gold);
+  margin-bottom: 14px;
+  text-align: center;
+  letter-spacing: 1px;
+}
+.event-modal-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #e8e8f0;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.event-modal-effects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+.event-modal-effect {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid #ffffff14;
+}
+.event-modal-effect.pos { color: #5be58a; border-color: #5be58a44; }
+.event-modal-effect.neg { color: #ff7070; border-color: #ff707044; }
+.event-modal-warn {
+  text-align: center;
+  font-size: 13px;
+  color: #ff5050;
+  font-weight: 700;
+  margin-bottom: 12px;
+  padding: 8px;
+  background: rgba(255,80,80,0.10);
+  border: 1px solid #ff505044;
+  border-radius: 8px;
+}
+.event-modal-warn.cap { color: #ffa040; background: rgba(255,160,64,0.10); border-color: #ffa04044; }
+.event-modal-close {
+  width: 100%;
+  padding: 12px;
+  background: var(--gold);
+  color: #1a1a2e;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* ── JOBS TABS (Работа / Мой бизнес) ── */
+.jobs-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--bg2);
+}
+.jobs-tab {
+  flex: 1;
+  padding: 10px 12px;
+  background: var(--bg3);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .15s;
+}
+.jobs-tab.active {
+  background: linear-gradient(180deg, var(--gold) 0%, var(--gold2) 100%);
+  color: #1a1208;
+  border-color: var(--gold);
+}
+
+/* ── BUSINESS CARDS (Мой бизнес) ── */
+.biz-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin: 12px;
+  transition: border-color .2s;
+}
+.biz-card.owned   { border-color: var(--gold); }
+.biz-card.burned  { border-color: #ff5050; opacity: 0.9; }
+.biz-card.blocked { border-color: #ffa040; opacity: 0.9; }
+.biz-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.biz-emoji { font-size: 32px; line-height: 1; }
+.biz-info { flex: 1; min-width: 0; }
+.biz-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.biz-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.biz-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.biz-chip {
+  padding: 4px 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--text);
+}
+.biz-chip.income { color: var(--gold); border-color: #e8c96e44; }
+.biz-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 6px;
+}
+.biz-btn {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  background: linear-gradient(180deg, var(--gold), var(--gold2));
+  color: #1a1208;
+}
+.biz-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.biz-btn.collect { background: linear-gradient(180deg, #4caf50, #388e3c); color: #fff; }
+.biz-btn.restore { background: linear-gradient(180deg, #ff7043, #d84315); color: #fff; }
+.biz-status-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+.biz-status-badge.ok      { background: rgba(76,175,80,0.20);  color: #4caf50; }
+.biz-status-badge.blocked { background: rgba(255,160,64,0.20); color: #ffa040; }
+.biz-status-badge.burned  { background: rgba(255,80,80,0.25);  color: #ff5050; }
+
+/* ── SHOP / INVENTORY ── */
+.shop-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--bg2);
+  flex-wrap: wrap;
+}
+.shop-cash-chip { color: var(--gold); }
+.shop-cash-chip.dia { color: #6ee0ff; }
+.shop-card, .inv-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  margin: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.shop-card.equipped, .inv-card.equipped {
+  border-color: var(--gold);
+  background: linear-gradient(135deg, var(--bg3) 0%, #2a2010 100%);
+}
+.shop-icon, .inv-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+  width: 42px;
+  text-align: center;
+}
+.shop-info, .inv-info { flex: 1; min-width: 0; }
+.shop-name, .inv-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 2px;
+}
+.shop-desc, .inv-desc {
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+.shop-stats, .inv-stats {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+.shop-stat-chip {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.shop-stat-chip.atk { color: #ff7070; border-color: #ff707044; }
+.shop-stat-chip.def { color: #6ec5ff; border-color: #6ec5ff44; }
+.shop-stat-chip.heal{ color: #5be58a; border-color: #5be58a44; }
+.shop-actions, .inv-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.shop-btn, .inv-btn {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  background: linear-gradient(180deg, var(--gold), var(--gold2));
+  color: #1a1208;
+  white-space: nowrap;
+  min-width: 90px;
+}
+.shop-btn:disabled, .inv-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.inv-btn.equip   { background: linear-gradient(180deg, #4caf50, #388e3c); color: #fff; }
+.inv-btn.unequip { background: linear-gradient(180deg, #6c7480, #4a5260); color: #fff; }
+.inv-qty-badge {
+  font-size: 11px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 2px 6px;
+  border-radius: 6px;
+  color: var(--gold);
+}
+.equipped-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, #1c1810, #1a1530);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+.equipped-row .label  { font-size: 11px; color: var(--muted); }
+.equipped-row .name   { font-size: 14px; color: var(--gold); font-weight: 700; }
+.equipped-row .empty  { color: var(--muted); font-style: italic; font-size: 13px; }
+
+/* Hero card — equipped weapon chip */
+.hero-equipped {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text);
+  background: rgba(232, 201, 110, 0.12);
+  border: 1px solid #e8c96e44;
+  padding: 3px 8px;
+  border-radius: 8px;
+}
+.hero-equipped.empty { background: rgba(255,255,255,0.04); border-color: var(--border); color: var(--muted); }
 /* ── AVATAR ── */
 .avatar-wrap {
   position: relative;
@@ -1135,6 +1445,34 @@ body.on-subpage .time-display-box { display: none !important; }
 </div>
 </div>
 
+<!-- RANDOM EVENT MODAL -->
+<div class="event-modal-bg" id="eventModal" onclick="if(event.target===this)closeEventModal()">
+  <div class="event-modal-box">
+    <div class="event-modal-title">⚡ Случайное событие</div>
+    <div class="event-modal-text" id="event-modal-text">—</div>
+    <div class="event-modal-effects" id="event-modal-effects"></div>
+    <div class="event-modal-warn"     id="event-modal-jail" style="display:none">🚔 Тебя забрали в тюрьму!</div>
+    <div class="event-modal-warn cap" id="event-modal-cap"  style="display:none">⛓ Тебя взяли в плен банды!</div>
+    <button class="event-modal-close" onclick="closeEventModal()">Понял</button>
+  </div>
+</div>
+
+<!-- WANTED INFO MODAL -->
+<div class="wanted-modal-bg" id="wantedInfoModal" onclick="if(event.target===this)closeWantedInfo()">
+  <div class="wanted-modal-box">
+    <div class="wanted-modal-title">⚠️ Кто тебя ищет</div>
+    <div class="wanted-modal-section">
+      <div class="wanted-modal-row">🚓 Розыск копов <span class="count" id="wanted-modal-cops">0/3</span></div>
+      <div class="wanted-modal-desc">Чем больше звёзд — тем активнее ищет полиция. На 3 звёздах попадаешь в тюрьму. Снижается со временем, либо избавься от компромата.</div>
+    </div>
+    <div class="wanted-modal-section">
+      <div class="wanted-modal-row">👊 Розыск банд <span class="count" id="wanted-modal-gangs">0/3</span></div>
+      <div class="wanted-modal-desc">Соперничающие банды держат на тебя зуб. На 3 кулаках готовь к серьёзному наезду — отнять могут часть денег. Снижается со временем.</div>
+    </div>
+    <button class="wanted-modal-close" onclick="closeWantedInfo()">Закрыть</button>
+  </div>
+</div>
+
 <div id="page-main">
 
 <!-- TOP BAR -->
@@ -1154,7 +1492,13 @@ body.on-subpage .time-display-box { display: none !important; }
   </div>
   <div class="hero-info">
     <div class="hero-name" id="hero-name">—</div>
-    <div class="hero-rank" id="hero-rank">Ранг 1</div>
+    <div class="hero-meta-row">
+      <div class="hero-rank" id="hero-rank">Ранг 1</div>
+      <div class="hero-wanted" id="hero-wanted-box" onclick="event.stopPropagation(); openWantedInfo();" title="Кто тебя ищет">
+        <div class="hero-wanted-row" id="hero-wanted-cops"></div>
+        <div class="hero-wanted-row" id="hero-wanted-gangs"></div>
+      </div>
+    </div>
 
     <div class="stat-row">
       <div class="stat-label"><span>❤️ Здоровье</span><span id="hp-val">—</span></div>
@@ -1176,6 +1520,9 @@ body.on-subpage .time-display-box { display: none !important; }
         <span class="val" id="dia-val">0</span>
         <span class="lbl">Брилл. <span style="font-size:9px;opacity:.6">+</span></span>
       </div>
+    </div>
+    <div class="hero-equipped empty" id="hero-equipped" onclick="event.stopPropagation(); nav('inventory')" title="Открыть инвентарь">
+      <span id="hero-equipped-text">🚫 Без оружия</span>
     </div>
   </div>
 </div>
@@ -1296,6 +1643,19 @@ body.on-subpage .time-display-box { display: none !important; }
   </div>
 </div>
 
+<!-- ══ SUB-PAGE: ХАБ ЛОКАЦИИ "РЫНОК" (open world) ══ -->
+<div id="page-market-hub" class="subpage" style="display:none">
+  <div style="position:fixed;inset:0;background:#0b0d12;overflow:hidden;touch-action:none;user-select:none">
+    <canvas id="mh-canvas" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+    <button onclick="exitMarketHub()" style="position:absolute;left:10px;top:10px;z-index:5;padding:8px 14px;background:rgba(0,0,0,.6);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:8px;font-size:13px;cursor:pointer">← Назад</button>
+    <div id="mh-hud" style="position:absolute;right:10px;top:10px;z-index:5;padding:6px 10px;background:rgba(0,0,0,.55);color:#fff;border-radius:8px;font-size:11px">🏪 Рынок<br><span id="mh-fps">0</span> fps</div>
+    <div id="mh-joy-base" style="position:absolute;width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.12);pointer-events:none;opacity:0;transition:opacity .15s;z-index:4">
+      <div id="mh-joy-knob" style="position:absolute;width:46px;height:46px;left:50%;top:50%;margin-left:-23px;margin-top:-23px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,#aab2c8 70%);border:1px solid rgba(0,0,0,.4);box-shadow:0 4px 12px rgba(0,0,0,.5)"></div>
+    </div>
+    <div style="position:absolute;left:10px;bottom:10px;z-index:5;font-size:11px;color:#aab2c8;background:rgba(0,0,0,.4);padding:6px 10px;border-radius:8px;pointer-events:none">Жми в любое место и тащи — ходить</div>
+  </div>
+</div>
+
 <!-- ══ SUB-PAGE: БИТВА ══ -->
 <div id="page-battle" class="subpage" style="display:none">
   <div class="tac-screen" id="tac-screen">
@@ -1384,8 +1744,41 @@ body.on-subpage .time-display-box { display: none !important; }
     <button class="back-btn" onclick="goBack()">← Назад</button>
     <div class="subpage-title">💼 Работа</div>
   </div>
-  <div id="jobs-status"></div>
-  <div id="jobs-list" class="jobs-list"></div>
+  <div class="jobs-tabs">
+    <button class="jobs-tab active" data-tab="work" onclick="switchJobsTab('work')">💼 Работа</button>
+    <button class="jobs-tab"        data-tab="biz"  onclick="switchJobsTab('biz')">🏢 Мой бизнес</button>
+  </div>
+  <div id="jobs-tab-work">
+    <div id="jobs-status"></div>
+    <div id="jobs-list" class="jobs-list"></div>
+  </div>
+  <div id="jobs-tab-biz" style="display:none">
+    <div id="biz-cash" style="padding:8px 14px;color:var(--gold);font-weight:700"></div>
+    <div id="biz-list"></div>
+  </div>
+</div>
+
+<div id="page-shop" class="subpage" style="display:none">
+  <div class="subpage-header">
+    <button class="back-btn" onclick="goBack()">← Назад</button>
+    <div class="subpage-title">🏪 Чёрный рынок</div>
+  </div>
+  <div class="shop-tabs">
+    <button class="jobs-tab active" data-shop-tab="weapon" onclick="switchShopTab('weapon')">🔫 Оружие</button>
+    <button class="jobs-tab"        data-shop-tab="armor"  onclick="switchShopTab('armor')">🛡 Броня</button>
+    <button class="jobs-tab"        data-shop-tab="potion" onclick="switchShopTab('potion')">💊 Расходники</button>
+  </div>
+  <div id="shop-cash" style="padding:8px 14px;font-weight:700;display:flex;gap:14px"></div>
+  <div id="shop-list"></div>
+</div>
+
+<div id="page-inventory" class="subpage" style="display:none">
+  <div class="subpage-header">
+    <button class="back-btn" onclick="goBack()">← Назад</button>
+    <div class="subpage-title">🎒 Барахло</div>
+  </div>
+  <div id="inv-equipped" style="padding:10px 14px"></div>
+  <div id="inv-list"></div>
 </div>
 
 <div id="page-bot" class="subpage" style="display:none">
@@ -1658,25 +2051,95 @@ function renderStatusBar(){
     }
     sb.appendChild(chip);
   }
-  // Wanted by cops
-  if ((DATA.wanted || 0) > 0) {
-    const chip = document.createElement('div');
-    chip.className = 'status-chip active';
-    chip.style.color = '#ff4444';
-    chip.style.borderColor = '#ff444444';
-    chip.textContent = `🚓 Розыск копов: ${'⭐'.repeat(DATA.wanted)}/3`;
-    sb.appendChild(chip);
-  }
-  // Wanted by gangs
-  if ((DATA.wanted_g || 0) > 0) {
-    const chip = document.createElement('div');
-    chip.className = 'status-chip active';
-    chip.style.color = '#ff8888';
-    chip.style.borderColor = '#ff888844';
-    chip.textContent = `👊 Розыск банд: ${'👊'.repeat(DATA.wanted_g)}/3`;
-    sb.appendChild(chip);
-  }
+  // Розыск перенесён в карточку героя (правый верхний угол) — см. renderHeroWanted()
+  renderHeroWanted();
 }
+
+// ── EQUIPPED WEAPON chip in hero-card ─────────────────────────────────
+const WEAPON_DISPLAY = {
+  zatochka:    '🔪 Заточка',
+  nagan:       '🔫 Наган',
+  sawn_off:    '💥 Обрез',
+  uzi:         '🔫 Узи',
+  golden_colt: '🌟 Золотой Кольт',
+  revolver:    '🔫 Револьвер',
+  machete:     '🗡️ Мачете',
+  katana:      '⚔️ Катана',
+  spiked_bat:  '🏏 Бита с гвоздями',
+  deagle:      '🦅 Дезерт Игл',
+  sniper:      '🎯 Снайперка',
+  m16:         '💥 М-16',
+  rpg:         '🚀 Базука',
+  golden_uzi:  '🌟 Золотой Узи',
+  tommy_gun:   '🔥 Томми Ган',
+  knuckles:    '🥊 Кастет',
+  chain:       '⛓️ Цепь',
+  tt_pistol:   '🔫 Пистолет ТТ',
+  shotgun:     '💣 Дробовик',
+  ak74:        '🎯 АК-74',
+};
+function renderHeroEquipped() {
+  const el  = document.getElementById('hero-equipped');
+  const txt = document.getElementById('hero-equipped-text');
+  if (!el || !txt) return;
+  const w = DATA.weapon;
+  if (!w) {
+    el.classList.add('empty');
+    txt.textContent = '🚫 Без оружия';
+    return;
+  }
+  el.classList.remove('empty');
+  txt.textContent = DATA.weaponName || WEAPON_DISPLAY[w] || `🔫 ${w}`;
+}
+renderHeroEquipped();
+// При обновлении DATA через refreshHero (если есть) — тоже перерисовываем
+(function(){
+  if (typeof refreshHero === 'function') {
+    const _orig = refreshHero;
+    refreshHero = function(){ try { _orig.apply(this, arguments); } catch(e){} try { renderHeroEquipped(); } catch(e){} };
+  } else {
+    window.refreshHero = function(){
+      try { document.getElementById('hp-val').textContent  = `${DATA.hp} / ${DATA.maxhp}`; } catch(e){}
+      try { document.getElementById('mp-val').textContent  = `${DATA.mp} / ${DATA.maxmp}`; } catch(e){}
+      try { document.getElementById('cash-val').textContent = fmtNum(DATA.cash); } catch(e){}
+      try { document.getElementById('dia-val').textContent  = fmtNum(DATA.dia);  } catch(e){}
+      try { const hb=document.getElementById('hp-bar'); if(hb) hb.style.width = Math.min(100, DATA.hp/DATA.maxhp*100).toFixed(1)+'%'; } catch(e){}
+      try { const mb=document.getElementById('mp-bar'); if(mb) mb.style.width = Math.min(100, DATA.mp/DATA.maxmp*100).toFixed(1)+'%'; } catch(e){}
+      try { renderHeroEquipped(); } catch(e){}
+      try { if (typeof renderHeroWanted === 'function') renderHeroWanted(); } catch(e){}
+    };
+  }
+})();
+
+// ── WANTED indicator next to hero-rank ────────────────────────────────
+function renderHeroWanted() {
+  const copsRow  = document.getElementById('hero-wanted-cops');
+  const gangsRow = document.getElementById('hero-wanted-gangs');
+  if (!copsRow || !gangsRow) return;
+  const w  = Math.max(0, Math.min(3, DATA.wanted   || 0));
+  const wg = Math.max(0, Math.min(3, DATA.wanted_g || 0));
+  let copsHtml = '', gangsHtml = '';
+  for (let i = 0; i < 3; i++) {
+    copsHtml  += `<span class="hero-wanted-slot${i < w  ? ' active cop'  : ''}">⭐</span>`;
+    gangsHtml += `<span class="hero-wanted-slot${i < wg ? ' active gang' : ''}">👊</span>`;
+  }
+  copsRow.innerHTML  = copsHtml;
+  gangsRow.innerHTML = gangsHtml;
+}
+function openWantedInfo() {
+  const m = document.getElementById('wantedInfoModal');
+  if (!m) return;
+  const cEl = document.getElementById('wanted-modal-cops');
+  const gEl = document.getElementById('wanted-modal-gangs');
+  if (cEl) cEl.textContent = `${DATA.wanted   || 0}/3`;
+  if (gEl) gEl.textContent = `${DATA.wanted_g || 0}/3`;
+  m.classList.add('open');
+}
+function closeWantedInfo() {
+  const m = document.getElementById('wantedInfoModal');
+  if (m) m.classList.remove('open');
+}
+
 // Initial render
 renderStatusBar();
 
@@ -1688,10 +2151,8 @@ function fmtNum(n) {
 }
 
 // ── SPA Navigation ────────────────────────────────────────────────────
-const CLIENT_PAGES = ['explore', 'district', 'battle', 'character', 'coop', 'donate', 'jobs'];
+const CLIENT_PAGES = ['explore', 'district', 'battle', 'character', 'coop', 'donate', 'jobs', 'shop', 'inventory'];
 const BOT_PAGES = {
-  inventory:   { title: '🎒 Барахло',        icon: '🎒' },
-  shop:        { title: '🏪 Чёрный рынок',   icon: '🏪' },
   gang_menu:   { title: '🔱 Моя банда',       icon: '🔱' },
   diamonds:    { title: '💎 Бриллианты',      icon: '💎' },
   my_contacts: { title: '🤝 Мои связи',       icon: '🤝' },
@@ -1811,6 +2272,8 @@ function nav(dest, extra) {
     if (dest === 'character')  renderCharacter();
     if (dest === 'coop')       renderCoopLobby();
     if (dest === 'jobs')       renderJobs();
+    if (dest === 'shop')       renderShop();
+    if (dest === 'inventory')  renderInventory();
     document.getElementById('page-' + dest).style.display = '';
     document.body.classList.add('on-subpage');
   } else if (BOT_PAGES[dest]) {
@@ -2071,6 +2534,12 @@ function renderDistricts() {
 
 // ── ОТКРЫТЬ СТРАНИЦУ РАЙОНА ───────────────────────────────────────────
 function openDistrict(locId) {
+  // НОВОЕ: рынок → хаб-карта вместо списка боссов
+  if (locId === 'market' && typeof enterMarketHub === 'function') {
+    currentLocId = locId;
+    enterMarketHub();
+    return;
+  }
   currentLocId = locId;
   const loc = LOC_DATA[locId];
   document.getElementById('district-page-title').textContent = loc.icon + ' ' + loc.name;
@@ -2592,6 +3061,446 @@ function _drawName(ctx,vx,vy,TS,label,color){
   ctx.roundRect?ctx.roundRect(bx,by,tw+pad*2,bh,3):ctx.fillRect(bx,by,tw+pad*2,bh);
   ctx.fill();ctx.fillStyle=color;ctx.fillText(label,vx,by+bh-3);ctx.restore();
 }
+// ════════════════════════════════════════════════════════════════════
+// БЛОК CREATOR (drawChar и слои) — копия из creator.html
+// Используется для рендера в market-hub и далее в боёвке
+// ════════════════════════════════════════════════════════════════════
+const HAIR_COLORS_M = ['#1a0e00','#3d2200','#8b6333','#b8860b','#888','#111'];
+const HAIR_COLORS_F = ['#1a0e00','#8b1a1a','#b8860b','#3d2200','#888','#c87050','#e0c080'];
+
+function drawChar(ctx, W, H, opts) {
+  const { gender, skin, body, face, hair, hat, _back } = opts;
+  ctx.clearRect(0, 0, W, H);
+  const cx = W / 2;
+  const sc = Math.min(W, H) / 220;
+  function px(x) { return cx + x * sc; }
+  function py(y) { return H * 0.92 - y * sc; }
+  const skinCol = SKINS[skin] || SKINS[0];
+  if (gender === 0) drawMaleFull(ctx, px, py, sc, skinCol, body, face, hair, hat, !!_back);
+  else              drawFemaleFull(ctx, px, py, sc, skinCol, body, face, hair, hat, !!_back);
+}
+
+function drawMaleFull(ctx, px, py, sc, skinCol, body, face, hair, hat, isBack) {
+  const bodyDefs = [
+    { sw: 34, sh: 80, nw: 14, nh: 22, hw: 26 },
+    { sw: 44, sh: 85, nw: 16, nh: 22, hw: 30 },
+    { sw: 58, sh: 82, nw: 18, nh: 20, hw: 36 },
+    { sw: 52, sh: 92, nw: 16, nh: 24, hw: 32 },
+  ];
+  const bd = bodyDefs[body] || bodyDefs[1];
+  const suitCol = ['#1a1a2e','#1a2e1a','#2e1a1a','#1a1e2e'][body % 4];
+  const tieCol  = ['#c0392b','#e8c96e','#8e44ad','#2980b9'][face % 4];
+  ctx.fillStyle = suitCol;
+  const legW = bd.sw * 0.38; const legH = 55 * sc;
+  ctx.beginPath(); ctx.roundRect(px(-bd.sw*0.22), py(legH), legW*sc, legH, 4*sc); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(px(bd.sw*0.22 - legW), py(legH), legW*sc, legH, 4*sc); ctx.fill();
+  ctx.fillStyle = '#111';
+  [-1,1].forEach(s => { ctx.beginPath(); ctx.ellipse(px(s*bd.sw*0.1), py(2), 10*sc, 5*sc, 0, 0, Math.PI*2); ctx.fill(); });
+  ctx.fillStyle = suitCol;
+  ctx.beginPath(); ctx.roundRect(px(-bd.sw/2), py(bd.sh), bd.sw*sc, bd.sh*sc, [0,0,6*sc,6*sc]); ctx.fill();
+  if (!isBack) {
+    ctx.fillStyle = '#ddd';
+    ctx.beginPath(); ctx.roundRect(px(-7), py(bd.sh), 14*sc, bd.sh*0.7*sc, 2*sc); ctx.fill();
+    ctx.fillStyle = tieCol;
+    ctx.beginPath();
+    ctx.moveTo(px(-5), py(bd.sh-4)); ctx.lineTo(px(5), py(bd.sh-4));
+    ctx.lineTo(px(3), py(bd.sh*0.32)); ctx.lineTo(px(0), py(bd.sh*0.25));
+    ctx.lineTo(px(-3), py(bd.sh*0.32)); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = suitCol;
+    ctx.beginPath(); ctx.moveTo(px(0), py(bd.sh-2)); ctx.lineTo(px(-bd.sw/2), py(bd.sh)); ctx.lineTo(px(-bd.sw/2), py(bd.sh-20)); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(px(0), py(bd.sh-2)); ctx.lineTo(px(bd.sw/2), py(bd.sh)); ctx.lineTo(px(bd.sw/2), py(bd.sh-20)); ctx.closePath(); ctx.fill();
+  }
+  const armLen = body===3?65:60, armW = body===3?13:10;
+  ctx.fillStyle = suitCol;
+  ctx.beginPath(); ctx.roundRect(px(-bd.sw/2-armW*sc+2), py(bd.sh), armW*sc, armLen*sc, 5*sc); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(px(bd.sw/2-2), py(bd.sh), armW*sc, armLen*sc, 5*sc); ctx.fill();
+  ctx.fillStyle = skinCol;
+  ctx.beginPath(); ctx.ellipse(px(-bd.sw/2-armW*sc/2+2), py(armLen-10), 7*sc, 9*sc, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(px(bd.sw/2+armW*sc/2-2), py(armLen-10), 7*sc, 9*sc, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = skinCol;
+  ctx.beginPath(); ctx.roundRect(px(-bd.nw/2), py(bd.sh+bd.nh), bd.nw*sc, bd.nh*sc, 4*sc); ctx.fill();
+  const headH = bd.hw*1.22;
+  const headY = bd.sh + bd.nh + headH;
+  ctx.fillStyle = skinCol;
+  ctx.beginPath(); ctx.ellipse(px(0), py(bd.sh+bd.nh+headH/2), bd.hw/2*sc, headH/2*sc, 0, 0, Math.PI*2); ctx.fill();
+  if (!isBack) { ctx.beginPath(); ctx.ellipse(px(0), py(bd.sh+bd.nh+5), bd.hw/2.2*sc, 10*sc, 0, 0, Math.PI); ctx.fill(); }
+  if (!isBack) {
+    const eyeY = bd.sh + bd.nh + headH*0.55;
+    const eyeSpan = bd.hw*0.22;
+    const mouthY = bd.sh + bd.nh + headH*0.18;
+    drawFaceMFull(ctx, face, px, py, eyeY, eyeSpan, mouthY, bd, sc);
+    if (hair > 0) drawHairMFull(ctx, hair, px, py, bd, headY, headH, sc);
+    if (hat > 0)  drawHatFull(ctx, hat, px, py, bd, headY, headH, sc);
+  }
+}
+
+function drawFemaleFull(ctx, px, py, sc, skinCol, body, face, hair, hat, isBack) {
+  const bodyDefs = [
+    { sw: 30, sh: 78, nw: 12, nh: 20, hw: 24, hip: 32 },
+    { sw: 36, sh: 80, nw: 13, nh: 20, hw: 27, hip: 40 },
+    { sw: 48, sh: 76, nw: 15, nh: 18, hw: 32, hip: 54 },
+    { sw: 34, sh: 85, nw: 13, nh: 22, hw: 26, hip: 38 },
+  ];
+  const bd = bodyDefs[body] || bodyDefs[1];
+  const dressCol = ['#3a1a3a','#1a2a3a','#3a1a1a','#1a3a2a'][body % 4];
+  const accentCol = ['#e8c96e','#c0392b','#8e44ad','#2980b9'][face % 4];
+  ctx.fillStyle = dressCol;
+  ctx.beginPath();
+  ctx.moveTo(px(-bd.sw/2), py(bd.sh)); ctx.lineTo(px(-bd.hip/2), py(0));
+  ctx.lineTo(px(bd.hip/2), py(0)); ctx.lineTo(px(bd.sw/2), py(bd.sh));
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#111';
+  [-1,1].forEach(s => {
+    ctx.beginPath(); ctx.ellipse(px(s*bd.hip*0.18), py(3), 8*sc, 4*sc, 0, 0, Math.PI*2); ctx.fill();
+  });
+  ctx.fillStyle = dressCol;
+  ctx.beginPath();
+  ctx.roundRect(px(-bd.sw/2), py(bd.sh), bd.sw*sc, bd.sh*sc, [0,0,6*sc,6*sc]); ctx.fill();
+  if (!isBack) {
+    ctx.fillStyle = '#f0e8e0';
+    ctx.beginPath(); ctx.roundRect(px(-6), py(bd.sh), 12*sc, bd.sh*0.65*sc, 2*sc); ctx.fill();
+    ctx.fillStyle = accentCol;
+    ctx.beginPath(); ctx.arc(px(-8), py(bd.sh-10), 4*sc, 0, Math.PI*2); ctx.fill();
+  }
+  const armLen = 58, armW = 8;
+  ctx.fillStyle = dressCol;
+  ctx.beginPath(); ctx.roundRect(px(-bd.sw/2-armW*sc+2), py(bd.sh), armW*sc, armLen*sc, 4*sc); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(px(bd.sw/2-2), py(bd.sh), armW*sc, armLen*sc, 4*sc); ctx.fill();
+  ctx.fillStyle = skinCol;
+  ctx.beginPath(); ctx.ellipse(px(-bd.sw/2-armW*sc/2+2), py(armLen-10), 6*sc, 8*sc, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(px(bd.sw/2+armW*sc/2-2), py(armLen-10), 6*sc, 8*sc, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = skinCol;
+  ctx.beginPath(); ctx.roundRect(px(-bd.nw/2), py(bd.sh+bd.nh), bd.nw*sc, bd.nh*sc, 4*sc); ctx.fill();
+  const headH = bd.hw*1.18;
+  const headY = bd.sh + bd.nh + headH;
+  ctx.fillStyle = skinCol;
+  ctx.beginPath(); ctx.ellipse(px(0), py(bd.sh+bd.nh+headH/2), bd.hw/2*sc, headH/2*sc, 0, 0, Math.PI*2); ctx.fill();
+  const eyeY = bd.sh + bd.nh + headH*0.55;
+  const eyeSpan = bd.hw*0.22;
+  const mouthY = bd.sh + bd.nh + headH*0.18;
+  if (!isBack) {
+    drawFaceFFull(ctx, face, px, py, eyeY, eyeSpan, mouthY, bd, sc);
+    if (hair > 0) drawHairFFull(ctx, hair, px, py, bd, headY, headH, sc);
+    if (hat > 0)  drawHatFull(ctx, hat, px, py, bd, headY, headH, sc);
+  }
+}
+
+function drawFaceMFull(ctx, faceId, px, py, eyeY, eyeSpan, mouthY, bd, sc) {
+  const eyeR = 4*sc;
+  ctx.fillStyle = '#fff';
+  [-1,1].forEach(s => { ctx.beginPath(); ctx.ellipse(px(s*eyeSpan), py(eyeY), eyeR*1.3, eyeR, 0, 0, Math.PI*2); ctx.fill(); });
+  ctx.fillStyle = '#1a0a00';
+  [-1,1].forEach(s => { ctx.beginPath(); ctx.arc(px(s*eyeSpan), py(eyeY), eyeR*0.65, 0, Math.PI*2); ctx.fill(); });
+  ctx.strokeStyle = '#333'; ctx.lineWidth = 2*sc; ctx.lineCap = 'round';
+  [-1,1].forEach(s => {
+    ctx.beginPath(); ctx.moveTo(px(s*eyeSpan-8*sc),py(eyeY+9));
+    ctx.lineTo(px(s*eyeSpan+8*sc),py(eyeY+9)); ctx.stroke();
+  });
+  ctx.strokeStyle='#333'; ctx.lineWidth=2*sc;
+  ctx.beginPath(); ctx.moveTo(px(-8),py(mouthY));
+  ctx.quadraticCurveTo(px(0),py(mouthY+3),px(8),py(mouthY)); ctx.stroke();
+}
+
+function drawFaceFFull(ctx, faceId, px, py, eyeY, eyeSpan, mouthY, bd, sc) {
+  const eyeR = 4*sc;
+  ctx.fillStyle='#fff';
+  [-1,1].forEach(s=>{ctx.beginPath();ctx.ellipse(px(s*eyeSpan),py(eyeY),eyeR*1.4,eyeR,0,0,Math.PI*2);ctx.fill();});
+  ctx.fillStyle='#1a0a30';
+  [-1,1].forEach(s=>{ctx.beginPath();ctx.arc(px(s*eyeSpan),py(eyeY),eyeR*0.7,0,Math.PI*2);ctx.fill();});
+  ctx.fillStyle='#c0392b';
+  ctx.beginPath();
+  ctx.moveTo(px(-8),py(mouthY));
+  ctx.quadraticCurveTo(px(0),py(mouthY+4),px(8),py(mouthY));
+  ctx.quadraticCurveTo(px(0),py(mouthY-2),px(-8),py(mouthY));
+  ctx.fill();
+}
+
+function drawHairMFull(ctx, hairId, px, py, bd, headY, headH, sc) {
+  const hc = HAIR_COLORS_M[hairId % HAIR_COLORS_M.length];
+  const hw = bd.hw / 2;
+  ctx.fillStyle = hc;
+  ctx.beginPath();
+  ctx.ellipse(px(0), py(headY), hw*sc, 10*sc, 0, Math.PI, Math.PI*2);
+  ctx.fill();
+}
+
+function drawHairFFull(ctx, hairId, px, py, bd, headY, headH, sc) {
+  const hc = HAIR_COLORS_F[hairId % HAIR_COLORS_F.length];
+  const hw = bd.hw / 2;
+  ctx.fillStyle = hc;
+  ctx.beginPath();
+  ctx.ellipse(px(0), py(headY), hw*sc, 10*sc, 0, Math.PI, Math.PI*2);
+  ctx.fill();
+  if (hairId >= 1) {
+    [-1,1].forEach(s=>{
+      ctx.lineWidth=10*sc; ctx.strokeStyle=hc;
+      ctx.beginPath();
+      ctx.moveTo(px(s*hw),py(headY));
+      ctx.lineTo(px(s*(hw+2)),py(headY-25));
+      ctx.stroke();
+    });
+  }
+}
+
+function drawHatFull(ctx, hatId, px, py, bd, headY, headH, sc) {
+  const hw = bd.hw / 2;
+  if (hatId === 1) {
+    ctx.fillStyle = '#1a0e00';
+    ctx.beginPath(); ctx.ellipse(px(0), py(headY+2), (hw+10)*sc, 5*sc, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(px(-hw+2), py(headY+2+22), (hw*2-4)*sc, 22*sc, 4*sc); ctx.fill();
+    ctx.fillStyle = '#e8c96e';
+    ctx.fillRect(px(-hw+2), py(headY+8), (hw*2-4)*sc, 4*sc);
+  } else if (hatId === 2) {
+    ctx.fillStyle = '#1a2e3a';
+    ctx.beginPath(); ctx.ellipse(px(0), py(headY), hw*sc, 14*sc, 0, Math.PI, Math.PI*2); ctx.fill();
+  } else {
+    ctx.fillStyle = '#3a1a1a';
+    ctx.beginPath(); ctx.ellipse(px(0), py(headY+2), (hw+6)*sc, 4*sc, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(px(-hw), py(headY+18), hw*2*sc, 18*sc, 3*sc); ctx.fill();
+  }
+}
+
+// Кеш спрайтов персонажа
+const SPRITE_W = 110, SPRITE_H = 200;
+const _spriteCache = new Map();
+function getSprite(look) {
+  const key = [look.gender|0, look.skin|0, look.body|0, look.face|0, look.hair|0, look.hat|0].join('.');
+  if (_spriteCache.has(key)) return _spriteCache.get(key);
+  const off = document.createElement('canvas');
+  off.width = SPRITE_W; off.height = SPRITE_H;
+  drawChar(off.getContext('2d'), SPRITE_W, SPRITE_H, look);
+  _spriteCache.set(key, off);
+  return off;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// MARKET HUB — открытый мир рынка (изометрия)
+// ════════════════════════════════════════════════════════════════════
+let mhState = null;
+
+function enterMarketHub() {
+  document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
+  document.getElementById('page-market-hub').style.display = '';
+  if (tg && tg.BackButton) { tg.BackButton.offClick(goBack); tg.BackButton.onClick(exitMarketHub); tg.BackButton.show(); }
+  window.scrollTo(0, 0);
+
+  const canvas = document.getElementById('mh-canvas');
+  const COLS = 16, ROWS = 16;
+  mhState = {
+    canvas, ctx: canvas.getContext('2d'),
+    COLS, ROWS, TS: 60, ISO_Y: 0.5, dpr: 1,
+    player: { r: ROWS/2, c: COLS/2, angle: -Math.PI/2, walkPhase: 0, moving: false },
+    cam: { x: 0, y: 0 },
+    joy: { active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0 },
+    last: performance.now(), fpsAcc: 0, fpsLast: performance.now(),
+    raf: null,
+  };
+  mhResize();
+  mhBindInput();
+  mhState.raf = requestAnimationFrame(mhLoop);
+  window.addEventListener('resize', mhResize);
+}
+
+function exitMarketHub() {
+  if (mhState) {
+    if (mhState.raf) cancelAnimationFrame(mhState.raf);
+    window.removeEventListener('resize', mhResize);
+    mhUnbindInput();
+    mhState = null;
+  }
+  document.getElementById('page-market-hub').style.display = 'none';
+  // вернуться в обычную карту районов
+  if (typeof showDistricts === 'function') showDistricts();
+  else navDistrict('back');
+  if (tg && tg.BackButton) { tg.BackButton.offClick(exitMarketHub); tg.BackButton.hide(); }
+}
+
+function mhResize() {
+  if (!mhState) return;
+  const canvas = mhState.canvas;
+  const w = window.innerWidth, h = window.innerHeight;
+  mhState.dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.floor(w * mhState.dpr);
+  canvas.height = Math.floor(h * mhState.dpr);
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  mhState.ctx.setTransform(mhState.dpr, 0, 0, mhState.dpr, 0, 0);
+  const mapDiagonal = (mhState.COLS + mhState.ROWS) * 0.5;
+  mhState.TS = Math.max(40, Math.min(80, Math.min(w / mapDiagonal, h / (mapDiagonal * mhState.ISO_Y) * 0.55)));
+}
+
+// world (r,c) → screen
+function mhW2S(r, c) {
+  const s = mhState;
+  const w = s.canvas.width / s.dpr, h = s.canvas.height / s.dpr;
+  return {
+    x: w/2 + (c - r) * s.TS * 0.5 - s.cam.x,
+    y: h/2 + (c + r) * s.TS * 0.5 * s.ISO_Y - s.cam.y
+  };
+}
+
+function mhDrawTile(r, c) {
+  const s = mhState, ctx = s.ctx;
+  const p = mhW2S(r, c);
+  const wx = s.TS * 0.5, wy = s.TS * 0.5 * s.ISO_Y;
+  ctx.beginPath();
+  ctx.moveTo(p.x,       p.y - wy);
+  ctx.lineTo(p.x + wx,  p.y);
+  ctx.lineTo(p.x,       p.y + wy);
+  ctx.lineTo(p.x - wx,  p.y);
+  ctx.closePath();
+  const dark = (r + c) % 2 === 0;
+  ctx.fillStyle = dark ? '#252535' : '#2a2a3e';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,.3)';
+  ctx.lineWidth = 1; ctx.stroke();
+}
+
+function mhDrawPlayer() {
+  const s = mhState, ctx = s.ctx, p = s.player;
+  const pos = mhW2S(p.r, p.c);
+  const TS = s.TS, ISO_Y = s.ISO_Y;
+  const bob = Math.sin(p.walkPhase) * 2.5;
+  // тень
+  ctx.fillStyle = 'rgba(0,0,0,.55)';
+  ctx.beginPath();
+  ctx.ellipse(pos.x, pos.y + 2, TS * 0.18, TS * 0.5 * ISO_Y * 0.6, 0, 0, Math.PI*2);
+  ctx.fill();
+  // спрайт
+  const look = { gender:DATA.gender|0, skin:DATA.skin|0, body:DATA.body|0, face:DATA.face|0, hair:DATA.hair|0, hat:DATA.hat|0 };
+  const sprite = getSprite(look);
+  const sh = TS * 1.7;
+  const sw = sh * (SPRITE_W / SPRITE_H);
+  ctx.drawImage(sprite, Math.round(pos.x - sw/2), Math.round(pos.y - sh*0.94 + bob), sw, sh);
+}
+
+function mhRender() {
+  const s = mhState, ctx = s.ctx;
+  if (!ctx) return;
+  const w = s.canvas.width / s.dpr, h = s.canvas.height / s.dpr;
+  ctx.fillStyle = '#0b0d12';
+  ctx.fillRect(0, 0, w, h);
+  // пол
+  for (let r = 0; r < s.ROWS; r++)
+    for (let c = 0; c < s.COLS; c++)
+      mhDrawTile(r, c);
+  // игрок
+  mhDrawPlayer();
+}
+
+function mhUpdate(dt) {
+  const s = mhState, p = s.player;
+  const speed = 4;
+  if (s.joy.active && (Math.abs(s.joy.dx) > 0.1 || Math.abs(s.joy.dy) > 0.1)) {
+    // экран → мир (обратно изометрии)
+    const d = s.joy.dx, ss = s.joy.dy / s.ISO_Y;
+    const dc = (ss + d) * 0.5;
+    const dr = (ss - d) * 0.5;
+    const mag = Math.hypot(dr, dc) || 1;
+    p.r += (dr / mag) * speed * dt;
+    p.c += (dc / mag) * speed * dt;
+    p.r = Math.max(0.5, Math.min(s.ROWS - 0.5, p.r));
+    p.c = Math.max(0.5, Math.min(s.COLS - 0.5, p.c));
+    p.angle = Math.atan2(dr, dc);
+    p.walkPhase += dt * 10;
+    p.moving = true;
+  } else {
+    p.moving = false;
+    p.walkPhase *= 0.9;
+  }
+  // камера за игроком
+  const tx = (p.c - p.r) * s.TS * 0.5;
+  const ty = (p.c + p.r) * s.TS * 0.5 * s.ISO_Y;
+  const lerp = 1 - Math.pow(0.001, dt);
+  s.cam.x += (tx - s.cam.x) * lerp;
+  s.cam.y += (ty - s.cam.y) * lerp;
+}
+
+function mhLoop(t) {
+  if (!mhState) return;
+  const s = mhState;
+  const dt = Math.min(0.05, (t - s.last) / 1000);
+  s.last = t;
+  mhUpdate(dt);
+  mhRender();
+  s.fpsAcc++;
+  if (t - s.fpsLast > 500) {
+    const fpsEl = document.getElementById('mh-fps');
+    if (fpsEl) fpsEl.textContent = Math.round(s.fpsAcc / ((t - s.fpsLast) / 1000));
+    s.fpsAcc = 0; s.fpsLast = t;
+  }
+  s.raf = requestAnimationFrame(mhLoop);
+}
+
+// ── Управление ──
+const JOY_RADIUS = 55;
+function mhStartTouch(x, y, id) {
+  if (!mhState || mhState.joy.active) return;
+  mhState.joy.active = true; mhState.joy.id = id;
+  mhState.joy.ox = x; mhState.joy.oy = y;
+  mhState.joy.dx = 0; mhState.joy.dy = 0;
+  const base = document.getElementById('mh-joy-base');
+  if (base) {
+    base.style.left = (x - 55) + 'px';
+    base.style.top = (y - 55) + 'px';
+    base.style.opacity = '1';
+    document.getElementById('mh-joy-knob').style.transform = 'translate(0,0)';
+  }
+}
+function mhMoveTouch(x, y, id) {
+  if (!mhState || !mhState.joy.active || mhState.joy.id !== id) return;
+  let dx = x - mhState.joy.ox, dy = y - mhState.joy.oy;
+  const d = Math.hypot(dx, dy);
+  if (d > JOY_RADIUS) { dx = dx / d * JOY_RADIUS; dy = dy / d * JOY_RADIUS; }
+  mhState.joy.dx = dx / JOY_RADIUS; mhState.joy.dy = dy / JOY_RADIUS;
+  const knob = document.getElementById('mh-joy-knob');
+  if (knob) knob.style.transform = `translate(${dx}px, ${dy}px)`;
+}
+function mhEndTouch(id) {
+  if (!mhState || !mhState.joy.active || mhState.joy.id !== id) return;
+  mhState.joy.active = false; mhState.joy.dx = 0; mhState.joy.dy = 0;
+  const base = document.getElementById('mh-joy-base');
+  if (base) base.style.opacity = '0';
+}
+let _mhTouchHandlers = null;
+function mhBindInput() {
+  const page = document.getElementById('page-market-hub');
+  const onTouchStart = (e) => {
+    e.preventDefault();
+    for (const t of e.changedTouches) mhStartTouch(t.clientX, t.clientY, t.identifier);
+  };
+  const onTouchMove = (e) => {
+    e.preventDefault();
+    for (const t of e.changedTouches) mhMoveTouch(t.clientX, t.clientY, t.identifier);
+  };
+  const onTouchEnd = (e) => {
+    for (const t of e.changedTouches) mhEndTouch(t.identifier);
+  };
+  const onMouseDown = (e) => mhStartTouch(e.clientX, e.clientY, 'mouse');
+  const onMouseMove = (e) => mhMoveTouch(e.clientX, e.clientY, 'mouse');
+  const onMouseUp   = ()  => mhEndTouch('mouse');
+  page.addEventListener('touchstart', onTouchStart, { passive: false });
+  page.addEventListener('touchmove',  onTouchMove,  { passive: false });
+  page.addEventListener('touchend',   onTouchEnd);
+  page.addEventListener('touchcancel',onTouchEnd);
+  page.addEventListener('mousedown',  onMouseDown);
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup',  onMouseUp);
+  _mhTouchHandlers = { page, onTouchStart, onTouchMove, onTouchEnd, onMouseDown, onMouseMove, onMouseUp };
+}
+function mhUnbindInput() {
+  if (!_mhTouchHandlers) return;
+  const h = _mhTouchHandlers;
+  h.page.removeEventListener('touchstart', h.onTouchStart);
+  h.page.removeEventListener('touchmove',  h.onTouchMove);
+  h.page.removeEventListener('touchend',   h.onTouchEnd);
+  h.page.removeEventListener('touchcancel',h.onTouchEnd);
+  h.page.removeEventListener('mousedown',  h.onMouseDown);
+  window.removeEventListener('mousemove', h.onMouseMove);
+  window.removeEventListener('mouseup',   h.onMouseUp);
+  _mhTouchHandlers = null;
+}
+
 function tacDrawPlayerChar(ctx,vx,vy,TS,charData,phase){
   const sk=TAC_SKINS[Math.min(4,(charData.skin||0))];
   const hr=TAC_HAIR[(charData.hair||0)%TAC_HAIR.length];
@@ -4207,6 +5116,8 @@ function afterBattle(stayInDistrict, fromButton) {
       }
     }, 2500);
   }
+  // После боя — шанс получить событие «копы заинтересовались» / «банда жалуется»
+  setTimeout(()=>{ try { if (typeof eventTick === 'function') eventTick({postBattle: true}); } catch(e){} }, 1500);
 }
 
 // ── TOAST NOTIFICATION ────────────────────────────────────────────────
@@ -4761,34 +5672,770 @@ drawAvatar();
 </script>
 
 <script>
-let gameHour = 12;
+// Игровое время: 1 реальная секунда = 1 игровая минута → 60 секунд = 1 игровой час
+let gameMinutes   = 12 * 60;  // стартуем с 12:00
+let gameHour      = 12;       // оставляем для обратной совместимости с другими функциями
+let _lastEventHour = 12;      // следим за сменой часа для тика событий
 
 function updateGameClock(){
-const timeEl = document.getElementById('gameClock');
-const emojiEl = document.getElementById('timeEmoji');
+  const timeEl  = document.getElementById('gameClock');
+  const emojiEl = document.getElementById('timeEmoji');
+  const h = Math.floor(gameMinutes / 60) % 24;
+  const m = gameMinutes % 60;
+  gameHour = h;
 
-timeEl.innerText = String(gameHour).padStart(2,'0') + ':00';
+  if (timeEl)  timeEl.innerText  = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+  if (emojiEl) {
+    if      (h >= 6  && h < 12) emojiEl.innerText = '🌅';
+    else if (h >= 12 && h < 18) emojiEl.innerText = '☀️';
+    else if (h >= 18 && h < 22) emojiEl.innerText = '🌆';
+    else                        emojiEl.innerText = '🌙';
+  }
 
-if(gameHour >= 6 && gameHour < 12){
-emojiEl.innerText = '🌅';
-}else if(gameHour >= 12 && gameHour < 18){
-emojiEl.innerText = '☀️';
-}else if(gameHour >= 18 && gameHour < 22){
-emojiEl.innerText = '🌆';
-}else{
-emojiEl.innerText = '🌙';
+  // События — только при смене ЧАСА (не чаще раза в реальную минуту)
+  if (h !== _lastEventHour) {
+    _lastEventHour = h;
+    try { if (typeof eventTick === 'function') eventTick(); } catch(e) {}
+  }
+
+  gameMinutes = (gameMinutes + 1) % 1440;  // +1 игровая минута
 }
 
-gameHour++;
-if(gameHour >= 24) gameHour = 0;
-}
-
-setInterval(updateGameClock,60000);
+setInterval(updateGameClock, 1000);  // тик каждую реальную секунду
 updateGameClock();
 
 function toggleTimeInfo(){
 const modal = document.getElementById('timeInfoModal');
 modal.style.display = modal.style.display === 'flex' ? 'none' : 'flex';
+}
+
+// ── СЛУЧАЙНЫЕ СОБЫТИЯ (по тику игрового времени) ─────────────────────
+function getCurrentPhase() {
+  // Час, который ТОЛЬКО ЧТО показали (gameHour уже инкрементирован)
+  const h = (typeof gameHour === 'number' ? (gameHour - 1 + 24) % 24 : 12);
+  if (h >= 6  && h < 12) return 'morning';
+  if (h >= 12 && h < 18) return 'day';
+  if (h >= 18 && h < 22) return 'evening';
+  return 'night';
+}
+function isInBattleOrMinigame() {
+  // Бой (page-battle видим)
+  const pb = document.getElementById('page-battle');
+  if (pb && getComputedStyle(pb).display !== 'none') return true;
+  // Уже открыт модал события — не стакаем
+  const em = document.getElementById('eventModal');
+  if (em && em.classList.contains('open')) return true;
+  // Мини-апп открыт но мы на саб-странице с активной логикой?
+  // Покрываем основной кейс: если открыт оверлей результата боя.
+  const tr = document.getElementById('tac-result');
+  if (tr && getComputedStyle(tr).display === 'flex') return true;
+  return false;
+}
+function eventTick(opts) {
+  opts = opts || {};
+  if (!opts.postBattle && isInBattleOrMinigame()) return;
+  const api = (typeof DATA !== 'undefined' && DATA.api) ? DATA.api : '';
+  const uid = (typeof jobUidStr === 'function') ? jobUidStr() : '';
+  if (!api || !uid) return;
+  const phase = getCurrentPhase();
+  fetch(`${api}/event/${uid}/tick`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phase: phase, post_battle: !!opts.postBattle }),
+  }).then(r => r.json()).then(j => {
+    if (!j || !j.ok || !j.event) return;
+    showEventModal(j);
+    // Обновляем DATA из ответа сервера
+    if (j.state) {
+      if (typeof j.state.hp       === 'number') DATA.hp       = j.state.hp;
+      if (typeof j.state.mana     === 'number') DATA.mana     = j.state.mana;
+      if (typeof j.state.cash     === 'number') DATA.cash     = j.state.cash;
+      if (typeof j.state.wanted   === 'number') DATA.wanted   = j.state.wanted;
+      if (typeof j.state.wanted_g === 'number') DATA.wanted_g = j.state.wanted_g;
+    }
+    // Перерисовать видимые элементы
+    if (typeof refreshHero       === 'function') { try { refreshHero(); } catch(e){} }
+    if (typeof renderStatusBar   === 'function') { try { renderStatusBar(); } catch(e){} }
+    else if (typeof renderHeroWanted === 'function') { try { renderHeroWanted(); } catch(e){} }
+  }).catch(()=>{});
+}
+function showEventModal(j) {
+  const ev = j.event || {};
+  const txt = document.getElementById('event-modal-text');
+  const fx  = document.getElementById('event-modal-effects');
+  const jw  = document.getElementById('event-modal-jail');
+  const cw  = document.getElementById('event-modal-cap');
+  if (txt) txt.textContent = ev.text || '';
+  if (fx) {
+    fx.innerHTML = '';
+    const eff = ev.effects || {};
+    const map = [
+      { key: 'hp',       icon: '❤️' },
+      { key: 'energy',   icon: '⚡' },
+      { key: 'cash',     icon: '💵' },
+      { key: 'wanted',   icon: '⭐' },
+      { key: 'wanted_g', icon: '👊' },
+    ];
+    map.forEach(m => {
+      const v = eff[m.key];
+      if (!v || v === 0) return;
+      const sign = v > 0 ? '+' : '';
+      const cls  = v > 0 ? 'pos' : 'neg';
+      const span = document.createElement('span');
+      span.className = `event-modal-effect ${cls}`;
+      span.textContent = `${m.icon} ${sign}${v}`;
+      fx.appendChild(span);
+    });
+  }
+  if (jw) jw.style.display = j.jailed   ? '' : 'none';
+  if (cw) cw.style.display = j.captured ? '' : 'none';
+  const m = document.getElementById('eventModal');
+  if (m) m.classList.add('open');
+}
+function closeEventModal() {
+  const m = document.getElementById('eventModal');
+  if (m) m.classList.remove('open');
+}
+
+// ── DEMO MODE (когда нет api/uid — UI работает на локальных данных) ──
+function _isDemo() {
+  const api = (typeof DATA !== 'undefined' && DATA.api) ? DATA.api : '';
+  const uid = (typeof jobUidStr === 'function') ? jobUidStr() : '';
+  return !api || !uid;
+}
+
+// Локальный каталог бизнесов (зеркало серверного)
+const DEMO_BUSINESSES_CATALOG = [
+  {id:'coffee',     emoji:'☕', name:'Кофейня «У Дона»',   price:3000,   daily_min:150,  daily_max:200,  desc:'Тихая кофейня на углу. Прикрытие для встреч и стабильный кэш.'},
+  {id:'carwash',    emoji:'🚗', name:'Автомойка',           price:5000,   daily_min:220,  daily_max:300,  desc:'Удобная схема для отмыва налички. Машины моют, бабки трутся.'},
+  {id:'barbershop', emoji:'💈', name:'Парикмахерская',      price:7500,   daily_min:300,  daily_max:400,  desc:'Классика жанра. Здесь все «свои» договариваются.'},
+  {id:'pizza',      emoji:'🍕', name:'Пиццерия',            price:12000,  daily_min:450,  daily_max:600,  desc:'Доставка пиццы — отличная легенда для перевозок чего угодно.'},
+  {id:'garage',     emoji:'🔧', name:'Гараж-СТО',           price:18000,  daily_min:650,  daily_max:900,  desc:'Ремонтируем тачки, варим номера, шлифуем VIN. Спрос есть.'},
+  {id:'bar',        emoji:'🍸', name:'Бар «Чёрная вдова»',  price:28000,  daily_min:1000, daily_max:1400, desc:'Ночной бар. Алкоголь, музыка, сделки за столиком в углу.'},
+  {id:'club',       emoji:'🎰', name:'Подпольный клуб',     price:45000,  daily_min:1600, daily_max:2200, desc:'Карты, рулетка, ставки. Доходно, но налоговая чует.'},
+  {id:'warehouse',  emoji:'📦', name:'Склад',               price:70000,  daily_min:2400, daily_max:3300, desc:'Большой склад на окраине. Хранение «чувствительного» груза.'},
+  {id:'casino',     emoji:'🎲', name:'Казино',              price:120000, daily_min:4000, daily_max:5500, desc:'Своё казино — мечта каждого. Высокий доход, высокий риск.'},
+  {id:'port',       emoji:'🚢', name:'Доля в порту',        price:200000, daily_min:6500, daily_max:9000, desc:'Купил долю в порту. Контейнеры идут — деньги капают.'},
+];
+
+// Локальное состояние демо: id → {status, blocked_until, last_collect, pending}
+let _demoBizState = {};
+
+// Локальный каталог оружия / брони / расходников (зеркало серверного ITEMS)
+const DEMO_SHOP_ITEMS = [
+  // ── Оружие ──
+  {id:'zatochka',    name:'🔪 Заточка',         type:'weapon', desc:'+6 атк. Заточенный кусок металла.',  price:60,    attack_bonus:6},
+  {id:'nagan',       name:'🔫 Наган',           type:'weapon', desc:'+8 атк. Старый уличный ствол.',      price:250,   attack_bonus:8},
+  {id:'sawn_off',    name:'💥 Обрез',           type:'weapon', desc:'+12 атк. Короткий и злой.',          price:600,   attack_bonus:12},
+  {id:'uzi',         name:'🔫 Узи',             type:'weapon', desc:'+16 атк. Автоматика за копейки.',    price:1500,  attack_bonus:16},
+  {id:'revolver',    name:'🔫 Револьвер',       type:'weapon', desc:'+20 атк. Шесть патронов — хватит на всех.', price:5000, attack_bonus:20},
+  {id:'machete',     name:'🗡️ Мачете',          type:'weapon', desc:'+28 атк. Латинский привет.',         price:8000,  attack_bonus:28},
+  {id:'katana',      name:'⚔️ Катана',          type:'weapon', desc:'+38 атк. Сталь из Японии.',          price:12000, attack_bonus:38},
+  {id:'spiked_bat',  name:'🏏 Бита с гвоздями', type:'weapon', desc:'+48 атк. Народное оружие 90-х.',     price:18000, attack_bonus:48},
+  {id:'deagle',      name:'🦅 Дезерт Игл',      type:'weapon', desc:'+58 атк. Пушка не для слабаков.',    price:25000, attack_bonus:58},
+  {id:'sniper',      name:'🎯 Снайперка',       type:'weapon', desc:'+68 атк. Один выстрел — один труп.', price:32000, attack_bonus:68},
+  {id:'m16',         name:'💥 М-16',            type:'weapon', desc:'+80 атк. Американская классика.',    price:42000, attack_bonus:80},
+  {id:'rpg',         name:'🚀 Базука',          type:'weapon', desc:'+95 атк. Вопросов нет ни у кого.',   price:50000, attack_bonus:95},
+  {id:'golden_colt', name:'🌟 Золотой Кольт',   type:'weapon', desc:'+65 атк (премиум)',                  diamonds_price:100, attack_bonus:65},
+  {id:'golden_uzi',  name:'🌟 Золотой Узи',     type:'weapon', desc:'+78 атк (премиум). Золото и свинец.',diamonds_price:10,  attack_bonus:78},
+  {id:'tommy_gun',   name:'🔥 Томми Ган',       type:'weapon', desc:'+100 атк (премиум). Крит 270-310 с шансом 25%.', diamonds_price:20, attack_bonus:100},
+  // ── Броня ──
+  {id:'leather_jacket',  name:'🧥 Кожанка',           type:'armor', desc:'+12 к защите. Уличная классика.',     price:180,   defense_bonus:12},
+  {id:'bulletproof',     name:'🦺 Бронежилет',         type:'armor', desc:'+28 к защите. Любительский.',          price:450,   defense_bonus:28},
+  {id:'kevlar_vest',     name:'🛡️ Кевларовый жилет',  type:'armor', desc:'+38 к защите. Стандарт ЧОПа.',         price:1200,  defense_bonus:38},
+  {id:'tactical_vest',   name:'🥋 Тактический жилет', type:'armor', desc:'+50 к защите. С разгрузкой.',          price:2500,  defense_bonus:50},
+  {id:'army_armor',      name:'🪖 Армейская броня',   type:'armor', desc:'+62 к защите. Списано со складов.',    price:5000,  defense_bonus:62},
+  {id:'swat_suit',       name:'👮 Костюм спецназа',   type:'armor', desc:'+78 к защите. Шлем, наколенники.',     price:9000,  defense_bonus:78},
+  {id:'composite_armor', name:'🦾 Композитный доспех',type:'armor', desc:'+95 к защите. Кевлар + керамика.',     price:16000, defense_bonus:95},
+  {id:'exo_armor',       name:'⚙️ Экзо-броня',        type:'armor', desc:'+120 к защите. Прототип.',             price:28000, defense_bonus:120},
+  {id:'titanium_vest',   name:'⚙️ Титановый жилет',   type:'armor', desc:'+65 к защите (премиум)',               diamonds_price:100, defense_bonus:65},
+  // ── Расходники-метательные ──
+  {id:'grenade',      name:'💣 Граната',         type:'throwable', desc:'80–130 урона, без ответки',          price:200, dmg_min:80,  dmg_max:130},
+  {id:'molotov',      name:'🔥 Коктейль Молотова',type:'throwable', desc:'50–80 + горение 2×25, без ответки', price:130, dmg_min:50,  dmg_max:80, burn_per_turn:25, burn_turns:2},
+  // ── Расходники ──
+  {id:'medkit_small', name:'🩹 Малая аптечка',  type:'potion', desc:'Восстанавливает 55 HP',              price:25,   heal:55},
+  {id:'medkit_medium',name:'🏥 Аптечка',        type:'potion', desc:'Восстанавливает 130 HP',             price:60,   heal:130},
+  {id:'medkit_large', name:'💉 Большая аптечка',type:'potion', desc:'Восстанавливает 280 HP',             price:120,  heal:280},
+  {id:'energy_drink', name:'⚡ Энергетик',      type:'potion', desc:'Восстанавливает 55 энергии',         price:45,   mana:55},
+];
+
+// Локальный демо-инвентарь (несколько предметов чтоб видно было)
+let _demoInventory = {
+  zatochka: 1,
+  nagan: 1,
+  leather_jacket: 1,
+  medkit_small: 3,
+  energy_drink: 2,
+};
+let _demoEquippedWeapon = 'nagan';
+let _demoEquippedArmor  = 'leather_jacket';
+let _demoCash = 200;
+let _demoDiamonds = 0;  // бриллианты — донатная валюта, у новичков нет
+
+// Синхронизируем DATA с демо-стейтом при старте
+if (_isDemo()) {
+  DATA.cash   = _demoCash;
+  DATA.dia    = _demoDiamonds;
+  DATA.weapon = _demoEquippedWeapon;
+}
+
+// ── МОЙ БИЗНЕС (вкладка Работа → Мой бизнес) ─────────────────────────
+let _bizCatalogCache = {};
+function switchJobsTab(tab) {
+  document.querySelectorAll('.jobs-tab').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
+  });
+  const work = document.getElementById('jobs-tab-work');
+  const biz  = document.getElementById('jobs-tab-biz');
+  if (work) work.style.display = (tab === 'work') ? '' : 'none';
+  if (biz)  biz.style.display  = (tab === 'biz')  ? '' : 'none';
+  if (tab === 'biz') renderBusinesses();
+}
+function _fmtCash(n) { try { return Number(n||0).toLocaleString('ru-RU'); } catch(e) { return String(n||0); } }
+async function renderBusinesses() {
+  const list = document.getElementById('biz-list');
+  const cashEl = document.getElementById('biz-cash');
+  if (!list) return;
+  // DEMO: показываем локальный каталог
+  if (_isDemo()) {
+    const now = Math.floor(Date.now() / 1000);
+    const data = DEMO_BUSINESSES_CATALOG.map(b => {
+      const st = _demoBizState[b.id];
+      const out = Object.assign({}, b);
+      if (st) {
+        out.owned         = true;
+        out.status        = st.status || 'ok';
+        out.blocked_until = st.blocked_until || 0;
+        // Накопленный доход: middle income / 86400 * elapsed
+        const elapsed = Math.max(0, now - (st.last_collect || now));
+        const avg = (b.daily_min + b.daily_max) / 2;
+        out.pending = (out.status === 'ok' && (out.blocked_until || 0) <= now)
+          ? Math.floor(elapsed * avg / 86400) : 0;
+      } else {
+        out.owned = false;
+      }
+      return out;
+    });
+    if (cashEl) cashEl.innerHTML = `💵 Наличные: $${_fmtCash(_demoCash)} <span style="margin-left:14px;color:#999;font-weight:400;font-size:12px">(демо: бот не подключён)</span>`;
+    list.innerHTML = '';
+    data.forEach(b => { _bizCatalogCache[b.id] = b; list.appendChild(renderBizCard(b)); });
+    return;
+  }
+  // ОБЫЧНЫЙ режим: с сервера
+  const api = DATA.api, uid = jobUidStr();
+  list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">Загрузка…</div>';
+  try {
+    const res = await fetch(`${api}/biz/${uid}/list`);
+    const j = await res.json();
+    if (!j.ok) throw new Error('list failed');
+    if (cashEl) cashEl.innerHTML = `💵 Наличные: $${_fmtCash(j.cash || 0)}`;
+    list.innerHTML = '';
+    (j.businesses || []).forEach(b => {
+      _bizCatalogCache[b.id] = b;
+      list.appendChild(renderBizCard(b));
+    });
+  } catch(e) {
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:#ff7070">Не удалось загрузить</div>';
+  }
+}
+function renderBizCard(b) {
+  const card = document.createElement('div');
+  let cls = 'biz-card';
+  if (b.owned) cls += ' owned';
+  if (b.status === 'burned')  cls += ' burned';
+  if (b.status === 'blocked') cls += ' blocked';
+  card.className = cls;
+  let badge = '';
+  if (b.owned) {
+    if (b.status === 'burned')      badge = '<span class="biz-status-badge burned">🔥 Сожжён</span>';
+    else if (b.status === 'blocked') {
+      const left = Math.max(0, (b.blocked_until || 0) - Math.floor(Date.now()/1000));
+      const h = Math.floor(left/3600), m = Math.floor((left%3600)/60);
+      badge = `<span class="biz-status-badge blocked">🚫 Закрыт ${h}ч ${m}м</span>`;
+    } else {
+      badge = '<span class="biz-status-badge ok">✓ Работает</span>';
+    }
+  }
+  const incomeChip = b.owned
+    ? `<span class="biz-chip income">📈 Накоплено: $${_fmtCash(b.pending || 0)}</span>`
+    : `<span class="biz-chip">💵 Цена: $${_fmtCash(b.price)}</span>`;
+  card.innerHTML = `
+    <div class="biz-row">
+      <div class="biz-emoji">${b.emoji}</div>
+      <div class="biz-info">
+        <div class="biz-name">${b.name} ${badge}</div>
+        <div class="biz-desc">${b.desc}</div>
+      </div>
+    </div>
+    <div class="biz-stats">
+      <span class="biz-chip">💰 $${_fmtCash(b.daily_min)}–$${_fmtCash(b.daily_max)}/сутки</span>
+      ${incomeChip}
+    </div>
+    <div class="biz-actions" id="biz-actions-${b.id}"></div>
+  `;
+  const actions = card.querySelector(`#biz-actions-${b.id}`);
+  if (!b.owned) {
+    const btn = document.createElement('button');
+    btn.className = 'biz-btn';
+    btn.textContent = `Купить за $${_fmtCash(b.price)}`;
+    btn.onclick = () => bizBuy(b.id);
+    actions.appendChild(btn);
+  } else if (b.status === 'burned') {
+    const cost = Math.round(b.price * 0.12);
+    const btn = document.createElement('button');
+    btn.className = 'biz-btn restore';
+    btn.textContent = `🔧 Восстановить ($${_fmtCash(cost)})`;
+    btn.onclick = () => bizRestore(b.id);
+    actions.appendChild(btn);
+  } else if (b.status === 'blocked') {
+    const btn = document.createElement('button');
+    btn.className = 'biz-btn'; btn.disabled = true;
+    btn.textContent = '⏳ Ждёт разблокировки';
+    actions.appendChild(btn);
+  } else if ((b.pending || 0) > 0) {
+    const btn = document.createElement('button');
+    btn.className = 'biz-btn collect';
+    btn.textContent = `💰 Забрать $${_fmtCash(b.pending)}`;
+    btn.onclick = () => bizCollect(b.id);
+    actions.appendChild(btn);
+  } else {
+    const btn = document.createElement('button');
+    btn.className = 'biz-btn'; btn.disabled = true;
+    btn.textContent = 'Доход накапливается…';
+    actions.appendChild(btn);
+  }
+  return card;
+}
+async function bizBuy(bizId) {
+  // DEMO
+  if (_isDemo()) {
+    const b = DEMO_BUSINESSES_CATALOG.find(x => x.id === bizId);
+    if (!b) return;
+    if (_demoCash < b.price) { showToast('Не хватает наличных', '⚠️'); return; }
+    if (_demoBizState[bizId]) { showToast('Уже куплен', '⚠️'); return; }
+    _demoCash -= b.price;
+    DATA.cash  = _demoCash;
+    _demoBizState[bizId] = { status:'ok', blocked_until:0, last_collect: Math.floor(Date.now()/1000) - 3600 };
+    showToast('🏢 Бизнес куплен (демо)', '✅');
+    if (typeof refreshHero === 'function') { try { refreshHero(); } catch(e){} }
+    renderBusinesses();
+    return;
+  }
+  const api = DATA.api, uid = jobUidStr();
+  if (!api || !uid) return;
+  try {
+    const res = await fetch(`${api}/biz/${uid}/buy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ biz_id: bizId })
+    });
+    const j = await res.json();
+    if (!j.ok) {
+      showToast(j.error === 'no cash' ? 'Не хватает наличных' : 'Не удалось купить', '⚠️');
+      return;
+    }
+    DATA.cash = j.cash;
+    showToast('🏢 Бизнес куплен!', '✅');
+    if (typeof refreshHero === 'function') { try { refreshHero(); } catch(e){} }
+    renderBusinesses();
+  } catch(e) { showToast('Ошибка соединения', '⚠️'); }
+}
+async function bizCollect(bizId) {
+  // DEMO
+  if (_isDemo()) {
+    const b  = DEMO_BUSINESSES_CATALOG.find(x => x.id === bizId);
+    const st = _demoBizState[bizId];
+    if (!b || !st || st.status !== 'ok') return;
+    const now = Math.floor(Date.now()/1000);
+    const elapsed = Math.max(0, now - (st.last_collect || now));
+    const avg = (b.daily_min + b.daily_max) / 2;
+    let pay = Math.floor(elapsed * avg / 86400);
+    // 30% шанс события (для демо ярче)
+    let evFired = null;
+    if (Math.random() < 0.30) {
+      const evs = [
+        {kind:'income_bonus',  text:'✨ Удачный день — выручка +30%.', value:0.30},
+        {kind:'income_penalty',text:'📋 Налоговая накрыла — забрали 20%.', value:0.20},
+        {kind:'block',         text:'🚓 Полицейская проверка — закрыто на 12 часов.', hours:12},
+        {kind:'burn',          text:'🔥 Конкуренты подожгли точку!'},
+      ];
+      const ev = evs[Math.floor(Math.random() * evs.length)];
+      if (ev.kind === 'income_bonus')  pay = Math.floor(pay * (1 + ev.value));
+      if (ev.kind === 'income_penalty') pay = Math.floor(pay * (1 - ev.value));
+      if (ev.kind === 'block') { st.status = 'blocked'; st.blocked_until = now + ev.hours * 3600; }
+      if (ev.kind === 'burn')  { st.status = 'burned';  st.blocked_until = 0; }
+      evFired = { biz_emoji: b.emoji, biz_name: b.name, text: ev.text };
+    }
+    st.last_collect = now;
+    _demoCash += pay;
+    DATA.cash  = _demoCash;
+    if (pay > 0) showToast(`+$${_fmtCash(pay)} (демо)`, '💵');
+    if (evFired) showBusinessEventModal(evFired);
+    if (typeof refreshHero === 'function') { try { refreshHero(); } catch(e){} }
+    renderBusinesses();
+    return;
+  }
+  const api = DATA.api, uid = jobUidStr();
+  if (!api || !uid) return;
+  try {
+    const res = await fetch(`${api}/biz/${uid}/collect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ biz_id: bizId })
+    });
+    const j = await res.json();
+    if (!j.ok) { showToast('Не удалось забрать', '⚠️'); return; }
+    DATA.cash = j.cash;
+    if ((j.collected || 0) > 0) showToast(`+$${_fmtCash(j.collected)}`, '💵');
+    if (j.events && j.events.length > 0) {
+      showBusinessEventModal(j.events[0]);
+    }
+    if (typeof refreshHero === 'function') { try { refreshHero(); } catch(e){} }
+    renderBusinesses();
+  } catch(e) { showToast('Ошибка соединения', '⚠️'); }
+}
+function showBusinessEventModal(ev) {
+  const txt = document.getElementById('event-modal-text');
+  const fx  = document.getElementById('event-modal-effects');
+  const jw  = document.getElementById('event-modal-jail');
+  const cw  = document.getElementById('event-modal-cap');
+  if (txt) txt.innerHTML = `<b>${ev.biz_emoji || '🏢'} ${ev.biz_name || 'Бизнес'}</b><br><br>${ev.text || ''}`;
+  if (fx)  fx.innerHTML  = '';
+  if (jw) jw.style.display = 'none';
+  if (cw) cw.style.display = 'none';
+  const m = document.getElementById('eventModal');
+  if (m) m.classList.add('open');
+}
+// ── ЧЁРНЫЙ РЫНОК (мини-апп) ──────────────────────────────────────────
+let _shopState = { tab: 'weapon', items: [], cash: 0, diamonds: 0 };
+function switchShopTab(tab) {
+  _shopState.tab = tab;
+  document.querySelectorAll('.shop-tabs .jobs-tab').forEach(b => {
+    b.classList.toggle('active', b.dataset.shopTab === tab);
+  });
+  _renderShopList();
+}
+async function renderShop() {
+  const list = document.getElementById('shop-list');
+  if (!list) return;
+  // DEMO
+  if (_isDemo()) {
+    _shopState.items    = DEMO_SHOP_ITEMS.slice();
+    _shopState.cash     = _demoCash;
+    _shopState.diamonds = _demoDiamonds;
+    _renderShopList();
+    return;
+  }
+  const api = DATA.api, uid = jobUidStr();
+  list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">Загрузка…</div>';
+  try {
+    const res = await fetch(`${api}/shop/${uid}/list`);
+    const j = await res.json();
+    if (!j.ok) throw new Error('shop list failed');
+    _shopState.items    = j.items || [];
+    _shopState.cash     = j.cash || 0;
+    _shopState.diamonds = j.diamonds || 0;
+    _renderShopList();
+  } catch(e) {
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:#ff7070">Не удалось загрузить</div>';
+  }
+}
+function _renderShopList() {
+  const cashEl = document.getElementById('shop-cash');
+  if (cashEl) {
+    cashEl.innerHTML = `<span class="shop-cash-chip">💵 $${_fmtCash(_shopState.cash)}</span>` +
+                       `<span class="shop-cash-chip dia">💎 ${_fmtCash(_shopState.diamonds)}</span>`;
+  }
+  const list = document.getElementById('shop-list');
+  list.innerHTML = '';
+  const filtered = _shopState.items.filter(it => it.type === _shopState.tab);
+  if (filtered.length === 0) {
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">Пусто</div>';
+    return;
+  }
+  // Сортируем по цене
+  filtered.sort((a,b) => (a.price || a.diamonds_price*1000 || 0) - (b.price || b.diamonds_price*1000 || 0));
+  filtered.forEach(it => list.appendChild(_renderShopCard(it)));
+}
+function _renderShopCard(it) {
+  const card = document.createElement('div');
+  card.className = 'shop-card';
+  const stats = [];
+  if (it.attack_bonus)  stats.push(`<span class="shop-stat-chip atk">⚔ +${it.attack_bonus}</span>`);
+  if (it.defense_bonus) stats.push(`<span class="shop-stat-chip def">🛡 +${it.defense_bonus}</span>`);
+  if (it.heal)          stats.push(`<span class="shop-stat-chip heal">❤️ +${it.heal}</span>`);
+  if (it.mana)          stats.push(`<span class="shop-stat-chip heal">⚡ +${it.mana}</span>`);
+  // Иконка из имени (первый emoji)
+  const emoji = (it.name || '').match(/^\S+/)?.[0] || '🔹';
+  const cleanName = (it.name || '').replace(/^\S+\s*/, '');
+  let priceLabel = '';
+  let priceClass = '';
+  let canAfford = true;
+  if (it.diamonds_price) {
+    priceLabel = `💎 ${it.diamonds_price}`;
+    canAfford = _shopState.diamonds >= it.diamonds_price;
+  } else if (it.price) {
+    priceLabel = `💵 $${_fmtCash(it.price)}`;
+    canAfford = _shopState.cash >= it.price;
+  }
+  card.innerHTML = `
+    <div class="shop-icon">${emoji}</div>
+    <div class="shop-info">
+      <div class="shop-name">${cleanName}</div>
+      <div class="shop-desc">${it.desc || ''}</div>
+      <div class="shop-stats">${stats.join('')}</div>
+    </div>
+    <div class="shop-actions">
+      <button class="shop-btn" ${canAfford ? '' : 'disabled'}>${priceLabel}</button>
+    </div>
+  `;
+  card.querySelector('.shop-btn').onclick = () => shopBuy(it.id);
+  return card;
+}
+async function shopBuy(itemId) {
+  // DEMO
+  if (_isDemo()) {
+    const it = DEMO_SHOP_ITEMS.find(x => x.id === itemId);
+    if (!it) return;
+    if (it.diamonds_price) {
+      if (_demoDiamonds < it.diamonds_price) { showToast('Не хватает бриллиантов', '⚠️'); return; }
+      _demoDiamonds -= it.diamonds_price;
+    } else if (it.price) {
+      if (_demoCash < it.price) { showToast('Не хватает баксов', '⚠️'); return; }
+      _demoCash -= it.price;
+    }
+    DATA.cash = _demoCash;
+    DATA.dia  = _demoDiamonds;
+    _shopState.cash     = _demoCash;
+    _shopState.diamonds = _demoDiamonds;
+    _demoInventory[itemId] = (_demoInventory[itemId] || 0) + 1;
+    showToast('🛒 Куплено! (демо)', '✅');
+    if (typeof refreshHero === 'function') { try { refreshHero(); } catch(e){} }
+    _renderShopList();
+    return;
+  }
+  const api = DATA.api, uid = jobUidStr();
+  if (!api || !uid) return;
+  try {
+    const res = await fetch(`${api}/shop/${uid}/buy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item_id: itemId, qty: 1 })
+    });
+    const j = await res.json();
+    if (!j.ok) {
+      const msg = j.error === 'no cash' ? 'Не хватает баксов'
+                : j.error === 'no diamonds' ? 'Не хватает бриллиантов'
+                : 'Не удалось купить';
+      showToast(msg, '⚠️');
+      return;
+    }
+    DATA.cash = j.cash;
+    DATA.dia  = j.diamonds;
+    _shopState.cash = j.cash;
+    _shopState.diamonds = j.diamonds;
+    showToast('🛒 Куплено!', '✅');
+    if (typeof refreshHero === 'function') { try { refreshHero(); } catch(e){} }
+    _renderShopList();
+  } catch(e) { showToast('Ошибка соединения', '⚠️'); }
+}
+
+// ── ИНВЕНТАРЬ / БАРАХЛО (мини-апп) ───────────────────────────────────
+let _invState = { items: [], equipped_weapon: null, equipped_armor: null };
+async function renderInventory() {
+  const list = document.getElementById('inv-list');
+  if (!list) return;
+  // DEMO
+  if (_isDemo()) {
+    const items = [];
+    for (const [id, qty] of Object.entries(_demoInventory)) {
+      const it = DEMO_SHOP_ITEMS.find(x => x.id === id);
+      if (!it) continue;
+      items.push(Object.assign({}, it, { qty }));
+    }
+    _invState.items           = items;
+    _invState.equipped_weapon = _demoEquippedWeapon;
+    _invState.equipped_armor  = _demoEquippedArmor;
+    DATA.weapon = _demoEquippedWeapon || '';
+    _renderInventoryList();
+    if (typeof refreshHero === 'function') { try { refreshHero(); } catch(e){} }
+    return;
+  }
+  const api = DATA.api, uid = jobUidStr();
+  list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">Загрузка…</div>';
+  try {
+    const res = await fetch(`${api}/inv/${uid}/list`);
+    const j = await res.json();
+    if (!j.ok) throw new Error('inv list failed');
+    _invState.items           = j.items || [];
+    _invState.equipped_weapon = j.equipped_weapon;
+    _invState.equipped_armor  = j.equipped_armor;
+    DATA.weapon = j.equipped_weapon || '';
+    _renderInventoryList();
+    if (typeof refreshHero === 'function') { try { refreshHero(); } catch(e){} }
+  } catch(e) {
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:#ff7070">Не удалось загрузить</div>';
+  }
+}
+function _renderInventoryList() {
+  const eqDiv = document.getElementById('inv-equipped');
+  const list  = document.getElementById('inv-list');
+  if (!list) return;
+  // Equipped block
+  const findItem = id => _invState.items.find(x => x.id === id) || null;
+  const eqW = _invState.equipped_weapon ? findItem(_invState.equipped_weapon) : null;
+  const eqA = _invState.equipped_armor  ? findItem(_invState.equipped_armor)  : null;
+  if (eqDiv) {
+    eqDiv.innerHTML = `
+      <div class="equipped-row">
+        <span class="label">Оружие:</span>
+        ${eqW ? `<span class="name">${eqW.name}</span>
+                 <button class="inv-btn unequip" style="margin-left:auto" onclick="invEquip(null,'weapon')">Снять</button>`
+              : `<span class="empty">не надето</span>`}
+      </div>
+      <div class="equipped-row">
+        <span class="label">Броня:</span>
+        ${eqA ? `<span class="name">${eqA.name}</span>
+                 <button class="inv-btn unequip" style="margin-left:auto" onclick="invEquip(null,'armor')">Снять</button>`
+              : `<span class="empty">не надета</span>`}
+      </div>
+    `;
+  }
+  list.innerHTML = '';
+  if (_invState.items.length === 0) {
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">Барахла нет — иди в чёрный рынок</div>';
+    return;
+  }
+  // Группировать по типу: weapon, armor, potion
+  const groups = [
+    { type: 'weapon', label: '🔫 Оружие' },
+    { type: 'armor',  label: '🛡 Броня'  },
+    { type: 'potion', label: '💊 Расходники' },
+    { type: 'document', label: '📄 Документы' },
+  ];
+  groups.forEach(g => {
+    const arr = _invState.items.filter(it => it.type === g.type);
+    if (arr.length === 0) return;
+    const header = document.createElement('div');
+    header.className = 'section-label';
+    header.textContent = g.label;
+    list.appendChild(header);
+    arr.forEach(it => list.appendChild(_renderInvCard(it)));
+  });
+}
+function _renderInvCard(it) {
+  const card = document.createElement('div');
+  const isEquipped = (it.type === 'weapon' && it.id === _invState.equipped_weapon)
+                  || (it.type === 'armor'  && it.id === _invState.equipped_armor);
+  card.className = 'inv-card' + (isEquipped ? ' equipped' : '');
+  const stats = [];
+  if (it.attack_bonus)  stats.push(`<span class="shop-stat-chip atk">⚔ +${it.attack_bonus}</span>`);
+  if (it.defense_bonus) stats.push(`<span class="shop-stat-chip def">🛡 +${it.defense_bonus}</span>`);
+  if (it.heal)          stats.push(`<span class="shop-stat-chip heal">❤️ +${it.heal}</span>`);
+  if (it.mana)          stats.push(`<span class="shop-stat-chip heal">⚡ +${it.mana}</span>`);
+  const emoji = (it.name || '').match(/^\S+/)?.[0] || '🔹';
+  const cleanName = (it.name || '').replace(/^\S+\s*/, '');
+  let action = '';
+  if (it.type === 'weapon' || it.type === 'armor') {
+    if (isEquipped) {
+      action = `<button class="inv-btn unequip" onclick="invEquip(null,'${it.type}')">Снять</button>`;
+    } else {
+      action = `<button class="inv-btn equip" onclick="invEquip('${it.id}')">Надеть</button>`;
+    }
+  } else if (it.qty > 0) {
+    action = `<span class="inv-qty-badge">×${it.qty}</span>`;
+  }
+  card.innerHTML = `
+    <div class="inv-icon">${emoji}</div>
+    <div class="inv-info">
+      <div class="inv-name">${cleanName}</div>
+      <div class="inv-desc">${it.desc || ''}</div>
+      <div class="inv-stats">${stats.join('')}</div>
+    </div>
+    <div class="inv-actions">${action}</div>
+  `;
+  return card;
+}
+async function invEquip(itemId, slotForUnequip) {
+  // DEMO
+  if (_isDemo()) {
+    if (itemId) {
+      const it = DEMO_SHOP_ITEMS.find(x => x.id === itemId);
+      if (!it || (it.type !== 'weapon' && it.type !== 'armor')) { showToast('Не подходит', '⚠️'); return; }
+      if (!_demoInventory[itemId]) { showToast('Нет в инвентаре', '⚠️'); return; }
+      if (it.type === 'weapon') _demoEquippedWeapon = itemId;
+      else                      _demoEquippedArmor  = itemId;
+    } else {
+      if (slotForUnequip === 'weapon') _demoEquippedWeapon = null;
+      if (slotForUnequip === 'armor')  _demoEquippedArmor  = null;
+    }
+    _invState.equipped_weapon = _demoEquippedWeapon;
+    _invState.equipped_armor  = _demoEquippedArmor;
+    DATA.weapon = _demoEquippedWeapon || '';
+    showToast(itemId ? '✅ Надето (демо)' : 'Снято (демо)', '🎒');
+    _renderInventoryList();
+    if (typeof refreshHero === 'function') { try { refreshHero(); } catch(e){} }
+    return;
+  }
+  const api = DATA.api, uid = jobUidStr();
+  if (!api || !uid) return;
+  try {
+    const body = itemId ? { item_id: itemId } : { item_id: null, slot: slotForUnequip };
+    const res = await fetch(`${api}/inv/${uid}/equip`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const j = await res.json();
+    if (!j.ok) { showToast('Не удалось', '⚠️'); return; }
+    _invState.equipped_weapon = j.equipped_weapon;
+    _invState.equipped_armor  = j.equipped_armor;
+    DATA.weapon = j.equipped_weapon || '';
+    showToast(itemId ? '✅ Надето' : 'Снято', '🎒');
+    _renderInventoryList();
+    if (typeof refreshHero === 'function') { try { refreshHero(); } catch(e){} }
+  } catch(e) { showToast('Ошибка соединения', '⚠️'); }
+}
+
+async function bizRestore(bizId) {
+  // DEMO
+  if (_isDemo()) {
+    const b  = DEMO_BUSINESSES_CATALOG.find(x => x.id === bizId);
+    const st = _demoBizState[bizId];
+    if (!b || !st) return;
+    const cost = Math.round(b.price * 0.12);
+    if (_demoCash < cost) { showToast(`Нужно $${_fmtCash(cost)}`, '⚠️'); return; }
+    _demoCash -= cost;
+    DATA.cash  = _demoCash;
+    const success = Math.random() < 0.55;
+    if (success) {
+      st.status = 'ok';
+      st.blocked_until = 0;
+      st.last_collect  = Math.floor(Date.now()/1000);
+    }
+    showToast(success ? '🔧 Восстановлено! (демо)' : '😖 Не получилось, попробуй ещё', success ? '✅' : '⚠️');
+    if (typeof refreshHero === 'function') { try { refreshHero(); } catch(e){} }
+    renderBusinesses();
+    return;
+  }
+  const api = DATA.api, uid = jobUidStr();
+  if (!api || !uid) return;
+  try {
+    const res = await fetch(`${api}/biz/${uid}/restore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ biz_id: bizId })
+    });
+    const j = await res.json();
+    if (!j.ok) {
+      showToast(j.error === 'no cash' ? `Нужно $${_fmtCash(j.cost || 0)}` : 'Не удалось', '⚠️');
+      return;
+    }
+    DATA.cash = j.cash;
+    showToast(j.success ? '🔧 Бизнес восстановлен!' : '😖 Не получилось, попробуй ещё', j.success ? '✅' : '⚠️');
+    if (typeof refreshHero === 'function') { try { refreshHero(); } catch(e){} }
+    renderBusinesses();
+  } catch(e) { showToast('Ошибка соединения', '⚠️'); }
 }
 
 // === JOBS v2 (mini-app) ============================================
