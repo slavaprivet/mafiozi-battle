@@ -342,6 +342,15 @@ const QP = {
 // ── Telegram WebApp ─────────────────────────────────────────────
 const tg = (typeof window.Telegram !== 'undefined') ? window.Telegram.WebApp : null;
 try { if (tg) { tg.ready(); tg.expand(); } } catch(e) {}
+// Если из hub пришло дефолтное «Гангстер» (потому что бот не пробросил
+// ?name=...), пытаемся вытащить настоящее имя из Telegram initDataUnsafe.
+try {
+  if ((QP.name === 'Гангстер' || QP.name === 'Игрок') && tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
+    const u = tg.initDataUnsafe.user;
+    const real = (u.first_name || u.username || '').trim();
+    if (real) QP.name = real.slice(0, 24);
+  }
+} catch(e) {}
 // Запрещаем вертикальный свайп вниз чтобы свайп по джойстику не закрывал
 // мини-апп. API 7.7+; на старых версиях просто игнорируется.
 try { if (tg && typeof tg.disableVerticalSwipes === 'function') tg.disableVerticalSwipes(); } catch(e) {}
@@ -872,9 +881,9 @@ window.addEventListener('keyup', (e) => {
 });
 
 // ── Коллизии ───────────────────────────────────────────────────
-// Проходимые тайлы: 0 (дорога), 7 (фонарь — низкий столб, обходим),
-// 8 (трава), 9 (бордюр/плитка). Всё остальное — блок.
-const PASSABLE = new Set([0, 8, 9]);
+// Проходимые тайлы: 0 (дорога), 7 (фонарь — рисуется как столб
+// над тайлом, но сам тайл-пол свободен), 8 (трава), 9 (бордюр).
+const PASSABLE = new Set([0, 7, 8, 9]);
 function isBlocked(r, c) {
   const ri = Math.floor(r), ci = Math.floor(c);
   if (ri < 0 || ri >= MAP_ROWS || ci < 0 || ci >= MAP_COLS) return true;
@@ -991,6 +1000,16 @@ function wsConnect() {
           // Респаун — сбрасываем причину смерти
           myDeathBy = '';
         }
+        // Сервер шлёт авторитативный look (из БД через creator) — перетираем
+        // QP.look, чтобы рисовался ТОТ перс которого ты создал в creator,
+        // даже если hub.html не подсунул правильные параметры в URL.
+        if (d.me.look && (d.me.look.skin !== undefined || d.me.look.hair !== undefined)) {
+          QP.look = Object.assign({}, QP.look, d.me.look);
+          QP.has_look = 1;
+        }
+        // ИМЯ НЕ ТРОГАЕМ — берём только из URL (DATA.name в hub).
+        // В БД может лежать старое/дефолтное «Гангстер», перезапись его
+        // на свой вычитала бы из под игрока его «Вячеслав».
       }
       const seen = new Set();
       const list = d.others || [];
