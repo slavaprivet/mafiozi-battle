@@ -1204,21 +1204,84 @@ _zoneEl.addEventListener('click', () => {
     showToast(`🔒 Нужен ранг ${_zoneCur.minLvl}+ (у тебя ${QP.lvl})`, 2800);
     return;
   }
-  // Обычный район → возврат в hub с view=district&loc=<id>.
-  const locId = _zoneCur.id;
-  let target = '';
-  try { target = decodeURIComponent(QP.hubUrl || ''); } catch(e) { target = QP.hubUrl || ''; }
-  if (!target) target = 'hub.html';
-  try {
-    const u = new URL(target, location.href);
-    u.searchParams.set('view', 'district');
-    u.searchParams.set('loc',  locId);
-    u.searchParams.set('v',    Date.now());
-    window.location.href = u.toString();
-  } catch(e) {
-    const sep = target.includes('?') ? '&' : '?';
-    window.location.href = `${target}${sep}view=district&loc=${locId}&v=${Date.now()}`;
+  // Обычный район → открываем боёвку (demo_isometric) в iframe поверх
+  // города. Бэк сам соберёт URL с актуальным снаряжением игрока из БД.
+  openDistrictBattle(_zoneCur.id);
+});
+
+// ── Боёвка района — iframe overlay поверх города ───────────────
+const _battleOv     = document.getElementById('battleOverlay');
+const _battleFrame  = document.getElementById('battleFrame');
+const _battleLoad   = document.getElementById('battleLoading');
+const _battleClose  = document.getElementById('battleClose');
+let _battleOpen = false;
+
+async function openDistrictBattle(locId) {
+  // Без свежего api боёвку не запустить — пробуем подтянуть из coop_api.json.
+  if (!QP.api) await _fetchApiFallback();
+  if (!QP.api) {
+    showToast('⚠️ Сервер недоступен — открой ЗАПУСТИТЬ_БОТА.bat', 3000);
+    return;
   }
+  if (!QP.uid) {
+    showToast('Нет Telegram ID — открой через бота', 2400);
+    return;
+  }
+  // Показываем оверлей сразу — юзер сразу видит реакцию на клик.
+  _battleLoad.classList.remove('hide');
+  _battleLoad.textContent = 'Загружаем район…';
+  _battleFrame.src = 'about:blank';
+  _battleOv.classList.add('open');
+  _battleOpen = true;
+  try {
+    const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    if (ctl) setTimeout(() => ctl.abort(), 8000);
+    const r = await fetch(
+      `${QP.api}/world/battle_url/${encodeURIComponent(QP.uid)}?loc=${encodeURIComponent(locId)}`,
+      { cache: 'no-store', signal: ctl ? ctl.signal : undefined }
+    );
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok || !j.url) {
+      const err = j && j.error || ('HTTP ' + r.status);
+      _battleLoad.textContent = '⚠️ Не удалось открыть район: ' + err;
+      setTimeout(closeBattleOverlay, 2400);
+      return;
+    }
+    // URL уже содержит &back=world (бэк добавил) — demo_isometric при
+    // выходе из боя пришлёт postMessage сюда вместо редиректа в hub.
+    _battleFrame.src = j.url;
+  } catch(e) {
+    _battleLoad.textContent = '⚠️ Сервер не ответил. Бот работает?';
+    setTimeout(closeBattleOverlay, 2400);
+  }
+}
+
+function closeBattleOverlay() {
+  _battleOv.classList.remove('open');
+  _battleOpen = false;
+  // Освобождаем iframe чтобы он не продолжал крутить тяжёлый game-loop в фоне.
+  _battleFrame.src = 'about:blank';
+  _battleLoad.classList.remove('hide');
+}
+
+_battleClose.addEventListener('click', () => {
+  // Спрашиваем пацифистский confirm: если бой идёт — юзер может случайно
+  // зафейлить прогресс. confirm() в TG WebApp на мобильнике может не показаться,
+  // поэтому если он не сработал — закрываем без вопроса.
+  let ok = true;
+  try { ok = confirm('Выйти из боя? Прогресс потеряется.'); } catch(e) { ok = true; }
+  if (ok) closeBattleOverlay();
+});
+
+// postMessage от demo_isometric.html — бой завершён (победа/смерть/выход).
+window.addEventListener('message', (ev) => {
+  const d = ev && ev.data;
+  if (!d || typeof d !== 'object') return;
+  if (d.type !== 'battle_done') return;
+  // Параметры из боя (out.toString()) — там обновлённые cash/hp/kills/gren/mol.
+  // Пока в city не реинтегрируем их (нет state-машины), просто закрываем
+  // оверлей. Свежие значения подтянутся при следующем заходе через hub.
+  closeBattleOverlay();
 });
 
 // ── Toast (короткие уведомления) ────────────────────────────────
