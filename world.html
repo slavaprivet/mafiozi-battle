@@ -1439,22 +1439,11 @@ function showModeModal(onPick) {
   pve.onclick = () => close('pve');
 }
 
-// Сменить режим во время сессии — показываем модал и перезагружаем
-// страницу с новым режимом (это создаёт свежую WS-сессию).
+// Кнопка «сменить» в HUD — просто перезагрузка страницы. После reload
+// startup-блок снова покажет модал (myMode='' на старте). Игрок выберет
+// заново. Не используем localStorage/URL — режим всегда заново.
 function switchModeFlow() {
-  showModeModal((picked) => {
-    // Через sessionStorage передаём выбор переживущий reload (а после
-    // загрузки startup нормально перетянет в myMode и снова откроет
-    // модал — нет, плохо. Проще: пишем в URL и читаем при загрузке).
-    // Самое простое — добавить ?mode= к URL и reload.
-    try {
-      const u = new URL(location.href);
-      u.searchParams.set('mode', picked);
-      location.href = u.toString();
-    } catch(e) {
-      location.reload();
-    }
-  });
+  location.reload();
 }
 
 function wsUrl() {
