@@ -1067,6 +1067,74 @@ window.addEventListener('touchmove', (e) => {
 }, { passive: false });
 window.addEventListener('touchend',    () => { if (joyL.active) joyLEnd(); });
 window.addEventListener('touchcancel', () => { if (joyL.active) joyLEnd(); });
+
+// ── Правый стик (прицел+огонь) ─────────────────────────────────
+// Тянешь джойстик в направлении выстрела (как Brawl Stars). Отпустил —
+// стреляем туда. Если просто тапнул без сдвига — auto-aim (ближайшая цель).
+// JoyR виден только когда есть оружие/цель (см. updateJoyRVisibility).
+const joyR = { active: false, dx: 0, dy: 0, id: -1, hasAim: false };
+const joyREl = document.getElementById('joyR');
+const joyRKnob = joyREl.querySelector('.knob');
+function joyRMove(x, y) {
+  const r = joyREl.getBoundingClientRect();
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const dx = x - cx, dy = y - cy;
+  const max = r.width / 2 - 12;
+  const d = Math.hypot(dx, dy);
+  const k = d > max ? max / d : 1;
+  joyR.dx = (dx * k) / max;
+  joyR.dy = (dy * k) / max;
+  joyR.hasAim = (Math.hypot(joyR.dx, joyR.dy) > 0.18);
+  joyRKnob.style.transform = `translate(${dx * k}px, ${dy * k}px)`;
+  joyREl.classList.toggle('aiming', joyR.hasAim);
+}
+function joyREnd() {
+  // На отпускании — стреляем (в направление если был сдвиг, иначе auto-aim)
+  if (joyR.active) {
+    if (joyR.hasAim) {
+      // Конвертация экранных dx/dy → угол в мировых координатах.
+      // На экране ось X = вправо, Y = вниз. В мировой системе (изометрия)
+      // direction соответствует Math.atan2(joyR.dy, joyR.dx) с инверсией
+      // оси (изометрия повёрнута на 45°). Простой подход: угол на экране
+      // соответствует мировому углу 1:1 в нашей проекции — игрок смотрит
+      // в этом же направлении (мы храним player.ang в мировых rad).
+      fire(Math.atan2(joyR.dy, joyR.dx));
+    } else {
+      fire(null);  // auto-aim
+    }
+  }
+  joyR.active = false; joyR.dx = 0; joyR.dy = 0; joyR.id = -1; joyR.hasAim = false;
+  joyRKnob.style.transform = '';
+  joyREl.classList.remove('aiming');
+}
+joyREl.addEventListener('pointerdown', (e) => {
+  joyR.active = true; joyR.id = e.pointerId;
+  joyRMove(e.clientX, e.clientY);
+  try { joyREl.setPointerCapture(e.pointerId); } catch(_) {}
+  e.preventDefault();
+}, { passive: false });
+window.addEventListener('pointermove', (e) => {
+  if (joyR.active && (joyR.id === -1 || e.pointerId === joyR.id)) {
+    joyRMove(e.clientX, e.clientY);
+  }
+});
+window.addEventListener('pointerup',     () => { if (joyR.active) joyREnd(); });
+window.addEventListener('pointercancel', () => { if (joyR.active) joyREnd(); });
+joyREl.addEventListener('touchstart', (e) => {
+  if (joyR.active) return;
+  const t = e.changedTouches[0]; if (!t) return;
+  joyR.active = true; joyR.id = -1;
+  joyRMove(t.clientX, t.clientY);
+  e.preventDefault();
+}, { passive: false });
+window.addEventListener('touchmove', (e) => {
+  if (!joyR.active) return;
+  const t = e.changedTouches[0]; if (!t) return;
+  joyRMove(t.clientX, t.clientY);
+}, { passive: false });
+window.addEventListener('touchend',    () => { if (joyR.active) joyREnd(); });
+window.addEventListener('touchcancel', () => { if (joyR.active) joyREnd(); });
+
 // Клавиатура (для теста с десктопа)
 const _keyState = { up:false, down:false, left:false, right:false };
 window.addEventListener('keydown', (e) => {
@@ -1172,7 +1240,6 @@ function handleEventPacket(d) {
     }
   } else if (kind === 'player_shot') {
     // Один из игроков стрельнул в конвой — трассер от стрелка к цели
-    // Координаты цели берём из текущего worldEvent (boss или guard)
     if (!worldEvent) return;
     let tx = 0, ty = 0;
     if (d.target === 'b') {
@@ -1186,6 +1253,33 @@ function handleEventPacket(d) {
       sr: d.sy, sc: d.sx, er: ty, ec: tx,
       t0: performance.now(), ttl: 160, hit: true, fromPlayer: true,
     });
+  } else if (kind === 'pvp_shot') {
+    // PvP: игрок стреляет в другого игрока (в активной зоне инкассатора)
+    bullets.push({
+      sr: d.sy, sc: d.sx, er: d.ty, ec: d.tx,
+      t0: performance.now(), ttl: 180, hit: true, fromPlayer: true,
+    });
+    const meIsShooter = (String(d.shooter_uid) === String(QP.uid));
+    const meIsTarget  = (String(d.target_uid)  === String(QP.uid));
+    if (meIsTarget) {
+      flashHitOverlay();
+      if (d.killed) {
+        myDeathBy = d.shooter_name || 'игрок';
+      }
+    }
+    if (d.killed) {
+      const sName = d.shooter_name || 'кто-то';
+      const tName = d.target_name  || 'кто-то';
+      if (meIsShooter) {
+        showEventBanner('🩸 Фраг!', `Ты завалил ${tName}.`, 2800, 'win');
+      } else if (meIsTarget) {
+        showEventBanner('💀 Тебя завалили',
+          `${sName} убил тебя в борьбе за инкассатора.`, 2800, 'lose');
+      } else {
+        showEventBanner('🩸 PvP в городе',
+          `${sName} завалил ${tName} в зоне инкассатора.`, 2500, 'neutral');
+      }
+    }
   }
 }
 
@@ -1332,13 +1426,16 @@ function wsConnect() {
       // Сервер шлёт всю структуру конвоя в d.event. Кладём её в
       // worldEvent — render-loop сам отрисует NPC и HP-бары.
       worldEvent = d.event || null;
-      // Если игрок мёртв от полиции — серверный respawn timer тащим в HUD
       if (d.me && typeof d.me.respawn_in === 'number') {
         myDeathLeft = d.me.respawn_in;
       }
       if (d.me && typeof d.me.max_hp === 'number') {
         PVP.max_hp = d.me.max_hp;
       }
+      // Countdown до следующего инкассатора (виден всем игрокам)
+      if (typeof d.next_event_in === 'number') nextEventIn = d.next_event_in;
+      // Игрок сейчас в активной PvP-зоне? (вокруг маршрута, пока конвой жив)
+      pvpActive = !!d.pvp_active;
     } else if (pkt.t === 'event') {
       handleEventPacket(pkt.d || {});
     }
@@ -1547,10 +1644,13 @@ const _pvpDeaths = document.getElementById('pvpDeaths');
 const _deathOv   = document.getElementById('deathOverlay');
 const _deathBy   = document.getElementById('deathBy');
 const _deathCnt  = document.getElementById('deathCnt');
-// Найти ближайшую живую цель конвоя в радиусе огня. Возвращает
-// {id:'b'|'g0'..'g2', x, y, d} или null. Игрок наводится автоматически —
-// на телефоне точно прицелиться по маленькому NPC сложно.
-const FIRE_R_CONVOY = 8.5;
+// Текущее экипированное оружие (выбор из инвентаря через weaponBar).
+// Дефолт — pistol (он есть у всех). Реальный урон — на сервере (WEAPON_DMG).
+let currentWeapon = (QP.weapon || 'pistol');
+
+// Найти ближайшую живую цель конвоя в радиусе огня. Используется как
+// auto-aim (тап fire без правого стика). Возвращает {id, x, y, d} или null.
+const FIRE_R_CONVOY = 9.5;
 function findNearestConvoyTarget() {
   if (!worldEvent) return null;
   const pr = player.r, pc = player.c;
@@ -1564,40 +1664,106 @@ function findNearestConvoyTarget() {
       best = { id: npc.id, x: npc.x, y: npc.y, d };
     }
   };
-  // Сначала ставим в приоритет полицейских — они активно стреляют,
-  // выгоднее убрать их раньше. На равной дистанции — guard, потом boss.
   for (const g of (worldEvent.guards || [])) try_(g);
   try_(worldEvent.boss);
   return best;
 }
 
-function fire() {
+// Найти живого ИГРОКА на которого направлен наш прицел (в pvp-зоне).
+// dirX/dirY — единичный вектор направления выстрела. Возвращаем игрока
+// который ближе всего к лучу (cone-style aim).
+const PVP_FIRE_R = 8.5;
+function findPvpTargetAlongAim(dirX, dirY) {
+  if (!pvpActive) return null;
+  let best = null;
+  for (const [uid, o] of others) {
+    if (o.dead) continue;
+    const dx = o.x - player.c, dy = o.y - player.r;
+    const d = Math.hypot(dx, dy);
+    if (d > PVP_FIRE_R) continue;
+    // Косинус угла между направлением и вектором на цель
+    const dn = d > 0.001 ? d : 1;
+    const dot = (dx * dirX + dy * dirY) / dn;
+    if (dot < 0.65) continue;   // цель не в конусе ±50° от прицела
+    const score = d - dot * 2;  // ближе + точнее = лучше
+    if (!best || score < best.score) best = { uid, x: o.x, y: o.y, d, score };
+  }
+  return best;
+}
+
+// fire(angle): если angle задан — стреляем в эту сторону, иначе auto-aim.
+// Учитывает текущее оружие; приоритеты: конвой → игрок в pvp-зоне.
+function fire(angle = null) {
   if (myDead) return;
   const now = performance.now();
-  if (now - lastShotClientT < PVP.cd * 1000) return;   // лок. cooldown
-  // Приоритет: конвой (эмерджентное событие) > PVP-арена.
-  const ct = findNearestConvoyTarget();
-  if (ct) {
-    lastShotClientT = now;
-    _fireBtn.classList.add('cd');
-    setTimeout(() => _fireBtn.classList.remove('cd'), PVP.cd * 1000);
-    // Поворот игрока к цели (визуально приятнее)
-    player.ang = Math.atan2(ct.y - player.r, ct.x - player.c);
-    // Локальный трассер сразу — без ожидания подтверждения сервера
+  if (now - lastShotClientT < PVP.cd * 1000) return;
+  let dirX = 1, dirY = 0;
+  if (typeof angle === 'number') {
+    dirX = Math.cos(angle); dirY = Math.sin(angle);
+    player.ang = angle;
+  }
+  // Если англ не задан и есть конвой/игрок поблизости — авто-нацеливаемся.
+  if (angle === null) {
+    const ct = findNearestConvoyTarget();
+    if (ct) {
+      const a = Math.atan2(ct.y - player.r, ct.x - player.c);
+      dirX = Math.cos(a); dirY = Math.sin(a);
+      player.ang = a;
+    } else {
+      // Авто-выстрел в направлении взгляда (player.ang)
+      dirX = Math.cos(player.ang); dirY = Math.sin(player.ang);
+    }
+  }
+  // Что под прицелом?
+  // 1) Конвой в радиусе огня + по направлению (или auto-aim)
+  let chosenConvoy = null;
+  if (worldEvent) {
+    const targets = [];
+    if (worldEvent.boss && worldEvent.boss.alive) targets.push(worldEvent.boss);
+    for (const g of (worldEvent.guards || [])) if (g.alive) targets.push(g);
+    for (const t of targets) {
+      const dx = t.x - player.c, dy = t.y - player.r;
+      const d = Math.hypot(dx, dy);
+      if (d > FIRE_R_CONVOY) continue;
+      const dn = d > 0.001 ? d : 1;
+      const dot = (dx * dirX + dy * dirY) / dn;
+      if (dot < 0.55) continue;
+      if (!chosenConvoy || d < chosenConvoy.d) chosenConvoy = { id: t.id, x: t.x, y: t.y, d };
+    }
+  }
+  // 2) PvP-игрок
+  const pvpTarget = !chosenConvoy ? findPvpTargetAlongAim(dirX, dirY) : null;
+  if (!chosenConvoy && !pvpTarget && !inArena(player.r, player.c)) {
+    // Промах в пустоту — игнорим чтобы не спамить серверу
+    return;
+  }
+  lastShotClientT = now;
+  _fireBtn.classList.add('cd');
+  joyREl.classList.add('cd');
+  setTimeout(() => { _fireBtn.classList.remove('cd'); joyREl.classList.remove('cd'); }, PVP.cd * 1000);
+  if (chosenConvoy) {
     bullets.push({
-      sr: player.r, sc: player.c, er: ct.y, ec: ct.x,
+      sr: player.r, sc: player.c, er: chosenConvoy.y, ec: chosenConvoy.x,
       t0: now, ttl: 160, hit: true, fromPlayer: true,
     });
     try {
       ws && ws.send(JSON.stringify({ t: 'event_shoot',
-        d: { target: ct.id, dmg: 25 } }));
+        d: { target: chosenConvoy.id, weapon: currentWeapon } }));
     } catch(e) {}
     return;
   }
-  if (!inArena(player.r, player.c)) return;
-  lastShotClientT = now;
-  _fireBtn.classList.add('cd');
-  setTimeout(() => _fireBtn.classList.remove('cd'), PVP.cd * 1000);
+  if (pvpTarget) {
+    bullets.push({
+      sr: player.r, sc: player.c, er: pvpTarget.y, ec: pvpTarget.x,
+      t0: now, ttl: 160, hit: true, fromPlayer: true,
+    });
+    try {
+      ws && ws.send(JSON.stringify({ t: 'player_shoot',
+        d: { target_uid: pvpTarget.uid, weapon: currentWeapon } }));
+    } catch(e) {}
+    return;
+  }
+  // Старый PVP-арена-режим (если конвоя нет)
   sendShoot(player.ang);
 }
 _fireBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); fire(); }, { passive: false });
@@ -1605,20 +1771,22 @@ _fireBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); fire(); },
 window.addEventListener('keydown', (e) => { if (e.code === 'Space' && !chatOpen) { e.preventDefault(); fire(); } });
 
 function updatePvpUI() {
-  const inPvp     = inArena(player.r, player.c);
-  const convoyT   = findNearestConvoyTarget();
-  // HUD виден в PVP-зоне ИЛИ когда HP неполный (тебя кто-то ранил из конвоя)
-  const showHud   = inPvp || myHp < (PVP.max_hp || 100);
+  const inPvp      = inArena(player.r, player.c);
+  const convoyT    = findNearestConvoyTarget();
+  const canShoot   = (inPvp || pvpActive || convoyT) && !myDead;
+  // HUD виден в PVP-зоне ИЛИ когда HP неполный (тебя ранили) ИЛИ в pvp-зоне инкассатора
+  const showHud   = inPvp || pvpActive || myHp < (PVP.max_hp || 100);
   _pvpHud.style.display  = showHud ? 'block' : 'none';
-  // Кнопка огня — в арене или когда конвой в радиусе огня (auto-aim)
-  _fireBtn.style.display = ((inPvp || convoyT) && !myDead) ? 'block' : 'none';
-  // HP-бар (показывает реальное серверное HP, не локальный predict)
+  _fireBtn.style.display = canShoot ? 'block' : 'none';
+  // Правый стик показываем когда есть кому стрелять
+  if (joyREl) joyREl.style.display = canShoot ? 'block' : 'none';
+  // Weapon bar показываем если можем стрелять и есть оружие в инвентаре
+  if (_weaponBarEl) _weaponBarEl.style.display = (canShoot && _myWeapons.length > 0) ? 'flex' : 'none';
   const pct = Math.max(0, Math.min(100, (myHp / (PVP.max_hp || 100)) * 100));
   _pvpHpBar.style.width = pct + '%';
   _pvpHpTxt.textContent = Math.max(0, Math.round(myHp));
   _pvpKills.textContent  = myKills;
   _pvpDeaths.textContent = myDeaths;
-  // Экран смерти
   if (myDead) {
     if (!_deathOv.classList.contains('show')) _deathOv.classList.add('show');
     _deathBy.textContent = myDeathBy ? `Тебя завалил ${myDeathBy}` : '';
@@ -1626,9 +1794,98 @@ function updatePvpUI() {
   } else if (_deathOv.classList.contains('show')) {
     _deathOv.classList.remove('show');
   }
-  // Hit-flash overlay тик (плавно гаснет 350мс после попадания)
   _updateHitFlash();
+  // Countdown «до инкассатора»
+  if (_cdHudEl) {
+    if (nextEventIn < 0) {
+      // Сейчас идёт — пульсирующий красный
+      _cdHudEl.textContent = '🚨 ИНКАССАТОР НА МАРШРУТЕ';
+      _cdHudEl.classList.add('live');
+      _cdHudEl.style.display = 'block';
+    } else if (nextEventIn > 0) {
+      const m = Math.floor(nextEventIn / 60);
+      const s = nextEventIn % 60;
+      _cdHudEl.textContent = `⏱ До инкассатора ${m}:${String(s).padStart(2,'0')}`;
+      _cdHudEl.classList.remove('live');
+      _cdHudEl.style.display = 'block';
+    } else {
+      _cdHudEl.style.display = 'none';
+    }
+  }
+  // PvP-зона badge
+  if (_pvpZoneEl) {
+    _pvpZoneEl.style.display = (pvpActive && !myDead) ? 'block' : 'none';
+    document.body.classList.toggle('in-pvp', !!pvpActive);
+  }
 }
+
+// ── Countdown / PvP-zone state из snap ──────────────────────────
+let nextEventIn = 0;
+let pvpActive   = false;
+const _cdHudEl    = document.getElementById('cdHud');
+const _pvpZoneEl  = document.getElementById('pvpZone');
+
+// ── Weapon switcher ─────────────────────────────────────────────
+// Дергаем /inv/{uid}/list, фильтруем только weapon-предметы, рисуем
+// горизонтальную полоску иконок. Тап меняет currentWeapon. Сейчас
+// показываем первые 6 (чтобы влезало на телефоне).
+const _weaponBarEl = document.getElementById('weaponBar');
+let _myWeapons = [];   // [{id, name, icon, dmg}]
+// Иконки оружия — соответствуют ITEMS из бота. Минимальный набор.
+const WEAPON_ICON = {
+  pistol:'🔫', nagan:'🔫', pistol_heavy:'🔫', pistol_gold:'⭐',
+  shotgun:'💥', smg:'⚡', tommy_gun:'🏛', rifle:'🎯',
+  sniper:'🎯', rpg:'🚀',
+};
+async function loadMyWeapons() {
+  if (!QP.api || !QP.uid) return;
+  try {
+    const r = await fetch(QP.api + '/inv/' + encodeURIComponent(QP.uid) + '/list',
+                          { cache: 'no-store' });
+    const j = await r.json().catch(()=>({}));
+    if (!j || !Array.isArray(j.items)) return;
+    _myWeapons = [];
+    for (const it of j.items) {
+      const id = it.id || it.item_id;
+      if (!id) continue;
+      if (it.type && it.type !== 'weapon') continue;
+      // Только огнестрел известный серверу
+      if (!(id in WEAPON_ICON)) continue;
+      _myWeapons.push({
+        id, name: it.name || id,
+        icon: WEAPON_ICON[id] || '🔫',
+        count: it.count || 1,
+      });
+    }
+    // Pistol гарантированно есть (стартовый)
+    if (!_myWeapons.find(w => w.id === currentWeapon)) {
+      if (_myWeapons.length > 0) currentWeapon = _myWeapons[0].id;
+    }
+    renderWeaponBar();
+  } catch(e) { /* тихо */ }
+}
+function renderWeaponBar() {
+  if (!_weaponBarEl) return;
+  _weaponBarEl.innerHTML = '';
+  // Сначала ставим текущее, потом остальные. До 6 штук.
+  const list = _myWeapons.slice(0, 6);
+  for (const w of list) {
+    const b = document.createElement('button');
+    b.className = 'wslot' + (w.id === currentWeapon ? ' active' : '');
+    b.textContent = w.icon;
+    b.title = w.name;
+    b.addEventListener('click', (e) => {
+      e.preventDefault();
+      currentWeapon = w.id;
+      renderWeaponBar();
+      showToast(w.name, '🔫', 1200);
+    });
+    _weaponBarEl.appendChild(b);
+  }
+}
+// Подгружаем оружие при загрузке мира (и потом раз в 60с — на случай покупки в магазине)
+loadMyWeapons();
+setInterval(loadMyWeapons, 60000);
 
 document.getElementById('shopGoBtn').addEventListener('click', () => {
   // Редирект в hub.html?view=shop&back=world. Hub откроет страницу
