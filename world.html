@@ -1262,7 +1262,7 @@ function handleEventPacket(d) {
     worldEvent = null;
   } else if (kind === 'inkassator_escaped') {
     showEventBanner('💼 Инкассатор уехал',
-      'Никто не успел перехватить. Следующий через 3 мин.', 3500, 'neutral');
+      'Никто не успел перехватить. Следующий через 10 мин.', 3500, 'neutral');
     worldEvent = null;
   } else if (kind === 'inkass_shot') {
     // NPC выстрелил в игрока — трассер + вспышка
