@@ -963,33 +963,6 @@ function buildMap() {
       }
     }
   }
-  // Зона Логова — отдельный «цыганский лагерь» в радиусе 20 от центра.
-  // Сносим все обычные здания внутри (чтобы вместо офисов рисовался
-  // открытый пустырь с палатками/руинами), а декор расставляет
-  // generateLairDecor() ниже — отдельным списком, не через MAP.
-  for (const p of POI) {
-    if (!p.aggro) continue;
-    const rad = (p.radius || 20);
-    for (let r = p.r - rad; r <= p.r + rad; r++) {
-      for (let c = p.c - rad; c <= p.c + rad; c++) {
-        if (r <= 0 || r >= MAP_ROWS - 1 || c <= 0 || c >= MAP_COLS - 1) continue;
-        // Внутри зоны: сносим здания, фонари, машины, ящики — всё что
-        // не дорога. Оставляем 8/9 (газон/бордюр) как «земля лагеря».
-        const t = MAP[r][c];
-        if (t === 1 || t === 6 || t === 7 || t === 2 ||
-            t === 3 || t === 4 || t === 5) {
-          // На дороге не трогаем (дорога остаётся 0); внутри блока → земля 8
-          const onRoadR = (r % BLOCK <= 3);
-          const onRoadC = (c % BLOCK <= 3);
-          MAP[r][c] = (onRoadR || onRoadC) ? 0 : 8;
-        }
-      }
-    }
-    // POI-тайл вернём как здание (☠️-вывеска должна торчать).
-    if (p.r > 0 && p.r < MAP_ROWS - 1 && p.c > 0 && p.c < MAP_COLS - 1) {
-      MAP[p.r][p.c] = 1;
-    }
-  }
 }
 
 // ── POI районов ────────────────────────────────────────────────
@@ -1124,9 +1097,6 @@ const activeCaptures = new Map();
 // Заполняется из snap.aggro. Боты рисуются как банда (фиолетовая футболка +
 // балаклава), укрытия — как разрушаемые ящики с HP-баром.
 const aggroZones = Object.create(null);
-// Активные бандитские гнёзда — массив объектов [{id, r, c, state,
-// expires_in, bots_alive}]. Перезаписывается с каждым snap.
-let gangNests = [];
 // Эхо: моё последнее предупреждение от банды — чтобы рисовать чат-баббл
 const _aggroWarnMsg = { until: 0, text: '', from: null };
 // Helper: получить ЛЮБОЙ активный захват — приоритет мой, иначе первый.
@@ -1158,666 +1128,6 @@ function ownerColor(key) {
 }
 
 buildMap();
-
-// ── Декор Логова: цыганский лагерь ──────────────────────────────
-// Палатки/руины/костры/обломки машин/тряпки. Генерируется один раз
-// детерминированно по координатам зоны (одинаково у всех клиентов).
-// НЕ участвует в проходимости — чисто визуал. Объекты добавляются
-// в depth-sort вместе с обычными тайлами в render().
-const LAIR_DECOR = [];   // [{ type, r, c, seed }]
-function generateLairDecor() {
-  LAIR_DECOR.length = 0;
-  // Простой LCG seed по координате — детерминированный pseudo-random
-  function det(r, c, k) { return ((r * 73 + c * 131 + k * 37) % 1000) / 1000; }
-  for (const p of POI) {
-    if (!p.aggro) continue;
-    const rad = (p.radius || 20);
-    // Шагаем сеткой 2 тайла, в каждой клетке решаем: ставить ли что-то
-    for (let r = p.r - rad + 2; r <= p.r + rad - 2; r += 2) {
-      for (let c = p.c - rad + 2; c <= p.c + rad - 2; c += 2) {
-        if (r <= 0 || r >= MAP_ROWS - 1 || c <= 0 || c >= MAP_COLS - 1) continue;
-        // Внутреннее кольцо вокруг POI оставляем пустым (там босс/спавн)
-        const distToPoi = Math.max(Math.abs(r - p.r), Math.abs(c - p.c));
-        if (distToPoi < 3) continue;
-        // Не ставим на дороге (бо́льшая часть дорог снесена, но всё же)
-        if (MAP[r][c] === 0) continue;
-        const x = det(r, c, 1);
-        if (x > 0.55) continue;   // 45% заполнения
-        // Кольца: внешнее = граница лагеря (руины/обломки), среднее =
-        // защитная линия (баррикады), внутреннее = жилая зона (палатки/костры).
-        const innerR = rad * 0.45;
-        const midR   = rad * 0.75;
-        let type;
-        if (distToPoi < innerR) {
-          // Жилая зона — много палаток, костров, мусора, бочка с огнём
-          if      (x < 0.08) type = 'firebarrel';
-          else if (x < 0.18) type = 'fire';
-          else if (x < 0.42) type = 'tent';
-          else if (x < 0.50) type = 'junk';
-          else               type = 'wreck';
-        } else if (distToPoi < midR) {
-          // Защитная линия — баррикады, костры на постах, обломки
-          if      (x < 0.20) type = 'barricade';
-          else if (x < 0.30) type = 'firebarrel';
-          else if (x < 0.40) type = 'wreck';
-          else if (x < 0.48) type = 'junk';
-          else               type = 'ruin';
-        } else {
-          // Внешний периметр — руины и обломки (заброшенные дома)
-          if      (x < 0.10) type = 'wreck';
-          else if (x < 0.20) type = 'junk';
-          else               type = 'ruin';
-        }
-        // Лёгкий jitter координат для «небрежности» лагеря
-        const jr = r + (det(r, c, 5) - 0.5) * 0.8;
-        const jc = c + (det(r, c, 6) - 0.5) * 0.8;
-        LAIR_DECOR.push({ type, r: jr, c: jc, seed: x });
-      }
-    }
-    // Периметральные стены — длинные стены с граффити вдоль границы
-    // лагеря. Расставляем сегментами с разрывами (входы между стенами).
-    // Ориентация: горизонтальная (orient=0) на северной/южной сторонах,
-    // вертикальная (orient=1) на восточной/западной.
-    const wallR = rad - 2;   // на 2 тайла внутрь от границы зоны
-    const wallStep = 3;      // шаг между стенами
-    for (let off = -wallR; off <= wallR; off += wallStep) {
-      // Северная грань (r = p.r - wallR)
-      const skipN = det(p.r - wallR, p.c + off, 2) < 0.30;
-      if (!skipN) LAIR_DECOR.push({
-        type: 'wall', r: p.r - wallR, c: p.c + off,
-        seed: det(p.r - wallR, p.c + off, 11),
-        orient: 0,
-      });
-      // Южная грань (r = p.r + wallR)
-      const skipS = det(p.r + wallR, p.c + off, 2) < 0.30;
-      if (!skipS) LAIR_DECOR.push({
-        type: 'wall', r: p.r + wallR, c: p.c + off,
-        seed: det(p.r + wallR, p.c + off, 13),
-        orient: 0,
-      });
-      // Западная грань (c = p.c - wallR)
-      const skipW = det(p.r + off, p.c - wallR, 2) < 0.30;
-      if (!skipW) LAIR_DECOR.push({
-        type: 'wall', r: p.r + off, c: p.c - wallR,
-        seed: det(p.r + off, p.c - wallR, 17),
-        orient: 1,
-      });
-      // Восточная грань (c = p.c + wallR)
-      const skipE = det(p.r + off, p.c + wallR, 2) < 0.30;
-      if (!skipE) LAIR_DECOR.push({
-        type: 'wall', r: p.r + off, c: p.c + wallR,
-        seed: det(p.r + off, p.c + wallR, 19),
-        orient: 1,
-      });
-    }
-  }
-}
-generateLairDecor();
-
-// drawLairTent — изометрический шатёр (треугольник + полосы).
-// Цвета пёстрые (бордовые/тёмно-зелёные/охра) — цыганский колорит.
-function drawLairTent(d) {
-  const p = w2s(d.r + 0.5, d.c + 0.5);
-  const wx = TS * 0.55, wy = TS * 0.55 * ISO_Y;
-  const H  = isoH(0.9 + d.seed * 0.5);
-  // Палитра — выбирается по seed
-  const pals = [
-    { side: '#6a1818', top: '#aa2a2a', stripe: '#f1c40f' },  // бордо + золото
-    { side: '#1a3a1a', top: '#2a6a2a', stripe: '#e8d23b' },  // тёмно-зелёный
-    { side: '#3a2410', top: '#6a4020', stripe: '#cdd3d8' },  // охра
-    { side: '#2a1a3a', top: '#4a2a5a', stripe: '#ffaa44' },  // фиолетовый
-    { side: '#5a3010', top: '#8a4a18', stripe: '#f0e44a' },  // рыжий
-  ];
-  const pal = pals[Math.floor(d.seed * 100) % pals.length];
-  // Тень
-  ctx.fillStyle = 'rgba(0,0,0,.5)';
-  ctx.beginPath();
-  ctx.moveTo(p.x, p.y - wy);
-  ctx.lineTo(p.x + wx, p.y);
-  ctx.lineTo(p.x, p.y + wy);
-  ctx.lineTo(p.x - wx, p.y);
-  ctx.closePath();
-  ctx.fill();
-  // Шатёр — две треугольные грани от основания к вершине
-  // Левая грань (тёмная)
-  ctx.fillStyle = pal.side;
-  ctx.beginPath();
-  ctx.moveTo(p.x - wx, p.y);
-  ctx.lineTo(p.x,      p.y + wy);
-  ctx.lineTo(p.x,      p.y - H);
-  ctx.closePath();
-  ctx.fill();
-  // Правая грань (светлая)
-  ctx.fillStyle = pal.top;
-  ctx.beginPath();
-  ctx.moveTo(p.x,      p.y + wy);
-  ctx.lineTo(p.x + wx, p.y);
-  ctx.lineTo(p.x,      p.y - H);
-  ctx.closePath();
-  ctx.fill();
-  // Полосы — горизонтальные на правой грани (даёт «тент» вид)
-  ctx.strokeStyle = pal.stripe;
-  ctx.lineWidth = 0.8;
-  for (let i = 1; i <= 3; i++) {
-    const k = i / 4;
-    const y1 = p.y + wy * (1 - k) - 0; // граница: от низа правой грани
-    const y2 = p.y - H + (p.y + wy - (p.y - H)) * k * 0.5;
-    ctx.beginPath();
-    ctx.moveTo(p.x, p.y + wy - (H + wy) * k);
-    ctx.lineTo(p.x + wx * (1 - k), p.y - H * k + wy * (1 - k) * 0);
-    ctx.stroke();
-  }
-  // Тёмный «вход» (треугольный лаз)
-  ctx.fillStyle = '#0a0a0a';
-  ctx.beginPath();
-  ctx.moveTo(p.x - wx * 0.20, p.y + wy * 0.45);
-  ctx.lineTo(p.x,              p.y + wy * 0.10);
-  ctx.lineTo(p.x + wx * 0.20,  p.y + wy * 0.45);
-  ctx.lineTo(p.x,              p.y + wy * 0.60);
-  ctx.closePath();
-  ctx.fill();
-  // Колышки и верёвки оттяжки
-  ctx.strokeStyle = '#1a1208';
-  ctx.lineWidth = 0.7;
-  ctx.beginPath();
-  ctx.moveTo(p.x, p.y - H);
-  ctx.lineTo(p.x - wx * 1.15, p.y + wy * 0.45);
-  ctx.moveTo(p.x, p.y - H);
-  ctx.lineTo(p.x + wx * 1.15, p.y + wy * 0.45);
-  ctx.stroke();
-  // Флажок на вершине (треугольник)
-  ctx.fillStyle = pal.stripe;
-  ctx.beginPath();
-  ctx.moveTo(p.x, p.y - H);
-  ctx.lineTo(p.x + 6, p.y - H + 2);
-  ctx.lineTo(p.x, p.y - H + 5);
-  ctx.closePath();
-  ctx.fill();
-}
-
-// drawLairRuin — разрушенная стена с выбитым окном и обугленным верхом.
-function drawLairRuin(d) {
-  const p = w2s(d.r + 0.5, d.c + 0.5);
-  const wx = TS * 0.5, wy = TS * 0.5 * ISO_Y;
-  const H  = isoH(0.7 + d.seed * 0.8);  // ниже обычного дома — обрушено
-  // Палитра — землистый кирпич, обугленный наверху
-  const sides = [
-    ['#3a2a20', '#1a120c', '#5a4030'],
-    ['#4a382a', '#241a10', '#6a5040'],
-    ['#3a2820', '#180e08', '#52382a'],
-  ];
-  const palI = Math.floor(d.seed * 100) % sides.length;
-  const [side, dark, top] = sides[palI];
-  // Тень основания
-  ctx.fillStyle = 'rgba(0,0,0,.5)';
-  ctx.beginPath();
-  ctx.moveTo(p.x, p.y - wy);
-  ctx.lineTo(p.x + wx, p.y);
-  ctx.lineTo(p.x, p.y + wy);
-  ctx.lineTo(p.x - wx, p.y);
-  ctx.closePath();
-  ctx.fill();
-  // Левая грань — с «выщербленным» верхом (рваная линия)
-  ctx.fillStyle = side;
-  ctx.beginPath();
-  ctx.moveTo(p.x - wx, p.y);
-  ctx.lineTo(p.x,      p.y + wy);
-  ctx.lineTo(p.x,      p.y + wy - H);
-  // Рваный верх: 3 зубца
-  const lh1 = H * (0.55 + d.seed * 0.35);
-  const lh2 = H * (0.80 - d.seed * 0.25);
-  ctx.lineTo(p.x - wx * 0.33, p.y - lh1 + wy * 0.66);
-  ctx.lineTo(p.x - wx * 0.66, p.y - lh2 + wy * 0.33);
-  ctx.lineTo(p.x - wx,        p.y - H * (0.40 + d.seed * 0.30));
-  ctx.closePath();
-  ctx.fill();
-  // Правая грань — тоже рваная
-  ctx.fillStyle = top;
-  ctx.beginPath();
-  ctx.moveTo(p.x,      p.y + wy);
-  ctx.lineTo(p.x + wx, p.y);
-  ctx.lineTo(p.x + wx, p.y - H * (0.50 + d.seed * 0.30));
-  const rh1 = H * (0.75 - d.seed * 0.20);
-  const rh2 = H * (0.55 + d.seed * 0.30);
-  ctx.lineTo(p.x + wx * 0.66, p.y - rh1 + wy * 0.33);
-  ctx.lineTo(p.x + wx * 0.33, p.y - rh2 + wy * 0.66);
-  ctx.lineTo(p.x,             p.y + wy - H);
-  ctx.closePath();
-  ctx.fill();
-  // Выбитое окно — чёрный неровный прямоугольник
-  const winY = p.y - H * 0.5;
-  ctx.fillStyle = '#000';
-  ctx.fillRect(p.x + wx * 0.15, winY - 4, 8, 7);
-  // Осколки стекла по краям окна — мелкие штрихи
-  ctx.strokeStyle = '#9accff';
-  ctx.lineWidth = 0.6;
-  ctx.beginPath();
-  ctx.moveTo(p.x + wx * 0.15, winY - 4); ctx.lineTo(p.x + wx * 0.15 + 2, winY - 2);
-  ctx.moveTo(p.x + wx * 0.15 + 8, winY + 3); ctx.lineTo(p.x + wx * 0.15 + 6, winY + 1);
-  ctx.stroke();
-  // Граффити или подтёк — короткая красная черта
-  if (d.seed > 0.5) {
-    ctx.strokeStyle = '#8a1010';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(p.x + wx * 0.10, winY + 6);
-    ctx.lineTo(p.x + wx * 0.40, winY + 8);
-    ctx.stroke();
-  }
-  // Куча обломков у основания (правая сторона)
-  ctx.fillStyle = dark;
-  ctx.beginPath();
-  ctx.ellipse(p.x + wx * 0.5, p.y + wy * 0.5, wx * 0.45, wy * 0.5, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // Кирпичики
-  ctx.fillStyle = side;
-  for (let i = 0; i < 3; i++) {
-    const bx = p.x + wx * (0.30 + i * 0.18);
-    const by = p.y + wy * (0.45 + (i & 1) * 0.12);
-    ctx.fillRect(bx, by, 3, 2);
-  }
-}
-
-// drawLairFire — костёр (пляшущее пламя + кольцо камней).
-function drawLairFire(d) {
-  const p = w2s(d.r + 0.5, d.c + 0.5);
-  const t = performance.now() * 0.008 + d.seed * 6.28;
-  // Кольцо камней
-  ctx.fillStyle = '#3a3a44';
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * Math.PI * 2;
-    const sx = p.x + Math.cos(a) * 7;
-    const sy = p.y + Math.sin(a) * 3.5;
-    ctx.beginPath();
-    ctx.ellipse(sx, sy, 2.5, 1.8, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  // Дрова — две перекрещенные палки
-  ctx.strokeStyle = '#3a2010';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(p.x - 5, p.y - 1); ctx.lineTo(p.x + 5, p.y + 1);
-  ctx.moveTo(p.x - 4, p.y + 1); ctx.lineTo(p.x + 4, p.y - 2);
-  ctx.stroke();
-  // Угли — оранжевое свечение
-  ctx.fillStyle = 'rgba(255,140,40,.85)';
-  ctx.shadowColor = '#ff6020';
-  ctx.shadowBlur = 12;
-  ctx.beginPath();
-  ctx.ellipse(p.x, p.y - 1, 4, 2.5, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // Пляшущее пламя
-  const flameH = 9 + Math.sin(t) * 1.5 + Math.sin(t * 2.3) * 1;
-  const flameW = 5 + Math.sin(t * 1.7) * 0.6;
-  const fg = ctx.createLinearGradient(p.x, p.y - flameH, p.x, p.y);
-  fg.addColorStop(0,    'rgba(255,240,80,.0)');
-  fg.addColorStop(0.35, 'rgba(255,180,40,.85)');
-  fg.addColorStop(0.75, 'rgba(255,90,20,.95)');
-  fg.addColorStop(1,    'rgba(180,40,10,.95)');
-  ctx.fillStyle = fg;
-  ctx.beginPath();
-  ctx.moveTo(p.x, p.y - flameH);
-  ctx.quadraticCurveTo(p.x + flameW, p.y - flameH * 0.4, p.x + flameW * 0.5, p.y - 1);
-  ctx.lineTo(p.x - flameW * 0.5, p.y - 1);
-  ctx.quadraticCurveTo(p.x - flameW, p.y - flameH * 0.4, p.x, p.y - flameH);
-  ctx.closePath();
-  ctx.fill();
-  ctx.shadowBlur = 0;
-  // Искра — мелкая жёлтая точка над пламенем (изредка)
-  if ((Math.sin(t * 3.1) + Math.cos(t * 5.7)) > 1.2) {
-    ctx.fillStyle = '#ffd060';
-    ctx.beginPath();
-    ctx.arc(p.x + Math.sin(t * 7) * 3, p.y - flameH - 3 - Math.sin(t * 4) * 2, 0.9, 0, Math.PI * 2);
-    ctx.fill();
-  }
-}
-
-// drawLairJunk — куча мусора (тряпки/банки/бутылки).
-function drawLairJunk(d) {
-  const p = w2s(d.r + 0.5, d.c + 0.5);
-  // Грязное пятно под мусором
-  ctx.fillStyle = 'rgba(40,30,20,.55)';
-  ctx.beginPath();
-  ctx.ellipse(p.x, p.y + 2, 9, 4, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // Тряпки — цветные пятна (бордо, оливка, серый)
-  const cols = ['#7a2020', '#5a5028', '#3a3a40', '#682818', '#404a28'];
-  for (let i = 0; i < 4; i++) {
-    const ang = (d.seed * 6.28 + i * 1.5);
-    const dx = Math.cos(ang) * 3;
-    const dy = Math.sin(ang) * 1.5;
-    ctx.fillStyle = cols[(Math.floor(d.seed * 100) + i) % cols.length];
-    ctx.beginPath();
-    ctx.ellipse(p.x + dx, p.y + dy, 2.8, 1.6, ang, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  // Бутылка/банка — мелкий блестящий цилиндрик сбоку
-  ctx.fillStyle = '#3a4a2a';
-  ctx.fillRect(p.x + 3, p.y - 4, 2, 4);
-  ctx.fillStyle = '#7aa050';
-  ctx.fillRect(p.x + 3, p.y - 4, 2, 1);
-  // Картонная коробка справа
-  ctx.fillStyle = '#5a3818';
-  ctx.fillRect(p.x - 5, p.y - 3, 4, 3.5);
-  ctx.strokeStyle = '#3a2410';
-  ctx.lineWidth = 0.5;
-  ctx.strokeRect(p.x - 5, p.y - 3, 4, 3.5);
-}
-
-// drawLairWreck — обугленный/перевёрнутый каркас машины.
-function drawLairWreck(d) {
-  const p = w2s(d.r + 0.5, d.c + 0.5);
-  // Лужа масла
-  ctx.fillStyle = 'rgba(10,8,6,.7)';
-  ctx.beginPath();
-  ctx.ellipse(p.x, p.y + 3, 11, 5, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // Каркас — тёмно-серый с ржавчиной
-  const upside = d.seed > 0.65;
-  ctx.fillStyle = '#1a1612';
-  if (upside) {
-    // Перевёрнутая — крыша вниз
-    ctx.beginPath();
-    ctx.moveTo(p.x - 9, p.y + 2);
-    ctx.lineTo(p.x + 9, p.y + 2);
-    ctx.lineTo(p.x + 7, p.y - 4);
-    ctx.lineTo(p.x - 7, p.y - 4);
-    ctx.closePath();
-    ctx.fill();
-    // Колёса вверх
-    ctx.fillStyle = '#0a0808';
-    ctx.fillRect(p.x - 8, p.y - 7, 3, 2.5);
-    ctx.fillRect(p.x + 5, p.y - 7, 3, 2.5);
-    ctx.fillRect(p.x - 8, p.y - 4, 3, 2.5);
-    ctx.fillRect(p.x + 5, p.y - 4, 3, 2.5);
-  } else {
-    // Стоит, но обугленная
-    ctx.beginPath();
-    ctx.moveTo(p.x - 10, p.y - 2);
-    ctx.lineTo(p.x + 10, p.y - 2);
-    ctx.lineTo(p.x + 8,  p.y + 3);
-    ctx.lineTo(p.x - 8,  p.y + 3);
-    ctx.closePath();
-    ctx.fill();
-    // Крыша (обгорелая, проваленная)
-    ctx.fillStyle = '#2a2018';
-    ctx.beginPath();
-    ctx.moveTo(p.x - 6, p.y - 7);
-    ctx.lineTo(p.x + 6, p.y - 7);
-    ctx.lineTo(p.x + 8, p.y - 2);
-    ctx.lineTo(p.x - 8, p.y - 2);
-    ctx.closePath();
-    ctx.fill();
-    // Выбитые «окна» — чёрные дыры
-    ctx.fillStyle = '#000';
-    ctx.fillRect(p.x - 5, p.y - 6, 4, 3);
-    ctx.fillRect(p.x + 1, p.y - 6, 4, 3);
-    // Колёса
-    ctx.fillStyle = '#0a0808';
-    ctx.fillRect(p.x - 9, p.y + 2, 3, 2.5);
-    ctx.fillRect(p.x + 6, p.y + 2, 3, 2.5);
-  }
-  // Дымок — серая полупрозрачная клякса сверху (медленно колышется)
-  const t = performance.now() * 0.0008 + d.seed * 6.28;
-  ctx.fillStyle = 'rgba(110,110,110,.30)';
-  ctx.beginPath();
-  ctx.ellipse(p.x + Math.sin(t) * 2, p.y - 12 + Math.cos(t * 1.3), 6, 3, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // Ржавые подтёки — рыжая полоса по корпусу
-  ctx.strokeStyle = 'rgba(140,60,20,.55)';
-  ctx.lineWidth = 0.6;
-  ctx.beginPath();
-  ctx.moveTo(p.x - 5, p.y - 1); ctx.lineTo(p.x - 4, p.y + 2);
-  ctx.moveTo(p.x + 3, p.y - 1); ctx.lineTo(p.x + 4, p.y + 2);
-  ctx.stroke();
-}
-
-// drawLairWall — длинная бетонная стена с граффити. Ориентация:
-// orient=0 — горизонтальная (вдоль X), orient=1 — вертикальная (вдоль Y).
-// На видимой грани — большой граффити-символ (череп/тег/буква).
-function drawLairWall(d) {
-  const p = w2s(d.r + 0.5, d.c + 0.5);
-  const wx = TS * 0.5, wy = TS * 0.5 * ISO_Y;
-  const H  = isoH(1.1 + d.seed * 0.3);
-  const horiz = (d.orient === 0);
-  // Тень
-  ctx.fillStyle = 'rgba(0,0,0,.5)';
-  ctx.beginPath();
-  ctx.moveTo(p.x, p.y - wy);
-  ctx.lineTo(p.x + wx, p.y);
-  ctx.lineTo(p.x, p.y + wy);
-  ctx.lineTo(p.x - wx, p.y);
-  ctx.closePath();
-  ctx.fill();
-  // Бетонная палитра — серый с подтёками
-  const side = '#3a3a40';
-  const top  = '#5a5a64';
-  const dark = '#1a1a20';
-  // Левая грань
-  ctx.fillStyle = side;
-  ctx.beginPath();
-  ctx.moveTo(p.x - wx, p.y);
-  ctx.lineTo(p.x,      p.y + wy);
-  ctx.lineTo(p.x,      p.y + wy - H);
-  ctx.lineTo(p.x - wx, p.y - H);
-  ctx.closePath();
-  ctx.fill();
-  // Правая грань (главная — на ней граффити)
-  ctx.fillStyle = top;
-  ctx.beginPath();
-  ctx.moveTo(p.x,      p.y + wy);
-  ctx.lineTo(p.x + wx, p.y);
-  ctx.lineTo(p.x + wx, p.y - H);
-  ctx.lineTo(p.x,      p.y + wy - H);
-  ctx.closePath();
-  ctx.fill();
-  // Крыша (тонкая полоса сверху)
-  ctx.fillStyle = '#7a7a84';
-  ctx.beginPath();
-  ctx.moveTo(p.x,        p.y - H + wy);
-  ctx.lineTo(p.x + wx,   p.y - H);
-  ctx.lineTo(p.x,        p.y - H - wy);
-  ctx.lineTo(p.x - wx,   p.y - H);
-  ctx.closePath();
-  ctx.fill();
-  // Стык — тёмная вертикаль
-  ctx.strokeStyle = 'rgba(0,0,0,.6)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(p.x, p.y + wy); ctx.lineTo(p.x, p.y + wy - H);
-  ctx.stroke();
-  // Подтёки — тонкие вертикальные ржавые полосы
-  ctx.strokeStyle = 'rgba(120,60,30,.45)';
-  ctx.lineWidth = 0.7;
-  for (let i = 0; i < 3; i++) {
-    const k = 0.20 + i * 0.30;
-    ctx.beginPath();
-    ctx.moveTo(p.x + wx * k, p.y - H * (0.85 - i * 0.10) + wy * (1-k) * 0.6);
-    ctx.lineTo(p.x + wx * k, p.y - H * 0.10 + wy * (1-k));
-    ctx.stroke();
-  }
-  // Граффити — большой символ-тег. Выбираем по seed.
-  const tags = [
-    { sym: '☠', col: '#d84040' },
-    { sym: '✘', col: '#e0e040' },
-    { sym: 'L',  col: '#d84040' },   // Logovo
-    { sym: '☠', col: '#a040d8' },
-    { sym: '666', col: '#d84040' },
-    { sym: '$$',  col: '#40d840' },
-    { sym: 'RIP', col: '#e0e040' },
-  ];
-  const tag = tags[Math.floor(d.seed * 100) % tags.length];
-  // Граффити на правой грани (наиболее видимая)
-  ctx.save();
-  const gx = p.x + wx * 0.5;
-  const gy = p.y - H * 0.55 + wy * 0.25;
-  ctx.font = `bold ${Math.floor(H * 0.45)}px "Segoe UI Emoji", system-ui, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  // Тень за тегом
-  ctx.shadowColor = tag.col;
-  ctx.shadowBlur = 6;
-  // Чёрный контур + цветной фронт
-  ctx.fillStyle = '#000';
-  ctx.fillText(tag.sym, gx + 0.7, gy + 0.7);
-  ctx.fillStyle = tag.col;
-  ctx.fillText(tag.sym, gx, gy);
-  ctx.restore();
-  // Бирка-наклейка снизу — маленький жёлтый тег (заштрихованный)
-  if (d.seed > 0.5) {
-    ctx.fillStyle = '#1a1a14';
-    ctx.fillRect(p.x + wx * 0.10, p.y - 6 + wy * 0.4, 12, 4);
-    ctx.strokeStyle = '#f1c40f';
-    ctx.lineWidth = 0.5;
-    ctx.strokeRect(p.x + wx * 0.10, p.y - 6 + wy * 0.4, 12, 4);
-  }
-  // Подножие — мусор/осколки бетона
-  ctx.fillStyle = dark;
-  ctx.beginPath();
-  ctx.ellipse(p.x, p.y + wy * 0.7, wx * 0.7, wy * 0.4, 0, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-// drawLairBarricade — мешки с песком + автомобильные шины + колючка.
-// Низкое заграждение, прикрытие для бойцов.
-function drawLairBarricade(d) {
-  const p = w2s(d.r + 0.5, d.c + 0.5);
-  // Земляное пятно
-  ctx.fillStyle = 'rgba(40,30,20,.55)';
-  ctx.beginPath();
-  ctx.ellipse(p.x, p.y + 2, 13, 5, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // 3 мешка с песком (бежевые)
-  const bagCol = '#8a7a50';
-  const bagDk  = '#5a4a30';
-  for (let i = 0; i < 3; i++) {
-    const bx = p.x + (i - 1) * 7;
-    const by = p.y - 1;
-    // Тело мешка
-    ctx.fillStyle = bagCol;
-    ctx.beginPath();
-    ctx.ellipse(bx, by, 5, 4, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // Тёмная нижняя дуга
-    ctx.fillStyle = bagDk;
-    ctx.beginPath();
-    ctx.ellipse(bx, by + 1, 5, 2, 0, 0, Math.PI);
-    ctx.fill();
-    // Узел сверху
-    ctx.strokeStyle = bagDk;
-    ctx.lineWidth = 0.7;
-    ctx.beginPath();
-    ctx.moveTo(bx - 1, by - 3); ctx.lineTo(bx + 1, by - 3);
-    ctx.stroke();
-  }
-  // Шина сверху (поверх мешков, в центре)
-  ctx.strokeStyle = '#0a0808';
-  ctx.lineWidth = 1.8;
-  ctx.beginPath();
-  ctx.ellipse(p.x, p.y - 5, 5, 2.2, 0, 0, Math.PI * 2);
-  ctx.stroke();
-  // Внутренний обод
-  ctx.fillStyle = '#2a2a30';
-  ctx.beginPath();
-  ctx.ellipse(p.x, p.y - 5, 2.5, 1.0, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // Колючая проволока — зигзаг сверху
-  ctx.strokeStyle = '#888892';
-  ctx.lineWidth = 0.7;
-  ctx.beginPath();
-  for (let i = 0; i < 10; i++) {
-    const x1 = p.x - 10 + i * 2.2;
-    const y1 = p.y - 9 - (i & 1) * 1.5;
-    if (i === 0) ctx.moveTo(x1, y1);
-    else ctx.lineTo(x1, y1);
-  }
-  ctx.stroke();
-  // Шипы — короткие штрихи перпендикулярно
-  for (let i = 1; i < 8; i++) {
-    const x1 = p.x - 10 + i * 2.5;
-    const y1 = p.y - 8;
-    ctx.beginPath();
-    ctx.moveTo(x1, y1 - 1.5); ctx.lineTo(x1, y1 + 1.5);
-    ctx.moveTo(x1 - 1.5, y1); ctx.lineTo(x1 + 1.5, y1);
-    ctx.stroke();
-  }
-}
-
-// drawLairFireBarrel — бочка с горящим внутри огнём. Стоит как фонарь
-// для лагеря ночью, пламя пульсирует.
-function drawLairFireBarrel(d) {
-  const p = w2s(d.r + 0.5, d.c + 0.5);
-  const t = performance.now() * 0.008 + d.seed * 6.28;
-  // Земляное пятно
-  ctx.fillStyle = 'rgba(40,20,10,.6)';
-  ctx.beginPath();
-  ctx.ellipse(p.x, p.y + 4, 8, 3.5, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // Бочка — чёрная с ржавыми пятнами
-  const barH = 14;
-  ctx.fillStyle = '#1a1612';
-  ctx.fillRect(p.x - 5, p.y - barH + 2, 10, barH);
-  // Обручи
-  ctx.strokeStyle = '#3a2a18';
-  ctx.lineWidth = 0.8;
-  ctx.beginPath();
-  ctx.moveTo(p.x - 5, p.y - barH + 5); ctx.lineTo(p.x + 5, p.y - barH + 5);
-  ctx.moveTo(p.x - 5, p.y - 1);        ctx.lineTo(p.x + 5, p.y - 1);
-  ctx.stroke();
-  // Ржавые подтёки
-  ctx.strokeStyle = 'rgba(140,60,20,.55)';
-  ctx.lineWidth = 0.6;
-  ctx.beginPath();
-  ctx.moveTo(p.x - 3, p.y - barH + 5); ctx.lineTo(p.x - 3, p.y - 1);
-  ctx.moveTo(p.x + 2, p.y - barH + 6); ctx.lineTo(p.x + 2, p.y - 2);
-  ctx.stroke();
-  // Горящие угли на верху бочки — оранжевое свечение
-  ctx.fillStyle = 'rgba(255,140,40,.90)';
-  ctx.shadowColor = '#ff6020';
-  ctx.shadowBlur = 14;
-  ctx.beginPath();
-  ctx.ellipse(p.x, p.y - barH + 2, 4, 1.5, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // Пляшущее пламя над бочкой (выше чем у обычного костра)
-  const flameH = 14 + Math.sin(t) * 2 + Math.sin(t * 2.3) * 1.5;
-  const flameW = 5 + Math.sin(t * 1.7) * 0.8;
-  const fy0 = p.y - barH + 1;
-  const fg = ctx.createLinearGradient(p.x, fy0 - flameH, p.x, fy0);
-  fg.addColorStop(0,    'rgba(255,240,80,.0)');
-  fg.addColorStop(0.30, 'rgba(255,200,40,.85)');
-  fg.addColorStop(0.70, 'rgba(255,90,20,.95)');
-  fg.addColorStop(1,    'rgba(180,40,10,.95)');
-  ctx.fillStyle = fg;
-  ctx.beginPath();
-  ctx.moveTo(p.x, fy0 - flameH);
-  ctx.quadraticCurveTo(p.x + flameW, fy0 - flameH * 0.4, p.x + flameW * 0.5, fy0);
-  ctx.lineTo(p.x - flameW * 0.5, fy0);
-  ctx.quadraticCurveTo(p.x - flameW, fy0 - flameH * 0.4, p.x, fy0 - flameH);
-  ctx.closePath();
-  ctx.fill();
-  ctx.shadowBlur = 0;
-  // Искра — летит вверх
-  if ((Math.sin(t * 3.1) + Math.cos(t * 5.7)) > 1.0) {
-    ctx.fillStyle = '#ffd060';
-    ctx.beginPath();
-    ctx.arc(p.x + Math.sin(t * 7) * 4,
-            fy0 - flameH - 4 - Math.sin(t * 4) * 3, 1.1, 0, Math.PI * 2);
-    ctx.fill();
-  }
-}
-
-function drawLairDecorItem(d) {
-  switch (d.type) {
-    case 'tent':       drawLairTent(d);       break;
-    case 'ruin':       drawLairRuin(d);       break;
-    case 'fire':       drawLairFire(d);       break;
-    case 'junk':       drawLairJunk(d);       break;
-    case 'wreck':      drawLairWreck(d);      break;
-    case 'wall':       drawLairWall(d);       break;
-    case 'barricade':  drawLairBarricade(d);  break;
-    case 'firebarrel': drawLairFireBarrel(d); break;
-  }
-}
 
 // ── Живой город: NPC прохожие + машины + светофоры ──────────────
 // Локальная симуляция (у каждого клиента своя — это декор, не мультиплеер).
@@ -1933,29 +1243,6 @@ function triggerNpcPanic(srcR, srcC, radius) {
 
 function updateNpcs(dt) {
   const now = performance.now();
-  // Если рядом с NPC прохожим стоит бот городской банды с act='harass'
-  // — NPC паникует и убегает. Триггерим один раз в секунду на NPC.
-  for (const tid of Object.keys(aggroZones)) {
-    const az = aggroZones[tid];
-    if (!az || !az.bots) continue;
-    for (const bot of az.bots) {
-      if (bot.act !== 'harass') continue;
-      // Только city_gangs могут пугать прохожих
-      if (!String(bot.id || '').startsWith('cgbot')) continue;
-      for (const n of NPCS) {
-        if (n.panicUntil && now < n.panicUntil) continue;
-        const dr = n.r - bot.y, dc = n.c - bot.x;
-        if (Math.hypot(dr, dc) < 2.5) {
-          n.panicUntil = now + 3500 + Math.random() * 1500;
-          n.cryUntil   = now + 1800;
-          n.cryText    = (Math.random() < 0.5) ? 'ОТСТАНЬТЕ!' : 'ПОМОГИТЕ!';
-          n.panicSrcR  = bot.y;
-          n.panicSrcC  = bot.x;
-          n.idleUntil  = 0;
-        }
-      }
-    }
-  }
   for (const n of NPCS) {
     // PANIC: NPC видит стрельбу — бежит ОТ источника. Скорость ×2.5.
     if (n.panicUntil && now < n.panicUntil) {
@@ -2603,55 +1890,6 @@ function applyCopsTargets(newCops) {
   worldCops = next;
 }
 
-// applyAggroTargets — то же что applyCopsTargets, но для банды Логова.
-// Сервер шлёт x/y в snap.aggro 15 раз/сек — без интерполяции боты «телепортятся»
-// каждые 66мс. Сохраняем текущие x/y, кладём серверные в tx/ty, а interpWorldNpcs
-// плавно подтягивает позицию. Сопоставление ботов по id (стабилен в пределах
-// жизни респауна — назначается из _next_bot_id на сервере).
-function applyAggroTargets(newAggro) {
-  const freshTids = new Set(Object.keys(newAggro || {}));
-  // Удаляем зоны которых больше нет
-  for (const tid of Object.keys(aggroZones)) {
-    if (!freshTids.has(tid)) delete aggroZones[tid];
-  }
-  for (const tid of freshTids) {
-    const fresh = newAggro[tid];
-    const cur   = aggroZones[tid];
-    if (!cur) {
-      // Новая зона — копируем как есть, x=tx (нет интерполяции с нуля)
-      const z = JSON.parse(JSON.stringify(fresh));
-      for (const b of (z.bots || [])) { b.tx = b.x; b.ty = b.y; }
-      aggroZones[tid] = z;
-      continue;
-    }
-    // Не-позиционные поля зоны
-    cur.state        = fresh.state;
-    cur.cap_left     = fresh.cap_left;
-    cur.next_respawn = fresh.next_respawn;
-    // Боты — мерж по id
-    const newBots = fresh.bots || [];
-    const oldById = new Map((cur.bots || []).map(b => [b.id, b]));
-    const merged = [];
-    for (const nb of newBots) {
-      const ob = oldById.get(nb.id);
-      if (ob) {
-        ob.tx    = nb.x;    ob.ty    = nb.y;
-        ob.ang   = nb.ang;
-        ob.hp    = nb.hp;   ob.max_hp = nb.max_hp;
-        ob.kind  = nb.kind;
-        ob.weapon = nb.weapon;
-        if (nb.look) ob.look = nb.look;
-        merged.push(ob);
-      } else {
-        merged.push({ ...nb, tx: nb.x, ty: nb.y });
-      }
-    }
-    cur.bots = merged;
-    // Укрытия не двигаются — перетираем как есть
-    cur.covers = fresh.covers || [];
-  }
-}
-
 // interpWorldNpcs — плавное подтягивание текущих x/y к целевым tx/ty.
 // k = 1 - exp(-dt * speed), но для простоты используем стандартный lerp
 // с коэффициентом ~8 (= ~0.13с до 99% позиции при 60fps), как для
@@ -2673,15 +1911,6 @@ function interpWorldNpcs(dt) {
     if (c.tx == null) continue;
     c.x += (c.tx - c.x) * k;
     c.y += (c.ty - c.y) * k;
-  }
-  for (const tid of Object.keys(aggroZones)) {
-    const z = aggroZones[tid];
-    if (!z) continue;
-    for (const b of (z.bots || [])) {
-      if (b.tx == null) continue;
-      b.x += (b.tx - b.x) * k;
-      b.y += (b.ty - b.y) * k;
-    }
   }
 }
 
@@ -2867,51 +2096,6 @@ function handleEventPacket(d) {
         addShake(7);
       }
     }
-  } else if (kind === 'cop_shot_bot') {
-    // Коп выстрелил в бойца городской банды (cop_shot_bot пакет).
-    // Трассер от копа + brызги при попадании. UI игрока не дёргаем.
-    {
-      const wp  = d.weapon || 'pistol_heavy';
-      const ang = Math.atan2(d.ty - d.sy, d.tx - d.sx);
-      const md  = (WEAPON_FX_CFG[wp] || {}).muzzleD || 0.8;
-      const sR  = d.sy + Math.sin(ang) * md;
-      const sC  = d.sx + Math.cos(ang) * md;
-      spawnBullet(sR, sC, d.ty, d.tx, { hit: !d.miss, fromNpc: true, weapon: wp });
-      spawnMuzzle(sR, sC, ang, wp);
-      if (!d.miss) spawnImpact(d.ty, d.tx, wp);
-    }
-    if (d.cop_id) lastBossShotAt.set(d.cop_id, performance.now());
-  } else if (kind === 'city_gang_combat') {
-    // Городская банда стала hostile — баннер всем игрокам поблизости.
-    // Без этого «там перестрелка» легко пропустить.
-    showEventBanner('🚨 Стрельба в городе!',
-      'Бандиты ввязались в бой. Копы выехали на разбор.',
-      4000, 'spawn');
-  } else if (kind === 'city_gang_threat') {
-    // Threat-фраза уже передана через snap.aggro.bots[].threat —
-    // тут реакции не делаем (можно было бы звук).
-  } else if (kind === 'gang_nest_spawned') {
-    // Новое гнездо в городе — спавнинг-баннер всем игрокам.
-    showEventBanner('☠️ БАНДИТСКОЕ ГНЕЗДО!',
-      'Бойцы засели в здании. Зачисти всех за награду — пока не разошлись.',
-      5500, 'spawn');
-  } else if (kind === 'gang_nest_cleared') {
-    // Гнездо зачищено — бонус всем кто стрелял.
-    const me = (d.bonus_uids || []).some(u => String(u) === String(QP.uid));
-    if (me) {
-      showEventBanner('✅ Гнездо зачищено!',
-        `+${d.cash||500}$ +${d.exp||60} exp — отличная работа.`,
-        4500, 'win');
-    } else {
-      showEventBanner('🪦 Гнездо разгромлено',
-        'Кто-то управился раньше тебя.',
-        3500, 'spawn');
-    }
-  } else if (kind === 'gang_nest_expired') {
-    // Бандиты ушли сами — никто не пришёл их зачистить.
-    showEventBanner('💨 Банда ушла',
-      'Гнездо опустело. Будет новое через несколько минут.',
-      3000, 'spawn');
   } else if (kind === 'cop_hit') {
     // Игрок попал в копа — пуля из КОНЦА ствола стрелка + брызги крови
     {
@@ -3379,16 +2563,10 @@ function wsConnect() {
       }
       if (d.aggro !== undefined) {
         // Агрессивные районы: банда NPC + укрытия. Источник истины — сервер.
-        // applyAggroTargets сохраняет текущие x/y и кладёт серверные в tx/ty
-        // — interpWorldNpcs плавно подтянет, чтобы боты не «лагали»
-        // (телепортировались 15 раз/сек между снапами).
-        applyAggroTargets(d.aggro || {});
-      }
-      if (d.gang_nests !== undefined) {
-        // Активные бандитские гнёзда — массив [{id, r, c, state,
-        // expires_in, bots_alive}]. Локально просто кэшируем для рендера
-        // (красная подсветка здания + маркер на мини-карте).
-        gangNests = d.gang_nests || [];
+        for (const k of Object.keys(aggroZones)) delete aggroZones[k];
+        for (const tid of Object.keys(d.aggro || {})) {
+          aggroZones[tid] = d.aggro[tid];
+        }
       }
       if (d.active_captures !== undefined) {
         // Перетираем карту целиком — сервер источник истины. Сохраняем
@@ -3812,9 +2990,11 @@ function fire(angle = null) {
       dirX = Math.cos(player.ang); dirY = Math.sin(player.ang);
     }
   }
-  // В тюрьме стрелять МОЖНО — но урон серверная сторона разрешит
-  // только если цель тоже сидит (тюремные разборки). По копам/прохожим
-  // через лазер не пройдёт — сервер отклонит выстрел.
+  // В тюрьме стрелять нельзя
+  if (myJailIn > 0) {
+    showToast('⛓ Ты в тюрьме — стрелять нельзя', '🚫', 1500);
+    return;
+  }
   // Что под прицелом?
   // AUTO-AIM ОТКЛЮЧЁН: цель засчитывается ТОЛЬКО если правый стик
   // направлен строго в неё (dot >= 0.985, что соответствует ±10°).
@@ -5443,52 +4623,6 @@ function drawTerritoryPerimeters() {
   }
 }
 
-// Пульсирующее кольцо вокруг здания-гнезда + череп над крышей.
-// Красное в guard, ярко-оранжевое мигающее в hostile.
-function drawGangNestRings() {
-  if (!gangNests || !gangNests.length) return;
-  const now = performance.now();
-  for (const ne of gangNests) {
-    // Центр здания на земле
-    const center = w2s(ne.r + 0.5, ne.c + 0.5);
-    const hostile = (ne.state === 'hostile');
-    const pulse = 0.5 + 0.5 * Math.sin(now / (hostile ? 100 : 220));
-    const radPx = TS * 0.5 * 4.2;     // ~4 тайла радиус кольца
-    // Полупрозрачная заливка-круг под зданием
-    ctx.save();
-    ctx.fillStyle = hostile
-      ? `rgba(255, 80, 40, ${0.10 + 0.10 * pulse})`
-      : `rgba(220, 40, 40, ${0.08 + 0.06 * pulse})`;
-    ctx.beginPath();
-    ctx.ellipse(center.x, center.y, radPx, radPx * ISO_Y, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // Контур кольца — пунктиром
-    ctx.strokeStyle = hostile
-      ? `rgba(255, 100, 40, ${0.70 + 0.30 * pulse})`
-      : `rgba(220, 60, 60, ${0.55 + 0.25 * pulse})`;
-    ctx.lineWidth = hostile ? 2.5 : 1.8;
-    ctx.setLineDash([6, 4]);
-    ctx.beginPath();
-    ctx.ellipse(center.x, center.y, radPx, radPx * ISO_Y, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.restore();
-    // Череп над крышей — высокий маркер чтобы видно с улицы
-    const top = w2s(ne.r + 0.5, ne.c + 0.5);
-    top.y -= isoH(2.3);
-    ctx.save();
-    ctx.font = '20px "Segoe UI Emoji", system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#000';
-    ctx.fillText('☠️', top.x + 1, top.y + 1);
-    ctx.fillStyle = hostile ? '#ff6040' : '#ff9090';
-    ctx.shadowColor = hostile ? '#ff4020' : '#ff4040';
-    ctx.shadowBlur = 10 + 6 * pulse;
-    ctx.fillText('☠️', top.x, top.y);
-    ctx.restore();
-  }
-}
-
 // ── Красивая отрисовка машины В ИЗОМЕТРИИ ──────────────────────
 // Машина — настоящий объёмный параллелепипед (как здания/ящики),
 // ориентированный по направлению движения. 4 угла основания в
@@ -5985,91 +5119,11 @@ const _COP_LOOKS = {
 // Рисуем банда-бота агрессивного района. Босс — крупнее, с особым ореолом.
 const _AGGRO_GRUNT_LOOK = { gender:0, skin:2, body:2, face:1, hair:0, hat:4 };
 const _AGGRO_BOSS_LOOK  = { gender:0, skin:1, body:2, face:1, hair:0, hat:4, boss:1 };
-// Бутылка пива в руке (city-gang activity 'drink')
-function drawBeerBottle(cx, cy, ang) {
-  ctx.save();
-  // Бутылка чуть смещена в сторону «руки» (как и оружие)
-  const ox = cx + Math.cos(ang) * 5;
-  const oy = cy + Math.sin(ang) * 5 - 4;
-  // Стекло — тёмно-зелёное
-  ctx.fillStyle = '#1a3a1a';
-  ctx.beginPath();
-  ctx.ellipse(ox, oy + 2, 1.6, 3.2, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // Горлышко
-  ctx.fillRect(ox - 0.7, oy - 3, 1.4, 2.2);
-  // Этикетка — жёлтая полоска
-  ctx.fillStyle = '#f1c40f';
-  ctx.fillRect(ox - 1.4, oy + 1, 2.8, 1.4);
-  // Блик
-  ctx.strokeStyle = 'rgba(180,220,180,.5)';
-  ctx.lineWidth = 0.4;
-  ctx.beginPath();
-  ctx.moveTo(ox - 0.8, oy - 1); ctx.lineTo(ox - 0.8, oy + 3);
-  ctx.stroke();
-  ctx.restore();
-}
-
-// Баллончик с краской в руке (city-gang activity 'tag')
-function drawSprayCan(cx, cy, ang) {
-  ctx.save();
-  const ox = cx + Math.cos(ang) * 5;
-  const oy = cy + Math.sin(ang) * 5 - 4;
-  // Корпус — красный
-  ctx.fillStyle = '#a02020';
-  ctx.fillRect(ox - 1.5, oy - 2, 3, 5);
-  // Колпачок
-  ctx.fillStyle = '#1a1a1a';
-  ctx.fillRect(ox - 1, oy - 3.5, 2, 1.5);
-  // Сопло
-  ctx.fillStyle = '#888';
-  ctx.fillRect(ox - 0.4, oy - 4.2, 0.8, 0.7);
-  // Облачко краски — мелкие точки впереди
-  const t = performance.now() * 0.012;
-  const pa = ang;
-  ctx.fillStyle = 'rgba(220,40,40,.55)';
-  for (let i = 0; i < 5; i++) {
-    const dist = 5 + i * 2;
-    const jx   = Math.sin(t + i) * 1.5;
-    const jy   = Math.cos(t + i * 1.7) * 1.5;
-    ctx.beginPath();
-    ctx.arc(ox + Math.cos(pa) * dist + jx,
-            oy + Math.sin(pa) * dist + jy - 1, 0.9 + i * 0.2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
-}
-
-// След граффити на земле — постоянный тег под ногами таггера.
-// Цвет / символ детерминированы по bot.id (всегда одинаковые).
-function drawGraffitiOnGround(cx, cy, botId) {
-  const seed = (String(botId).split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % 100;
-  const tags = ['☠', '666', 'L', '$', 'RIP', '✘'];
-  const cols = ['#d84040', '#e0e040', '#40d840', '#a040d8', '#d84040'];
-  const tag = tags[seed % tags.length];
-  const col = cols[(seed * 3) % cols.length];
-  ctx.save();
-  ctx.font = 'bold 9px "Segoe UI Emoji", system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.globalAlpha = 0.65;
-  ctx.fillStyle = '#000';
-  ctx.fillText(tag, cx + 0.5, cy + 0.5);
-  ctx.fillStyle = col;
-  ctx.fillText(tag, cx, cy);
-  ctx.restore();
-}
-
 function drawAggroBot(bot) {
   const p = w2s(bot.y + 0.5, bot.x + 0.5);
   const isBoss = (bot.kind === 'aggro_boss');
   const look   = bot.look || (isBoss ? _AGGRO_BOSS_LOOK : _AGGRO_GRUNT_LOOK);
-  // Activity городских банд — если не 'walk', стоят на месте (не качаемся).
-  const act = bot.act || 'walk';
-  const isCityGang = String(bot.id || '').startsWith('cgbot');
-  const walkPhase = (isCityGang && act !== 'walk')
-    ? 0
-    : (performance.now() * 0.008) % (Math.PI * 2);
+  const walkPhase = (performance.now() * 0.008) % (Math.PI * 2);
   // Сиреневая «аура» под ногами — отличает банду от обычных NPC
   ctx.save();
   ctx.fillStyle = isBoss ? 'rgba(180, 80, 255, .55)' : 'rgba(140, 70, 200, .35)';
@@ -6079,35 +5133,22 @@ function drawAggroBot(bot) {
   ctx.ellipse(p.x, p.y + 6, isBoss ? 22 : 16, isBoss ? 8 : 6, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
-  // Threat-фраза от городской банды («Чё уставился?»). Приходит в
-  // bot.threat из serverного snapshot.aggro (поле threat). Передаём
-  // в drawPerson как chat — рисуется стандартным пузырём над головой.
-  const threatChat = (bot.threat) ? String(bot.threat) : null;
   // Босс крупнее — масштабируем человечка.
   if (isBoss) {
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.scale(1.25, 1.25);
-    drawPerson(0, 0, bot.ang || 0, look, walkPhase, null, threatChat, false,
+    drawPerson(0, 0, bot.ang || 0, look, walkPhase, null, null, false,
                bot.hp, bot.max_hp, false);
     ctx.restore();
   } else {
-    drawPerson(p.x, p.y, bot.ang || 0, look, walkPhase, null, threatChat, false,
+    drawPerson(p.x, p.y, bot.ang || 0, look, walkPhase, null, null, false,
                bot.hp, bot.max_hp, false);
   }
-  // Activity-предметы (бутылка/баллончик) у городских банд в patrol
-  // заменяют оружие. В hostile-режиме всегда оружие.
-  if (isCityGang && act === 'drink') {
-    drawBeerBottle(p.x, p.y, bot.ang || 0);
-  } else if (isCityGang && act === 'tag') {
-    drawSprayCan(p.x, p.y, bot.ang || 0);
-    drawGraffitiOnGround(p.x, p.y + 12, bot.id);
-  } else {
-    // Оружие
-    const weapon = bot.weapon || (isBoss ? 'uzi' : 'pistol_heavy');
-    const flashAt = lastBossShotAt.get(bot.id) || 0;
-    drawWeaponInHands(p.x, p.y, bot.ang || 0, weapon, isBoss ? 1.15 : 0.95, flashAt);
-  }
+  // Оружие
+  const weapon = bot.weapon || (isBoss ? 'uzi' : 'pistol_heavy');
+  const flashAt = lastBossShotAt.get(bot.id) || 0;
+  drawWeaponInHands(p.x, p.y, bot.ang || 0, weapon, isBoss ? 1.15 : 0.95, flashAt);
   // Босс с саблей: рисуем «крутящуюся» саблю если близко к игроку
   if (isBoss) {
     const tNow = performance.now() * 0.012;
@@ -6917,16 +5958,13 @@ function drawPoliceStationDecor(stationR, stationC) {
 // ЗЕЛЁНЫЙ когда срок вышел (можно выйти физически). Серверный JAIL_R
 // держит игрока внутри — лазер тут чистый визуал.
 const JAIL_CENTER_R = 76, JAIL_CENTER_C = 76;
-// Радиус загона — 7 тайлов (диаметр 14, 10+ игроков размещается с запасом).
-// ВАЖНО: должно совпадать с серверным JAIL_R (см. mafiozi_bot.py).
-const JAIL_RADIUS_TILES = 7.0;
-const JAIL_GATE_HALF_RAD = 0.50;   // ширина проёма в радианах (≈57°) — для нескольких игроков
+const JAIL_RADIUS_TILES = 3.5;
+const JAIL_GATE_HALF_RAD = 0.35;   // ширина проёма в радианах (≈40°)
 function drawJailCell(stationR, stationC) {
   const cR = stationR, cC = stationC;
   const R  = JAIL_RADIUS_TILES;
-  // Прутья по окружности с дыркой на южной стороне (Math.PI/2 в нашей системе).
-  // Раньше было N=28 на R=3.5 → шаг ~0.78. Сохраняем плотность: N ~= 8*R.
-  const N = Math.max(28, Math.round(R * 8));
+  // Прутья по окружности с дыркой на южной стороне (Math.PI/2 в нашей системе)
+  const N = 28;
   const gateA = Math.PI * 0.5;      // ворота — на юг от центра
   const gw = JAIL_GATE_HALF_RAD;
   ctx.save();
@@ -8036,8 +7074,6 @@ function render() {
   drawArenaPerimeter();
   // 1.6) Периметры захватываемых районов — цвет владельца / пунктир если ничейная
   drawTerritoryPerimeters();
-  // 1.7) Бандитские гнёзда — пульсирующая красная подсветка вокруг здания
-  drawGangNestRings();
   // 2) Объекты с depth-sort
   const items = [];
   for (let r = r0; r < r1; r++) {
@@ -8104,12 +7140,6 @@ function render() {
   for (const cop of worldCops) {
     if (cop.y < r0 || cop.y >= r1 || cop.x < c0 || cop.x >= c1) continue;
     items.push({ depth: cop.y + cop.x + 0.0011, draw: () => drawCopNpc(cop) });
-  }
-  // Декор Логова — палатки/руины/костры/обломки. Рисуем под ботами,
-  // под укрытиями (depth-сорт по r+c как обычные объекты).
-  for (const d of LAIR_DECOR) {
-    if (d.r < r0 || d.r >= r1 || d.c < c0 || d.c >= c1) continue;
-    items.push({ depth: d.r + d.c + 0.0007, draw: () => drawLairDecorItem(d) });
   }
   // Агрессивные районы: укрытия → банда → босс. Все вписаны в depth-сорт.
   for (const tid of Object.keys(aggroZones)) {
@@ -8630,25 +7660,6 @@ function drawMinimap() {
     ctx2.setLineDash([4, 3]);
     ctx2.strokeRect(x + 0.5, y + 0.5, w, h);
     ctx2.setLineDash([]);
-  }
-  // Бандитские гнёзда — маленький череп на мини-карте
-  for (const ne of gangNests) {
-    const x = (ne.c + 0.5) * sx;
-    const y = (ne.r + 0.5) * sy;
-    const hostile = (ne.state === 'hostile');
-    // Подложка-кружок
-    ctx2.fillStyle = hostile
-      ? `rgba(255,60,40,${0.60 + 0.30 * tPulse})`
-      : `rgba(200,40,40,${0.50 + 0.20 * tPulse})`;
-    ctx2.beginPath();
-    ctx2.arc(x, y, 5, 0, Math.PI * 2);
-    ctx2.fill();
-    // Череп
-    ctx2.font = 'bold 10px "Segoe UI Emoji", system-ui, sans-serif';
-    ctx2.textAlign = 'center';
-    ctx2.textBaseline = 'middle';
-    ctx2.fillStyle = '#fff';
-    ctx2.fillText('☠', x, y);
   }
   // Тюрьма (как POI 🚓) — серый домик в правом-нижнем углу карты
   const jailX = 56, jailY = 56, jailSize = 8;
