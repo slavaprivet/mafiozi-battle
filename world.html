@@ -2043,7 +2043,10 @@ function pickNpcWaypoint(npc) {
 }
 function initNpcs() {
   NPCS.length = 0;
-  for (let i = 0; i < 20; i++) {
+  // 60 прохожих — город ощущается живым. На карте 80×80 это ~один на
+  // 3 квартала, на пляже/Логово/тюрьме их нет (отфильтровываются по
+  // npcPassable: только тротуар/газон, не в арене).
+  for (let i = 0; i < 60; i++) {
     const n = spawnNpc(i);
     if (n) { pickNpcWaypoint(n); NPCS.push(n); }
   }
