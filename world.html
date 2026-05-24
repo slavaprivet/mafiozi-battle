@@ -847,6 +847,12 @@ let MAP = [];
 // 1 парк на каждые ~6 блоков. Раскидаем по карте красиво.
 const PARK_BLOCKS = new Set();
 function isParkBlock(br, bc) { return PARK_BLOCKS.has(br + ',' + bc); }
+// Центральный парк-площадь — точка для массовых ивентов. Один блок
+// в центре города: бордюры заменены на траву, в центре фонтан.
+const CENTRAL_PARK = { br: 4, bc: 4 };
+function isCentralPark(br, bc) {
+  return br === CENTRAL_PARK.br && bc === CENTRAL_PARK.bc;
+}
 
 function buildMap() {
   // Подбираем парк-блоки: каждый 3-й/5-й по диагонали (детерминистично)
@@ -862,11 +868,22 @@ function buildMap() {
   }
 
   MAP = [];
+  // BEACH_END — последняя строка пляжа (включительно). Выше неё (r<BEACH_END)
+  // — пляжная зона: море (r<3), прибой (3..5), песок (6..BEACH_END).
+  // Город начинается с r=BEACH_END+1.
+  const BEACH_END = 15;
   for (let r = 0; r < MAP_ROWS; r++) {
     const row = [];
     for (let c = 0; c < MAP_COLS; c++) {
+      // ─── ПЛЯЖ И МОРЕ — северная полоса карты (r=0..BEACH_END) ───
+      if (r <= BEACH_END) {
+        if (c === 0 || c === MAP_COLS - 1) { row.push(14); continue; } // боковые тоже море
+        if (r < 3)         { row.push(14); continue; } // глубокое море
+        if (r < 6)         { row.push(16); continue; } // прибой (мокрый песок)
+        row.push(15); continue;                         // сухой песок
+      }
       // Граница карты — стена
-      if (r === 0 || r === MAP_ROWS - 1 || c === 0 || c === MAP_COLS - 1) {
+      if (r === MAP_ROWS - 1 || c === 0 || c === MAP_COLS - 1) {
         row.push(1); continue;
       }
       // Дорога — ЧЕТЫРЕ клетки шириной (mod 10 ∈ {0..3}). Между фронтами
@@ -878,10 +895,14 @@ function buildMap() {
       // (mod 10 ∈ {4, 9}).
       const sideR = (r % BLOCK === 4) || (r % BLOCK === BLOCK - 1);
       const sideC = (c % BLOCK === 4) || (c % BLOCK === BLOCK - 1);
-      if (sideR || sideC) { row.push(9); continue; }   // бордюр-плитка
-      // Парк-блок — газон внутри
       const br = Math.floor(r / BLOCK), bc = Math.floor(c / BLOCK);
-      if (isParkBlock(br, bc)) { row.push(8); continue; }
+      if (sideR || sideC) {
+        // В центральном парке бордюр заменён на траву — площадь 6×6
+        if (isCentralPark(br, bc)) { row.push(8); continue; }
+        row.push(9); continue;
+      }
+      // Парк-блок — газон внутри
+      if (isParkBlock(br, bc) || isCentralPark(br, bc)) { row.push(8); continue; }
       // Здание — внутренний квадрат 4×4 (mod ∈ {5..8})
       row.push(1);
     }
@@ -890,13 +911,47 @@ function buildMap() {
 
   function det(r, c, k) { return ((r * 73 + c * 131 + k * 17) % 1000) / 1000; }
 
-  // Деревья — внутри парк-блоков (плотность снижена с 30% до 20%
-  // чтобы между ними проходило 2-3 тайла свободно).
+  // Грунтовые тропинки в парках — крест через центр парк-блока.
+  // Парк-зона внутри блока = mod ∈ {5..8}. Тропинка идёт по строке
+  // mod=6 и колонне mod=6 — пересечение в одном тайле в центре.
+  for (let r = 2; r < MAP_ROWS - 2; r++) {
+    for (let c = 2; c < MAP_COLS - 2; c++) {
+      if (MAP[r][c] !== 8) continue;
+      const rm = r % BLOCK, cm = c % BLOCK;
+      if (rm === 6 || cm === 6) MAP[r][c] = 10;
+    }
+  }
+  // Фонтан в центре центрального парка (тайл (br*10+6, bc*10+6)) и
+  // выделенная мощёная площадь 4×4 вокруг (mod 5..8) — мостовая (тип 12)
+  // вместо обычной травы. Удобная зона для будущих ивентов.
+  {
+    const br = CENTRAL_PARK.br, bc = CENTRAL_PARK.bc;
+    const baseR = br * BLOCK, baseC = bc * BLOCK;
+    for (let dr = 5; dr <= 8; dr++) {
+      for (let dc = 5; dc <= 8; dc++) {
+        const r = baseR + dr, c = baseC + dc;
+        if (MAP[r] && (MAP[r][c] === 8 || MAP[r][c] === 10 || MAP[r][c] === 6)) {
+          MAP[r][c] = 12;  // мощёная плитка площади
+        }
+      }
+    }
+    // Центр площади — фонтан (тайл 11)
+    const fr = baseR + 6, fc = baseC + 6;
+    if (MAP[fr]) MAP[fr][fc] = 11;
+  }
+  // Деревья — внутри парк-блоков. Правило проходимости: запрещаем
+  // соседние деревья по 4-связности И по диагоналям (в изо-проекции
+  // диагональные соседи визуально близко и могут блокировать обход).
   for (let r = 2; r < MAP_ROWS - 2; r++) {
     for (let c = 2; c < MAP_COLS - 2; c++) {
       if (MAP[r][c] !== 8) continue;
       const x = det(r, c, 3);
-      if (x < 0.20) MAP[r][c] = 6;          // дерево
+      if (x >= 0.65) continue;
+      if (MAP[r-1] && MAP[r-1][c]   === 6) continue;
+      if (MAP[r]   && MAP[r][c-1]   === 6) continue;
+      if (MAP[r-1] && MAP[r-1][c-1] === 6) continue;
+      if (MAP[r-1] && MAP[r-1][c+1] === 6) continue;
+      MAP[r][c] = 6;
     }
   }
   // Фонари — только в углах квартала (где обе координаты на тайле бордюра
@@ -920,6 +975,42 @@ function buildMap() {
       if (x < 0.018)       MAP[r][c] = 3; // ящик
       else if (x < 0.028)  MAP[r][c] = 4; // бочка
       else if (x < 0.036)  MAP[r][c] = 5; // мусорка
+    }
+  }
+  // Уличные торговцы — тележки с шаурмой/хот-догами, мини-кофейни и
+  // газетные ларьки на тротуарах. ~6% бордюрных тайлов, на прямых
+  // участках (не в углах кварталов). Проходимые — узкие, обходятся.
+  for (let r = 2; r < MAP_ROWS - 2; r++) {
+    for (let c = 2; c < MAP_COLS - 2; c++) {
+      if (MAP[r][c] !== 9) continue;
+      const rmod = r % BLOCK, cmod = c % BLOCK;
+      // Не в углах квартала (где фонари)
+      const onCornerR = (rmod === 4) || (rmod === BLOCK - 1);
+      const onCornerC = (cmod === 4) || (cmod === BLOCK - 1);
+      if (onCornerR && onCornerC) continue;
+      const x = det(r, c, 9);
+      if (x < 0.06) MAP[r][c] = 13;        // уличный торговец
+    }
+  }
+  // ── Декор на пляже — зонтики/лежаки (тип 17, проходимы) и пальмы
+  // (тип 18, непроходимы). Песок r=6..15.
+  for (let r = 6; r <= 15; r++) {
+    for (let c = 3; c < MAP_COLS - 3; c++) {
+      if (MAP[r][c] !== 15) continue;
+      const x = det(r, c, 4);
+      // Линия пальм у границы с городом (r=14,15)
+      if (r >= 14 && x < 0.10) {
+        // не сразу рядом друг с другом
+        if (MAP[r] && MAP[r][c-1] !== 18) {
+          MAP[r][c] = 18; continue;
+        }
+      }
+      // Зонты/лежаки на основной зоне пляжа
+      if (r >= 7 && r <= 13 && x < 0.08) {
+        if (MAP[r][c-1] !== 17 && MAP[r-1] && MAP[r-1][c] !== 17) {
+          MAP[r][c] = 17;
+        }
+      }
     }
   }
   // Припаркованные машины — на крайней полосе дороги у бордюра
@@ -1001,7 +1092,7 @@ const POI = [
   { id: 'port',    r: 16, c: 56, icon: '⚓', name: 'Порт',          minLvl: 5  },
   { id: 'casino',  r: 46, c: 16, icon: '🎰', name: 'Казино',        minLvl: 10 },
   { id: 'factory', r: 46, c: 56, icon: '🏭', name: 'Промзона',      minLvl: 15 },
-  { id: 'mansion', r: 66, c: 36, icon: '🏛', name: 'Резиденция',    minLvl: 20 },
+  { id: 'mansion', r: 36, c: 46, icon: '🏛', name: 'Резиденция',    minLvl: 20 },
   // Логово — НЕзахватываемая опасная зона в ДАЛЁКОМ ЮЖНОМ КРАЮ карты.
   // Карта 80×140: r=0..79 город, r=80..99 буфер, r=100..139 арена Логова.
   // Центр (120, 40), radius=20 → зона 41×41 целиком в арене, отдельно от
@@ -1009,7 +1100,7 @@ const POI = [
   // на сервере). Босс даёт x10 больше.
   { id: 'lair',    r: 120, c: 40, icon: '☠️', name: 'Логово',       minLvl: 10, aggro: true, radius: 20, noCapture: true },
   // Особые POI
-  { id: 'blackmarket', r:  6, c: 36, icon: '🌌', name: 'Чёрный рынок', minLvl: 1, special: 'shop'  },
+  { id: 'blackmarket', r: 26, c: 26, icon: '🌌', name: 'Чёрный рынок', minLvl: 1, special: 'shop'  },
   { id: 'arena',       r: 36, c: 66, icon: '🎯', name: 'PVP-арена',    minLvl: 1, special: 'arena' },
   // Больница — северо-восточный квартал, на отдельном здании-квартале
   // (не на спавне). Серверный респаун рядом на дороге (см. HOSPITAL_X/Y).
@@ -1915,19 +2006,64 @@ function initNpcs() {
 // логике. cryUntil = когда показывать чат-баббл (выводится в drawNpc).
 function triggerNpcPanic(srcR, srcC, radius) {
   const now = performance.now();
+  const cries = [
+    'ААА!!', 'ПОМОГИТЕ!', 'СТРЕЛЯЮТ!', 'УБЕГАЙ!',
+    'МАМА!', 'ПОЛИЦИЯ!', 'СПАСИТЕ!', 'УБИВАЮТ!',
+    'ВЫЗОВИТЕ КОПОВ!', 'ОН ВООРУЖЁН!', 'НЕ СТРЕЛЯЙТЕ!',
+  ];
   for (const n of NPCS) {
     const dr = n.r - srcR, dc = n.c - srcC;
     const d  = Math.hypot(dr, dc);
     if (d > radius) continue;
     n.panicUntil = now + 4000 + Math.random() * 2500;
     n.cryUntil   = now + 1800 + Math.random() * 1200;
-    n.cryText    = (Math.random() < 0.4) ? 'ААА!!'
-                  : (Math.random() < 0.5) ? 'ПОМОГИТЕ!'
-                  : (Math.random() < 0.5) ? 'СТРЕЛЯЮТ!'
-                  : 'УБЕГАЙ!';
+    n.cryText    = cries[(Math.random() * cries.length) | 0];
     n.panicSrcR  = srcR;
     n.panicSrcC  = srcC;
     n.idleUntil  = 0;   // не «отдыхаем», бежим
+  }
+}
+
+// Idle-болтовня — NPC изредка говорят бытовые фразы про себя или
+// «соседям». Срабатывает только когда NPC не в панике, и редко
+// (примерно раз в 25-45 сек на каждого NPC).
+const NPC_IDLE_PHRASES = [
+  'Опять цены поднялись...',
+  'Сосед мусор не выносит уже неделю!',
+  'Завтра дождь обещают.',
+  'Кто-нибудь видел моего кота?',
+  'Эта улица раньше тише была.',
+  'Надо в магазин зайти.',
+  'Бар на углу закрылся, говорят.',
+  'Слышал — банду новую видели?',
+  'Бабушка опять без молока...',
+  'Опаздываю на работу.',
+  'Хорошая сегодня погода.',
+  'Опять пробка на главной.',
+  'Жара невыносимая.',
+  'Где же мой автобус...',
+  'Соседи всю ночь шумели.',
+  'Кофе вкусный у Гены.',
+  'Опять эти бандиты тут шастают.',
+  'Дочка звонила, переживает.',
+  'Хлеб подорожал на двадцать.',
+  'Полиция ничего не делает.',
+];
+function tickNpcChatter() {
+  const now = performance.now();
+  for (const n of NPCS) {
+    if (n.panicUntil && now < n.panicUntil) continue;
+    if (n.cryUntil && now < n.cryUntil) continue;
+    if (n._nextChatAt == null) {
+      n._nextChatAt = now + 8000 + Math.random() * 35000;
+      continue;
+    }
+    if (now < n._nextChatAt) continue;
+    n._nextChatAt = now + 25000 + Math.random() * 25000;
+    // 70% случаев — фраза, 30% — пропуск (тишина)
+    if (Math.random() < 0.30) continue;
+    n.cryText  = NPC_IDLE_PHRASES[(Math.random() * NPC_IDLE_PHRASES.length) | 0];
+    n.cryUntil = now + 2500 + Math.random() * 1500;
   }
 }
 
@@ -2486,9 +2622,12 @@ window.addEventListener('keyup', (e) => {
 });
 
 // ── Коллизии ───────────────────────────────────────────────────
-// Проходимые тайлы: 0 (дорога), 7 (фонарь — рисуется как столб
-// над тайлом, но сам тайл-пол свободен), 8 (трава), 9 (бордюр).
-const PASSABLE = new Set([0, 7, 8, 9]);
+// Проходимые тайлы: 0 (дорога), 7 (фонарь), 8 (трава), 9 (бордюр),
+// 10 (грунтовая тропинка), 12 (мощёная площадь), 13 (уличный торговец),
+// 15 (песок пляжа), 16 (мокрый прибой), 17 (зонт/лежак — проходимый
+// тонкий декор), 18 (пальма? — НЕпроходимая, ставим в стенах).
+// Стены: 11 (фонтан), 14 (море).
+const PASSABLE = new Set([0, 7, 8, 9, 10, 12, 13, 15, 16, 17]);
 function isBlocked(r, c) {
   const ri = Math.floor(r), ci = Math.floor(c);
   if (ri < 0 || ri >= MAP_ROWS || ci < 0 || ci >= MAP_COLS) return true;
@@ -2628,6 +2767,11 @@ function applyAggroTargets(newAggro) {
     cur.state        = fresh.state;
     cur.cap_left     = fresh.cap_left;
     cur.next_respawn = fresh.next_respawn;
+    // Логово зачищено: копы-следователи + пожарные + таймер
+    cur.cleared      = !!fresh.cleared;
+    cur.cleared_left = fresh.cleared_left || 0;
+    cur.investigators = fresh.investigators || [];
+    cur.firefighters  = fresh.firefighters  || [];
     // Боты — мерж по id
     const newBots = fresh.bots || [];
     const oldById = new Map((cur.bots || []).map(b => [b.id, b]));
@@ -2912,6 +3056,16 @@ function handleEventPacket(d) {
     showEventBanner('💨 Банда ушла',
       'Гнездо опустело. Будет новое через несколько минут.',
       3000, 'spawn');
+  } else if (kind === 'lair_cleared') {
+    // Логово зачищено всеми игроками — приехали копы и пожарные.
+    showEventBanner('☠️ ЛОГОВО ЗАЧИЩЕНО!',
+      'Копы и пожарные на месте. Новая банда через 10 минут.',
+      6000, 'win');
+  } else if (kind === 'lair_respawn') {
+    // Банда вернулась.
+    showEventBanner('🔥 БАНДА ВЕРНУЛАСЬ',
+      'В Логово снова заехали бойцы. Готовься.',
+      4500, 'spawn');
   } else if (kind === 'cop_hit') {
     // Игрок попал в копа — пуля из КОНЦА ствола стрелка + брызги крови
     {
@@ -4408,6 +4562,7 @@ function update(dt) {
   }
   // Локальная симуляция декора: прохожие + машины
   updateNpcs(dt);
+  tickNpcChatter();
   updateCars(dt);
   // Пули и вспышки — двигаем тут, рисуем потом в render()
   updateProjectiles(dt);
@@ -4439,20 +4594,46 @@ function drawTile(r, c) {
     else if (h1 < 65)  color = '#234020'; // тёмная зелёная (тень)
     else if (h1 < 85)  color = '#28482a'; // средняя
     else               color = '#3a5a2a'; // светлая молодая трава
+  } else if (t === 10) {
+    // ─── ГРУНТОВАЯ ТРОПИНКА в парке ──────────────────────────────
+    if (h1 < 30)       color = '#5a4632';
+    else if (h1 < 70)  color = '#604a30';
+    else if (h1 < 92)  color = '#503e28';
+    else               color = '#6a5238';
+  } else if (t === 11 || t === 12) {
+    // ─── МОЩЁНАЯ ПЛОЩАДЬ ─ светло-серая плитка с лёгкими вариациями
+    if (h1 < 35)       color = '#8a8478';
+    else if (h1 < 75)  color = '#8e8a7c';
+    else               color = '#827c70';
+  } else if (t === 14) {
+    // ─── МОРЕ — глубокий синий с волнами (анимация ниже)
+    if (h1 < 50)       color = '#1c4870';
+    else               color = '#1a4068';
+  } else if (t === 16) {
+    // ─── ПРИБОЙ — мокрый песок, темнее обычного
+    if (h1 < 40)       color = '#9e8458';
+    else if (h1 < 75)  color = '#a48a5c';
+    else               color = '#988050';
+  } else if (t === 15 || t === 17 || t === 18) {
+    // ─── ПЕСОК — золотистый с лёгкими вариациями (под декором пляжа)
+    if (h1 < 8)        color = '#c8a868';   // тёмное пятно (мокрая дорожка)
+    else if (h1 < 85)  color = '#dec48a';
+    else if (h1 < 94)  color = '#d4b878';
+    else               color = '#e8d098';   // светлый
   } else if (isRoad) {
-    // ─── АСФАЛТ — три вариации с пятнами масла/трещинами ──────────
-    if (h1 < 8)        color = '#0e0e12'; // тёмное пятно масла
-    else if (h1 < 22)  color = '#1c1c20'; // обычный асфальт A
-    else if (h1 < 55)  color = '#181820'; // обычный асфальт B
-    else if (h1 < 78)  color = '#22221e'; // потёртый асфальт (светлее)
-    else               color = '#262824'; // выцветший
+    // ─── АСФАЛТ — почти ровный с редкими пятнами (без «шахматки») ─
+    if (h1 < 4)        color = '#1a1a22'; // тёмное пятно масла (редко)
+    else if (h1 < 88)  color = '#34343e'; // основной асфальт (84%)
+    else if (h1 < 94)  color = '#3a3a44'; // чуть светлее
+    else if (h1 < 97)  color = '#2e2e38'; // чуть темнее
+    else               color = '#3e3e3a'; // потёртый тёплый (3%)
   } else {
-    // ─── ТРОТУАР/ПЛИТКА — варианты + участки грунта ───────────────
-    if (h1 < 6)        color = '#3a3024'; // грунт между плитками
-    else if (h1 < 14)  color = '#383530'; // тёмная плитка
-    else if (h1 < 50)  color = '#2e2e28'; // обычная плитка A
-    else if (h1 < 80)  color = '#262620'; // обычная плитка B
-    else               color = '#34322a'; // светлая «новая» плитка
+    // ─── ТРОТУАР — почти ровный с редкими пятнами ────────────────
+    if (h1 < 3)        color = '#54422a'; // грунт-проплешина (редко)
+    else if (h1 < 82)  color = '#6e6a5e'; // основная плитка (79%)
+    else if (h1 < 90)  color = '#787262'; // чуть светлее
+    else if (h1 < 95)  color = '#66625a'; // чуть темнее
+    else               color = '#7c7666'; // новая плитка
   }
   // Если внутри PVP-арены — красноватый оттенок поверх
   if (inArena(r, c)) {
@@ -4467,9 +4648,9 @@ function drawTile(r, c) {
   ctx.lineTo(p.x - wx, p.y);
   ctx.closePath();
   ctx.fill();
-  // Обводка плиток (тротуар) — только если это «целая» плитка, не грунт
+  // Обводка плиток (тротуар) — лёгкая, чтобы не создавать «шахматку»
   if (!isRoad && t !== 8 && t !== 6 && h1 >= 6) {
-    ctx.strokeStyle = 'rgba(0,0,0,.18)';
+    ctx.strokeStyle = 'rgba(0,0,0,.07)';
     ctx.lineWidth = 1;
     ctx.stroke();
   }
@@ -4486,6 +4667,67 @@ function drawTile(r, c) {
       ctx.fillStyle = (h2 & 1) ? '#e8c050' : '#e87858';
       ctx.fillRect(p.x - 1, p.y - 1, 2, 2);
     }
+  } else if (t === 10) {
+    // Камешки и редкие травинки на грунтовой тропинке
+    if (h2 < 40) {
+      ctx.fillStyle = 'rgba(100,80,55,.6)';
+      ctx.fillRect(p.x - 2 + (h1 % 5 - 2), p.y - 1, 1.4, 1.4);
+    }
+    if (h2 >= 85) {
+      ctx.fillStyle = '#3a5a2a';
+      ctx.fillRect(p.x + 2, p.y, 1, 2);
+    }
+  } else if (t === 14) {
+    // ─── ВОЛНЫ на море — анимированные полоски пены
+    const tt = performance.now() * 0.0008;
+    const wavePhase = (tt + (r + c) * 0.07) % 1;
+    if (h2 < 35) {
+      ctx.fillStyle = `rgba(180,220,240,${0.25 + 0.20 * Math.sin(tt * 3 + r + c)})`;
+      ctx.beginPath();
+      ctx.ellipse(p.x + (wavePhase - 0.5) * wx * 0.6, p.y, wx * 0.30, wy * 0.10, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Блик-пятно (солнце на воде)
+    if (h1 >= 60 && h1 < 70) {
+      ctx.fillStyle = 'rgba(220,240,255,.20)';
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, wx * 0.18, wy * 0.10, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (t === 16) {
+    // ─── ПРИБОЙ — анимированная пена набегает на песок
+    const tt2 = performance.now() * 0.0006;
+    const foamPhase = (tt2 + (c * 0.05)) % 1;
+    ctx.fillStyle = `rgba(240,250,255,${0.6 - foamPhase * 0.4})`;
+    ctx.beginPath();
+    ctx.ellipse(p.x + (foamPhase * 2 - 1) * wx * 0.5, p.y - wy * 0.2,
+                 wx * 0.35, wy * 0.10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Мокрый блик
+    if (h2 < 40) {
+      ctx.fillStyle = 'rgba(220,235,245,.30)';
+      ctx.fillRect(p.x - 2, p.y - 1, 4, 0.8);
+    }
+  } else if (t === 15 || t === 17 || t === 18) {
+    // ─── ПЕСОК — мелкие точки/ракушки/следы
+    if (h2 < 25) {
+      ctx.fillStyle = 'rgba(160,130,80,.55)';
+      ctx.fillRect(p.x - 2 + (h1 % 4 - 2), p.y - 1, 1, 1);
+    }
+    // Изредка ракушка (белая или розоватая)
+    if (h1 >= 90 && h2 >= 88) {
+      const sh = (h2 & 1) ? '#f0e0c8' : '#f5d8c4';
+      ctx.fillStyle = sh;
+      ctx.beginPath();
+      ctx.ellipse(p.x + (h1 % 3 - 1), p.y, 1.4, 0.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Следы — пара точек
+    if (h1 < 18 && h2 >= 60) {
+      ctx.fillStyle = 'rgba(120,90,50,.45)';
+      ctx.fillRect(p.x - 2, p.y - 1, 1.4, 0.8);
+      ctx.fillRect(p.x + 1, p.y + 1, 1.4, 0.8);
+    }
   } else if (isRoad) {
     // Тонкие трещины — на потёртом асфальте
     if (h1 >= 55 && h1 < 70) {
@@ -4501,6 +4743,18 @@ function drawTile(r, c) {
     if (h2 < 12) {
       ctx.fillStyle = 'rgba(120,110,90,.4)';
       ctx.fillRect(p.x - 2 + (h1 % 5 - 2), p.y - 1, 1, 1);
+    }
+    // Лужа — тёмно-синий эллипс с глянцем (≈1% дорожных тайлов)
+    if (h1 >= 92 && h2 < 35) {
+      ctx.fillStyle = 'rgba(20,30,45,.85)';
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y + 1, wx * 0.42, wy * 0.32, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Блик — светлая полоска поперёк
+      ctx.fillStyle = 'rgba(180,200,230,.30)';
+      ctx.beginPath();
+      ctx.ellipse(p.x - wx * 0.10, p.y - 0.5, wx * 0.18, wy * 0.06, 0, 0, Math.PI * 2);
+      ctx.fill();
     }
   } else {
     // Плитка: разметка швов между плитками — диагональные риски
@@ -4519,17 +4773,69 @@ function drawTile(r, c) {
       ctx.fillRect(p.x + 1, p.y - 1, 1, 1);
     }
   }
+  // В зоне пляжа (r<=15) городскую разметку/зебры/люки/бордюр НЕ рисуем
+  if (r <= 15) return;
   // Жёлтая прерывистая разметка по центру дороги (центр 3-тайловой полосы = mod 1)
   if (onRoadR && !onRoadC && (r % BLOCK === 1) && (c % 3 === 0)) {
-    ctx.fillStyle = '#a68a18';
+    ctx.fillStyle = '#d4a830';
     ctx.fillRect(p.x - wx * 0.18, p.y - 1.5, wx * 0.36, 3);
+  }
+  // Двойная сплошная — на главных горизонтальных дорогах (rmod=1,2)
+  if (onRoadR && !onRoadC && (r % BLOCK === 2)) {
+    ctx.fillStyle = '#d4a830';
+    ctx.fillRect(p.x - wx, p.y - 1, wx * 2, 1);
   }
   // По центру вертикальных дорог — серые люки (центр = mod 1)
   if (onRoadC && !onRoadR && (c % BLOCK === 1) && (r % 4 === 0)) {
-    ctx.fillStyle = '#3a3a3a';
+    ctx.fillStyle = '#2a2a30';
     ctx.beginPath();
     ctx.ellipse(p.x, p.y, wx * 0.10, wy * 0.10, 0, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = 'rgba(80,80,90,.5)';
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+  }
+  // ── Зебры (пешеходные переходы) на выходах перекрёстков ──────────
+  // В изо-проекции ось c = (+wx,+wy), ось r = (-wx,+wy). Полоски лежат
+  // в плоскости тайла и параллельны одной из осей.
+  const rmod = r % BLOCK, cmod = c % BLOCK;
+  if (isRoad && rmod === 3 && cmod <= 2) {
+    // Зебра поперёк вертикальной дороги — полоски вдоль c, сдвиг по r
+    ctx.fillStyle = 'rgba(235,235,225,.85)';
+    for (let i = -1; i <= 1; i++) {
+      const off = i * 0.35;
+      const cx0 = p.x + off * (-wx);
+      const cy0 = p.y + off * ( wy);
+      const ax = cx0 - wx * 0.55, ay = cy0 - wy * 0.55;
+      const bx = cx0 + wx * 0.55, by = cy0 + wy * 0.55;
+      const tx = -wx * 0.08, ty = wy * 0.08;
+      ctx.beginPath();
+      ctx.moveTo(ax - tx, ay - ty);
+      ctx.lineTo(bx - tx, by - ty);
+      ctx.lineTo(bx + tx, by + ty);
+      ctx.lineTo(ax + tx, ay + ty);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  if (isRoad && cmod === 3 && rmod <= 2) {
+    // Зебра поперёк горизонтальной дороги — полоски вдоль r, сдвиг по c
+    ctx.fillStyle = 'rgba(235,235,225,.85)';
+    for (let i = -1; i <= 1; i++) {
+      const off = i * 0.35;
+      const cx0 = p.x + off * wx;
+      const cy0 = p.y + off * wy;
+      const ax = cx0 + wx * 0.55, ay = cy0 - wy * 0.55;
+      const bx = cx0 - wx * 0.55, by = cy0 + wy * 0.55;
+      const tx = wx * 0.08, ty = wy * 0.08;
+      ctx.beginPath();
+      ctx.moveTo(ax - tx, ay - ty);
+      ctx.lineTo(bx - tx, by - ty);
+      ctx.lineTo(bx + tx, by + ty);
+      ctx.lineTo(ax + tx, ay + ty);
+      ctx.closePath();
+      ctx.fill();
+    }
   }
   // Бордюр — тонкая светлая полоска по краю плитки, прилегающему к дороге
   if (t === 9) {
@@ -4543,6 +4849,142 @@ function drawTile(r, c) {
     if (nS) { ctx.beginPath(); ctx.moveTo(p.x - wx, p.y); ctx.lineTo(p.x, p.y + wy); ctx.lineTo(p.x, p.y + wy - 2); ctx.lineTo(p.x - wx*0.92, p.y - 1); ctx.closePath(); ctx.fill(); }
     if (nE) { ctx.beginPath(); ctx.moveTo(p.x + wx, p.y); ctx.lineTo(p.x, p.y + wy); ctx.lineTo(p.x, p.y + wy - 2); ctx.lineTo(p.x + wx*0.92, p.y + 1); ctx.closePath(); ctx.fill(); }
     if (nW) { ctx.beginPath(); ctx.moveTo(p.x - wx, p.y); ctx.lineTo(p.x, p.y - wy); ctx.lineTo(p.x, p.y - wy + 2); ctx.lineTo(p.x - wx*0.92, p.y + 1); ctx.closePath(); ctx.fill(); }
+  }
+  // ── Фонтан в центре центрального парка ────────────────────────
+  if (t === 11) {
+    const tt = performance.now() * 0.001;
+    // Тень под фонтаном (рассеянная)
+    ctx.fillStyle = 'rgba(0,0,0,.32)';
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y + 4, wx * 0.95, wy * 0.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Каменное основание-бортик (внешний эллипс)
+    ctx.fillStyle = '#8e8270';
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y + 2, wx * 0.92, wy * 0.82, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Тёмная кромка бортика
+    ctx.strokeStyle = '#5a4e3c';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+    // Кладка камней по периметру бортика — лёгкие риски
+    ctx.strokeStyle = 'rgba(80,60,40,.45)';
+    ctx.lineWidth = 0.6;
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 6) {
+      const x1 = p.x + Math.cos(a) * wx * 0.92;
+      const y1 = p.y + 2 + Math.sin(a) * wy * 0.82;
+      const x2 = p.x + Math.cos(a) * wx * 0.78;
+      const y2 = p.y + 2 + Math.sin(a) * wy * 0.68;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+    // Вода в бассейне — крупная и тёмно-синяя
+    ctx.fillStyle = '#1a4878';
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y + 2, wx * 0.74, wy * 0.62, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Лёгкий градиент глубины (светлее по центру)
+    const wg = ctx.createRadialGradient(p.x, p.y + 1, 1, p.x, p.y + 2, wx * 0.7);
+    wg.addColorStop(0, 'rgba(120,180,230,.45)');
+    wg.addColorStop(1, 'rgba(20,60,100,0)');
+    ctx.fillStyle = wg;
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y + 2, wx * 0.74, wy * 0.62, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Круги от падающих капель — расходятся от центра
+    ctx.strokeStyle = 'rgba(220,235,255,.55)';
+    ctx.lineWidth = 0.8;
+    for (let i = 0; i < 3; i++) {
+      const phase = (tt * 0.9 + i * 0.4) % 1;
+      const rad = phase * wx * 0.55;
+      ctx.globalAlpha = (1 - phase) * 0.7;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y + 2, rad, rad * 0.5, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1.0;
+    // Центральная каменная колонна — крупнее
+    const colH = 16, colW = 8;
+    ctx.fillStyle = '#807462';
+    ctx.fillRect(p.x - colW / 2, p.y - colH, colW, colH);
+    // Тёмная сторона колонны (тень)
+    ctx.fillStyle = '#5a4e3c';
+    ctx.fillRect(p.x + 1, p.y - colH, colW / 2 - 1, colH);
+    // Декоративные пояски на колонне
+    ctx.fillStyle = '#a89c84';
+    ctx.fillRect(p.x - colW / 2, p.y - colH + 3, colW, 1.5);
+    ctx.fillRect(p.x - colW / 2, p.y - 4,        colW, 1.5);
+    // Стекающая вода по бокам колонны (анимация)
+    for (let side = -1; side <= 1; side += 2) {
+      ctx.fillStyle = 'rgba(120,180,230,.65)';
+      const wPhase = (tt * 2.5 + side * 0.3) % 1;
+      const wY = p.y - colH + 4 + wPhase * (colH - 4);
+      ctx.fillRect(p.x + side * (colW / 2 + 0.5), p.y - colH + 4, 1.2, colH - 4);
+      // Светлый блик
+      ctx.fillStyle = 'rgba(220,235,255,.8)';
+      ctx.fillRect(p.x + side * (colW / 2 + 0.5), wY, 1.2, 2);
+    }
+    // Верхняя чаша — крупная
+    ctx.fillStyle = '#a89c84';
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y - colH, 9, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#6a604e';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    // Вода в чаше — переливается
+    ctx.fillStyle = '#3a78c0';
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y - colH - 0.5, 7, 2.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Перелив через края чаши — водопадики вниз
+    for (let side = -1; side <= 1; side += 2) {
+      const sx = p.x + side * 6.5;
+      // Падающая вода — изгибающаяся струя в бассейн
+      ctx.strokeStyle = 'rgba(140,195,235,.75)';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(sx, p.y - colH);
+      ctx.quadraticCurveTo(sx + side * 2, p.y - colH * 0.4,
+                            sx + side * (wx * 0.35), p.y + 1);
+      ctx.stroke();
+      // Капля падает — анимация по позиции
+      const dropPhase = (tt * 1.8 + side * 0.5) % 1;
+      const dropX = sx + side * (dropPhase * wx * 0.35);
+      const dropY = p.y - colH + dropPhase * (colH + 1);
+      ctx.fillStyle = 'rgba(180,220,240,.85)';
+      ctx.beginPath();
+      ctx.arc(dropX, dropY, 1.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Главная струя воды вверх — толстая, бьющая из чаши
+    const jetH = 18 + Math.sin(tt * 3) * 2.5;
+    const jetG = ctx.createLinearGradient(p.x, p.y - colH - jetH, p.x, p.y - colH);
+    jetG.addColorStop(0,    'rgba(180,220,240,.0)');
+    jetG.addColorStop(0.3,  'rgba(180,220,240,.65)');
+    jetG.addColorStop(1,    'rgba(120,180,230,.85)');
+    ctx.fillStyle = jetG;
+    ctx.beginPath();
+    ctx.moveTo(p.x - 2, p.y - colH);
+    ctx.quadraticCurveTo(p.x, p.y - colH - jetH * 1.05, p.x + 2, p.y - colH);
+    ctx.closePath();
+    ctx.fill();
+    // Капли воды над струёй — рассыпаются вверх и в стороны
+    for (let i = 0; i < 5; i++) {
+      const phase = (tt * 1.4 + i * 0.21) % 1;
+      const angle = (i * 1.3) % (Math.PI * 2);
+      const dist = phase * 7;
+      const dx = Math.cos(angle) * dist;
+      const dy = p.y - colH - jetH * (1 - phase);
+      ctx.fillStyle = `rgba(200,225,245,${1 - phase})`;
+      ctx.beginPath();
+      ctx.arc(p.x + dx, dy, 1.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Мягкий glow вокруг фонтана — особенно ночью
+    ctx.fillStyle = 'rgba(120,170,230,.10)';
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y - 5, wx * 1.05, wy * 0.95, 0, 0, Math.PI * 2);
+    ctx.fill();
   }
 }
 
@@ -6060,6 +6502,115 @@ function drawGraffitiOnGround(cx, cy, botId) {
   ctx.restore();
 }
 
+// ── Расследователь (полицейский с блокнотом) после зачистки Логова
+function drawLairInvestigator(n) {
+  const p = w2s(n.y + 0.5, n.x + 0.5);
+  const tt = performance.now() / 1000;
+  // Тень
+  ctx.fillStyle = 'rgba(0,0,0,.35)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y + 6, 6, 2.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Ноги
+  ctx.fillStyle = '#1a2840';
+  ctx.fillRect(p.x - 3, p.y, 2.5, 6);
+  ctx.fillRect(p.x + 0.5, p.y, 2.5, 6);
+  // Торс — синяя форма
+  ctx.fillStyle = '#2c4a80';
+  ctx.fillRect(p.x - 4, p.y - 6, 8, 7);
+  // Жилет (тёмный)
+  ctx.fillStyle = '#1a3060';
+  ctx.fillRect(p.x - 3, p.y - 5, 6, 5);
+  // Бляха
+  ctx.fillStyle = '#f0c040';
+  ctx.fillRect(p.x - 1, p.y - 4, 2, 1.5);
+  // Голова
+  ctx.fillStyle = '#d8b48a';
+  ctx.beginPath();
+  ctx.arc(p.x, p.y - 9, 3, 0, Math.PI * 2);
+  ctx.fill();
+  // Кепка
+  ctx.fillStyle = '#1a3060';
+  ctx.fillRect(p.x - 3, p.y - 12, 6, 2);
+  // Козырёк
+  ctx.fillRect(p.x - 4, p.y - 10, 5, 0.8);
+  // Блокнот в руке (анимация — пишет)
+  const writeOffset = Math.sin(tt * 3) * 0.6;
+  ctx.fillStyle = '#f0e8c8';
+  ctx.fillRect(p.x + 3, p.y - 4, 3, 4);
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(p.x + 3.5, p.y - 3, 2 + writeOffset, 0.4);
+  ctx.fillRect(p.x + 3.5, p.y - 2, 2, 0.4);
+  // «?» над головой иногда (расследует)
+  if (Math.sin(tt * 0.7 + n.x) > 0.5) {
+    ctx.font = 'bold 8px system-ui';
+    ctx.fillStyle = '#ffd070';
+    ctx.textAlign = 'center';
+    ctx.fillText('?', p.x, p.y - 14);
+  }
+}
+
+// ── Пожарный (красная форма со шлангом, тушит огонь)
+function drawLairFirefighter(n) {
+  const p = w2s(n.y + 0.5, n.x + 0.5);
+  const tt = performance.now() / 1000;
+  // Тень
+  ctx.fillStyle = 'rgba(0,0,0,.35)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y + 6, 6, 2.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Ноги
+  ctx.fillStyle = '#2a1810';
+  ctx.fillRect(p.x - 3, p.y, 2.5, 6);
+  ctx.fillRect(p.x + 0.5, p.y, 2.5, 6);
+  // Торс — красная куртка
+  ctx.fillStyle = '#c83020';
+  ctx.fillRect(p.x - 4, p.y - 6, 8, 7);
+  // Светоотражающие полосы (жёлтые)
+  ctx.fillStyle = '#f0e040';
+  ctx.fillRect(p.x - 4, p.y - 3, 8, 0.7);
+  ctx.fillRect(p.x - 4, p.y - 1, 8, 0.7);
+  // Голова
+  ctx.fillStyle = '#d8b48a';
+  ctx.beginPath();
+  ctx.arc(p.x, p.y - 9, 3, 0, Math.PI * 2);
+  ctx.fill();
+  // Каска (красная с жёлтой полоской)
+  ctx.fillStyle = '#a02018';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y - 11, 3.5, 2, 0, Math.PI, 0);
+  ctx.fill();
+  ctx.fillStyle = '#f0e040';
+  ctx.fillRect(p.x - 3.5, p.y - 11, 7, 0.5);
+  // Шланг — толстая зелёная труба
+  ctx.strokeStyle = '#3a6a3a';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(p.x + 3, p.y - 4);
+  ctx.quadraticCurveTo(p.x + 9, p.y - 7, p.x + 12, p.y - 9);
+  ctx.stroke();
+  // Сопло (металлическое)
+  ctx.fillStyle = '#7a7a7a';
+  ctx.fillRect(p.x + 11, p.y - 10, 3, 2);
+  // Струя воды (анимация — пульсирует)
+  const jetLen = 6 + Math.sin(tt * 6) * 1.5;
+  ctx.strokeStyle = 'rgba(140,195,235,.75)';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(p.x + 13, p.y - 9);
+  ctx.quadraticCurveTo(p.x + 13 + jetLen * 0.7, p.y - 9 + 1,
+                        p.x + 13 + jetLen, p.y - 9 + 3);
+  ctx.stroke();
+  // Капли воды
+  for (let i = 0; i < 3; i++) {
+    const phase = (tt * 1.8 + i * 0.3) % 1;
+    ctx.fillStyle = `rgba(180,220,240,${1 - phase})`;
+    ctx.beginPath();
+    ctx.arc(p.x + 13 + phase * jetLen, p.y - 9 + phase * 4 + Math.sin(phase * 8) * 1, 0.9, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
 function drawAggroBot(bot) {
   const p = w2s(bot.y + 0.5, bot.x + 0.5);
   const isBoss = (bot.kind === 'aggro_boss');
@@ -6448,6 +6999,323 @@ function drawDumpster(r, c) {
   ctx.closePath(); ctx.fill();
 }
 
+// ── Пляжный зонтик с лежаком (тип 17, проходимый)
+function drawBeachUmbrella(r, c) {
+  const p = w2s(r + 0.5, c + 0.5);
+  const wx = TS * 0.5, wy = TS * 0.5 * ISO_Y;
+  const variant = ((r * 17 + c * 31) % 3 + 3) % 3;
+  // Тень
+  ctx.fillStyle = 'rgba(0,0,0,.30)';
+  ctx.beginPath();
+  ctx.ellipse(p.x + 2, p.y + 3, wx * 0.65, wy * 0.55, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Лежак (синий/красный/жёлтый матрас на ножках)
+  const matCols = [['#3868c0','#1a4080'], ['#c83830','#8a2820'], ['#f0b830','#c08820']];
+  const mc = matCols[variant];
+  ctx.fillStyle = mc[1];
+  ctx.fillRect(p.x - 8, p.y + 2, 16, 3);    // тёмная нижняя часть
+  ctx.fillStyle = mc[0];
+  ctx.fillRect(p.x - 8, p.y - 0, 16, 3);    // верх матраса
+  // Полоски на матрасе
+  ctx.fillStyle = 'rgba(255,255,255,.4)';
+  ctx.fillRect(p.x - 7, p.y + 1, 14, 0.5);
+  // Ножки
+  ctx.fillStyle = '#2a2a2a';
+  ctx.fillRect(p.x - 7, p.y + 5, 1, 2);
+  ctx.fillRect(p.x + 6, p.y + 5, 1, 2);
+  // Зонт — ножка
+  ctx.strokeStyle = '#5a3a18';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(p.x + 2, p.y); ctx.lineTo(p.x + 2, p.y - 16);
+  ctx.stroke();
+  // Купол зонта (двухцветный сегментный)
+  const umbA = ['#e84030', '#3a9050', '#d040c0'];
+  const umbB = ['#f0f0f0', '#f0f0f0', '#f0f0f0'];
+  ctx.fillStyle = umbA[variant];
+  ctx.beginPath();
+  ctx.ellipse(p.x + 2, p.y - 16, 12, 4, 0, Math.PI, 0);
+  ctx.fill();
+  // Белые сектора
+  ctx.fillStyle = umbB[variant];
+  for (let i = 0; i < 3; i++) {
+    const a1 = Math.PI + (i * 2 + 1) * Math.PI / 6;
+    const a2 = a1 + Math.PI / 6;
+    ctx.beginPath();
+    ctx.moveTo(p.x + 2, p.y - 16);
+    ctx.arc(p.x + 2, p.y - 16, 12, a1, a2);
+    ctx.closePath(); ctx.fill();
+  }
+  // Острая шишечка на верху зонта
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(p.x + 1.5, p.y - 18, 1, 2);
+}
+
+// ── Пальма (тип 18, непроходимая)
+function drawPalmTree(r, c) {
+  const p = w2s(r + 0.5, c + 0.5);
+  const wx = TS * 0.5, wy = TS * 0.5 * ISO_Y;
+  const t = performance.now() / 1000;
+  const sway = Math.sin(t + r * 0.4 + c * 0.6) * 1.6;
+  // Тень
+  ctx.fillStyle = 'rgba(0,0,0,.32)';
+  ctx.beginPath();
+  ctx.ellipse(p.x + 4, p.y + 3, wx * 0.35, wy * 0.30, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Ствол — изогнутый
+  ctx.strokeStyle = '#7a4828';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y);
+  ctx.quadraticCurveTo(p.x + sway, p.y - 14, p.x + sway * 1.5, p.y - 26);
+  ctx.stroke();
+  // Сегменты на стволе (кольца)
+  ctx.strokeStyle = '#4a2818';
+  ctx.lineWidth = 0.6;
+  for (let i = 1; i < 5; i++) {
+    const y = p.y - i * 6;
+    const x = p.x + sway * (i / 5);
+    ctx.beginPath();
+    ctx.moveTo(x - 2.5, y); ctx.lineTo(x + 2.5, y);
+    ctx.stroke();
+  }
+  // Крона — 6 листьев расходятся
+  const top = { x: p.x + sway * 1.5, y: p.y - 26 };
+  const leaves = [
+    { ang: -0.3, len: 16, col: '#3a8038' },
+    { ang:  0.3, len: 16, col: '#2a6028' },
+    { ang: -1.0, len: 14, col: '#4a9048' },
+    { ang:  1.0, len: 14, col: '#3a7838' },
+    { ang: -2.0, len: 13, col: '#2a6028' },
+    { ang:  2.0, len: 13, col: '#3a7838' },
+  ];
+  for (const lf of leaves) {
+    ctx.strokeStyle = lf.col;
+    ctx.lineWidth = 3.2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(top.x, top.y);
+    const ex = top.x + Math.cos(lf.ang - Math.PI / 2) * lf.len;
+    const ey = top.y + Math.sin(lf.ang - Math.PI / 2) * lf.len * 0.7;
+    ctx.quadraticCurveTo(top.x + Math.cos(lf.ang - Math.PI / 2) * lf.len * 0.5,
+                          top.y + Math.sin(lf.ang - Math.PI / 2) * lf.len * 0.3 - 3,
+                          ex, ey);
+    ctx.stroke();
+  }
+  // Кокосы (2-3 шт)
+  ctx.fillStyle = '#3a2010';
+  for (let i = 0; i < 3; i++) {
+    const ang = i * 2.1;
+    ctx.beginPath();
+    ctx.arc(top.x + Math.cos(ang) * 3, top.y + Math.sin(ang) * 2, 1.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// ── Уличный торговец (тележка с едой / кофе-зонтик / газетный ларёк)
+// Тип тайла 13. Подвариант выбирается по seed. Все варианты узкие,
+// анимация (дымок, мигающая лампочка) добавляет «жизнь».
+function drawStreetVendor(r, c) {
+  const p = w2s(r + 0.5, c + 0.5);
+  const wx = TS * 0.5, wy = TS * 0.5 * ISO_Y;
+  const variant = ((r * 13 + c * 23) % 4 + 4) % 4;
+  const tt = performance.now() / 1000;
+  // Тень
+  ctx.fillStyle = 'rgba(0,0,0,.35)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y + 3, wx * 0.5, wy * 0.45, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (variant === 0) {
+    // ─── ТЕЛЕЖКА ШАУРМЫ — красная с жёлтой крышей ───────────────
+    // 2 колеса
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath(); ctx.arc(p.x - 6, p.y + 4, 2.2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x + 6, p.y + 4, 2.2, 0, Math.PI * 2); ctx.fill();
+    // Корпус (красный)
+    ctx.fillStyle = '#c83830';
+    ctx.fillRect(p.x - 9, p.y - 4, 18, 8);
+    // Тёмный низ
+    ctx.fillStyle = '#8a2820';
+    ctx.fillRect(p.x - 9, p.y + 1, 18, 3);
+    // Витрина-окно
+    ctx.fillStyle = '#fff0a8';
+    ctx.fillRect(p.x - 7, p.y - 2, 14, 4);
+    // Стойки-опоры крыши
+    ctx.fillStyle = '#5a3018';
+    ctx.fillRect(p.x - 9, p.y - 14, 1.5, 10);
+    ctx.fillRect(p.x + 7, p.y - 14, 1.5, 10);
+    // Крыша-навес (жёлто-полосатая)
+    ctx.fillStyle = '#f0b830';
+    ctx.beginPath();
+    ctx.moveTo(p.x - 11, p.y - 14);
+    ctx.lineTo(p.x + 11, p.y - 14);
+    ctx.lineTo(p.x + 9,  p.y - 17);
+    ctx.lineTo(p.x - 9,  p.y - 17);
+    ctx.closePath(); ctx.fill();
+    // Полоски на крыше
+    ctx.fillStyle = '#c08820';
+    for (let i = 0; i < 3; i++) {
+      ctx.fillRect(p.x - 10 + i * 7, p.y - 16, 2, 2);
+    }
+    // Текст «KEBAB» на корпусе
+    ctx.font = 'bold 5px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff0c0';
+    ctx.fillText('KEBAB', p.x, p.y - 7);
+    // Вертикальный шампур-гриль в окне (анимация — крутится)
+    const rot = Math.sin(tt * 1.2) * 0.3;
+    ctx.fillStyle = '#8a4020';
+    ctx.fillRect(p.x - 1 + rot, p.y - 2, 2, 4);
+    // Дымок
+    for (let i = 0; i < 3; i++) {
+      const phase = (tt * 0.7 + i * 0.33) % 1;
+      ctx.fillStyle = `rgba(220,220,220,${0.5 - phase * 0.4})`;
+      ctx.beginPath();
+      ctx.arc(p.x + 4 + Math.sin(phase * 6) * 1.5, p.y - 17 - phase * 10, 2 + phase * 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (variant === 1) {
+    // ─── ХОТ-ДОГ ТЕЛЕЖКА — синяя с зонтиком ─────────────────────
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath(); ctx.arc(p.x - 5, p.y + 4, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x + 5, p.y + 4, 2, 0, Math.PI * 2); ctx.fill();
+    // Корпус (синий)
+    ctx.fillStyle = '#2a68c0';
+    ctx.fillRect(p.x - 8, p.y - 3, 16, 7);
+    // Стеклянный купол (полукруг)
+    ctx.fillStyle = 'rgba(180,210,240,.7)';
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y - 3, 7, 3, 0, Math.PI, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#5a8eb0';
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+    // Сосиски в куполе
+    ctx.fillStyle = '#c8704a';
+    ctx.fillRect(p.x - 5, p.y - 4, 3, 1.2);
+    ctx.fillRect(p.x - 1, p.y - 4, 3, 1.2);
+    ctx.fillRect(p.x + 3, p.y - 4, 3, 1.2);
+    // Зонтик-навес (красно-белый)
+    ctx.strokeStyle = '#5a3018';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y - 3); ctx.lineTo(p.x, p.y - 16);
+    ctx.stroke();
+    ctx.fillStyle = '#e04030';
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y - 16, 10, 3, 0, Math.PI, 0);
+    ctx.fill();
+    // Белые сектора зонта
+    ctx.fillStyle = '#f0f0f0';
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      const a1 = Math.PI + (i * 2 + 1) * Math.PI / 6;
+      const a2 = a1 + Math.PI / 6;
+      ctx.moveTo(p.x, p.y - 16);
+      ctx.arc(p.x, p.y - 16, 10, a1, a2);
+      ctx.closePath(); ctx.fill();
+    }
+    // Текст «HOT DOG»
+    ctx.font = 'bold 4.5px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffe040';
+    ctx.fillText('HOT DOG', p.x, p.y + 1);
+  } else if (variant === 2) {
+    // ─── КОФЕ-СТОЛИК ПОД ЗОНТИКОМ ──────────────────────────────
+    // Зонт
+    ctx.strokeStyle = '#3a2a18';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y); ctx.lineTo(p.x, p.y - 18);
+    ctx.stroke();
+    ctx.fillStyle = '#509060';
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y - 18, 13, 4, 0, Math.PI, 0);
+    ctx.fill();
+    ctx.fillStyle = '#3a6a48';
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y - 18, 13, 4, 0, Math.PI, Math.PI * 1.3);
+    ctx.fill();
+    // Кант зонта
+    ctx.strokeStyle = '#2a4a30';
+    ctx.lineWidth = 0.7;
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y - 18, 13, 4, 0, Math.PI, 0);
+    ctx.stroke();
+    // Логотип на зонте
+    ctx.font = 'bold 4px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff0c0';
+    ctx.fillText('☕', p.x, p.y - 17);
+    // Столик (круглая столешница)
+    ctx.fillStyle = '#5a3a20';
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, 6, 2.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Ножка столика
+    ctx.fillStyle = '#3a2410';
+    ctx.fillRect(p.x - 1, p.y, 2, 4);
+    // Чашка на столе
+    ctx.fillStyle = '#f0f0f0';
+    ctx.fillRect(p.x - 1.5, p.y - 2, 3, 2);
+    ctx.fillStyle = '#7a4a28';
+    ctx.fillRect(p.x - 1, p.y - 2, 2, 0.8);
+    // Пар от кофе
+    for (let i = 0; i < 2; i++) {
+      const phase = (tt * 0.9 + i * 0.5) % 1;
+      ctx.fillStyle = `rgba(220,220,220,${0.45 - phase * 0.35})`;
+      ctx.beginPath();
+      ctx.arc(p.x + Math.sin(phase * 4) * 1.2, p.y - 3 - phase * 6, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Стульчик рядом
+    ctx.fillStyle = '#3a2410';
+    ctx.fillRect(p.x + 5, p.y + 1, 3, 3);
+  } else {
+    // ─── ГАЗЕТНЫЙ ЛАРЁК — будка с газетами и неоном ────────────
+    // Корпус
+    ctx.fillStyle = '#3a4858';
+    ctx.fillRect(p.x - 7, p.y - 12, 14, 16);
+    // Тёмный бок
+    ctx.fillStyle = '#202832';
+    ctx.fillRect(p.x + 4, p.y - 12, 3, 16);
+    // Крыша наклонная
+    ctx.fillStyle = '#1a1a20';
+    ctx.beginPath();
+    ctx.moveTo(p.x - 8, p.y - 12);
+    ctx.lineTo(p.x + 8, p.y - 12);
+    ctx.lineTo(p.x + 7, p.y - 15);
+    ctx.lineTo(p.x - 7, p.y - 15);
+    ctx.closePath(); ctx.fill();
+    // Окошко
+    ctx.fillStyle = '#ffe48a';
+    ctx.fillRect(p.x - 5, p.y - 9, 10, 5);
+    // Газеты в окошке (мелкие полоски)
+    ctx.fillStyle = '#202020';
+    ctx.fillRect(p.x - 4, p.y - 8, 3, 0.6);
+    ctx.fillRect(p.x - 4, p.y - 7, 3, 0.6);
+    ctx.fillRect(p.x + 1, p.y - 8, 3, 0.6);
+    ctx.fillRect(p.x + 1, p.y - 7, 3, 0.6);
+    // Вывеска «PRESS»
+    ctx.font = 'bold 4.5px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    // Мигающий неон
+    const blink = Math.sin(tt * 4) > -0.5;
+    ctx.shadowColor = '#ff5050';
+    ctx.shadowBlur = blink ? 5 : 1;
+    ctx.fillStyle = blink ? '#ff5050' : '#7a2020';
+    ctx.fillText('PRESS', p.x, p.y - 2);
+    ctx.shadowBlur = 0;
+    // Стопка газет у входа
+    ctx.fillStyle = '#d0d0c0';
+    ctx.fillRect(p.x - 8, p.y + 2, 4, 2);
+    ctx.fillStyle = '#a0a090';
+    ctx.fillRect(p.x - 8, p.y + 1, 4, 1);
+  }
+}
+
 function drawBuilding(r, c) {
   const p = w2s(r + 0.5, c + 0.5);
   const wx = TS * 0.5, wy = TS * 0.5 * ISO_Y;
@@ -6516,6 +7384,45 @@ function drawBuilding(r, c) {
   ctx.beginPath();
   ctx.moveTo(p.x, p.y + wy); ctx.lineTo(p.x, p.y + wy - H);
   ctx.stroke();
+  // ── Граффити на стене (низ правой/левой грани, редко) ────────
+  // Не на высотках/офисных — они сверкают, тег смотрится грязно.
+  // На жилых и магазинах ~14% домов.
+  if ((bldType === 0 || bldType === 2) && ((r * 23 + c * 19) % 7) === 0) {
+    const tagsList = [
+      { s: '☠',   col: '#e8e8e8' },
+      { s: '666', col: '#e84030' },
+      { s: 'L',   col: '#40c0e8' },
+      { s: '$',   col: '#50e060' },
+      { s: 'RIP', col: '#e8b020' },
+      { s: '✘',   col: '#e060c0' },
+      { s: '$$$', col: '#80e040' },
+      { s: 'BX',  col: '#ff6020' },
+    ];
+    const tg = tagsList[(r * 7 + c * 13) % tagsList.length];
+    const gx = p.x + wx * 0.45;
+    const gy = p.y - H * 0.18;
+    ctx.save();
+    ctx.font = (tg.s.length > 1 ? 'bold 9px' : 'bold 13px') +
+               ' system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    // Тень-подтёк
+    ctx.fillStyle = 'rgba(0,0,0,.55)';
+    ctx.fillText(tg.s, gx + 0.7, gy + 0.7);
+    // Сам тег с лёгким glow
+    ctx.shadowColor = tg.col;
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = tg.col;
+    ctx.fillText(tg.s, gx, gy);
+    ctx.shadowBlur = 0;
+    // Потёки краски от тега вниз
+    ctx.fillStyle = tg.col;
+    ctx.globalAlpha = 0.55;
+    ctx.fillRect(gx - 5, gy + 7, 0.8, 5);
+    ctx.fillRect(gx + 3, gy + 6, 0.8, 7);
+    ctx.globalAlpha = 1.0;
+    ctx.restore();
+  }
   // ── Окна (разные стили в зависимости от типа) ────────────────
   const winRows = Math.max(2, Math.floor(H / 14));
   if (bldType === 1 || bldType === 3) {
@@ -6587,6 +7494,125 @@ function drawBuilding(r, c) {
     ctx.moveTo(p.x + wx * 0.10, balY - 5);
     ctx.lineTo(p.x + wx * 0.66, balY - 5);
     ctx.stroke();
+    // Цветы в горшках на балконе — 50% домов с балконом
+    if (((r * 19 + c * 41) % 2) === 0) {
+      const flowerCols = ['#e85878', '#f0b820', '#d040c0', '#f06840'];
+      for (let i = 0; i < 3; i++) {
+        const fx = p.x + wx * (0.18 + i * 0.18);
+        // Горшок
+        ctx.fillStyle = '#7a3a18';
+        ctx.fillRect(fx - 1.5, balY - 3, 3, 2);
+        // Цветок
+        ctx.fillStyle = flowerCols[((r + c + i) % flowerCols.length + flowerCols.length) % flowerCols.length];
+        ctx.beginPath();
+        ctx.arc(fx, balY - 4, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        // Листочки
+        ctx.fillStyle = '#3a7038';
+        ctx.fillRect(fx - 1, balY - 3, 2, 0.6);
+      }
+    }
+  }
+  // ── Маркиза над входом (на жилых и магазинах, ~40%) ──────────
+  if ((bldType === 0 || bldType === 2) && ((r * 31 + c * 17) % 5) < 2) {
+    const mkCols = [
+      ['#c84030', '#8a2820'], ['#3868c0', '#1a4080'],
+      ['#3a9050', '#1a6030'], ['#d0a020', '#8a6010'],
+      ['#a040c0', '#601880'],
+    ];
+    const mk = mkCols[((r * 5 + c * 11) % mkCols.length + mkCols.length) % mkCols.length];
+    const mkY = p.y - H * 0.18;
+    const mkX = p.x + wx * 0.45;
+    const mkW = wx * 0.45;
+    // Основной тент
+    ctx.fillStyle = mk[0];
+    ctx.beginPath();
+    ctx.moveTo(mkX,         mkY);
+    ctx.lineTo(mkX + mkW,   mkY + 1);
+    ctx.lineTo(mkX + mkW,   mkY + 4);
+    ctx.lineTo(mkX,         mkY + 3);
+    ctx.closePath(); ctx.fill();
+    // Полоски
+    ctx.fillStyle = mk[1];
+    for (let i = 0; i < 3; i++) {
+      const px = mkX + mkW * (0.15 + i * 0.28);
+      ctx.fillRect(px, mkY + 0.5, mkW * 0.08, 3);
+    }
+    // Скалопированная нижняя кромка (волнистая)
+    ctx.fillStyle = mk[0];
+    for (let i = 0; i < 4; i++) {
+      const px = mkX + mkW * (i * 0.27);
+      ctx.beginPath();
+      ctx.arc(px, mkY + 4, 1.2, 0, Math.PI);
+      ctx.fill();
+    }
+    // Скобы крепления к стене (тёмные)
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(mkX,       mkY - 0.5, 0.8, 1.5);
+    ctx.fillRect(mkX + mkW, mkY,       0.8, 1.5);
+  }
+  // ── Пожарная лестница (zigzag) на боковой стене высоток/офисов
+  if ((bldType === 1 || bldType === 3) && ((r * 13 + c * 29) % 4) === 0 && H > 40) {
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 0.8;
+    // 2 платформы + лесенки + вертикальная труба
+    const fx = p.x + wx * 0.85;
+    const fyTop = p.y - H * 0.85;
+    const fyBot = p.y - H * 0.15;
+    // Вертикальная труба
+    ctx.beginPath();
+    ctx.moveTo(fx, fyTop); ctx.lineTo(fx, fyBot);
+    ctx.stroke();
+    // Платформы (3 шт) + поручни
+    for (let i = 0; i < 3; i++) {
+      const py = fyTop + (fyBot - fyTop) * (i + 0.5) / 3;
+      // Платформа
+      ctx.fillStyle = '#2a2a2a';
+      ctx.fillRect(fx - 8, py, 9, 1.2);
+      // Поручень
+      ctx.strokeStyle = '#1a1a1a';
+      ctx.lineWidth = 0.6;
+      ctx.beginPath();
+      ctx.moveTo(fx - 8, py - 3); ctx.lineTo(fx, py - 3);
+      ctx.stroke();
+      // Прутья поручня
+      for (let k = 0; k < 4; k++) {
+        const kx = fx - 8 + k * 2.5;
+        ctx.beginPath();
+        ctx.moveTo(kx, py); ctx.lineTo(kx, py - 3);
+        ctx.stroke();
+      }
+      // Лесенка вниз (диагональ)
+      if (i < 2) {
+        const nextPy = fyTop + (fyBot - fyTop) * (i + 1.5) / 3;
+        ctx.beginPath();
+        ctx.moveTo(fx - 8, py);
+        ctx.lineTo(fx, nextPy);
+        ctx.stroke();
+        // Ступеньки
+        for (let k = 1; k < 4; k++) {
+          const t = k / 4;
+          ctx.beginPath();
+          ctx.moveTo(fx - 8 + 8 * t - 0.8, py + (nextPy - py) * t);
+          ctx.lineTo(fx - 8 + 8 * t + 0.8, py + (nextPy - py) * t);
+          ctx.stroke();
+        }
+      }
+    }
+  }
+  // ── Адресная табличка — мелкий жёлтый прямоугольник с номером дома
+  if ((bldType === 0 || bldType === 2) && ((r * 11 + c * 23) % 3) === 0) {
+    const num = ((r * 7 + c * 13) % 99 + 100) % 99 + 1;
+    const adX = p.x + wx * 0.30, adY = p.y - H * 0.05;
+    ctx.fillStyle = '#d4b820';
+    ctx.fillRect(adX, adY, 8, 4.5);
+    ctx.strokeStyle = '#5a4810';
+    ctx.lineWidth = 0.4;
+    ctx.strokeRect(adX, adY, 8, 4.5);
+    ctx.font = 'bold 4px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillText(String(num), adX + 4, adY + 2.5);
   }
   // ── Вывеска магазина на низком доме (горизонтальная полоса) ───
   if (bldType === 2 && winRows <= 3) {
@@ -6599,13 +7625,27 @@ function drawBuilding(r, c) {
     ctx.lineWidth = 0.7;
     ctx.strokeRect(p.x + 2, sgnY, wx - 4, sgnH);
     // Шрифт вывески — по координатам выбирается случайное имя
-    const names = ['BAR', 'CAFE', '24/7', 'PIZZA', 'BREAD', 'TACO'];
-    const nm = names[((r + c) % names.length + names.length) % names.length];
+    const names = [
+      'BAR', 'CAFE', '24/7', 'PIZZA', 'BREAD', 'TACO',
+      'KEBAB', 'SUSHI', 'BURGER', 'DONUTS', 'COFFEE', 'WINE',
+      'BEER', 'NAILS', 'TATTOO', 'BARBER', 'LAUNDRY', 'RAMEN',
+    ];
+    const signColors = ['#ffd76b', '#ff7050', '#50e0c0', '#a0e040', '#ff60a0'];
+    const nm = names[((r * 7 + c * 13) % names.length + names.length) % names.length];
+    const sgnCol = signColors[((r * 3 + c * 5) % signColors.length + signColors.length) % signColors.length];
     ctx.save();
     ctx.font = 'bold 7px system-ui, sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#ffd76b';
+    // Лёгкое свечение неона
+    ctx.shadowColor = sgnCol;
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = sgnCol;
     ctx.fillText(nm, p.x + wx * 0.5, sgnY + sgnH / 2);
+    ctx.shadowBlur = 0;
+    // Обновим обводку вывески под цвет
+    ctx.strokeStyle = sgnCol;
+    ctx.lineWidth = 0.7;
+    ctx.strokeRect(p.x + 2, sgnY, wx - 4, sgnH);
     ctx.restore();
   }
   // ── Антенна / спутниковая тарелка на крыше (детерминированно) ─
@@ -6649,6 +7689,56 @@ function drawBuilding(r, c) {
     for (let i = 0; i < 3; i++) {
       ctx.fillRect(acX - 3, acY - 4 + i * 2, 6, 0.8);
     }
+  }
+  // ── Билборд на крыше высотки (20% высоток) ────────────────────
+  if (bldType === 3 && rooftop === 3) {
+    const bx = p.x;
+    const bH_sgn = 14;
+    const bW = wx * 1.45;
+    const bTop = p.y - H - 22;
+    // Ножки от крыши до низа щита
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(bx - bW * 0.42, p.y - H, 1.6, bTop + bH_sgn - (p.y - H));
+    ctx.fillRect(bx + bW * 0.42 - 1.6, p.y - H, 1.6, bTop + bH_sgn - (p.y - H));
+    // Щит — тёмная подложка с обводкой
+    ctx.fillStyle = '#181820';
+    ctx.fillRect(bx - bW * 0.5, bTop, bW, bH_sgn);
+    ctx.strokeStyle = '#403838';
+    ctx.lineWidth = 0.8;
+    ctx.strokeRect(bx - bW * 0.5, bTop, bW, bH_sgn);
+    // Прожекторы по краям сверху
+    ctx.fillStyle = '#5a5a5a';
+    ctx.fillRect(bx - bW * 0.45, bTop - 2.5, 4, 2.2);
+    ctx.fillRect(bx + bW * 0.45 - 4, bTop - 2.5, 4, 2.2);
+    // Свет от прожекторов (мягкий конус вниз)
+    ctx.fillStyle = 'rgba(255,235,170,.15)';
+    ctx.beginPath();
+    ctx.moveTo(bx - bW * 0.43, bTop);
+    ctx.lineTo(bx - bW * 0.30, bTop + bH_sgn);
+    ctx.lineTo(bx - bW * 0.55, bTop + bH_sgn);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(bx + bW * 0.43, bTop);
+    ctx.lineTo(bx + bW * 0.30, bTop + bH_sgn);
+    ctx.lineTo(bx + bW * 0.55, bTop + bH_sgn);
+    ctx.closePath(); ctx.fill();
+    // Текст билборда
+    const adNames = ['CASINO', '$$$', 'BAR', '24/7', 'GANG', 'CITY', 'BOSS', 'DEALS'];
+    const adColors = ['#ffd76b', '#ff5050', '#40c0e8', '#a0e040', '#e060c0'];
+    const nm = adNames[((r * 7 + c * 5) % adNames.length + adNames.length) % adNames.length];
+    const tCol = adColors[((r * 3 + c * 11) % adColors.length + adColors.length) % adColors.length];
+    ctx.save();
+    ctx.font = 'bold 10px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(0,0,0,.7)';
+    ctx.fillText(nm, bx + 0.6, bTop + bH_sgn / 2 + 0.6);
+    ctx.shadowColor = tCol;
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = tCol;
+    ctx.fillText(nm, bx, bTop + bH_sgn / 2);
+    ctx.shadowBlur = 0;
+    ctx.restore();
   }
 }
 
@@ -8066,11 +9156,15 @@ function render() {
       else if (t === 5) items.push({ depth: r + c, draw: () => drawDumpster(r, c) });
       else if (t === 6) items.push({ depth: r + c, draw: () => drawTree(r, c) });
       else if (t === 7) items.push({ depth: r + c, draw: () => drawLamp(r, c) });
+      else if (t === 13) items.push({ depth: r + c, draw: () => drawStreetVendor(r, c) });
+      else if (t === 17) items.push({ depth: r + c, draw: () => drawBeachUmbrella(r, c) });
+      else if (t === 18) items.push({ depth: r + c, draw: () => drawPalmTree(r, c) });
     }
   }
   // Светофоры на перекрёстках. Перекрёсток теперь 3×3 (mod ∈ {0,1,2});
   // «северо-восточный» угол около бордюра — это тайл (2, 2).
-  for (let r = r0; r < r1; r++) {
+  // В зоне пляжа (r<=15) светофоров нет.
+  for (let r = Math.max(r0, 16); r < r1; r++) {
     if (r % BLOCK !== 2) continue;
     for (let c = c0; c < c1; c++) {
       if (c % BLOCK !== 2) continue;
@@ -8122,6 +9216,17 @@ function render() {
     for (const bot of (az.bots || [])) {
       if (bot.y < r0 || bot.y >= r1 || bot.x < c0 || bot.x >= c1) continue;
       items.push({ depth: bot.y + bot.x + 0.0012, draw: () => drawAggroBot(bot) });
+    }
+    // Логово зачищено — расследователи и пожарные
+    if (az.cleared) {
+      for (const n of (az.investigators || [])) {
+        if (n.y < r0 || n.y >= r1 || n.x < c0 || n.x >= c1) continue;
+        items.push({ depth: n.y + n.x + 0.00125, draw: () => drawLairInvestigator(n) });
+      }
+      for (const n of (az.firefighters || [])) {
+        if (n.y < r0 || n.y >= r1 || n.x < c0 || n.x >= c1) continue;
+        items.push({ depth: n.y + n.x + 0.00125, draw: () => drawLairFirefighter(n) });
+      }
     }
   }
   // Игрок (со своим чат-баблом из последнего смайлика, чтобы сразу видеть).
@@ -8845,10 +9950,19 @@ function bakeMini() {
       let col;
       if (t === 1)              col = '#2a2530';                  // здание (тёмное)
       else if (t === 8 || t === 6) col = ((r + c) & 1) ? '#2a4a22' : '#243d1c';
+      else if (t === 10)        col = '#5a4632';                  // грунтовая тропинка
+      else if (t === 11)        col = '#4a8ad0';                  // фонтан (синий)
+      else if (t === 12)        col = '#8a8478';                  // мощёная площадь
+      else if (t === 13)        col = '#c83830';                  // уличный торговец
+      else if (t === 14)        col = '#1c4870';                  // море
+      else if (t === 15)        col = '#dec48a';                  // пляж
+      else if (t === 16)        col = '#a48a5c';                  // прибой
+      else if (t === 17)        col = '#e84030';                  // зонт
+      else if (t === 18)        col = '#3a7838';                  // пальма
       else if (t === 9)         col = '#33343a';                  // бордюр
       else if (t === 7)         col = '#ffe48a';                  // фонарь
-      else if (isRoad)          col = ((r + c) & 1) ? '#2a2a32' : '#222228';
-      else                      col = ((r + c) & 1) ? '#3a3530' : '#332e2a';  // тротуар
+      else if (isRoad)          col = ((r + c) & 1) ? '#3c3c46' : '#34343e';
+      else                      col = ((r + c) & 1) ? '#6e6a5e' : '#605c52';  // тротуар
       b.fillStyle = col;
       b.fillRect(c * sx, r * sy, Math.ceil(sx) + 0.5, Math.ceil(sy) + 0.5);
     }
