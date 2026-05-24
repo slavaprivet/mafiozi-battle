@@ -8654,6 +8654,286 @@ function drawBuilding(r, c) {
 // POI — большая вывеска НАД крышей здания. Рисуется поверх drawBuilding(r,c)
 // в том же тайле. Размер таблички адаптивен; для привлечения внимания
 // добавлен пульсирующий «гало»-блик за иконкой.
+// ── Визуальные настройки для каждого бизнеса: палитра фасада, цвет
+// неона, иконка-декор окна. Делает каждое здание-бизнес узнаваемым
+// на расстоянии без чтения вывески.
+const BIZ_VISUALS = {
+  coffee:     { top: '#6a4e2a', side: '#3a2614', neon: '#ffd070', wf: 'warm',    deco: 'awning_brown' },
+  carwash:    { top: '#3a6e8e', side: '#1a3a52', neon: '#5ad8ff', wf: 'cool',    deco: 'water_jets' },
+  barbershop: { top: '#a83838', side: '#5e1a1a', neon: '#ff80a0', wf: 'redwhite',deco: 'barber_pole' },
+  pizza:      { top: '#7a3030', side: '#3a1414', neon: '#ff5050', wf: 'warm',    deco: 'pizza_window' },
+  garage:     { top: '#4a4a52', side: '#2a2a32', neon: '#ffa040', wf: 'cool',    deco: 'garage_door' },
+  bar:        { top: '#2a1a3a', side: '#0e0820', neon: '#c060ff', wf: 'nightbar',deco: 'bottle' },
+  club:       { top: '#5a1858', side: '#2a0828', neon: '#ff40c0', wf: 'club',    deco: 'disco' },
+  warehouse:  { top: '#3a3a30', side: '#1a1a14', neon: '#ffd040', wf: 'industrial',deco: 'roll_door' },
+  casino:     { top: '#7a5a18', side: '#3a2a0a', neon: '#ffd060', wf: 'gold',    deco: 'chips' },
+  port:       { top: '#1a5a6a', side: '#0a2a32', neon: '#40e0d0', wf: 'sea',     deco: 'anchor' },
+};
+
+// ── Рендер здания-бизнеса. Изо-куб с фирменной палитрой, неоновая
+// вывеска на правой грани, специфичный декор на фасаде.
+function drawBizBuilding(r, c, biz) {
+  const p = w2s(r + 0.5, c + 0.5);
+  const wx = TS * 0.5, wy = TS * 0.5 * ISO_Y;
+  const seed = ((r * 73 + c * 131) % 7) / 7;
+  // Бизнесы — низкие/средние здания (не высотки)
+  const H = isoH(1.4 + seed * 0.6);
+  const v = BIZ_VISUALS[biz.id] || BIZ_VISUALS.coffee;
+  const t = performance.now() / 1000;
+  // Тень
+  ctx.fillStyle = 'rgba(0,0,0,.55)';
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y - wy); ctx.lineTo(p.x + wx, p.y);
+  ctx.lineTo(p.x, p.y + wy); ctx.lineTo(p.x - wx, p.y);
+  ctx.closePath(); ctx.fill();
+  // Левая грань
+  ctx.fillStyle = v.side;
+  ctx.beginPath();
+  ctx.moveTo(p.x - wx, p.y); ctx.lineTo(p.x, p.y + wy);
+  ctx.lineTo(p.x, p.y + wy - H); ctx.lineTo(p.x - wx, p.y - H);
+  ctx.closePath(); ctx.fill();
+  // Правая грань (фасад) — лёгкий градиент
+  const fGrad = ctx.createLinearGradient(p.x, p.y - H, p.x + wx, p.y);
+  fGrad.addColorStop(0, v.top); fGrad.addColorStop(1, v.side);
+  ctx.fillStyle = fGrad;
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y + wy); ctx.lineTo(p.x + wx, p.y);
+  ctx.lineTo(p.x + wx, p.y - H); ctx.lineTo(p.x, p.y + wy - H);
+  ctx.closePath(); ctx.fill();
+  // Крыша
+  ctx.fillStyle = v.top;
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y - H + wy); ctx.lineTo(p.x + wx, p.y - H);
+  ctx.lineTo(p.x, p.y - H - wy); ctx.lineTo(p.x - wx, p.y - H);
+  ctx.closePath(); ctx.fill();
+  // Чёрный стык
+  ctx.strokeStyle = 'rgba(0,0,0,.45)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y + wy); ctx.lineTo(p.x, p.y + wy - H);
+  ctx.stroke();
+
+  // ── ДЕКОР ОКОН/ВИТРИНЫ — снизу фасада ──────────────────────────
+  // Большое тёплое окно витрины на правой грани, нижняя 40% высоты
+  const winY1 = p.y + wy - H * 0.55;
+  const winY2 = p.y + wy - H * 0.10;
+  // Полупрозрачное стекло
+  ctx.fillStyle = 'rgba(255,235,160,.18)';
+  ctx.beginPath();
+  ctx.moveTo(p.x + wx * 0.15, p.y + wy - H * 0.55);
+  ctx.lineTo(p.x + wx * 0.85, p.y + wy * 0.30 - H * 0.55);
+  ctx.lineTo(p.x + wx * 0.85, p.y + wy * 0.30 - H * 0.10);
+  ctx.lineTo(p.x + wx * 0.15, p.y + wy - H * 0.10);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,.4)';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+  // Тёплый внутренний свет (мерцание для bar/club)
+  const lightPulse = (v.wf === 'club') ? 0.5 + 0.5 * Math.sin(t * 8 + r) : 0.8;
+  ctx.fillStyle = `rgba(255,200,100,${0.15 * lightPulse})`;
+  ctx.beginPath();
+  ctx.moveTo(p.x + wx * 0.20, p.y + wy * 0.08 - H * 0.50);
+  ctx.lineTo(p.x + wx * 0.80, p.y + wy * 0.32 - H * 0.50);
+  ctx.lineTo(p.x + wx * 0.80, p.y + wy * 0.32 - H * 0.15);
+  ctx.lineTo(p.x + wx * 0.20, p.y + wy * 0.08 - H * 0.15);
+  ctx.closePath(); ctx.fill();
+
+  // Спец-декор по типу
+  drawBizDeco(p, wx, wy, H, v, r, c, t);
+
+  // Окна на верхнем этаже (маленькие) — на правой грани
+  const upWinRows = 2, upWinCols = 3;
+  for (let wr = 0; wr < upWinRows; wr++) {
+    for (let wc = 0; wc < upWinCols; wc++) {
+      const k = (wc + 0.5) / upWinCols;
+      const wxp = p.x + wx * (0.15 + k * 0.70);
+      const wyp = p.y + wy * (0.15 + k * 0.70) - H * (0.62 + wr * 0.18);
+      const lit = ((r * 5 + c * 3 + wr * 7 + wc * 11) % 3) !== 0;
+      ctx.fillStyle = lit ? 'rgba(255,210,120,.7)' : 'rgba(40,30,20,.7)';
+      ctx.fillRect(wxp - 1.6, wyp - 1.2, 3.2, 2.4);
+    }
+  }
+
+  // ── НЕОНОВАЯ ВЫВЕСКА — большой эмодзи на крыше с glow ─────────
+  const neonY = p.y - H - wy * 0.10;
+  ctx.save();
+  ctx.shadowColor = v.neon;
+  ctx.shadowBlur = 14 + Math.sin(t * 3 + r) * 4;
+  ctx.font = '20px "Segoe UI Emoji", system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = v.neon;
+  ctx.fillText(biz.emoji, p.x, neonY);
+  ctx.shadowBlur = 0;
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'left';
+  ctx.restore();
+}
+
+// ── Спец-декор фасада по типу бизнеса (полоса парикмахера, бочки
+// бара, винные бутылки, чипы казино и т.д.)
+function drawBizDeco(p, wx, wy, H, v, r, c, t) {
+  const fx = p.x + wx * 0.50;
+  const fy = p.y + wy * 0.25 - H * 0.30;
+  if (v.deco === 'awning_brown') {
+    // Зигзаг-навес над витриной
+    ctx.fillStyle = '#7a4a20';
+    ctx.beginPath();
+    const ax = p.x + wx * 0.15, ay = p.y + wy * 0.02 - H * 0.50;
+    const bx = p.x + wx * 0.85, by = p.y + wy * 0.36 - H * 0.50;
+    ctx.moveTo(ax, ay);
+    for (let i = 0; i <= 6; i++) {
+      const kk = i / 6;
+      const cx = ax + (bx - ax) * kk;
+      const cy = ay + (by - ay) * kk + ((i % 2) ? 2 : 0);
+      ctx.lineTo(cx, cy);
+    }
+    ctx.lineTo(bx, by - 4); ctx.lineTo(ax, ay - 4); ctx.closePath();
+    ctx.fill();
+  } else if (v.deco === 'barber_pole') {
+    // Спирально-крутящийся столб у двери — красно-белая полоса
+    const px = p.x + wx * 0.10, py = p.y + wy * 0.05 - H * 0.40;
+    const ph = H * 0.30;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(px - 2, py, 4, ph);
+    ctx.strokeStyle = '#e02020';
+    ctx.lineWidth = 1.8;
+    for (let i = 0; i < 5; i++) {
+      const ph2 = (t * 30 + i * 6) % ph;
+      ctx.beginPath();
+      ctx.moveTo(px - 2, py + ph2);
+      ctx.lineTo(px + 2, py + ph2 + 3);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = '#888'; ctx.lineWidth = 0.8;
+    ctx.strokeRect(px - 2, py, 4, ph);
+  } else if (v.deco === 'water_jets') {
+    // Синие капли воды под витриной — анимированные
+    for (let i = 0; i < 4; i++) {
+      const ph = (t * 0.8 + i * 0.3) % 1;
+      ctx.fillStyle = `rgba(120,200,255,${1 - ph})`;
+      const dx = p.x + wx * (0.20 + i * 0.18);
+      const dy = p.y + wy * (0.20 + i * 0.18) - H * 0.05 + ph * 8;
+      ctx.beginPath();
+      ctx.ellipse(dx, dy, 1.4, 2.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (v.deco === 'pizza_window') {
+    // Круглая пицца через витрину (большой жёлто-красный круг)
+    ctx.fillStyle = '#f0c050';
+    ctx.beginPath();
+    ctx.ellipse(fx, fy, 6, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#c83030';
+    for (let i = 0; i < 5; i++) {
+      const a = i * 1.3;
+      ctx.beginPath();
+      ctx.arc(fx + Math.cos(a) * 3, fy + Math.sin(a) * 1.5, 0.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (v.deco === 'garage_door') {
+    // Поднимающиеся ребристые ворота — серый прямоугольник с полосками
+    ctx.fillStyle = '#6a6a72';
+    ctx.fillRect(p.x + wx * 0.20, p.y + wy * 0.05 - H * 0.45,
+                 wx * 0.60, H * 0.35);
+    ctx.strokeStyle = '#4a4a52';
+    ctx.lineWidth = 0.6;
+    for (let i = 0; i < 5; i++) {
+      const y = p.y + wy * 0.05 - H * 0.45 + i * (H * 0.07);
+      ctx.beginPath();
+      ctx.moveTo(p.x + wx * 0.20, y);
+      ctx.lineTo(p.x + wx * 0.80, y);
+      ctx.stroke();
+    }
+  } else if (v.deco === 'bottle') {
+    // Стойка с бутылками за витриной — 3 силуэта
+    for (let i = 0; i < 3; i++) {
+      const bx = p.x + wx * (0.30 + i * 0.18);
+      const by = p.y + wy * (0.15 + i * 0.18) - H * 0.20;
+      ctx.fillStyle = ['#3a8a3a','#8a4a3a','#3a3a8a'][i];
+      ctx.fillRect(bx - 1.2, by - 5, 2.4, 5);
+      ctx.fillRect(bx - 0.6, by - 7, 1.2, 2);
+    }
+  } else if (v.deco === 'disco') {
+    // Диско-шар над крышей + светящиеся блики на фасаде
+    const dx = p.x, dy = p.y - H - wy * 0.45;
+    ctx.fillStyle = '#aaaacc';
+    ctx.beginPath();
+    ctx.arc(dx, dy, 5, 0, Math.PI * 2);
+    ctx.fill();
+    // Сетка фасок
+    ctx.strokeStyle = 'rgba(255,255,255,.6)';
+    ctx.lineWidth = 0.5;
+    for (let i = -2; i <= 2; i++) {
+      ctx.beginPath();
+      ctx.arc(dx, dy, 5, i * 0.6 + t, i * 0.6 + t + 0.3);
+      ctx.stroke();
+    }
+    // Шарики света на фасаде
+    for (let i = 0; i < 4; i++) {
+      const ph = (t * 2 + i * 1.5) % (Math.PI * 2);
+      const lx = p.x + Math.sin(ph) * wx * 0.4;
+      const ly = p.y + wy * 0.25 + Math.cos(ph) * wy * 0.3 - H * 0.25;
+      ctx.fillStyle = `hsl(${(i * 90 + t * 60) % 360}, 90%, 60%)`;
+      ctx.beginPath();
+      ctx.arc(lx, ly, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (v.deco === 'roll_door') {
+    // Большие промышленные складские ворота — широкие, с ребрами
+    ctx.fillStyle = '#4a4a3a';
+    ctx.fillRect(p.x + wx * 0.20, p.y + wy * 0.02 - H * 0.55,
+                 wx * 0.60, H * 0.50);
+    ctx.strokeStyle = '#2a2a1a';
+    ctx.lineWidth = 0.8;
+    for (let i = 0; i < 7; i++) {
+      const y = p.y + wy * 0.02 - H * 0.55 + i * (H * 0.08);
+      ctx.beginPath();
+      ctx.moveTo(p.x + wx * 0.20, y);
+      ctx.lineTo(p.x + wx * 0.80, y);
+      ctx.stroke();
+    }
+    // Жёлтые предупредительные полосы внизу
+    ctx.fillStyle = '#ffd040';
+    for (let i = 0; i < 4; i++) {
+      ctx.fillRect(p.x + wx * (0.22 + i * 0.15),
+                   p.y + wy * 0.30 - H * 0.05, wx * 0.07, 1.5);
+    }
+  } else if (v.deco === 'chips') {
+    // Стопка фишек казино перед окном
+    for (let i = 0; i < 4; i++) {
+      const cx = fx, cy = fy + 2 - i * 1.5;
+      ctx.fillStyle = ['#e02030','#1a1a1a','#3050d0','#e0c020'][i];
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, 3, 1, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 0.4;
+      ctx.stroke();
+    }
+  } else if (v.deco === 'anchor') {
+    // Якорь у двери + волна
+    ctx.strokeStyle = '#a0c8d0';
+    ctx.lineWidth = 1.5;
+    const ax = p.x + wx * 0.20, ay = p.y + wy * 0.05 - H * 0.20;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay - 6); ctx.lineTo(ax, ay + 2);
+    ctx.arc(ax, ay + 3, 3, Math.PI, 0, true);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(ax - 3, ay - 4); ctx.lineTo(ax + 3, ay - 4);
+    ctx.stroke();
+    // Голубой шеврон волны
+    ctx.strokeStyle = '#40e0d0';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(p.x + wx * 0.40, p.y + wy * 0.30 - H * 0.05);
+    ctx.quadraticCurveTo(p.x + wx * 0.60, p.y + wy * 0.40 - H * 0.10,
+                          p.x + wx * 0.80, p.y + wy * 0.32 - H * 0.05);
+    ctx.stroke();
+  }
+}
+
 // ── Подпись бизнеса над зданием. Зелёная если можно купить, синяя
 // если уже твой (хозяин). Подходи близко → доступна покупка/сбор.
 function drawBizSign(r, c, biz) {
@@ -10208,17 +10488,18 @@ function render() {
         items.push({ depth: r + c, draw: () => {
           // Каждый POI — своя стилизованная постройка. Остальные
           // тайлы — обычные дома (drawBuilding с разными палитрами).
+          const biz = WORLD_BIZ_BY_RC.get(r + ',' + c);
           if      (poi && poi.id === 'casino')    drawCasinoBuilding(r, c);
           else if (poi && poi.id === 'market')    drawMarketBuilding(r, c);
           else if (poi && poi.id === 'port')      drawPortBuilding(r, c);
           else if (poi && poi.id === 'factory')   drawFactoryBuilding(r, c);
           else if (poi && poi.id === 'mansion')   drawMansionBuilding(r, c);
           else if (poi && poi.special === 'shop') drawBlackmarket(r, c);
+          else if (biz)                            drawBizBuilding(r, c, biz);
           else                                    drawBuilding(r, c);
           if (poi) drawPOI(r, c, poi);
-          // Подпись бизнеса (если это здание-бизнес)
-          const biz = WORLD_BIZ_BY_RC.get(r + ',' + c);
-          if (biz) drawBizSign(r, c, biz);
+          // Подпись бизнеса (если это здание-бизнес и нет POI поверх)
+          if (biz && !poi) drawBizSign(r, c, biz);
           // У полицейского участка — парковка с техникой + турель на крыше
           if (poi && poi.id === 'police') drawPoliceStationDecor(r, c);
         }});
