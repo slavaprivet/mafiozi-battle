@@ -994,22 +994,54 @@ function buildMap() {
   }
   // ── Декор на пляже — зонтики/лежаки (тип 17, проходимы) и пальмы
   // (тип 18, непроходимы). Песок r=6..15.
+  // Плотность поднята: пляж не должен выглядеть пустым. Пальмы — две
+  // полосы у границы с городом (r=13..15), зонтики — по всей зоне 7..12.
   for (let r = 6; r <= 15; r++) {
     for (let c = 3; c < MAP_COLS - 3; c++) {
       if (MAP[r][c] !== 15) continue;
       const x = det(r, c, 4);
-      // Линия пальм у границы с городом (r=14,15)
-      if (r >= 14 && x < 0.10) {
-        // не сразу рядом друг с другом
+      // Полоса пальм у границы с городом (r=13..15) — плотнее
+      if (r >= 13 && x < 0.22) {
         if (MAP[r] && MAP[r][c-1] !== 18) {
           MAP[r][c] = 18; continue;
         }
       }
-      // Зонты/лежаки на основной зоне пляжа
-      if (r >= 7 && r <= 13 && x < 0.08) {
+      // Одиночные пальмы по всему пляжу — изредка для разнообразия
+      if (r >= 8 && r <= 12 && x < 0.04) {
+        if (MAP[r][c-1] !== 18 && MAP[r-1] && MAP[r-1][c] !== 18) {
+          MAP[r][c] = 18; continue;
+        }
+      }
+      // Зонты/лежаки на основной зоне пляжа — плотнее
+      if (r >= 7 && r <= 12 && x >= 0.04 && x < 0.18) {
         if (MAP[r][c-1] !== 17 && MAP[r-1] && MAP[r-1][c] !== 17) {
           MAP[r][c] = 17;
         }
+      }
+    }
+  }
+  // ── Плавный переход город↔пляж: на r=16,17 (сразу за пляжем) на
+  // тротуарах/газоне рассыпаем песок. POI-здания (тип 1) и дороги (0)
+  // не трогаем — это безопасно. Чем ближе к пляжу, тем больше песка:
+  // r=16 → ~60%, r=17 → ~30%.
+  for (let r = BEACH_END + 1; r <= BEACH_END + 2; r++) {
+    for (let c = 1; c < MAP_COLS - 1; c++) {
+      const tile = MAP[r][c];
+      if (tile !== 9 && tile !== 8) continue;     // только тротуар/газон
+      const x = det(r, c, 6);
+      const threshold = (r === BEACH_END + 1) ? 0.60 : 0.30;
+      if (x < threshold) MAP[r][c] = 15;          // песчаный нанос
+    }
+  }
+  // Полоса пальм вдоль приморского бульвара — на r=16,17 редкие пальмы
+  // на оставшемся тротуаре/газоне/песке. Создаёт ощущение променада.
+  for (let r = BEACH_END + 1; r <= BEACH_END + 2; r++) {
+    for (let c = 4; c < MAP_COLS - 4; c++) {
+      const tile = MAP[r][c];
+      if (tile !== 9 && tile !== 8 && tile !== 15) continue;
+      const x = det(r, c, 5);
+      if (x < 0.12 && MAP[r][c-1] !== 18 && MAP[r-1] && MAP[r-1][c] !== 18) {
+        MAP[r][c] = 18;
       }
     }
   }
@@ -2625,9 +2657,10 @@ window.addEventListener('keyup', (e) => {
 // Проходимые тайлы: 0 (дорога), 7 (фонарь), 8 (трава), 9 (бордюр),
 // 10 (грунтовая тропинка), 12 (мощёная площадь), 13 (уличный торговец),
 // 15 (песок пляжа), 16 (мокрый прибой), 17 (зонт/лежак — проходимый
-// тонкий декор), 18 (пальма? — НЕпроходимая, ставим в стенах).
+// тонкий декор), 18 (пальма — проходима, тонкий ствол не мешает),
+// 19 (песчаный променад — переход от города к пляжу).
 // Стены: 11 (фонтан), 14 (море).
-const PASSABLE = new Set([0, 7, 8, 9, 10, 12, 13, 15, 16, 17]);
+const PASSABLE = new Set([0, 7, 8, 9, 10, 12, 13, 15, 16, 17, 18, 19]);
 function isBlocked(r, c) {
   const ri = Math.floor(r), ci = Math.floor(c);
   if (ri < 0 || ri >= MAP_ROWS || ci < 0 || ci >= MAP_COLS) return true;
@@ -4606,20 +4639,30 @@ function drawTile(r, c) {
     else if (h1 < 75)  color = '#8e8a7c';
     else               color = '#827c70';
   } else if (t === 14) {
-    // ─── МОРЕ — глубокий синий с волнами (анимация ниже)
-    if (h1 < 50)       color = '#1c4870';
-    else               color = '#1a4068';
+    // ─── МОРЕ — градиент глубины: r=0 глубокое, r=2 мелководье у прибоя
+    // Чем дальше от берега (меньше r) — тем темнее и насыщеннее синий.
+    let base, light;
+    if (r === 0)      { base = '#0a2342'; light = '#10314f'; } // глубина
+    else if (r === 1) { base = '#16456b'; light = '#1c537d'; } // средняя
+    else              { base = '#2a6f96'; light = '#36839f'; } // бирюза-мель (r=2)
+    if (h1 < 60)       color = base;
+    else if (h1 < 90)  color = light;
+    else               color = (r === 2) ? '#4a9fb8' : '#1f5a82'; // светлое пятно ряби
   } else if (t === 16) {
-    // ─── ПРИБОЙ — мокрый песок, темнее обычного
-    if (h1 < 40)       color = '#9e8458';
-    else if (h1 < 75)  color = '#a48a5c';
+    // ─── ПРИБОЙ — мокрый песок, темнее обычного, с лёгким бирюзовым оттенком
+    if (h1 < 25)       color = '#8a6f48';   // самый мокрый (тёмный)
+    else if (h1 < 55)  color = '#a08658';
+    else if (h1 < 85)  color = '#ac9264';
     else               color = '#988050';
   } else if (t === 15 || t === 17 || t === 18) {
-    // ─── ПЕСОК — золотистый с лёгкими вариациями (под декором пляжа)
-    if (h1 < 8)        color = '#c8a868';   // тёмное пятно (мокрая дорожка)
-    else if (h1 < 85)  color = '#dec48a';
-    else if (h1 < 94)  color = '#d4b878';
-    else               color = '#e8d098';   // светлый
+    // ─── ПЕСОК — золотистый с лёгкими вариациями (под декором пляжа).
+    // У самой кромки воды (r=6) песок чуть темнее (ещё влажный).
+    const wet = (r === 6) ? 1 : 0;
+    if (h1 < 8)        color = wet ? '#b89a5e' : '#c8a868';   // тёмное пятно
+    else if (h1 < 50)  color = wet ? '#cdb074' : '#dec48a';
+    else if (h1 < 85)  color = wet ? '#d4b87a' : '#e2c890';
+    else if (h1 < 94)  color = wet ? '#c8ac70' : '#d4b878';
+    else               color = wet ? '#dcc088' : '#e8d098';   // светлый
   } else if (isRoad) {
     // ─── АСФАЛТ — почти ровный с редкими пятнами (без «шахматки») ─
     if (h1 < 4)        color = '#1a1a22'; // тёмное пятно масла (редко)
@@ -4678,51 +4721,216 @@ function drawTile(r, c) {
       ctx.fillRect(p.x + 2, p.y, 1, 2);
     }
   } else if (t === 14) {
-    // ─── ВОЛНЫ на море — анимированные полоски пены
+    // ─── ВОЛНЫ на море — два слоя: мелкая рябь + длинные гребни пены
     const tt = performance.now() * 0.0008;
+    // Слой 1 — мелкая рябь (старая) с большей насыщенностью у поверхности
     const wavePhase = (tt + (r + c) * 0.07) % 1;
-    if (h2 < 35) {
-      ctx.fillStyle = `rgba(180,220,240,${0.25 + 0.20 * Math.sin(tt * 3 + r + c)})`;
+    if (h2 < 40) {
+      const alpha = (r === 2 ? 0.40 : 0.30) + 0.18 * Math.sin(tt * 3 + r + c);
+      ctx.fillStyle = `rgba(190,225,240,${Math.max(0.1, alpha)})`;
       ctx.beginPath();
-      ctx.ellipse(p.x + (wavePhase - 0.5) * wx * 0.6, p.y, wx * 0.30, wy * 0.10, 0, 0, Math.PI * 2);
+      ctx.ellipse(p.x + (wavePhase - 0.5) * wx * 0.6, p.y, wx * 0.32, wy * 0.12, 0, 0, Math.PI * 2);
       ctx.fill();
     }
-    // Блик-пятно (солнце на воде)
-    if (h1 >= 60 && h1 < 70) {
-      ctx.fillStyle = 'rgba(220,240,255,.20)';
+    // Слой 2 — длинный гребень пены движется вдоль берега (по c).
+    // Гребни занимают несколько тайлов подряд (период ~12 тайлов).
+    const crestT = performance.now() * 0.00035;
+    const crestX = (c * 0.12 + r * 0.4 - crestT * 6) % 12;
+    if (crestX >= 0 && crestX < 1.6) {
+      const opa = 0.55 - Math.abs(crestX - 0.8) * 0.45;
+      ctx.fillStyle = `rgba(245,252,255,${opa})`;
       ctx.beginPath();
-      ctx.ellipse(p.x, p.y, wx * 0.18, wy * 0.10, 0, 0, Math.PI * 2);
+      ctx.ellipse(p.x, p.y - wy * 0.05, wx * 0.55, wy * 0.14, 0, 0, Math.PI * 2);
       ctx.fill();
+    }
+    // Блик солнца — яркая «дорожка» по диагонали (узкий коридор c-r)
+    const sunDiag = Math.abs((c - r * 2) % 22 - 11);
+    if (sunDiag < 3 && h1 >= 30) {
+      const sparkle = 0.18 + 0.18 * Math.sin(tt * 5 + r + c);
+      ctx.fillStyle = `rgba(255,245,200,${sparkle * (1 - sunDiag / 3)})`;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, wx * 0.26, wy * 0.10, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Редкая чайка над глубоким морем (r=0,1). Анимированный V-силуэт.
+    if (r <= 1 && h1 >= 96 && h2 >= 70) {
+      const gt = performance.now() * 0.0009;
+      const flap = Math.sin(gt * 4 + r + c) * 1.2;
+      const gx = p.x + Math.sin(gt + r * 0.7) * 4;
+      const gy = p.y - 22 - Math.abs(Math.sin(gt * 0.6)) * 3;
+      ctx.strokeStyle = 'rgba(20,20,30,.85)';
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(gx - 4, gy + flap);
+      ctx.quadraticCurveTo(gx - 1, gy - 1.5, gx, gy);
+      ctx.quadraticCurveTo(gx + 1, gy - 1.5, gx + 4, gy + flap);
+      ctx.stroke();
     }
   } else if (t === 16) {
-    // ─── ПРИБОЙ — анимированная пена набегает на песок
+    // ─── ПРИБОЙ — пена набегает на песок + языки пены
     const tt2 = performance.now() * 0.0006;
     const foamPhase = (tt2 + (c * 0.05)) % 1;
-    ctx.fillStyle = `rgba(240,250,255,${0.6 - foamPhase * 0.4})`;
+    // Основная полоса пены (с большим контрастом)
+    ctx.fillStyle = `rgba(245,252,255,${0.75 - foamPhase * 0.5})`;
     ctx.beginPath();
-    ctx.ellipse(p.x + (foamPhase * 2 - 1) * wx * 0.5, p.y - wy * 0.2,
-                 wx * 0.35, wy * 0.10, 0, 0, Math.PI * 2);
+    ctx.ellipse(p.x + (foamPhase * 2 - 1) * wx * 0.55, p.y - wy * 0.15,
+                 wx * 0.42, wy * 0.13, 0, 0, Math.PI * 2);
     ctx.fill();
-    // Мокрый блик
-    if (h2 < 40) {
-      ctx.fillStyle = 'rgba(220,235,245,.30)';
-      ctx.fillRect(p.x - 2, p.y - 1, 4, 0.8);
+    // Языки пены — белые «капли» дальше от воды (по диагонали к песку)
+    if (h2 < 20) {
+      const tongueA = 0.45 - foamPhase * 0.4;
+      if (tongueA > 0) {
+        ctx.fillStyle = `rgba(255,255,255,${tongueA})`;
+        ctx.beginPath();
+        ctx.ellipse(p.x + (h1 % 6 - 3), p.y + wy * 0.15,
+                    wx * 0.18, wy * 0.07, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
-  } else if (t === 15 || t === 17 || t === 18) {
-    // ─── ПЕСОК — мелкие точки/ракушки/следы
-    if (h2 < 25) {
-      ctx.fillStyle = 'rgba(160,130,80,.55)';
-      ctx.fillRect(p.x - 2 + (h1 % 4 - 2), p.y - 1, 1, 1);
-    }
-    // Изредка ракушка (белая или розоватая)
-    if (h1 >= 90 && h2 >= 88) {
-      const sh = (h2 & 1) ? '#f0e0c8' : '#f5d8c4';
-      ctx.fillStyle = sh;
+    // Пузырьки пены (мелкие белые точки) — на гребне волны
+    if (h1 >= 60 && h2 >= 55) {
+      ctx.fillStyle = 'rgba(255,255,255,.6)';
+      const bx = p.x + ((h1 % 7) - 3);
+      const by = p.y - wy * 0.1 + ((h2 % 5) - 2);
       ctx.beginPath();
-      ctx.ellipse(p.x + (h1 % 3 - 1), p.y, 1.4, 0.8, 0, 0, Math.PI * 2);
+      ctx.arc(bx, by, 0.8, 0, Math.PI * 2);
       ctx.fill();
     }
-    // Следы — пара точек
+    // Мокрый зеркальный блик (плёнка воды на песке)
+    if (h2 < 45) {
+      ctx.fillStyle = 'rgba(220,240,250,.35)';
+      ctx.fillRect(p.x - 3, p.y, 6, 0.8);
+    }
+  } else if (t === 15 || t === 17 || t === 18) {
+    // ─── ПЕСОК — многослойная зернистость, дюны, ребристый прибойный
+    // след, камешки, ракушки, кокос, звезда, кустики на границе.
+    // У кромки воды (r=6,7) — волнистые тёмные «рёбра» от ушедшей воды
+    if (r <= 7 && h1 >= 30 && h1 < 50) {
+      ctx.strokeStyle = 'rgba(140,108,70,.40)';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(p.x - wx * 0.7, p.y + Math.sin(c * 0.8) * 1.2);
+      ctx.quadraticCurveTo(p.x, p.y - 1 + Math.cos(c * 0.6) * 1, p.x + wx * 0.7, p.y + Math.sin(c * 0.9) * 1.2);
+      ctx.stroke();
+    }
+    // ── Дюнная подсветка: тонкий светлый «гребень» сверху + тёмная полутень
+    // снизу. Создаёт ощущение рельефа, а не плоской заливки.
+    if (h1 >= 25 && h1 < 70) {
+      ctx.fillStyle = 'rgba(255,238,190,.22)';
+      ctx.beginPath();
+      ctx.ellipse(p.x + (h2 % 5 - 2), p.y - wy * 0.35,
+                  wx * 0.55, wy * 0.10, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(120,90,55,.18)';
+      ctx.beginPath();
+      ctx.ellipse(p.x + (h2 % 5 - 2), p.y + wy * 0.30,
+                  wx * 0.50, wy * 0.10, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // ── Плотная зернистость: 6 крупинок разного оттенка по тайлу.
+    // Псевдослучайные смещения от h1/h2 — детерминированно, но разбросано.
+    // Половина — тёмные крупинки, половина — светлые блестящие.
+    {
+      const grains = [
+        { dx: -3 + (h1 % 7), dy: -2 + (h2 % 5),  c: 'rgba(120,88,52,.55)' },
+        { dx:  2 + (h2 % 5), dy: -3 + (h1 % 6),  c: 'rgba(150,116,72,.50)' },
+        { dx: -2 + (h2 % 6), dy:  2 + (h1 % 4),  c: 'rgba(90,68,40,.45)'  },
+        { dx:  3 + (h1 % 4), dy:  3 + (h2 % 4),  c: 'rgba(255,235,180,.55)' },
+        { dx: -4 + (h1 % 5), dy:  1 + (h2 % 6),  c: 'rgba(255,245,205,.45)' },
+        { dx:  1 + (h2 % 7), dy: -1 + (h1 % 5),  c: 'rgba(230,200,150,.45)' },
+      ];
+      for (const g of grains) {
+        ctx.fillStyle = g.c;
+        ctx.fillRect(p.x + g.dx, p.y + g.dy, 1, 1);
+      }
+      // Изредка крупинка побольше (1.4×1.4) — блестит на солнце
+      if (h1 >= 70 && h2 < 30) {
+        ctx.fillStyle = 'rgba(255,250,220,.7)';
+        ctx.fillRect(p.x + (h1 % 5 - 2), p.y + (h2 % 4 - 2), 1.4, 1.4);
+      }
+    }
+    // ── Маленький серый камешек — раз в ~10 тайлов
+    if (h1 >= 70 && h1 < 78 && h2 >= 65 && h2 < 73) {
+      ctx.fillStyle = '#6a6258';
+      ctx.beginPath();
+      ctx.ellipse(p.x + (h1 % 4 - 2), p.y + 1, 1.5, 1.0, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(160,150,135,.7)';
+      ctx.fillRect(p.x + (h1 % 4 - 2) - 0.5, p.y + 0.5, 0.8, 0.5);
+    }
+    // ── Тёмный камешек побольше
+    if (h1 >= 12 && h1 < 16 && h2 >= 70 && h2 < 76) {
+      ctx.fillStyle = '#3a3228';
+      ctx.beginPath();
+      ctx.ellipse(p.x + 1, p.y - 1, 2.2, 1.4, 0.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(120,100,80,.55)';
+      ctx.fillRect(p.x + 0.5, p.y - 1.5, 1, 0.6);
+    }
+    // ── Островки сухой травы у границы с городом (r=14,15) — переход
+    // от пляжа к газону, иначе граница режет глаз.
+    if (r >= 14 && h1 >= 40 && h1 < 55) {
+      ctx.strokeStyle = '#7a8a3a';
+      ctx.lineWidth = 0.8;
+      for (let k = 0; k < 3; k++) {
+        const gx = p.x + (h2 % 6 - 3) + k * 1.5 - 1.5;
+        ctx.beginPath();
+        ctx.moveTo(gx, p.y + 1);
+        ctx.lineTo(gx + (k - 1) * 0.5, p.y - 2);
+        ctx.stroke();
+      }
+    }
+    // ── Тонкий штрих от ветра — лёгкая царапина по песку
+    if (h1 >= 80 && h1 < 84) {
+      ctx.strokeStyle = 'rgba(180,150,100,.35)';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(p.x - wx * 0.5, p.y + (h2 % 3 - 1));
+      ctx.lineTo(p.x + wx * 0.5, p.y + ((h2 + 2) % 3 - 1));
+      ctx.stroke();
+    }
+    // Ракушка побольше — белая «гребешок» с рёбрами
+    if (h1 >= 88 && h2 >= 82) {
+      const isPink = (h2 & 1);
+      ctx.fillStyle = isPink ? '#f5d8c4' : '#f0e8d0';
+      ctx.beginPath();
+      ctx.ellipse(p.x + (h1 % 3 - 1), p.y, 2.2, 1.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Рёбра ракушки
+      ctx.strokeStyle = isPink ? 'rgba(190,140,120,.7)' : 'rgba(180,160,120,.6)';
+      ctx.lineWidth = 0.5;
+      for (let k = -1; k <= 1; k++) {
+        ctx.beginPath();
+        ctx.moveTo(p.x + (h1 % 3 - 1), p.y - 1.2);
+        ctx.lineTo(p.x + (h1 % 3 - 1) + k * 0.8, p.y + 1.2);
+        ctx.stroke();
+      }
+    }
+    // Морская звезда — изредка (h1≈55, h2≈25), оранжевая 5-конечная
+    if (h1 >= 54 && h1 < 58 && h2 >= 22 && h2 < 28) {
+      ctx.fillStyle = '#e07840';
+      ctx.beginPath();
+      for (let k = 0; k < 5; k++) {
+        const a = (k / 5) * Math.PI * 2 - Math.PI / 2;
+        const a2 = a + Math.PI / 5;
+        ctx.lineTo(p.x + Math.cos(a) * 3.2, p.y + Math.sin(a) * 2.2);
+        ctx.lineTo(p.x + Math.cos(a2) * 1.3, p.y + Math.sin(a2) * 0.9);
+      }
+      ctx.closePath(); ctx.fill();
+      // Точки на звезде
+      ctx.fillStyle = 'rgba(200,90,40,.7)';
+      ctx.fillRect(p.x - 0.5, p.y - 0.5, 1, 1);
+    }
+    // Упавший кокос на песке — коричневый шарик
+    if (h1 >= 78 && h1 < 82 && h2 >= 40 && h2 < 46) {
+      ctx.fillStyle = '#3a2010';
+      ctx.beginPath();
+      ctx.arc(p.x + (h2 % 3 - 1), p.y, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(120,80,40,.6)';
+      ctx.fillRect(p.x + (h2 % 3 - 1) - 0.5, p.y - 0.5, 0.8, 0.8);
+    }
+    // Следы ног на песке
     if (h1 < 18 && h2 >= 60) {
       ctx.fillStyle = 'rgba(120,90,50,.45)';
       ctx.fillRect(p.x - 2, p.y - 1, 1.4, 0.8);
