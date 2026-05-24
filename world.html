@@ -4083,13 +4083,46 @@ function updateZoneBtn() {
     const d2 = dr * dr + dc * dc;
     if (d2 < bestD2) { best = poi; bestD2 = d2; }
   }
-  if (best !== _zoneCur) {
+  // Бизнесы — отдельный приоритет. Радиус подхода — 3.5 тайла (чуть
+  // больше чем у POI, потому что бизнесы крупные здания + корабль).
+  const BIZ_R2 = 3.5 * 3.5;
+  let bestBiz = null, bestBizD2 = BIZ_R2;
+  for (const biz of WORLD_BIZ) {
+    const dr = biz.r - player.r, dc = biz.c - player.c;
+    const d2 = dr * dr + dc * dc;
+    if (d2 < bestBizD2) { bestBiz = biz; bestBizD2 = d2; }
+  }
+  // Если бизнес ближе — он перебивает POI
+  if (bestBiz && (best === null || bestBizD2 < bestD2)) {
+    best = { _isBiz: true, biz: bestBiz };
+  }
+  // Сравнение объектов — для бизнеса по biz.id, для POI по ссылке
+  const sameAsCur = best && _zoneCur && (
+    (best._isBiz && _zoneCur._isBiz && best.biz.id === _zoneCur.biz.id) ||
+    (!best._isBiz && best === _zoneCur)
+  );
+  if (!sameAsCur) {
     _zoneCur = best;
     if (best) {
       let label;
-      if (best.special === 'shop')        label = `${best.icon} Зайти на «${best.name}»`;
-      else if (best.special === 'arena')  label = `${best.icon} Войти на «${best.name}»`;
-      else                                label = `${best.icon} Зайти на «${best.name}»`;
+      if (best._isBiz) {
+        const b = best.biz;
+        const owned = MY_BIZ.get(b.id);
+        if (owned) {
+          const pend = owned.pending || 0;
+          if (owned.status !== 'ok') {
+            label = `${b.emoji} ${b.name} (заблокирован)`;
+          } else if (pend > 0) {
+            label = `${b.emoji} Собрать $${pend.toLocaleString('ru-RU')}`;
+          } else {
+            label = `${b.emoji} ${b.name} — твой 🟢`;
+          }
+        } else {
+          label = `${b.emoji} Купить за $${b.price.toLocaleString('ru-RU')}`;
+        }
+      } else if (best.special === 'shop')   label = `${best.icon} Зайти на «${best.name}»`;
+      else if (best.special === 'arena')    label = `${best.icon} Войти на «${best.name}»`;
+      else                                  label = `${best.icon} Зайти на «${best.name}»`;
       _zoneEl.textContent = label;
       _zoneEl.style.display = 'block';
     } else {
@@ -4108,6 +4141,14 @@ function updateZoneBtn() {
 }
 _zoneEl.addEventListener('click', () => {
   if (!_zoneCur) return;
+  // Бизнес — покупка или сбор
+  if (_zoneCur._isBiz) {
+    const biz = _zoneCur.biz;
+    const owned = MY_BIZ.get(biz.id);
+    if (owned) collectBizFromWorld(biz);
+    else       buyBizFromWorld(biz);
+    return;
+  }
   // Спец-POI: открываем модал/баннер прямо в мире, никуда не переходим.
   if (_zoneCur.special === 'shop')   { openShop();   return; }
   if (_zoneCur.special === 'arena')  { showToast('🎯 Вы внутри PVP-зоны. Огонь скоро добавим.'); return; }
@@ -4120,6 +4161,138 @@ _zoneEl.addEventListener('click', () => {
   // города. Бэк сам соберёт URL с актуальным снаряжением игрока из БД.
   openDistrictBattle(_zoneCur.id);
 });
+
+// ── Простой confirm-модал «Купить за $X?»
+function bizConfirmDialog(title, msg, okText, onOk) {
+  let el = document.getElementById('bizModal');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'bizModal';
+    el.style.cssText = 'position:absolute;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);font-family:inherit;';
+    el.innerHTML = `
+      <div style="background:linear-gradient(180deg,#1a1d24,#0f1116);border:1px solid #ffd76b;border-radius:12px;padding:18px 20px;min-width:260px;max-width:88vw;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.8),0 0 30px rgba(255,215,107,.2);">
+        <div id="bizModalTitle" style="font-size:18px;font-weight:800;color:#ffd76b;margin-bottom:8px;"></div>
+        <div id="bizModalMsg" style="font-size:13px;color:#c8d0dc;margin-bottom:18px;line-height:1.4;"></div>
+        <div style="display:flex;gap:10px;justify-content:center;">
+          <button id="bizModalOk" style="background:#3aa050;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-weight:700;font-size:14px;cursor:pointer;">Купить</button>
+          <button id="bizModalNo" style="background:#3a3a44;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-weight:700;font-size:14px;cursor:pointer;">Отмена</button>
+        </div>
+      </div>`;
+    document.body.appendChild(el);
+  }
+  el.querySelector('#bizModalTitle').textContent = title;
+  el.querySelector('#bizModalMsg').innerHTML = msg;
+  const okBtn = el.querySelector('#bizModalOk');
+  const noBtn = el.querySelector('#bizModalNo');
+  okBtn.textContent = okText || 'OK';
+  el.style.display = 'flex';
+  okBtn.onclick = () => { el.style.display = 'none'; if (onOk) onOk(); };
+  noBtn.onclick = () => { el.style.display = 'none'; };
+}
+
+async function buyBizFromWorld(biz) {
+  if (!QP.api || !QP.uid) {
+    showToast('⚠️ Сервер недоступен — открой ЗАПУСТИТЬ_БОТА.bat', 3000);
+    return;
+  }
+  // Получаем актуальные деньги через /biz/{uid}/list (там есть cash)
+  let cash = 0;
+  try {
+    const r = await fetch(QP.api + '/biz/' + encodeURIComponent(QP.uid) + '/list',
+                          { cache: 'no-store' });
+    const j = await r.json().catch(()=>({}));
+    cash = j.cash || 0;
+    // Заодно обновим MY_BIZ
+    if (Array.isArray(j.businesses)) {
+      MY_BIZ.clear();
+      for (const b of j.businesses) {
+        if (b.owned) MY_BIZ.set(b.id, { pending: b.pending, status: b.status, blocked_until: b.blocked_until });
+      }
+    }
+  } catch(e) {
+    showToast('⚠️ Не удалось проверить счёт', 2400);
+    return;
+  }
+  if (cash < biz.price) {
+    const need = biz.price - cash;
+    showToast(`💵 Не хватает $${need.toLocaleString('ru-RU')} — накопи ещё`, 3500, '⛔');
+    return;
+  }
+  bizConfirmDialog(
+    `${biz.emoji} ${biz.name}`,
+    `Купить за <b style="color:#ffd76b">$${biz.price.toLocaleString('ru-RU')}</b>?<br>` +
+    `<span style="opacity:.7">Доход $${biz.daily_min}–${biz.daily_max}/сут.<br>` +
+    `На счету $${cash.toLocaleString('ru-RU')} → останется $${(cash - biz.price).toLocaleString('ru-RU')}</span>`,
+    'Купить',
+    async () => {
+      try {
+        const r = await fetch(QP.api + '/biz/' + encodeURIComponent(QP.uid) + '/buy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ biz_id: biz.id }),
+        });
+        const j = await r.json().catch(()=>({}));
+        if (j.ok) {
+          MY_BIZ.set(biz.id, { pending: 0, status: 'ok', blocked_until: 0 });
+          _zoneCur = null;  // принудительно перерисовать кнопку (с новым лейблом)
+          showToast(`✅ ${biz.emoji} ${biz.name} — твой!`, 3500);
+        } else {
+          showToast('⚠️ Покупка не прошла: ' + (j.error || '?'), 3500);
+        }
+      } catch(e) {
+        showToast('⚠️ Ошибка связи', 2400);
+      }
+    }
+  );
+}
+
+async function collectBizFromWorld(biz) {
+  if (!QP.api || !QP.uid) return;
+  try {
+    const r = await fetch(QP.api + '/biz/' + encodeURIComponent(QP.uid) + '/collect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ biz_id: biz.id }),
+    });
+    const j = await r.json().catch(()=>({}));
+    if (j.ok) {
+      const total = j.total || 0;
+      if (total > 0) {
+        showToast(`💰 +$${total.toLocaleString('ru-RU')} с «${biz.name}»`, 3500);
+      } else {
+        showToast(`ℹ️ Ещё нечего собирать (доход капает по таймеру)`, 2500);
+      }
+      // Обновим MY_BIZ
+      const m = MY_BIZ.get(biz.id) || {};
+      m.pending = 0;
+      MY_BIZ.set(biz.id, m);
+      _zoneCur = null;
+    } else {
+      showToast('⚠️ Не удалось собрать: ' + (j.error || '?'), 3000);
+    }
+  } catch(e) {
+    showToast('⚠️ Ошибка связи', 2400);
+  }
+}
+
+// Загружаем список моих бизнесов при коннекте и периодически
+async function loadMyBiz() {
+  if (!QP.api || !QP.uid) return;
+  try {
+    const r = await fetch(QP.api + '/biz/' + encodeURIComponent(QP.uid) + '/list',
+                          { cache: 'no-store' });
+    const j = await r.json().catch(()=>({}));
+    if (Array.isArray(j.businesses)) {
+      MY_BIZ.clear();
+      for (const b of j.businesses) {
+        if (b.owned) MY_BIZ.set(b.id, { pending: b.pending, status: b.status, blocked_until: b.blocked_until });
+      }
+    }
+  } catch(e) {}
+}
+// Загрузка при старте и обновление раз в 30с (доход капает)
+setTimeout(loadMyBiz, 2000);
+setInterval(loadMyBiz, 30000);
 
 // ── Боёвка района — iframe overlay поверх города ───────────────
 const _battleOv     = document.getElementById('battleOverlay');
