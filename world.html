@@ -4639,43 +4639,20 @@ function update(dt) {
   // Мёртвый игрок не двигается — ждём респауна сервера, иначе появлялся
   // в той же точке где умер (баг: «бегать могу и возрождаюсь там же»).
   if (myDead) inDx = 0, inDy = 0;
-  // В тюрьме движение блокируем ВНУТРИ радиуса JAIL_R. Раньше сервер
-  // молча клампил позицию обратно, и игрок мог «выбежать» в момент между
-  // снапами — иногда даже досрочно освобождался. Теперь клиент сам
-  // ограничивает шаг: вектор движения, толкающий за пределы JAIL_R,
-  // подрезается так, чтобы шаг шёл вдоль границы (а не на стену).
-  let jailGuard = null;
-  if (myJailIn > 0) {
-    jailGuard = { jx: 76.0, jy: 76.0, jr: 6.5 };
-  }
   if (Math.abs(inDx) > 0.08 || Math.abs(inDy) > 0.08) {
     const d = inDx, s = inDy / ISO_Y;
     const dc = (s + d) * 0.5;
     const dr = (s - d) * 0.5;
     const mag = Math.hypot(dr, dc) || 1;
     const mv = Math.min(1, Math.hypot(inDx, inDy));
-    let stepR = dr / mag * speed * dt * mv;
-    let stepC = dc / mag * speed * dt * mv;
-    if (jailGuard) {
-      // Проектируем планируемую позицию; если она вне радиуса — отбрасываем
-      // радиальную часть шага, оставляя только тангенциальную (вдоль стены).
-      const nr = player.r + stepR, nc = player.c + stepC;
-      const dvr = nr - jailGuard.jy, dvc = nc - jailGuard.jx;
-      const ddist = Math.hypot(dvr, dvc);
-      if (ddist > jailGuard.jr) {
-        const rx = (player.r - jailGuard.jy);
-        const ry = (player.c - jailGuard.jx);
-        const norm = Math.hypot(rx, ry) || 1;
-        const ux = rx / norm, uy = ry / norm;
-        const dot = stepR * ux + stepC * uy;
-        if (dot > 0) { stepR -= ux * dot; stepC -= uy * dot; }
-      }
-    }
-    tryMove(player, stepR, stepC);
+    tryMove(player, dr / mag * speed * dt * mv, dc / mag * speed * dt * mv);
     player.ang = Math.atan2(dr, dc);
     player.walking = mv > 0.15;
     player.walkPhase += dt * 10 * mv;
   }
+  // В тюрьме удержание чисто серверное (apply_input clamps на JAIL_R-0.3).
+  // Клиентский guard убран — он слишком агрессивно блокировал движение
+  // вблизи спавна (особенно когда сервер ставил игрока у границы).
   // Камера следит за игроком — держим его ровно по центру экрана.
   // Целевое смещение камеры = изометрические координаты игрока
   // (то самое что прибавляется в w2s до вычитания cam). Плавно.
