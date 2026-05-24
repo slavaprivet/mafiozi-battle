@@ -2043,12 +2043,234 @@ function pickNpcWaypoint(npc) {
 }
 function initNpcs() {
   NPCS.length = 0;
-  // 60 прохожих — город ощущается живым. На карте 80×80 это ~один на
-  // 3 квартала, на пляже/Логово/тюрьме их нет (отфильтровываются по
-  // npcPassable: только тротуар/газон, не в арене).
+  // 60 прохожих
   for (let i = 0; i < 60; i++) {
     const n = spawnNpc(i);
     if (n) { pickNpcWaypoint(n); NPCS.push(n); }
+  }
+  // 5 велосипедистов — ездят по дорогам/тротуарам
+  for (let i = 0; i < 5; i++) {
+    const n = spawnNpc(1000 + i);
+    if (n) { n.kind = 'cyclist'; n.speed = 3.4; n.bikeColor = ['#c83030','#2a6acd','#e0a020','#3aa050','#7a2090'][i % 5]; pickNpcWaypoint(n); NPCS.push(n); }
+  }
+  // 8 собак
+  for (let i = 0; i < 8; i++) {
+    const n = spawnNpc(2000 + i);
+    if (n) { n.kind = 'dog'; n.speed = 1.6 + Math.random()*0.8; n.dogColor = ['#5a3a20','#3a2a18','#a08868','#e8d8b8'][i % 4]; n.barkNext = performance.now() + Math.random()*15000; pickNpcWaypoint(n); NPCS.push(n); }
+  }
+  // 3 уличных артиста — стоят на площадях
+  const artistSpots = [
+    { r: 46, c: 46 }, { r: 36, c: 26 }, { r: 56, c: 36 },
+  ];
+  for (const sp of artistSpots) {
+    const n = spawnNpc(3000);
+    if (n) {
+      n.kind = 'artist';
+      n.r = sp.r + 0.5; n.c = sp.c + 0.5;
+      n.tr = n.r; n.tc = n.c;
+      n.speed = 0;
+      n.artistKind = (Math.random() < 0.5) ? 'guitar' : 'dancer';
+      n.musicNext = performance.now() + Math.random()*4000;
+      NPCS.push(n);
+    }
+  }
+}
+
+// ── ДРАКИ БОМЖЕЙ у мусорки. Раз в 4-7 мин ищем тайл-мусорку (5),
+// спавним 2 «бомжей» рядом, они дерутся 12 сек, потом расходятся.
+let _nextBumFightAt = 0;
+const BUM_PHRASES = ['На тебе!', 'Сам нарвался!', 'Это моя бутылка!',
+                      'Уйди отсюда!', 'А-А-А!', 'Ах ты гнида!',
+                      'Не подходи!', 'Моё место!'];
+function trySpawnBumFight() {
+  const now = performance.now();
+  if (now < _nextBumFightAt) return;
+  _nextBumFightAt = now + 240000 + Math.random() * 180000;  // 4-7 мин
+  // Ищем случайную мусорку (тайл 5) НЕ слишком близко к игроку
+  const dumpsters = [];
+  for (let r = 16; r < MAP_ROWS - 2; r++) {
+    for (let c = 2; c < MAP_COLS - 2; c++) {
+      if (MAP[r][c] !== 5) continue;
+      if (Math.hypot(player.r - r, player.c - c) < 12) continue;
+      dumpsters.push({ r, c });
+      if (dumpsters.length > 30) break;
+    }
+    if (dumpsters.length > 30) break;
+  }
+  if (!dumpsters.length) return;
+  const dump = dumpsters[(Math.random() * dumpsters.length) | 0];
+  // Спавним 2 бомжей в радиусе 1-2 от мусорки, на проходимых тайлах
+  const positions = [
+    { r: dump.r + 0.5, c: dump.c + 1.2 },
+    { r: dump.r + 1.2, c: dump.c + 0.5 },
+  ];
+  const fightUntil = now + 14000;
+  const bumLooks = [
+    { gender: 0, skin: 2, body: 0, face: 2, hair: 4, hat: 2 },
+    { gender: 0, skin: 4, body: 1, face: 1, hair: 3, hat: 3 },
+  ];
+  const bums = [];
+  for (let i = 0; i < 2; i++) {
+    const pos = positions[i];
+    if (!npcPassable(pos.r, pos.c)) continue;
+    const b = {
+      r: pos.r, c: pos.c, tr: pos.r, tc: pos.c,
+      speed: 0, ang: 0, walkPhase: 0, idleUntil: now + 100000,
+      hp: 60, dead: false, deathT: 0, deathAng: 0,
+      bloodSeed: Math.floor(Math.random()*1000),
+      kind: 'bum',
+      bumState: 'fight',
+      bumUntil: fightUntil,
+      punchNext: now + Math.random() * 800,
+      look: bumLooks[i],
+    };
+    NPCS.push(b);
+    bums.push(b);
+  }
+  if (bums.length === 2) {
+    bums[0].bumPartner = bums[1];
+    bums[1].bumPartner = bums[0];
+    bums[0].ang = Math.atan2(bums[1].r - bums[0].r, bums[1].c - bums[0].c);
+    bums[1].ang = Math.atan2(bums[0].r - bums[1].r, bums[0].c - bums[1].c);
+  }
+}
+function tickBum(npc, dt) {
+  const now = performance.now();
+  if (npc.bumState === 'fight') {
+    if (now > npc.bumUntil || !npc.bumPartner || npc.bumPartner.dead) {
+      npc.bumState = 'flee';
+      npc.fleeUntil = now + 12000;
+      npc.cryText = 'Хватит! Ухожу!';
+      npc.cryUntil = now + 1800;
+      npc.cryPanic = false;
+      // Случайная цель побега — край карты
+      npc.tr = (Math.random() < 0.5 ? 18 : MAP_ROWS - 4);
+      npc.tc = (Math.random() < 0.5 ? 4 : MAP_COLS - 4);
+      npc.speed = 1.6;
+      npc.idleUntil = 0;
+      return;
+    }
+    // Анимация замаха — walkPhase используется для рисования
+    npc.walkPhase += dt * 9;
+    if (now >= (npc.punchNext || 0)) {
+      npc.punchNext = now + 1200 + Math.random() * 800;
+      npc.cryText  = BUM_PHRASES[(Math.random() * BUM_PHRASES.length) | 0];
+      npc.cryUntil = now + 1500;
+      npc.cryPanic = true;   // красный — драка
+      // Лёгкая «отдача» по партнёру (анимация удара, реального hp не снимаем)
+      if (npc.bumPartner) {
+        const dr = npc.bumPartner.r - npc.r, dc = npc.bumPartner.c - npc.c;
+        npc.r -= dr * 0.05; npc.c -= dc * 0.05;
+        npc.bumPartner.r += dr * 0.05; npc.bumPartner.c += dc * 0.05;
+      }
+    }
+  } else if (npc.bumState === 'flee') {
+    if (now > (npc.fleeUntil || 0)) { npc._toRemove = true; return; }
+    const dr = npc.tr - npc.r, dc = npc.tc - npc.c;
+    const dist = Math.hypot(dr, dc) || 1;
+    if (dist < 0.5) { npc._toRemove = true; return; }
+    const sp = npc.speed * dt;
+    const nr = npc.r + (dr/dist) * sp, nc = npc.c + (dc/dist) * sp;
+    if (npcPassable(nr, nc)) { npc.r = nr; npc.c = nc; }
+    npc.ang = Math.atan2(dr, dc);
+    npc.walkPhase += dt * 12;
+  }
+}
+
+// ── НПС-ГРАБИТЕЛЬ: раз в 2-3 мин появляется на краю карты, идёт к
+// магазину, «грабит» 5 сек (фраза + паника окружающих), сбегает.
+let _nextRobberAt = 0;
+const ROBBER_PHRASES_ATTACK = ['ВСЕ НА ПОЛ!', 'КАССА ОТКРЫТА!', 'ДЕНЬГИ СЮДА!',
+                                'НИКТО НЕ ДЕРГАЕТСЯ!', 'ЭТО ОГРАБЛЕНИЕ!'];
+const ROBBER_PHRASES_FLEE   = ['Я БОГАТ!', 'УХОЖУ!', 'УВИДИМСЯ!',
+                                'ХА-ХА-ХА!', 'СПАСИБО ЗА УЛОВ!'];
+function trySpawnRobber() {
+  const now = performance.now();
+  if (now < _nextRobberAt) return;
+  _nextRobberAt = now + 120000 + Math.random() * 90000;  // 2-3.5 мин
+  // Ищем магазин — Чёрный рынок (26,26) или Рынок (16,16). Случайно.
+  const shops = [{ r: 26, c: 26 }, { r: 16, c: 16 }];
+  const shop = shops[(Math.random() * shops.length) | 0];
+  // Спавним на краю карты, подальше от игрока (как обычный NPC с onEdge)
+  const r = spawnNpc(NPCS.length, true);
+  if (!r) return;
+  r.kind = 'robber';
+  r.robState = 'go';           // 'go' → 'rob' → 'flee'
+  r.robTarget = { r: shop.r + 1.5, c: shop.c + 1.5 };  // у двери
+  r.tr = r.robTarget.r; r.tc = r.robTarget.c;
+  r.speed = 2.2;               // бежит быстрее обычного
+  // Тёмный шмот — внешне «бандит»
+  r.look = Object.assign(r.look || {}, {
+    body: 5, hat: 0, hair: 0,
+  });
+  NPCS.push(r);
+}
+function tickRobber(npc, dt) {
+  const now = performance.now();
+  if (npc.robState === 'go') {
+    // Идём к магазину; если рядом — переход в rob
+    const d = Math.hypot(npc.r - npc.robTarget.r, npc.c - npc.robTarget.c);
+    if (d < 1.5) {
+      npc.robState = 'rob';
+      npc.robUntil = now + 5000;
+      npc.cryText  = ROBBER_PHRASES_ATTACK[(Math.random() * ROBBER_PHRASES_ATTACK.length) | 0];
+      npc.cryPanic = true;
+      npc.cryUntil = now + 3000;
+      // Паника соседей в радиусе 8
+      try { triggerNpcPanic(npc.r, npc.c, 8); } catch(e) {}
+      return;
+    }
+    // Движение
+    const dr = npc.robTarget.r - npc.r, dc = npc.robTarget.c - npc.c;
+    const dist = Math.hypot(dr, dc) || 1;
+    const sp = npc.speed * dt;
+    const nr = npc.r + (dr/dist) * sp, nc = npc.c + (dc/dist) * sp;
+    if (npcPassable(nr, nc)) { npc.r = nr; npc.c = nc; }
+    npc.ang = Math.atan2(dr, dc);
+    npc.walkPhase += dt * 12;
+  } else if (npc.robState === 'rob') {
+    if (now > npc.robUntil) {
+      npc.robState = 'flee';
+      npc.cryText  = ROBBER_PHRASES_FLEE[(Math.random() * ROBBER_PHRASES_FLEE.length) | 0];
+      npc.cryPanic = true;
+      npc.cryUntil = now + 2500;
+      // Цель — случайный край карты подальше
+      const edges = [
+        { r: 18,  c: MAP_COLS-3 }, { r: MAP_ROWS-3, c: MAP_COLS-3 },
+        { r: MAP_ROWS-3, c: 3 }, { r: 18, c: 3 },
+      ];
+      const e = edges[(Math.random() * edges.length) | 0];
+      npc.robTarget = e;
+      npc.tr = e.r; npc.tc = e.c;
+      npc.fleeUntil = now + 30000;
+    }
+    // Стоит у магазина, орёт каждые 1.5с
+    if (now > (npc.cryUntil || 0) - 500 && Math.random() < 0.04) {
+      npc.cryText  = ROBBER_PHRASES_ATTACK[(Math.random() * ROBBER_PHRASES_ATTACK.length) | 0];
+      npc.cryUntil = now + 1800;
+      npc.cryPanic = true;
+    }
+  } else if (npc.robState === 'flee') {
+    if (now > (npc.fleeUntil || 0) ||
+        (npc.r < 3 || npc.r > MAP_ROWS - 3 || npc.c < 3 || npc.c > MAP_COLS - 3)) {
+      // Помечаем удалить (используем dead=true но не рисуем труп)
+      npc._toRemove = true;
+      return;
+    }
+    const dr = npc.robTarget.r - npc.r, dc = npc.robTarget.c - npc.c;
+    const dist = Math.hypot(dr, dc) || 1;
+    const sp = (npc.speed * 1.4) * dt;
+    const nr = npc.r + (dr/dist) * sp, nc = npc.c + (dc/dist) * sp;
+    if (npcPassable(nr, nc)) {
+      npc.r = nr; npc.c = nc;
+    } else {
+      // Пробуем сдвиг — если упёрся в стену, вокруг
+      for (const [d1, d2] of [[sp,0],[-sp,0],[0,sp],[0,-sp]]) {
+        if (npcPassable(npc.r + d1, npc.c + d2)) { npc.r += d1; npc.c += d2; break; }
+      }
+    }
+    npc.ang = Math.atan2(dr, dc);
+    npc.walkPhase += dt * 14;
   }
 }
 
@@ -2103,12 +2325,74 @@ const NPC_IDLE_PHRASES = [
   'Хлеб подорожал на двадцать.',
   'Полиция ничего не делает.',
 ];
+// Реплики для диалога двух прохожих. Когда два NPC встречаются —
+// останавливаются, перекидываются 3-5 фразами по очереди.
+const NPC_DIALOG_OPENERS = [
+  'О, привет!', 'Здарова!', 'Какие люди!', 'Давно не виделись!',
+  'Как сам?', 'Чё нового?', 'Видел ту новость?',
+];
+const NPC_DIALOG_REPLIES = [
+  'Норм, бегу по делам.', 'Да ничё особенного.',
+  'Дочка вчера звонила.', 'Жена пилит — за продуктами.',
+  'Снова цены подняли, ужас.', 'Слышал — у Гены закрыли?',
+  'Та банда опять рядом шастает.', 'Полиция бесполезна, как всегда.',
+  'Кофе с утра не помог...', 'Ладно, побежал.',
+  'Давай встретимся в выходные!', 'Передавай своим привет.',
+];
 function tickNpcChatter() {
   const now = performance.now();
+  // 1) Парные диалоги: ищем близкие пары idle-NPC и пускаем их в conversation.
+  // Проверяем раз в ~2 сек.
+  if (!tickNpcChatter._nextPair || now > tickNpcChatter._nextPair) {
+    tickNpcChatter._nextPair = now + 2000 + Math.random() * 1000;
+    for (let i = 0; i < NPCS.length; i++) {
+      const a = NPCS[i];
+      if (a.dead || a.panicUntil || a.chatPartner) continue;
+      if (a.idleUntil && now < a.idleUntil) continue;
+      for (let j = i + 1; j < NPCS.length; j++) {
+        const b = NPCS[j];
+        if (b.dead || b.panicUntil || b.chatPartner) continue;
+        const d = Math.hypot(a.r - b.r, a.c - b.c);
+        if (d > 3.5) continue;
+        // Шанс начать диалог ~30% (не каждая встреча)
+        if (Math.random() < 0.7) continue;
+        const duration = 8000 + Math.random() * 6000;
+        a.chatPartner = b; b.chatPartner = a;
+        a.chatUntil = b.chatUntil = now + duration;
+        a.chatNext  = now + 200;     // a говорит первым через 200мс
+        b.chatNext  = now + 200 + 2200; // b отвечает через 2с
+        a.chatTurn  = 0; b.chatTurn = 1;
+        // Развернуть лицом друг к другу
+        a.ang = Math.atan2(b.r - a.r, b.c - a.c);
+        b.ang = Math.atan2(a.r - b.r, a.c - b.c);
+        a.idleUntil = b.idleUntil = now + duration;
+        break;
+      }
+    }
+  }
+  // 2) Реплики в текущих диалогах + idle-фразы у одиночек
   for (const n of NPCS) {
     if (n.dead) continue;
     if (n.panicUntil && now < n.panicUntil) continue;
     if (n.cryUntil && now < n.cryUntil) continue;
+    // ── В диалоге: говорим по очереди каждые ~2.5 сек, потом расходимся
+    if (n.chatPartner) {
+      if (now > n.chatUntil || n.chatPartner.dead) {
+        if (n.chatPartner) n.chatPartner.chatPartner = null;
+        n.chatPartner = null;
+        n.idleUntil = 0;
+        continue;
+      }
+      if (now >= (n.chatNext || 0)) {
+        const list = (n.chatTurn === 0) ? NPC_DIALOG_OPENERS : NPC_DIALOG_REPLIES;
+        n.cryText  = list[(Math.random() * list.length) | 0];
+        n.cryUntil = now + 1800 + Math.random() * 600;
+        n.cryPanic = false;
+        n.chatTurn = (n.chatTurn === 0) ? 2 : 1;  // дальше — обычные реплики
+        n.chatNext = now + 4500 + Math.random() * 1500;
+      }
+      continue;
+    }
     if (n._nextChatAt == null) {
       n._nextChatAt = now + 8000 + Math.random() * 35000;
       continue;
@@ -2125,6 +2409,24 @@ function tickNpcChatter() {
 
 function updateNpcs(dt) {
   const now = performance.now();
+  // Спецтипы — попытка спавна и индивидуальная логика
+  trySpawnRobber();
+  trySpawnBumFight();
+  // Удаление помеченных _toRemove (грабители ушли с карты)
+  for (let i = NPCS.length - 1; i >= 0; i--) {
+    if (NPCS[i]._toRemove) {
+      NPCS.splice(i, 1);
+      // Спавним обычного на замену чтобы держать ~60
+      const fresh = spawnNpc(NPCS.length, true);
+      if (fresh) { pickNpcWaypoint(fresh); NPCS.push(fresh); }
+    }
+  }
+  // Грабители и драки — отдельная логика, не общий wander
+  for (const n of NPCS) {
+    if (n.dead) continue;
+    if (n.kind === 'robber') tickRobber(n, dt);
+    else if (n.kind === 'bum') tickBum(n, dt);
+  }
   // Если рядом с NPC прохожим стоит бот городской банды с act='harass'
   // — NPC паникует и убегает. Триггерим один раз в секунду на NPC.
   for (const tid of Object.keys(aggroZones)) {
@@ -2162,6 +2464,29 @@ function updateNpcs(dt) {
   }
   for (const n of NPCS) {
     if (n.dead) continue;   // труп не двигается
+    if (n.kind === 'robber') continue;  // своя AI (tickRobber)
+    if (n.kind === 'bum') continue;     // своя AI (tickBum)
+    if (n.kind === 'artist') {
+      // Стоит на месте, иногда фраза/нотка
+      if (n.musicNext && now > n.musicNext) {
+        n.musicNext = now + 3500 + Math.random()*3000;
+        n.cryText  = (n.artistKind === 'guitar') ? '♪♬ ♬♪' : '💃 танцую!';
+        n.cryUntil = now + 1800;
+        n.cryPanic = false;
+      }
+      n.walkPhase += dt * (n.artistKind === 'dancer' ? 6 : 2);
+      continue;
+    }
+    if (n.kind === 'dog') {
+      // Лай каждые ~12-20 сек
+      if (n.barkNext && now > n.barkNext) {
+        n.barkNext = now + 12000 + Math.random()*8000;
+        n.cryText  = (Math.random() < 0.5) ? 'ГАВ!' : 'ВУФ!';
+        n.cryUntil = now + 900;
+        n.cryPanic = false;
+      }
+      // Двигается обычной логикой ниже, но waypoints ставим близкие
+    }
     // PANIC: NPC видит стрельбу — бежит ОТ источника. Скорость ×2.5.
     if (n.panicUntil && now < n.panicUntil) {
       const dr = n.r - (n.panicSrcR || 0);
@@ -6639,6 +6964,108 @@ function drawTrafficLight(r, c) {
 }
 
 // ── NPC прохожий (упрощённый человечек) ──────────────────────────
+// ── Велосипедист: NPC сверху + овальное колесо + рама под ним
+function drawCyclistSprite(p, npc) {
+  // Тень колеса
+  ctx.fillStyle = 'rgba(0,0,0,.45)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y + 4, 11, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Рама велосипеда
+  ctx.strokeStyle = npc.bikeColor || '#c83030';
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(p.x - 8, p.y + 2);
+  ctx.lineTo(p.x + 2, p.y - 4);
+  ctx.lineTo(p.x + 8, p.y + 2);
+  ctx.stroke();
+  // Два колеса (овалы — изо-проекция)
+  ctx.strokeStyle = '#222';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.ellipse(p.x - 8, p.y + 3, 4.5, 2.4, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(p.x + 8, p.y + 3, 4.5, 2.4, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  // Сам велосипедист — обычный спрайт, чуть приподнят
+  drawPerson(p.x, p.y - 2, npc.ang, npc.look, npc.walkPhase * 0.6,
+             null, null, false, null, null, false);
+}
+
+// ── Уличный артист — стоит на месте, нотки/танец
+function drawArtistSprite(p, npc) {
+  drawPerson(p.x, p.y, npc.ang || 0, npc.look, npc.walkPhase,
+             null, null, false, null, null, false);
+  const t = performance.now() * 0.003;
+  // Нотки/иконка над головой
+  const ic = (npc.artistKind === 'guitar') ? '🎸' : '💃';
+  ctx.font = '14px "Segoe UI Emoji", system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ffe070';
+  ctx.shadowColor = '#000'; ctx.shadowBlur = 3;
+  ctx.fillText(ic, p.x, p.y - 38 + Math.sin(t) * 1.5);
+  // Летающая нотка
+  for (let i = 0; i < 2; i++) {
+    const ph = (t + i * 0.8) % 2;
+    const noteY = p.y - 42 - ph * 18;
+    const noteX = p.x + Math.sin(t + i) * 10 + (i ? -8 : 8);
+    ctx.fillStyle = `rgba(255,224,112,${1 - ph * 0.5})`;
+    ctx.fillText('♪', noteX, noteY);
+  }
+  ctx.shadowBlur = 0;
+  ctx.textAlign = 'left';
+}
+
+// ── Собака — мелкий 4-ногий силуэт + хвост
+function drawDogSprite(p, npc) {
+  const c = npc.dogColor || '#5a3a20';
+  // Тень
+  ctx.fillStyle = 'rgba(0,0,0,.4)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y + 3, 8, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Туловище — горизонтальный овал
+  const wag = Math.sin(npc.walkPhase * 1.5) * 1;
+  ctx.fillStyle = c;
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y - 1, 7, 3.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Голова + морда
+  const hx = p.x + Math.cos(npc.ang) * 5;
+  const hy = p.y - 2 + Math.sin(npc.ang) * 2;
+  ctx.beginPath();
+  ctx.arc(hx, hy, 2.8, 0, Math.PI * 2);
+  ctx.fill();
+  // Уши
+  ctx.fillStyle = '#000';
+  ctx.fillRect(hx - 1.5, hy - 3, 1, 1.5);
+  ctx.fillRect(hx + 0.5, hy - 3, 1, 1.5);
+  // Глаз — белая точка
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(hx, hy - 1, 0.8, 0.8);
+  // Хвост (виляет)
+  ctx.strokeStyle = c;
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'round';
+  const tx = p.x - Math.cos(npc.ang) * 7;
+  const ty = p.y - 1 - Math.sin(npc.ang) * 3;
+  ctx.beginPath();
+  ctx.moveTo(tx, ty);
+  ctx.lineTo(tx - 2 + wag, ty - 3);
+  ctx.stroke();
+  // 4 лапы (мелкие штрихи)
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1.2;
+  for (const off of [-4, -1.5, 1.5, 4]) {
+    ctx.beginPath();
+    ctx.moveTo(p.x + off, p.y + 1);
+    ctx.lineTo(p.x + off + Math.sin(npc.walkPhase + off) * 0.8, p.y + 3.5);
+    ctx.stroke();
+  }
+}
+
 function drawNpc(npc) {
   const p = w2s(npc.r, npc.c);
   // ── ТРУП: лежит тот же спрайт что и при жизни (тот же скин/одежда),
@@ -6690,7 +7117,13 @@ function drawNpc(npc) {
     }
     return;
   }
-  drawPerson(p.x, p.y, npc.ang, npc.look, npc.walkPhase, null, null, false, null, null, false);
+  // Спец-рендер по kind
+  if (npc.kind === 'dog')      { drawDogSprite(p, npc); }
+  else if (npc.kind === 'cyclist') { drawCyclistSprite(p, npc); }
+  else if (npc.kind === 'artist')  { drawArtistSprite(p, npc); }
+  else {
+    drawPerson(p.x, p.y, npc.ang, npc.look, npc.walkPhase, null, null, false, null, null, false);
+  }
   // Крик «ПОМОГИТЕ!» когда NPC в панике (panicUntil > now). Чат-баббл
   // подпрыгивает с лёгкой анимацией. cryUntil — отдельно, чтобы крик
   // показывался лишь первые ~2 сек паники, потом NPC просто молча бежит.
