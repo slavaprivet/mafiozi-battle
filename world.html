@@ -3502,7 +3502,20 @@ function wsConnect() {
       // Подтягиваем себя к серверной позиции (lightweight reconcile)
       if (d.me) {
         const dist = Math.hypot(player.r - d.me.y, player.c - d.me.x);
-        if (dist > 3.0) { player.r = d.me.y; player.c = d.me.x; }
+        // Жёсткий телепорт: при респауне (был dead, стал alive) ВСЕГДА
+        // подтягиваем к серверной позиции, без порога. Иначе клиент
+        // остаётся в точке смерти, а сервер уже в тюрьме (или у госпиталя)
+        // — рассинхрон, клиент «лагает» и не может ходить.
+        const wasDead_pre = myDead;
+        const meAlive = !d.me.dead;
+        const justRespawned = wasDead_pre && meAlive;
+        // В тюрьме порог синхронизации жёстче (1.0) — сервер постоянно
+        // клампит позицию, и клиент должен это видеть, иначе «лагает».
+        const inJailNow = (typeof d.me.jail_in === 'number' && d.me.jail_in > 0);
+        const syncThresh = inJailNow ? 1.0 : 3.0;
+        if (justRespawned || dist > syncThresh) {
+          player.r = d.me.y; player.c = d.me.x;
+        }
         // PVP: HP, dead-state, счёт
         if (typeof d.me.hp === 'number')      myHp = d.me.hp;
         if (typeof d.me.kills === 'number')   myKills = d.me.kills;
