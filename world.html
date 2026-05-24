@@ -2416,6 +2416,9 @@ const PVP = {
 let myHp = 100;
 let myDead = false;
 let myDeathBy = '';       // uid того кто убил (последний)
+// true пока активна анимация ареста (между death-by-cop и респауном
+// в тюрьме). Подавляет «УБИТ» overlay, чтобы видеть только «АРЕСТ».
+let myArrestPending = false;
 let myDeathLeft = 0;      // сколько сек до респауна
 let myKills = 0, myDeaths = 0;
 let lastShotClientT = 0;  // локальный cooldown (предотвращает спам)
@@ -3076,6 +3079,7 @@ function handleEventPacket(d) {
       if (String(d.target_uid) === String(QP.uid)) {
         showArrestOverlay();
         addShake(7);
+        myArrestPending = true;   // подавляем «УБИТ» overlay
       }
     }
   } else if (kind === 'cop_shot_bot') {
@@ -4266,12 +4270,20 @@ function updatePvpUI() {
   _hpMaxVal.textContent  = maxHp;
   _hudKills.textContent  = myKills;
   _hudDeaths.textContent = myDeaths;
-  if (myDead) {
+  // Если убийство привело к аресту — показываем arrestOverlay, а не
+  // «УБИТ». Двойной overlay (сначала смерть, потом тюрьма) сбивал с
+  // толку — это была одна и та же ситуация.
+  if (myDead && !myArrestPending) {
     if (!_deathOv.classList.contains('show')) _deathOv.classList.add('show');
     _deathBy.textContent = myDeathBy ? `Тебя завалил ${myDeathBy}` : '';
     _deathCnt.textContent = Math.max(0, Math.ceil(myDeathLeft));
   } else if (_deathOv.classList.contains('show')) {
     _deathOv.classList.remove('show');
+  }
+  // Респаун случился — сбрасываем флаг ареста, чтобы следующая смерть
+  // (если она НЕ от копов) опять показывала обычный death overlay.
+  if (!myDead && myArrestPending && myJailIn <= 0) {
+    myArrestPending = false;
   }
   _updateHitFlash();
   // Countdown «до инкассатора»
@@ -4676,11 +4688,17 @@ function update(dt) {
   // оружию. Без сдвига — не стреляем (auto-aim убран, целимся вручную).
   // Угол стика → world-space через ISO_Y коррекцию (как в demo).
   // PvE — режим наблюдателя, стрельба отключена.
+  // ВАЖНО: player.ang обновляем ОТДЕЛЬНО от fire() — каждый кадр пока
+  // активен aim. Иначе оружие «крутится» вслед за направлением ХОДЬБЫ
+  // (которое тоже пишет player.ang), и пуля летит куда стик, а ствол
+  // смотрит куда шёл — визуальный рассинхрон.
   if (joyR.active && joyR.hasAim && myMode !== 'pve' && !myDead) {
     const d = joyR.dx, s = joyR.dy / ISO_Y;
     const dc = (s + d) * 0.5;
     const dr = (s - d) * 0.5;
-    fire(Math.atan2(dr, dc));
+    const aimAng = Math.atan2(dr, dc);
+    player.ang = aimAng;          // ствол всегда смотрит куда целишься
+    fire(aimAng);
   }
   // Интерполяция других игроков
   for (const [, o] of others) {
@@ -8465,6 +8483,118 @@ function drawJailCell(stationR, stationC) {
   const gateA = Math.PI * 0.5;      // ворота — на юг от центра
   const gw = JAIL_GATE_HALF_RAD;
   ctx.save();
+  // ── БЕТОННЫЙ ПОЛ КАМЕРЫ — серый круг внутри клетки + трещины ─────
+  {
+    const center = w2s(cR, cC);
+    // Тёмный бетон с лёгким градиентом
+    ctx.fillStyle = '#6a6a72';
+    ctx.beginPath();
+    ctx.ellipse(center.x, center.y, R * TS * 0.5, R * TS * 0.5 * ISO_Y,
+                0, 0, Math.PI * 2);
+    ctx.fill();
+    // Радиальные трещины + плиточные швы (4 линии креста)
+    ctx.strokeStyle = 'rgba(40,40,46,.55)';
+    ctx.lineWidth = 0.8;
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 + 0.3;
+      const r1 = R * 0.35, r2 = R * 0.92;
+      const p1 = w2s(cR + Math.sin(a) * r1, cC + Math.cos(a) * r1);
+      const p2 = w2s(cR + Math.sin(a) * r2, cC + Math.cos(a) * r2);
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+      ctx.stroke();
+    }
+    // Пятна — старая грязь
+    ctx.fillStyle = 'rgba(30,30,36,.35)';
+    for (let i = 0; i < 5; i++) {
+      const a = i * 1.27;
+      const rr = R * 0.4 + (i % 3) * 0.6;
+      const sp = w2s(cR + Math.sin(a) * rr, cC + Math.cos(a) * rr);
+      ctx.beginPath();
+      ctx.ellipse(sp.x, sp.y, 4 + (i % 2) * 2, 2 + (i % 2), 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  // ── НАРЫ — деревянная скамья у северной стены ─────────────────────
+  {
+    const benchR = cR - R * 0.65, benchC = cC;
+    const benchLen = R * 0.6;
+    const b1 = w2s(benchR, benchC - benchLen);
+    const b2 = w2s(benchR, benchC + benchLen);
+    // Тень
+    ctx.fillStyle = 'rgba(0,0,0,.45)';
+    ctx.beginPath();
+    ctx.moveTo(b1.x - 3, b1.y + 4); ctx.lineTo(b2.x - 3, b2.y + 4);
+    ctx.lineTo(b2.x + 3, b2.y + 6); ctx.lineTo(b1.x + 3, b1.y + 6);
+    ctx.closePath(); ctx.fill();
+    // Поверхность нар (доски)
+    ctx.fillStyle = '#5a3a20';
+    ctx.beginPath();
+    ctx.moveTo(b1.x - 4, b1.y - 2); ctx.lineTo(b2.x + 4, b2.y - 2);
+    ctx.lineTo(b2.x + 4, b2.y + 3); ctx.lineTo(b1.x - 4, b1.y + 3);
+    ctx.closePath(); ctx.fill();
+    // Доски-полосы
+    ctx.strokeStyle = '#3a2410';
+    ctx.lineWidth = 0.5;
+    for (let i = -3; i <= 3; i++) {
+      const t = (i + 3) / 6;
+      const px = b1.x + (b2.x - b1.x) * t;
+      const py = b1.y + (b2.y - b1.y) * t;
+      ctx.beginPath();
+      ctx.moveTo(px, py - 2); ctx.lineTo(px, py + 3);
+      ctx.stroke();
+    }
+    // Грязная подушка-тряпка
+    ctx.fillStyle = '#8a7060';
+    ctx.beginPath();
+    ctx.ellipse(b1.x + 4, b1.y, 5, 1.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // ── УНИТАЗ — белая «чаша» в восточной части ──────────────────────
+  {
+    const tR = cR + R * 0.15, tC = cC + R * 0.55;
+    const tp = w2s(tR, tC);
+    // Бачок (прямоугольник)
+    ctx.fillStyle = '#d8d8e0';
+    ctx.fillRect(tp.x - 4, tp.y - 8, 8, 4);
+    ctx.strokeStyle = '#8a8a90';
+    ctx.lineWidth = 0.7;
+    ctx.strokeRect(tp.x - 4, tp.y - 8, 8, 4);
+    // Чаша (эллипс)
+    ctx.fillStyle = '#e8e8f0';
+    ctx.beginPath();
+    ctx.ellipse(tp.x, tp.y - 2, 5, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Тёмный «зев» воды
+    ctx.fillStyle = '#3a4858';
+    ctx.beginPath();
+    ctx.ellipse(tp.x, tp.y - 2, 3, 1.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Тень
+    ctx.fillStyle = 'rgba(0,0,0,.3)';
+    ctx.beginPath();
+    ctx.ellipse(tp.x, tp.y + 2, 6, 1.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // ── ТАБЛИЧКА «☠ КАМЕРА» — над воротами снаружи ───────────────────
+  {
+    const gateMidR = cR + Math.sin(gateA) * (R + 1.5);
+    const gateMidC = cC + Math.cos(gateA) * (R + 1.5);
+    const gp = w2s(gateMidR, gateMidC);
+    const tY = gp.y - isoH(1.8);
+    // Подложка
+    ctx.fillStyle = 'rgba(30,30,38,.92)';
+    ctx.fillRect(gp.x - 22, tY - 8, 44, 14);
+    ctx.strokeStyle = '#a08030';
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(gp.x - 22, tY - 8, 44, 14);
+    // Текст
+    ctx.fillStyle = '#ffce5a';
+    ctx.font = 'bold 10px system-ui, "Segoe UI Emoji", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('☠ КАМЕРА', gp.x, tY + 2);
+    ctx.textAlign = 'left';
+  }
   for (let i = 0; i < N; i++) {
     const a = (i / N) * Math.PI * 2;
     // Пропускаем прутья в зоне ворот
@@ -9780,23 +9910,55 @@ function drawBullets() {
   for (let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
     const p1 = w2s(b.r + 0.5, b.c + 0.5);
-    const p2 = w2s(b.r - b.vr * 0.05 + 0.5, b.c - b.vc * 0.05 + 0.5);
-    ctx.strokeStyle = b.color;
-    ctx.lineWidth = b.thick ? 4 : 2.5;
+    // Длинный хвост — пропорционален скорости. Тонкие пули — ~0.18,
+    // дробовик/снайпер (thick) — ~0.28. Раньше было 0.05 — короткая
+    // точка вместо трассера.
+    const tail = b.thick ? 0.28 : 0.18;
+    const p2 = w2s(b.r - b.vr * tail + 0.5, b.c - b.vc * tail + 0.5);
+    const x1 = p1.x, y1 = p1.y - 18;
+    const x2 = p2.x, y2 = p2.y - 18;
+    // Линейный градиент: tail прозрачный → head яркий
+    const grad = ctx.createLinearGradient(x2, y2, x1, y1);
+    grad.addColorStop(0.0, 'rgba(255,255,255,0)');
+    grad.addColorStop(0.6, b.color);
+    grad.addColorStop(1.0, '#ffffff');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = b.thick ? 3.6 : 2.2;
     ctx.lineCap = 'round';
     ctx.shadowColor = b.color;
-    ctx.shadowBlur = 8;
+    ctx.shadowBlur = b.thick ? 10 : 6;
     ctx.beginPath();
-    ctx.moveTo(p2.x, p2.y - 18);  // на уровне пояса (как и оружие)
-    ctx.lineTo(p1.x, p1.y - 18);
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x1, y1);
     ctx.stroke();
+    // Яркое ядро головы — горячая точка
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = '#fffff0';
+    ctx.beginPath();
+    ctx.arc(x1, y1, b.thick ? 2.0 : 1.4, 0, Math.PI * 2);
+    ctx.fill();
     if (b._finished) {
       if (b.hit) {
-        ctx.shadowBlur = 12;
-        ctx.fillStyle = '#ff6464';
-        ctx.shadowColor = '#ff6464';
+        // Искра-звезда вместо круга: 5 коротких лучей + яркое ядро
+        ctx.shadowBlur = 14;
+        ctx.shadowColor = '#ffd070';
+        ctx.strokeStyle = '#ffd070';
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.arc(p1.x, p1.y - 18, 7, 0, Math.PI * 2);
+        for (let k = 0; k < 5; k++) {
+          const a = (k / 5) * Math.PI * 2 + (b.r + b.c);
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x1 + Math.cos(a) * 7, y1 + Math.sin(a) * 7);
+        }
+        ctx.stroke();
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = '#ff8040';
+        ctx.beginPath();
+        ctx.arc(x1, y1, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(x1, y1, 1.6, 0, Math.PI * 2);
         ctx.fill();
       }
       bullets.splice(i, 1);
