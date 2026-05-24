@@ -2842,11 +2842,49 @@ function spawnBullet(sr, sc, er, ec, opts) {
 // spawnMuzzle(r,c, angle, weapon) — вспышка дула. Живёт 80мс.
 function spawnMuzzle(r, c, angle, weapon) {
   const wcfg = WEAPON_FX_CFG[weapon] || {};
+  // Конвертируем МИРОВОЙ угол в ИЗО — лучи muzzle рисуются на канвасе
+  // через ctx.rotate(ang) в pixel-пространстве. Если оставить мировой,
+  // вспышка торчит «не туда» (не вдоль визуального ствола).
+  const sx = (Math.cos(angle) - Math.sin(angle)) * 0.5;
+  const sy = (Math.cos(angle) + Math.sin(angle)) * 0.5 * ISO_Y;
+  const isoAng = Math.atan2(sy, sx);
   muzzles.push({
-    r, c, angle,
+    r, c, angle: isoAng,
     life: 80, max: 80,
     color: wcfg.color || '#ffd76b',
   });
+}
+
+// Возвращает точку конца ствола в МИРОВЫХ координатах для игрока,
+// зная мировой угол стрельбы и оружие. Точка совпадает с тем, что
+// рисует drawWeaponInHands. Используется для spawn пули и muzzle.
+function gunMuzzleWorld(baseR, baseC, ang, weapon, scale) {
+  const wcfg = WEAPON_FX_CFG[weapon] || {};
+  scale = scale || 1.0;
+  // ИЗО-векторы (sx,sy) и перпендикуляр (perpX, perpY) — как в handAnchor
+  const sx = (Math.cos(ang) - Math.sin(ang)) * 0.5;
+  const sy = (Math.cos(ang) + Math.sin(ang)) * 0.5 * ISO_Y;
+  const dirLen = Math.hypot(sx, sy) || 1;
+  const perpX = -sy / dirLen;
+  const perpY =  sx / dirLen;
+  // shoulderD + armLen + длина ствола (см. drawFirearm для каждого weapon)
+  const shoulderD = TS * 0.10;
+  const armLen    = TS * 0.36;
+  // Приближённая длина ствола от хвата (в пикселях), по drawFirearm
+  const BARREL_PX = {
+    pistol: 17,  nagan: 17,  pistol_heavy: 22, pistol_gold: 18,
+    shotgun: 30, smg: 24, tommy_gun: 24,
+    rifle: 36, sniper: 42, rpg: 38,
+  };
+  const barrelLen = (BARREL_PX[weapon] || 18) * (TS / 60) * scale;
+  // Конец ствола в пикселях относительно центра игрока
+  const dx_pix = perpX * shoulderD + sx * (armLen + barrelLen);
+  const dy_pix = perpY * shoulderD + sy * (armLen + barrelLen);
+  // Обратное преобразование pixel → world (cam инвариантно)
+  // pixel_x = (c - r) * 0.5 * TS, pixel_y = (c + r) * 0.5 * TS * ISO_Y
+  const dc = (dy_pix / (TS * ISO_Y)) + (dx_pix / TS);
+  const dr = (dy_pix / (TS * ISO_Y)) - (dx_pix / TS);
+  return { r: baseR + dr, c: baseC + dc };
 }
 
 // ── Локальный игрок (predict) ───────────────────────────────────
@@ -3628,7 +3666,9 @@ function showArrestOverlay() {
   const el = document.getElementById('arrestOverlay');
   if (!el) return;
   el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 2500);
+  // Раньше snimали через setTimeout — но если игрок дольше «мёртв» чем
+  // 2.5с, оверлей пропадал, а death overlay подавлен → пустой экран.
+  // Теперь снимаем в updatePvpUI когда !myDead (значит респаун случился).
 }
 
 // ── Анимация ареста: автозак приезжает к жертве, забирает, везёт в участок.
@@ -4480,14 +4520,16 @@ function fire(angle = null) {
     _fireBtn.classList.remove('cd');
     joyREl.classList.remove('cd');
   }, cdSec * 1000);
-  // Стартовая точка пули — конец ствола (как в demo: r + dr * muzzleD).
-  // Без этого пуля «вырывается из груди», что особенно заметно у
-  // длинных стволов (rifle/sniper). Вспышка дула рисуется в той же точке.
+  // Стартовая точка пули — РОВНО конец ствола. Считаем через хелпер,
+  // который повторяет геометрию drawWeaponInHands (handAnchor + длина
+  // ствола), и переводит обратно в мировые координаты. Раньше использовали
+  // фиксированный muzD, и пуля вылетала «из груди»/«в бок».
   const wcfg = WEAPON_FX_CFG[currentWeapon] || {};
-  const muzD = wcfg.muzzleD || 0.75;
-  const sR = player.r + dirY * muzD;
-  const sC = player.c + dirX * muzD;
-  spawnMuzzle(sR, sC, Math.atan2(dirY, dirX), currentWeapon);
+  const fireAng = Math.atan2(dirY, dirX);
+  const mz = gunMuzzleWorld(player.r, player.c, fireAng, currentWeapon, 0.9);
+  const sR = mz.r;
+  const sC = mz.c;
+  spawnMuzzle(sR, sC, fireAng, currentWeapon);
   // Паника NPC: любой выстрел рядом — мирные NPC в радиусе 9 тайлов
   // переключаются в panic. Бегут от стрелка, кричат «ПОМОГИТЕ!» по
   // случайному паттерну. Когда отбежали — успокаиваются (см. updateNpcs).
@@ -4641,10 +4683,15 @@ function updatePvpUI() {
   } else if (_deathOv.classList.contains('show')) {
     _deathOv.classList.remove('show');
   }
-  // Респаун случился — сбрасываем флаг ареста, чтобы следующая смерть
-  // (если она НЕ от копов) опять показывала обычный death overlay.
-  if (!myDead && myArrestPending && myJailIn <= 0) {
-    myArrestPending = false;
+  // Респаун случился — снимаем arrest overlay и сбрасываем флаг.
+  if (!myDead) {
+    const arr = document.getElementById('arrestOverlay');
+    if (arr && arr.classList.contains('show')) arr.classList.remove('show');
+    // Флаг держим пока сидим (чтобы при повторной смерти НЕ от копов
+    // показать обычный death). Сбрасываем при освобождении.
+    if (myArrestPending && myJailIn <= 0) {
+      myArrestPending = false;
+    }
   }
   _updateHitFlash();
   // Countdown «до инкассатора»
@@ -10535,38 +10582,50 @@ function drawWeaponInHands(x, y, ang, weapon, scale /*shotAtMs ignored: см. dr
   // Масштаб ровно как в demo: gunScale = 1.0 * (TS / 60) для миньона,
   // 1.3 * (TS / 60) для босса. scale — лёгкая подкрутка.
   const sc = (scale || 1.0) * (TS / 60);
-  // 1. ОСНОВНАЯ рука — от плеча до точки хвата. Тёмный рукав, чтобы
-  //    отделить от тела. (sh1X, sh1Y) — плечо со стороны рабочей руки.
+  const wcfg = WEAPON_FX_CFG[weapon] || {};
+  // 1. ОСНОВНАЯ рука — от плеча до точки хвата.
   const sh1X = px + perpX * shoulderD;
   const sh1Y = shY + perpY * shoulderD;
+  // 2. Если двуручка — рисуем ВТОРУЮ руку ПЕРЕД стволом (плечо→цевье),
+  //    она проходит через тело сзади и виднеется по бокам ствола.
+  let fgT = 0, fgX = 0, fgY = 0, sh2X = 0, sh2Y = 0, isTwo = false;
+  if (wcfg.twoHanded) {
+    isTwo = true;
+    fgT  = FIREARM_FOREGRIP[weapon] || 0.36;
+    sh2X = px - perpX * shoulderD;
+    sh2Y = shY - perpY * shoulderD;
+    fgX  = hx + sx * TS * fgT;
+    fgY  = hy + sy * TS * fgT;
+    // Сначала рука «через грудь» — толстая и контрастная
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 4.2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(sh2X, sh2Y);
+    ctx.lineTo(fgX,  fgY);
+    ctx.stroke();
+  }
+  // 3. Основная рука (рисуем поверх — она спереди)
   ctx.strokeStyle = '#1a1a1a';
-  ctx.lineWidth = 3.5;
+  ctx.lineWidth = 3.8;
   ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.moveTo(sh1X, sh1Y);
   ctx.lineTo(hx, hy);
   ctx.stroke();
-  // 2. Само оружие
+  // 4. Само оружие
   drawFirearm(weapon, hx, hy, sx, sy, sc);
-  // 3. Для двуручного — вторая рука с противоположного плеча на цевье.
-  //    Игрок держит автомат/винтовку/дробовик ДВУМЯ руками (как в demo).
-  const wcfg = WEAPON_FX_CFG[weapon] || {};
-  if (wcfg.twoHanded) {
-    const fgT = FIREARM_FOREGRIP[weapon] || 0.36;
-    const sh2X = px - perpX * shoulderD;
-    const sh2Y = shY - perpY * shoulderD;
-    const fgX  = hx + sx * TS * fgT;
-    const fgY  = hy + sy * TS * fgT;
-    ctx.strokeStyle = '#1a1a1a';
-    ctx.lineWidth = 3.5;
+  // 5. Для двуручного — поверх ствола рисуем КИСТЬ на цевье (вторая
+  //    рука выходит из-за ствола и хватает его сверху).
+  if (isTwo) {
+    // Кисть-«перчатка» — чуть больше и тёмная, заметна на фоне ствола
+    ctx.fillStyle = '#1a1a1a';
     ctx.beginPath();
-    ctx.moveTo(sh2X, sh2Y);
-    ctx.lineTo(fgX,  fgY);
-    ctx.stroke();
-    // Кисть на цевье — маленький кружок цвета кожи
+    ctx.arc(fgX, fgY, 3.2, 0, Math.PI * 2);
+    ctx.fill();
     ctx.fillStyle = '#d8b48a';
     ctx.beginPath();
-    ctx.arc(fgX, fgY, 3, 0, Math.PI * 2);
+    ctx.arc(fgX, fgY, 2.2, 0, Math.PI * 2);
     ctx.fill();
   }
 }
@@ -10801,7 +10860,9 @@ function render() {
   for (const biz of WORLD_BIZ) {
     if (biz.id !== 'port') continue;
     if (biz.r < r0 - 4 || biz.r >= r1 + 4 || biz.c < c0 - 8 || biz.c >= c1 + 8) continue;
-    items.push({ depth: biz.r + biz.c + 0.5, draw: () => drawShipBusiness(biz) });
+    items.push({ depth: biz.r + biz.c + 0.5, draw: () => {
+      try { drawShipBusiness(biz); } catch(e) { console.error('ship', e); }
+    }});
   }
   // NPC прохожие
   for (const npc of NPCS) {
