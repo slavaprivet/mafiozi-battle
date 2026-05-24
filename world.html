@@ -4018,6 +4018,9 @@ function fire(angle = null) {
     return;
   }
   if (myDead) return;
+  // В тюрьме стрельба заблокирована и на клиенте и на сервере.
+  // Серверная сторона тоже отклонит, но не шлём пакет зря.
+  if (myJailIn > 0) return;
   const now = performance.now();
   // Cooldown зависит от выбранного оружия (как в demo_isometric):
   // smg/tommy быстрые ~0.2с, sniper медленный ~1.2с, rpg ~1.8с.
@@ -4248,7 +4251,10 @@ function updatePvpUI() {
   // даже если стрелять не в кого, ствол в руке и стик готов — это даёт
   // ощущение полноценной боёвки.
   const isPve      = (myMode === 'pve');
-  const canShoot   = !isPve && !myDead;
+  // В тюрьме стрельба запрещена — стик и weapon-bar скрываем. Кроме
+  // того, при освобождении автоматически появляются обратно.
+  const inJail     = (myJailIn > 0);
+  const canShoot   = !isPve && !myDead && !inJail;
   // HUD-карточку показываем всегда (часы + K/D + HP). Если игрок в чисто
   // PvE-режиме (мирный наблюдатель) — скрываем. В обычном городе с
   // настоящим аккаунтом HUD виден постоянно.
@@ -4692,7 +4698,7 @@ function update(dt) {
   // активен aim. Иначе оружие «крутится» вслед за направлением ХОДЬБЫ
   // (которое тоже пишет player.ang), и пуля летит куда стик, а ствол
   // смотрит куда шёл — визуальный рассинхрон.
-  if (joyR.active && joyR.hasAim && myMode !== 'pve' && !myDead) {
+  if (joyR.active && joyR.hasAim && myMode !== 'pve' && !myDead && myJailIn <= 0) {
     const d = joyR.dx, s = joyR.dy / ISO_Y;
     const dc = (s + d) * 0.5;
     const dr = (s - d) * 0.5;
