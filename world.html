@@ -1963,11 +1963,25 @@ function trafficPhase() {
 
 // NPC — простые прохожие на тротуарах. Бродят по случайным waypoint-ам.
 const NPCS = [];
-function spawnNpc(seed) {
-  // Ищем случайный бордюрный тайл (тип 9), вне PVP-арены
+// Если onEdge=true — спавним на краю карты, подальше от игрока (>30 тайлов),
+// чтобы респаун убитых не было видно «из воздуха».
+function spawnNpc(seed, onEdge) {
+  const EDGE = 4;
   for (let tries = 0; tries < 80; tries++) {
-    const r = 2 + Math.floor(Math.random() * (MAP_ROWS - 4));
-    const c = 2 + Math.floor(Math.random() * (MAP_COLS - 4));
+    let r, c;
+    if (onEdge) {
+      // 4 края × случайная точка вдоль края
+      const side = Math.floor(Math.random() * 4);
+      if (side === 0)      { r = 2 + Math.floor(Math.random() * EDGE); c = 2 + Math.floor(Math.random() * (MAP_COLS - 4)); }
+      else if (side === 1) { r = MAP_ROWS - 2 - Math.floor(Math.random() * EDGE); c = 2 + Math.floor(Math.random() * (MAP_COLS - 4)); }
+      else if (side === 2) { c = 2 + Math.floor(Math.random() * EDGE); r = 2 + Math.floor(Math.random() * (MAP_ROWS - 4)); }
+      else                 { c = MAP_COLS - 2 - Math.floor(Math.random() * EDGE); r = 2 + Math.floor(Math.random() * (MAP_ROWS - 4)); }
+      // Подальше от игрока — иначе «вылез из ничего»
+      if (Math.hypot(player.r - r, player.c - c) < 28) continue;
+    } else {
+      r = 2 + Math.floor(Math.random() * (MAP_ROWS - 4));
+      c = 2 + Math.floor(Math.random() * (MAP_COLS - 4));
+    }
     if (inArena(r, c)) continue;
     if (MAP[r][c] === 9 || MAP[r][c] === 8) {
       return {
@@ -1977,6 +1991,9 @@ function spawnNpc(seed) {
         ang: 0,
         walkPhase: 0,
         idleUntil: 0,
+        // ─── Жизнь NPC: hp 60, dead — лежит трупом, deathT — момент смерти
+        hp: 60, dead: false, deathT: 0, deathAng: 0,
+        bloodSeed: Math.floor(Math.random() * 1000),
         look: {
           gender: Math.random() < 0.5 ? 0 : 1,
           skin:   Math.floor(Math.random() * 5),
@@ -2044,12 +2061,14 @@ function triggerNpcPanic(srcR, srcC, radius) {
     'ВЫЗОВИТЕ КОПОВ!', 'ОН ВООРУЖЁН!', 'НЕ СТРЕЛЯЙТЕ!',
   ];
   for (const n of NPCS) {
+    if (n.dead) continue;
     const dr = n.r - srcR, dc = n.c - srcC;
     const d  = Math.hypot(dr, dc);
     if (d > radius) continue;
     n.panicUntil = now + 4000 + Math.random() * 2500;
     n.cryUntil   = now + 1800 + Math.random() * 1200;
     n.cryText    = cries[(Math.random() * cries.length) | 0];
+    n.cryPanic   = true;
     n.panicSrcR  = srcR;
     n.panicSrcC  = srcC;
     n.idleUntil  = 0;   // не «отдыхаем», бежим
@@ -2084,6 +2103,7 @@ const NPC_IDLE_PHRASES = [
 function tickNpcChatter() {
   const now = performance.now();
   for (const n of NPCS) {
+    if (n.dead) continue;
     if (n.panicUntil && now < n.panicUntil) continue;
     if (n.cryUntil && now < n.cryUntil) continue;
     if (n._nextChatAt == null) {
@@ -2096,6 +2116,7 @@ function tickNpcChatter() {
     if (Math.random() < 0.30) continue;
     n.cryText  = NPC_IDLE_PHRASES[(Math.random() * NPC_IDLE_PHRASES.length) | 0];
     n.cryUntil = now + 2500 + Math.random() * 1500;
+    n.cryPanic = false;
   }
 }
 
@@ -2117,6 +2138,7 @@ function updateNpcs(dt) {
           n.panicUntil = now + 3500 + Math.random() * 1500;
           n.cryUntil   = now + 1800;
           n.cryText    = (Math.random() < 0.5) ? 'ОТСТАНЬТЕ!' : 'ПОМОГИТЕ!';
+          n.cryPanic   = true;
           n.panicSrcR  = bot.y;
           n.panicSrcC  = bot.x;
           n.idleUntil  = 0;
@@ -2124,7 +2146,19 @@ function updateNpcs(dt) {
       }
     }
   }
+  // ── Мёртвые NPC: лежат 5 сек, потом удаляются и спавнится новый
+  // на краю карты (далеко от игрока, чтобы не было видно появления).
+  for (let i = NPCS.length - 1; i >= 0; i--) {
+    const n = NPCS[i];
+    if (!n.dead) continue;
+    if (now - n.deathT > 5000) {
+      NPCS.splice(i, 1);
+      const fresh = spawnNpc(NPCS.length, true);
+      if (fresh) { pickNpcWaypoint(fresh); NPCS.push(fresh); }
+    }
+  }
   for (const n of NPCS) {
+    if (n.dead) continue;   // труп не двигается
     // PANIC: NPC видит стрельбу — бежит ОТ источника. Скорость ×2.5.
     if (n.panicUntil && now < n.panicUntil) {
       const dr = n.r - (n.panicSrcR || 0);
@@ -3237,6 +3271,9 @@ function handleEventPacket(d) {
       } else if (reason === 'civilian') {
         title = '💀 ' + nm.toUpperCase() + ' РАССТРЕЛИВАЕТ ЛЮДЕЙ';
         msg = 'Расстрел мирных — копы открывают огонь без предупреждения.';
+      } else if (reason === 'civilian_killed') {
+        title = '☠️ ' + nm.toUpperCase() + ' УБИЛ МИРНОГО';
+        msg = 'Кровавая расправа над прохожим — SWAT выезжает на штурм.';
       } else {
         title = '🔫 ' + nm.toUpperCase() + ' открыл огонь!';
         msg = 'Где-то в городе началась стрельба — копы выехали на место.';
@@ -4055,9 +4092,24 @@ function fire(angle = null) {
   }
   // 4) PvP-игрок (в активной зоне инкассатора или в арене)
   const pvpTarget = (!chosenConvoy && !chosenCop && !chosenAggro) ? findPvpTargetAlongAim(dirX, dirY) : null;
+  // 5) Мирный NPC прохожий — последняя цель (если ничего другого не нашли).
+  // Дистанция и конус — те же что и для PvP, но радиус поменьше (FIRE_R 7).
+  let chosenNpc = null;
+  if (!chosenConvoy && !chosenCop && !chosenAggro && !pvpTarget && NPCS && NPCS.length) {
+    for (const npc of NPCS) {
+      if (npc.dead) continue;
+      const dx = npc.c - player.c, dy = npc.r - player.r;
+      const d  = Math.hypot(dx, dy);
+      if (d > 7) continue;
+      const dn = d > 0.001 ? d : 1;
+      const dot = (dx * dirX + dy * dirY) / dn;
+      if (dot < 0.985) continue;
+      if (!chosenNpc || d < chosenNpc.d) chosenNpc = { npc, d };
+    }
+  }
   // Если цели нет — стреляем «в пустоту» с визуальным эффектом
   // (трассер летит вперёд + отдача + cd). Локально, серверу не шлём.
-  const noTarget = !chosenConvoy && !chosenCop && !chosenAggro && !pvpTarget;
+  const noTarget = !chosenConvoy && !chosenCop && !chosenAggro && !pvpTarget && !chosenNpc;
   lastShotClientT = now;
   _fireBtn.classList.add('cd');
   joyREl.classList.add('cd');
@@ -4147,6 +4199,27 @@ function fire(angle = null) {
       ws && ws.send(JSON.stringify({ t: 'player_shoot',
         d: { target_uid: pvpTarget.uid, weapon: currentWeapon } }));
     } catch(e) {}
+    return;
+  }
+  if (chosenNpc) {
+    const n = chosenNpc.npc;
+    spawnBullet(sR, sC, n.r, n.c,
+      { hit: true, fromPlayer: true, weapon: currentWeapon });
+    // Локальный урон — берём dmg из конфига оружия
+    const dmg = (wcfg.dmg || 22);
+    n.hp -= dmg;
+    if (n.hp <= 0 && !n.dead) {
+      n.dead    = true;
+      n.deathT  = performance.now();
+      // Угол падения — лицом к стрелку (вектор от NPC к игроку)
+      n.deathAng = Math.atan2(player.r - n.r, player.c - n.c);
+      // Сервер — civilian_killed: жёсткая реакция полиции (+3★, штурм)
+      try {
+        ws && ws.send(JSON.stringify({ t: 'civilian_killed',
+          d: { weapon: currentWeapon } }));
+      } catch(e) {}
+      try { showToast('💀 МИРНЫЙ УБИТ — копы в ярости!', '🚨', 3500); } catch(e) {}
+    }
     return;
   }
   if (noTarget) {
@@ -4548,13 +4621,39 @@ function update(dt) {
   // Мёртвый игрок не двигается — ждём респауна сервера, иначе появлялся
   // в той же точке где умер (баг: «бегать могу и возрождаюсь там же»).
   if (myDead) inDx = 0, inDy = 0;
+  // В тюрьме движение блокируем ВНУТРИ радиуса JAIL_R. Раньше сервер
+  // молча клампил позицию обратно, и игрок мог «выбежать» в момент между
+  // снапами — иногда даже досрочно освобождался. Теперь клиент сам
+  // ограничивает шаг: вектор движения, толкающий за пределы JAIL_R,
+  // подрезается так, чтобы шаг шёл вдоль границы (а не на стену).
+  let jailGuard = null;
+  if (myJailIn > 0) {
+    jailGuard = { jx: 76.0, jy: 76.0, jr: 6.5 };
+  }
   if (Math.abs(inDx) > 0.08 || Math.abs(inDy) > 0.08) {
     const d = inDx, s = inDy / ISO_Y;
     const dc = (s + d) * 0.5;
     const dr = (s - d) * 0.5;
     const mag = Math.hypot(dr, dc) || 1;
     const mv = Math.min(1, Math.hypot(inDx, inDy));
-    tryMove(player, dr / mag * speed * dt * mv, dc / mag * speed * dt * mv);
+    let stepR = dr / mag * speed * dt * mv;
+    let stepC = dc / mag * speed * dt * mv;
+    if (jailGuard) {
+      // Проектируем планируемую позицию; если она вне радиуса — отбрасываем
+      // радиальную часть шага, оставляя только тангенциальную (вдоль стены).
+      const nr = player.r + stepR, nc = player.c + stepC;
+      const dvr = nr - jailGuard.jy, dvc = nc - jailGuard.jx;
+      const ddist = Math.hypot(dvr, dvc);
+      if (ddist > jailGuard.jr) {
+        const rx = (player.r - jailGuard.jy);
+        const ry = (player.c - jailGuard.jx);
+        const norm = Math.hypot(rx, ry) || 1;
+        const ux = rx / norm, uy = ry / norm;
+        const dot = stepR * ux + stepC * uy;
+        if (dot > 0) { stepR -= ux * dot; stepC -= uy * dot; }
+      }
+    }
+    tryMove(player, stepR, stepC);
     player.ang = Math.atan2(dr, dc);
     player.walking = mv > 0.15;
     player.walkPhase += dt * 10 * mv;
@@ -4993,15 +5092,98 @@ function drawTile(r, c) {
     ctx.fillStyle = '#d4a830';
     ctx.fillRect(p.x - wx, p.y - 1, wx * 2, 1);
   }
-  // По центру вертикальных дорог — серые люки (центр = mod 1)
+  // ── ЛЮКИ И ЛИВНЁВКИ на асфальте ────────────────────────────────
+  // 3 типа: круглый канализационный (с крестообразной решёткой),
+  // квадратный ливнёвый сток (с параллельной решёткой) и крышка
+  // телекома (плоская). Распределены по разным правилам.
+  const lukHash = ((r * 91 + c * 47) >>> 0) % 100;
+  // 1) Круглый канализационный — центр вертикальной дороги, раз в 4 тайла
   if (onRoadC && !onRoadR && (c % BLOCK === 1) && (r % 4 === 0)) {
-    ctx.fillStyle = '#2a2a30';
+    // Тёмная подложка (тень от люка чуть утопленного)
+    ctx.fillStyle = 'rgba(0,0,0,.35)';
     ctx.beginPath();
-    ctx.ellipse(p.x, p.y, wx * 0.10, wy * 0.10, 0, 0, Math.PI * 2);
+    ctx.ellipse(p.x, p.y + 0.5, wx * 0.22, wy * 0.22, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(80,80,90,.5)';
-    ctx.lineWidth = 0.6;
+    // Основной круг — чугун
+    ctx.fillStyle = '#3a3a42';
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, wx * 0.20, wy * 0.20, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Крестообразная решётка
+    ctx.strokeStyle = 'rgba(15,15,20,.85)';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(p.x - wx * 0.16, p.y); ctx.lineTo(p.x + wx * 0.16, p.y);
+    ctx.moveTo(p.x, p.y - wy * 0.16); ctx.lineTo(p.x, p.y + wy * 0.16);
     ctx.stroke();
+    // Обод
+    ctx.strokeStyle = 'rgba(120,120,130,.6)';
+    ctx.lineWidth = 0.7;
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, wx * 0.20, wy * 0.20, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  // 2) Такой же люк на горизонтальной дороге — центр полосы, раз в 5 тайлов
+  if (onRoadR && !onRoadC && (r % BLOCK === 1) && (c % 5 === 2)) {
+    ctx.fillStyle = 'rgba(0,0,0,.35)';
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y + 0.5, wx * 0.22, wy * 0.22, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#3a3a42';
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, wx * 0.20, wy * 0.20, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Концентрические кольца
+    ctx.strokeStyle = 'rgba(15,15,20,.7)';
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, wx * 0.13, wy * 0.13, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, wx * 0.07, wy * 0.07, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    // Обод
+    ctx.strokeStyle = 'rgba(140,140,150,.6)';
+    ctx.lineWidth = 0.7;
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, wx * 0.20, wy * 0.20, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  // 3) Ливнёвка — прямоугольная решётка у бордюра (на крайней полосе)
+  // Случайно ~6% таких тайлов
+  const isCurbR = onRoadR && (r % BLOCK === 0 || r % BLOCK === 3);
+  const isCurbC = onRoadC && (c % BLOCK === 0 || c % BLOCK === 3);
+  if ((isCurbR || isCurbC) && lukHash < 6 && !(onRoadR && onRoadC)) {
+    // Тёмная подложка
+    ctx.fillStyle = 'rgba(0,0,0,.50)';
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y + 0.5, wx * 0.32, wy * 0.16, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Чугунная пластина
+    ctx.fillStyle = '#2a2a30';
+    ctx.fillRect(p.x - wx * 0.30, p.y - wy * 0.14, wx * 0.60, wy * 0.28);
+    // Параллельные щели (5 шт)
+    ctx.fillStyle = 'rgba(0,0,0,.85)';
+    for (let i = -2; i <= 2; i++) {
+      ctx.fillRect(p.x - wx * 0.26, p.y + i * wy * 0.05 - 0.3, wx * 0.52, 0.7);
+    }
+    // Светлый край сверху
+    ctx.fillStyle = 'rgba(160,160,170,.55)';
+    ctx.fillRect(p.x - wx * 0.30, p.y - wy * 0.14, wx * 0.60, 0.6);
+  }
+  // 4) Случайная крышка телекома (квадратная плоская) — раз в ~30 тайлов
+  if (isRoad && lukHash >= 88 && lukHash < 92 && !(onRoadR && onRoadC)) {
+    ctx.fillStyle = '#404048';
+    ctx.fillRect(p.x - wx * 0.18, p.y - wy * 0.18, wx * 0.36, wy * 0.36);
+    ctx.strokeStyle = 'rgba(20,20,25,.7)';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(p.x - wx * 0.18, p.y - wy * 0.18, wx * 0.36, wy * 0.36);
+    // Болтики по углам
+    ctx.fillStyle = '#1a1a20';
+    ctx.fillRect(p.x - wx * 0.15, p.y - wy * 0.15, 1, 1);
+    ctx.fillRect(p.x + wx * 0.13, p.y - wy * 0.15, 1, 1);
+    ctx.fillRect(p.x - wx * 0.15, p.y + wy * 0.13, 1, 1);
+    ctx.fillRect(p.x + wx * 0.13, p.y + wy * 0.13, 1, 1);
   }
   // ── Зебры (пешеходные переходы) на выходах перекрёстков ──────────
   // В изо-проекции ось c = (+wx,+wy), ось r = (-wx,+wy). Полоски лежат
@@ -6442,6 +6624,55 @@ function drawTrafficLight(r, c) {
 // ── NPC прохожий (упрощённый человечек) ──────────────────────────
 function drawNpc(npc) {
   const p = w2s(npc.r, npc.c);
+  // ── ТРУП: лежит тот же спрайт что и при жизни (тот же скин/одежда),
+  // ниже него — лужа крови, вокруг — брызги.
+  if (npc.dead) {
+    const tt = (performance.now() - npc.deathT) / 1000;
+    // 1) Лужа крови — растёт первые 1.5 сек, потом стабильна
+    const grow = Math.min(1, tt / 1.5);
+    const pr   = TS * 0.55 * (0.35 + grow * 0.65);
+    ctx.fillStyle = 'rgba(140,8,12,.55)';
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y + 4, pr, pr * 0.42, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(80,4,8,.92)';
+    ctx.beginPath();
+    ctx.ellipse(p.x - 2, p.y + 4, pr * 0.62, pr * 0.28, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,180,180,.30)';
+    ctx.beginPath();
+    ctx.ellipse(p.x + pr * 0.15, p.y + 2, pr * 0.18, pr * 0.07, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // 2) Брызги вокруг (под телом)
+    const seed = npc.bloodSeed || 1;
+    for (let k = 0; k < 9; k++) {
+      const a = ((k * 137 + seed * 13) % 360) * Math.PI / 180;
+      const dist = TS * (0.45 + ((seed + k) % 7) * 0.05);
+      const sx = p.x + Math.cos(a) * dist;
+      const sy = p.y + 4 + Math.sin(a) * dist * 0.55;
+      ctx.fillStyle = 'rgba(140,8,12,.7)';
+      ctx.beginPath();
+      ctx.arc(sx, sy, 1.4 + ((seed * (k + 1)) % 3) * 0.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // 3) Тело — тот же спрайт что при жизни, повёрнут на бок (лежит).
+    // Угол падения — лицом к стрелку.
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate((npc.deathAng || 0) + Math.PI / 2);
+    drawPerson(0, 0, 0, npc.look, 0, null, null, false, null, null, true);
+    ctx.restore();
+    // 4) Чёрная иконка ☠ над трупом
+    if (tt < 4) {
+      const fade = Math.max(0, 1 - tt / 4);
+      ctx.fillStyle = `rgba(20,20,25,${0.85 * fade})`;
+      ctx.font = '14px system-ui, "Segoe UI Emoji", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('☠', p.x, p.y - 18);
+      ctx.textAlign = 'left';
+    }
+    return;
+  }
   drawPerson(p.x, p.y, npc.ang, npc.look, npc.walkPhase, null, null, false, null, null, false);
   // Крик «ПОМОГИТЕ!» когда NPC в панике (panicUntil > now). Чат-баббл
   // подпрыгивает с лёгкой анимацией. cryUntil — отдельно, чтобы крик
@@ -6449,25 +6680,31 @@ function drawNpc(npc) {
   const now = performance.now();
   if (npc.cryUntil && now < npc.cryUntil) {
     const txt = npc.cryText || 'А-А-А!';
-    const bob = Math.sin(now * 0.02) * 1.5;
+    const isPanic = !!npc.cryPanic;
+    const bob = isPanic ? Math.sin(now * 0.02) * 1.5 : Math.sin(now * 0.006) * 0.6;
     const ty  = p.y - 44 + bob;
     ctx.save();
-    ctx.font = 'bold 11px system-ui, "Segoe UI Emoji", sans-serif';
+    // Idle-болтовня — нейтральный серый. Panic — красный, тревожный.
+    const bg     = isPanic ? 'rgba(180,30,30,.95)'  : 'rgba(50,55,65,.92)';
+    const border = isPanic ? '#ffe'                 : '#9aa3b0';
+    const fg     = isPanic ? '#ffffff'              : '#e6ebf0';
+    const fontW  = isPanic ? 'bold'                 : 'normal';
+    ctx.font = fontW + ' 11px system-ui, "Segoe UI Emoji", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const w = ctx.measureText(txt).width + 12;
     const h = 16;
     // Плашка
-    ctx.fillStyle = 'rgba(180,30,30,.95)';
-    ctx.strokeStyle = '#ffe;';
-    ctx.lineWidth = 1.2;
+    ctx.fillStyle = bg;
+    ctx.strokeStyle = border;
+    ctx.lineWidth = 1.0;
     roundRect(p.x - w/2, ty - h/2, w, h, 4);
-    ctx.fill();
+    ctx.fill(); ctx.stroke();
     // Текст
-    ctx.fillStyle = '#fff';
+    ctx.fillStyle = fg;
     ctx.fillText(txt, p.x, ty + 1);
     // Хвостик «ниточка» от рта
-    ctx.fillStyle = 'rgba(180,30,30,.95)';
+    ctx.fillStyle = bg;
     ctx.beginPath();
     ctx.moveTo(p.x - 3, ty + h/2 - 1);
     ctx.lineTo(p.x + 3, ty + h/2 - 1);
