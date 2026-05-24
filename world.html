@@ -8934,6 +8934,277 @@ function drawBizDeco(p, wx, wy, H, v, r, c, t) {
   }
 }
 
+// ── Большой контейнеровоз — бизнес «Доля в порту». Стоит на воде
+// у пляжа, длиной ~12 тайлов. На палубе — стопки разноцветных
+// контейнеров, кран, рубка с трубой и дымком. Подпись над кораблём.
+function drawShipBusiness(biz) {
+  const cr = biz.r, cc = biz.c;
+  const wx = TS * 0.5, wy = TS * 0.5 * ISO_Y;
+  const t = performance.now() / 1000;
+  // Лёгкое покачивание на волнах
+  const sway = Math.sin(t * 0.6) * 1.5;
+  // Корабль вытянут вдоль оси c (восток-запад), длина 12 тайлов, ширина 3
+  const len = 12, wid = 3;
+  // 4 угла корпуса (в мировых тайлах), порядок по часовой
+  const corners = [
+    [cr - wid * 0.5, cc - len * 0.5],   // NW
+    [cr - wid * 0.5, cc + len * 0.5],   // NE
+    [cr + wid * 0.5, cc + len * 0.5],   // SE
+    [cr + wid * 0.5, cc - len * 0.5],   // SW
+  ].map(([rr, ccc]) => {
+    const pt = w2s(rr, ccc);
+    pt.y += sway;
+    return pt;
+  });
+  // Тень — широкий тёмный овал под кораблём
+  ctx.fillStyle = 'rgba(0,0,0,.50)';
+  ctx.beginPath();
+  const cen = w2s(cr, cc); cen.y += sway + 4;
+  ctx.ellipse(cen.x, cen.y, wx * 6, wy * 2.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // ── Корпус: 3D объём, как у здания. Верхняя «палуба» + борта
+  const HULL_H = isoH(0.85);
+  // Левый борт (north-side в нашей карте)
+  ctx.fillStyle = '#3a3838';
+  ctx.beginPath();
+  ctx.moveTo(corners[0].x, corners[0].y);
+  ctx.lineTo(corners[1].x, corners[1].y);
+  ctx.lineTo(corners[1].x, corners[1].y - HULL_H);
+  ctx.lineTo(corners[0].x, corners[0].y - HULL_H);
+  ctx.closePath(); ctx.fill();
+  // Правый борт (south-side)
+  ctx.fillStyle = '#2a2828';
+  ctx.beginPath();
+  ctx.moveTo(corners[1].x, corners[1].y);
+  ctx.lineTo(corners[2].x, corners[2].y);
+  ctx.lineTo(corners[2].x, corners[2].y - HULL_H);
+  ctx.lineTo(corners[1].x, corners[1].y - HULL_H);
+  ctx.closePath(); ctx.fill();
+  // Палуба (верх)
+  ctx.fillStyle = '#5a5852';
+  ctx.beginPath();
+  ctx.moveTo(corners[0].x, corners[0].y - HULL_H);
+  ctx.lineTo(corners[1].x, corners[1].y - HULL_H);
+  ctx.lineTo(corners[2].x, corners[2].y - HULL_H);
+  ctx.lineTo(corners[3].x, corners[3].y - HULL_H);
+  ctx.closePath(); ctx.fill();
+  // Бортовая полоса (красная ватерлиния)
+  ctx.strokeStyle = '#a02020';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(corners[0].x, corners[0].y - 1);
+  ctx.lineTo(corners[1].x, corners[1].y - 1);
+  ctx.lineTo(corners[2].x, corners[2].y - 1);
+  ctx.stroke();
+  // Заклёпки/иллюминаторы на борту
+  ctx.fillStyle = '#1a1818';
+  for (let i = 0; i < 8; i++) {
+    const k = (i + 0.5) / 8;
+    const px = corners[0].x + (corners[1].x - corners[0].x) * k;
+    const py = corners[0].y + (corners[1].y - corners[0].y) * k - HULL_H * 0.4;
+    ctx.fillRect(px - 1, py, 2, 2);
+  }
+
+  // ── КОНТЕЙНЕРЫ на палубе — 3 ряда × 4 столбца, разноцветные
+  const containerColors = ['#c83030','#3068c8','#e0a030','#3aa050',
+                            '#a040c0','#208090','#a06030','#5a5a5a'];
+  for (let row = 0; row < 2; row++) {
+    for (let col = 0; col < 5; col++) {
+      const offC = (col - 2) * 2.2;
+      const offR = (row - 0.5) * 0.9;
+      const cx = cc + offC, cy = cr + offR;
+      const cp = w2s(cy, cx); cp.y += sway;
+      const cH = isoH(0.55);
+      // Тип цвета — детерминированный
+      const idx = (col * 3 + row * 7 + Math.floor(cc * 11)) % containerColors.length;
+      const col1 = containerColors[idx];
+      const col2 = containerColors[(idx + 3) % containerColors.length];
+      // Цветной контейнер — 1×1 тайл, высота 0.55
+      const c_wx = wx * 0.85, c_wy = wy * 0.85;
+      // Левый борт
+      ctx.fillStyle = col2;
+      ctx.beginPath();
+      ctx.moveTo(cp.x - c_wx, cp.y - HULL_H);
+      ctx.lineTo(cp.x,        cp.y - HULL_H + c_wy);
+      ctx.lineTo(cp.x,        cp.y - HULL_H + c_wy - cH);
+      ctx.lineTo(cp.x - c_wx, cp.y - HULL_H - cH);
+      ctx.closePath(); ctx.fill();
+      // Правый борт
+      ctx.fillStyle = col1;
+      ctx.beginPath();
+      ctx.moveTo(cp.x,        cp.y - HULL_H + c_wy);
+      ctx.lineTo(cp.x + c_wx, cp.y - HULL_H);
+      ctx.lineTo(cp.x + c_wx, cp.y - HULL_H - cH);
+      ctx.lineTo(cp.x,        cp.y - HULL_H + c_wy - cH);
+      ctx.closePath(); ctx.fill();
+      // Крыша контейнера
+      ctx.fillStyle = col1;
+      ctx.beginPath();
+      ctx.moveTo(cp.x,         cp.y - HULL_H + c_wy - cH);
+      ctx.lineTo(cp.x + c_wx,  cp.y - HULL_H - cH);
+      ctx.lineTo(cp.x,         cp.y - HULL_H - c_wy - cH);
+      ctx.lineTo(cp.x - c_wx,  cp.y - HULL_H - cH);
+      ctx.closePath(); ctx.fill();
+      // Гофрированные полосы (вертикальные на правой грани)
+      ctx.strokeStyle = 'rgba(0,0,0,.35)';
+      ctx.lineWidth = 0.6;
+      for (let k = 1; k < 5; k++) {
+        const kk = k / 5;
+        ctx.beginPath();
+        ctx.moveTo(cp.x + c_wx * kk, cp.y - HULL_H + c_wy * (1 - kk));
+        ctx.lineTo(cp.x + c_wx * kk, cp.y - HULL_H + c_wy * (1 - kk) - cH);
+        ctx.stroke();
+      }
+    }
+  }
+
+  // ── РУБКА с трубой — на корме (запад от центра)
+  {
+    const wbR = cr - 0.4, wbC = cc + 4.5;   // блок надстройки
+    const wp = w2s(wbR, wbC); wp.y += sway;
+    const WH = isoH(1.4);
+    const wW = wx * 1.3, wH2 = wy * 1.3;
+    // Корпус надстройки
+    ctx.fillStyle = '#a0a0a0';
+    ctx.beginPath();
+    ctx.moveTo(wp.x - wW, wp.y - HULL_H);
+    ctx.lineTo(wp.x,      wp.y - HULL_H + wH2);
+    ctx.lineTo(wp.x,      wp.y - HULL_H + wH2 - WH);
+    ctx.lineTo(wp.x - wW, wp.y - HULL_H - WH);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#7a7a7a';
+    ctx.beginPath();
+    ctx.moveTo(wp.x,      wp.y - HULL_H + wH2);
+    ctx.lineTo(wp.x + wW, wp.y - HULL_H);
+    ctx.lineTo(wp.x + wW, wp.y - HULL_H - WH);
+    ctx.lineTo(wp.x,      wp.y - HULL_H + wH2 - WH);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#c0c0c0';
+    ctx.beginPath();
+    ctx.moveTo(wp.x,         wp.y - HULL_H + wH2 - WH);
+    ctx.lineTo(wp.x + wW,    wp.y - HULL_H - WH);
+    ctx.lineTo(wp.x,         wp.y - HULL_H - wH2 - WH);
+    ctx.lineTo(wp.x - wW,    wp.y - HULL_H - WH);
+    ctx.closePath(); ctx.fill();
+    // Окна мостика — светятся синим
+    ctx.fillStyle = 'rgba(120,200,255,.85)';
+    for (let i = 0; i < 4; i++) {
+      const kk = (i + 0.5) / 4;
+      const wxp = wp.x - wW + 2 * kk * wW;
+      const wyp = wp.y - HULL_H - WH * 0.45;
+      ctx.fillRect(wxp - 2, wyp, 4, 3);
+    }
+    // Труба (красная с белым кольцом)
+    const trX = wp.x + wW * 0.2, trY = wp.y - HULL_H - WH - 4;
+    ctx.fillStyle = '#a02020';
+    ctx.fillRect(trX - 3, trY - 12, 6, 14);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(trX - 3, trY - 8, 6, 2);
+    ctx.fillStyle = '#202020';
+    ctx.fillRect(trX - 3, trY - 13, 6, 1.5);
+    // Дымок — анимированные облачка
+    for (let i = 0; i < 3; i++) {
+      const ph = (t * 0.5 + i * 0.4) % 1;
+      ctx.fillStyle = `rgba(180,180,180,${(1 - ph) * 0.7})`;
+      ctx.beginPath();
+      ctx.arc(trX + Math.sin(ph * 4) * 3, trY - 18 - ph * 20,
+              3 + ph * 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // ── КРАН на носу (восток от центра)
+  {
+    const krC = cc - 4.5;
+    const kp = w2s(cr, krC); kp.y += sway;
+    // База крана
+    ctx.fillStyle = '#d8a020';
+    ctx.fillRect(kp.x - 3, kp.y - HULL_H - 3, 6, 4);
+    // Вертикальная мачта
+    ctx.strokeStyle = '#d8a020';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(kp.x, kp.y - HULL_H - 3);
+    ctx.lineTo(kp.x, kp.y - HULL_H - 24);
+    ctx.stroke();
+    // Стрела крана (наклонная)
+    ctx.beginPath();
+    ctx.moveTo(kp.x, kp.y - HULL_H - 24);
+    ctx.lineTo(kp.x + 22, kp.y - HULL_H - 18);
+    ctx.stroke();
+    // Решётка стрелы (3 поперечины)
+    ctx.lineWidth = 1;
+    for (let i = 1; i < 4; i++) {
+      const k = i / 4;
+      const xa = kp.x + 22 * k - 1;
+      const ya = kp.y - HULL_H - 24 + 6 * k;
+      ctx.beginPath();
+      ctx.moveTo(xa, ya); ctx.lineTo(xa + 2, ya + 2);
+      ctx.stroke();
+    }
+    // Трос с крюком
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 0.8;
+    const hookX = kp.x + 16, hookY = kp.y - HULL_H - 20 + Math.sin(t * 0.8) * 2;
+    ctx.beginPath();
+    ctx.moveTo(kp.x + 18, kp.y - HULL_H - 19); ctx.lineTo(hookX, hookY);
+    ctx.stroke();
+    // Крюк
+    ctx.fillStyle = '#666';
+    ctx.fillRect(hookX - 1.5, hookY, 3, 3);
+  }
+
+  // ── ВОЛНЫ у борта (пена)
+  for (let i = 0; i < 6; i++) {
+    const ph = (t * 0.6 + i * 0.4) % 1;
+    const wvX = cen.x + (i - 2.5) * wx * 1.5;
+    const wvY = cen.y + 3 + Math.sin(t * 2 + i) * 1.5;
+    ctx.fillStyle = `rgba(255,255,255,${(1 - ph) * 0.55})`;
+    ctx.beginPath();
+    ctx.ellipse(wvX, wvY, 6 + ph * 4, 1.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // ── ПОДПИСЬ над кораблём (как у других бизнесов)
+  {
+    const owned = MY_BIZ.has(biz.id);
+    const accent = owned ? '#7be58a' : '#40e0d0';
+    const topY = cen.y - HULL_H - 60;     // выше всего — над краном и трубой
+    // Ореол
+    const pulse = 0.5 + 0.5 * Math.sin(t * 1.4);
+    const grd = ctx.createRadialGradient(cen.x, topY - 4, 1, cen.x, topY - 4, 26);
+    grd.addColorStop(0, `rgba(64,224,208,${0.35 * pulse})`);
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(cen.x, topY - 4, 26, 0, Math.PI * 2);
+    ctx.fill();
+    // Плашка пошире, т.к. название длинное
+    const labelW = 110, labelH = 30;
+    const lx = cen.x - labelW / 2, ly = topY - labelH;
+    ctx.fillStyle = 'rgba(8,20,28,.94)';
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 1.6;
+    roundRect(lx, ly, labelW, labelH, 6);
+    ctx.fill(); ctx.stroke();
+    ctx.font = '18px system-ui, "Segoe UI Emoji", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = accent;
+    ctx.fillText(biz.emoji, lx + 6, ly + labelH / 2);
+    ctx.font = 'bold 10px system-ui, sans-serif';
+    ctx.fillStyle = owned ? '#c8ffd0' : '#aaffe0';
+    ctx.fillText(biz.name, lx + 30, ly + labelH / 2 - 6);
+    ctx.font = '8px system-ui, sans-serif';
+    ctx.fillStyle = owned ? '#80c890' : '#80c0b0';
+    const sub = owned
+      ? `${biz.daily_min}–${biz.daily_max}$/сут`
+      : `$${biz.price.toLocaleString('ru-RU')}`;
+    ctx.fillText(sub, lx + 30, ly + labelH / 2 + 6);
+    ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'left';
+  }
+}
+
 // ── Подпись бизнеса над зданием. Зелёная если можно купить, синяя
 // если уже твой (хозяин). Подходи близко → доступна покупка/сбор.
 function drawBizSign(r, c, biz) {
@@ -10524,6 +10795,13 @@ function render() {
       if (c % BLOCK !== 2) continue;
       items.push({ depth: r + c - 0.3, draw: () => drawTrafficLight(r, c) });
     }
+  }
+  // Спец-объекты — корабль «Доля в порту» на воде. Не привязан к тайлу
+  // здания (это вода), рендерим отдельно с правильным depth.
+  for (const biz of WORLD_BIZ) {
+    if (biz.id !== 'port') continue;
+    if (biz.r < r0 - 4 || biz.r >= r1 + 4 || biz.c < c0 - 8 || biz.c >= c1 + 8) continue;
+    items.push({ depth: biz.r + biz.c + 0.5, draw: () => drawShipBusiness(biz) });
   }
   // NPC прохожие
   for (const npc of NPCS) {
