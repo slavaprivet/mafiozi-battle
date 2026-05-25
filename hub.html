@@ -7322,7 +7322,11 @@ const _CLIENT_V = String(P.get('_v') || '');
 let _appVerLastCheck = 0;
 async function _appVersionCheck() {
   _appVerLastCheck = Date.now();
-  if (!coopApi()) await _coopFetchApiFallback();
+  // ВСЕГДА перетягиваем свежий URL из coop_api.json — DATA.api может
+  // указывать на мёртвый туннель от прошлого запуска бота, и тогда
+  // fetch на /app/version молча валится по таймауту, auto-update не
+  // срабатывает, юзер сидит на старом хабе пока вручную не обновит.
+  try { await _coopFetchApiFallback(); } catch(e) {}
   if (!coopApi()) return;
   try {
     const r = await _coopFetch(coopApi() + '/app/version', {}, 4000);
