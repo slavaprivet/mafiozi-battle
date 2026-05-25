@@ -1251,8 +1251,8 @@ let gangNests = [];
 // quest_car видна ВСЕМ онлайн-игрокам (соревнование «успей первым»).
 // Зона сдачи — прямоугольник в порту. Выход в зоне = автопродажа.
 // Координаты совпадают с серверными WorldSim.MICHAEL_X/Y, DROP_ZONE_*.
-const MICHAEL_POS = { r: 14, c: 58 };          // (y=14, x=58)
-const DROP_ZONE = { r0: 10, r1: 18, c0: 54, c1: 62 };
+const MICHAEL_POS = { r: 14, c: 56 };          // тротуар перед входом в порт
+const DROP_ZONE = { r0: 12, r1: 14, c0: 54, c1: 58 };  // узкая полоса 3×5
 // Snapshot quest_cars: {id, model, x, y, ang, vx, vy, owner_uid, driver_uid,
 //                       state, reward, tx, ty, tAng}
 const questCars = new Map();    // car_id → entry
@@ -7197,11 +7197,17 @@ const _MICHAEL_LOOK = { gender: 0, skin: 1, body: 2, face: 2, hair: 0, hat: 1 };
 function drawMichael() {
   const p = w2s(MICHAEL_POS.r + 0.5, MICHAEL_POS.c + 0.5);
   const t = performance.now() * 0.004;
-  // Подсветка — золотой круг под ногами
+  // Подсветка — золотой круг под ногами + ПОЛОСА «магии» вокруг (заметно
+  // издалека). Раньше игрок терялся среди серой плиточной площади порта.
   ctx.save();
-  ctx.fillStyle = 'rgba(255,215,107,.30)';
+  const haloR = 26 + Math.sin(t * 1.7) * 3;
+  ctx.fillStyle = 'rgba(255,215,107,.10)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y + 5, haloR, haloR * 0.45, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,215,107,.32)';
   ctx.shadowColor = '#ffd76b';
-  ctx.shadowBlur  = 14;
+  ctx.shadowBlur  = 16;
   ctx.beginPath();
   ctx.ellipse(p.x, p.y + 5, 18, 7, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -7209,14 +7215,27 @@ function drawMichael() {
   // Спрайт человечка
   const phase = (Math.sin(t) * 0.2);
   drawPerson(p.x, p.y, 0, _MICHAEL_LOOK, phase, 'Майкл', null, false, 1, 1, false);
-  // Иконка над головой — 💼 (бизнесмен)
+  // Иконка над головой — 💼 (бизнесмен) + табличка КУПЛЮ АВТО
   const bob = Math.sin(t * 1.6) * 2;
-  ctx.font = '18px system-ui, "Segoe UI Emoji", sans-serif';
+  ctx.font = '20px system-ui, "Segoe UI Emoji", sans-serif';
   ctx.textAlign = 'center';
   ctx.fillStyle = '#fff';
-  ctx.shadowColor = '#000'; ctx.shadowBlur = 4;
-  ctx.fillText('💼', p.x, p.y - 50 + bob);
+  ctx.shadowColor = '#000'; ctx.shadowBlur = 6;
+  ctx.fillText('💼', p.x, p.y - 56 + bob);
+  // Жёлтая «вывеска» КУПЛЮ АВТО над головой — самый сильный визуальный маркер
   ctx.shadowBlur = 0;
+  const labelY = p.y - 76 + bob;
+  const labelW = 78, labelH = 16;
+  ctx.fillStyle = '#1a1108';
+  ctx.fillRect(p.x - labelW / 2, labelY - labelH / 2, labelW, labelH);
+  ctx.strokeStyle = '#ffd76b';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(p.x - labelW / 2 + 0.5, labelY - labelH / 2 + 0.5, labelW - 1, labelH - 1);
+  ctx.font = 'bold 10px system-ui, sans-serif';
+  ctx.fillStyle = '#ffd76b';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('КУПЛЮ АВТО', p.x, labelY + 1);
+  ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'left';
 }
 
@@ -7224,41 +7243,44 @@ function drawMichael() {
 // Прямоугольник на пирсе порта. Полупрозрачная золотая штриховка +
 // рамка + иконка 💰 в центре. Внутри = автопродажа при выходе.
 function drawDropZone() {
-  // 4 угла зоны (в координатах тайл)
+  // 4 угла зоны (в координатах тайл). Зона узкая 3×5 — раньше была 8×8
+  // и закрашивала всю плиточную площадь порта («пляж»), теперь оставляет
+  // её видимой. Заливка ещё прозрачнее (×0.20 вместо ×0.45).
   const a = w2s(DROP_ZONE.r0, DROP_ZONE.c0);
   const b = w2s(DROP_ZONE.r0, DROP_ZONE.c1);
   const c = w2s(DROP_ZONE.r1, DROP_ZONE.c1);
   const d = w2s(DROP_ZONE.r1, DROP_ZONE.c0);
   const t = performance.now() * 0.001;
   const pulse = 0.32 + Math.sin(t * 1.8) * 0.10;
-  // Заливка пола (полупрозрачное золотое)
   ctx.save();
-  ctx.fillStyle = `rgba(255,215,107,${pulse * 0.45})`;
+  ctx.fillStyle = `rgba(255,215,107,${pulse * 0.20})`;
   ctx.beginPath();
   ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
   ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y);
   ctx.closePath();
   ctx.fill();
-  // Штриховка диагональными линиями (золото) — стилистика «парковка-сдача»
-  ctx.strokeStyle = `rgba(255,215,107,${pulse * 0.6})`;
+  // Рамка ярче чем заливка — чтобы границы было видно, но фон не пропал
+  ctx.strokeStyle = `rgba(255,215,107,${0.55 + pulse * 0.3})`;
   ctx.lineWidth = 2;
+  ctx.setLineDash([6, 4]);
   ctx.beginPath();
   ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y);
   ctx.lineTo(d.x, d.y); ctx.closePath();
   ctx.stroke();
+  ctx.setLineDash([]);
   ctx.restore();
   // Иконка $ в центре зоны (над тайлами)
   const mid = w2s((DROP_ZONE.r0 + DROP_ZONE.r1) / 2,
                   (DROP_ZONE.c0 + DROP_ZONE.c1) / 2);
   const bob = Math.sin(t * 2.5) * 3;
-  ctx.font = 'bold 28px system-ui, "Segoe UI Emoji", sans-serif';
+  ctx.font = 'bold 22px system-ui, "Segoe UI Emoji", sans-serif';
   ctx.textAlign = 'center';
   ctx.fillStyle = '#ffd76b';
   ctx.shadowColor = '#000'; ctx.shadowBlur = 8;
   ctx.fillText('💰', mid.x, mid.y + bob);
-  ctx.font = 'bold 11px system-ui, sans-serif';
+  ctx.font = 'bold 10px system-ui, sans-serif';
   ctx.fillStyle = '#ffe890';
-  ctx.fillText('СДАЧА УГНАННЫХ', mid.x, mid.y + 20);
+  ctx.fillText('СДАЧА', mid.x, mid.y + 14);
   ctx.shadowBlur = 0;
   ctx.textAlign = 'left';
 }
@@ -9445,6 +9467,41 @@ function drawPOIArrows(r0, r1, c0, c1) {
     if (NEAR_BOTTOM && NEAR_RIGHT && (W - ax) < SAFE_BR.w && (H - ay) < SAFE_BR.h) ay = H - SAFE_BR.h - PAD;
     _drawPOIArrow(ax, ay, ndx, ndy, poi);
   }
+  // Компас-стрелка к Майклу — если игрок далеко и у него есть активный
+  // контракт (или Майкл просто не на экране). Помогает найти перекупщика
+  // в порту, чтобы не блуждать. Стрелка ЗОЛОТАЯ с иконкой 💼.
+  const mVis = MICHAEL_POS.r >= r0 && MICHAEL_POS.r < r1 &&
+               MICHAEL_POS.c >= c0 && MICHAEL_POS.c < c1;
+  if (!mVis) {
+    const dr = MICHAEL_POS.r - player.r, dc = MICHAEL_POS.c - player.c;
+    const dist = Math.hypot(dr, dc);
+    // Показываем стрелку только если действительно есть смысл идти к Майклу:
+    // или активный контракт (надо сдать), или игрок не в машине (можно
+    // взять новый заказ). Если игрок просто едет мимо — не отвлекаем.
+    const shouldShow = (myGtaStatus && myGtaStatus.active) || (!myDrivingCarId && dist > 8);
+    if (shouldShow && dist > 8) {
+      const sp = w2s(MICHAEL_POS.r + 0.5, MICHAEL_POS.c + 0.5);
+      const dx = sp.x - cx, dy = sp.y - cy;
+      const len = Math.hypot(dx, dy) || 1;
+      const ndx = dx / len, ndy = dy / len;
+      const xMin = PAD, xMax = W - PAD, yMin = PAD, yMax = H - PAD;
+      let t = Infinity;
+      if (dx > 0) t = Math.min(t, (xMax - cx) / dx);
+      if (dx < 0) t = Math.min(t, (xMin - cx) / dx);
+      if (dy > 0) t = Math.min(t, (yMax - cy) / dy);
+      if (dy < 0) t = Math.min(t, (yMin - cy) / dy);
+      let ax = cx + t * dx, ay = cy + t * dy;
+      const NEAR_TOP    = ay < PAD + 20;
+      const NEAR_BOTTOM = ay > H - PAD - 20;
+      const NEAR_LEFT   = ax < PAD + 20;
+      const NEAR_RIGHT  = ax > W - PAD - 20;
+      if (NEAR_TOP && NEAR_LEFT  && ax < SAFE_TL.w && ay < SAFE_TL.h) ay = SAFE_TL.h + PAD;
+      if (NEAR_TOP && NEAR_RIGHT && (W - ax) < SAFE_TR.w && ay < SAFE_TR.h) ay = SAFE_TR.h + PAD;
+      if (NEAR_BOTTOM && NEAR_LEFT  && ax < SAFE_BL.w && (H - ay) < SAFE_BL.h) ay = H - SAFE_BL.h - PAD;
+      if (NEAR_BOTTOM && NEAR_RIGHT && (W - ax) < SAFE_BR.w && (H - ay) < SAFE_BR.h) ay = H - SAFE_BR.h - PAD;
+      _drawPOIArrow(ax, ay, ndx, ndy, { icon: '💼' });
+    }
+  }
 }
 
 // Рисует одну стрелку-«компас» в (ax, ay): кружок-фон, стрелка указывает
@@ -9634,6 +9691,25 @@ function drawMinimap() {
     ctx2.textBaseline = 'middle';
     ctx2.fillStyle = '#fff';
     ctx2.fillText('☠', x, y);
+  }
+  // Майкл-перекупщик на мини-карте — золотой 💼 у порта. Помогает игроку
+  // найти его (раньше Майкл «терялся» в углу порта рядом с захватываемым POI).
+  {
+    const mx = (MICHAEL_POS.c + 0.5) * sx;
+    const my = (MICHAEL_POS.r + 0.5) * sy;
+    const mp = 0.6 + Math.abs(Math.sin(performance.now() * 0.005)) * 0.4;
+    ctx2.fillStyle = `rgba(255,215,107,${mp})`;
+    ctx2.shadowColor = '#ffd76b';
+    ctx2.shadowBlur = 8;
+    ctx2.beginPath();
+    ctx2.arc(mx, my, 5, 0, Math.PI * 2);
+    ctx2.fill();
+    ctx2.shadowBlur = 0;
+    ctx2.font = 'bold 9px "Segoe UI Emoji", system-ui, sans-serif';
+    ctx2.textAlign = 'center';
+    ctx2.textBaseline = 'middle';
+    ctx2.fillStyle = '#000';
+    ctx2.fillText('💼', mx, my);
   }
   // Тюрьма (как POI 🚓) — серый домик в правом-нижнем углу карты
   const jailX = 56, jailY = 56, jailSize = 8;
