@@ -683,7 +683,9 @@ body.in-pvp #gtaActionBtn { top: 104px; }
              id="michaelQuestHint">Машина уже на карте — ищи стрелку 🎯</div>
       </div>
       <div class="btns">
-        <button class="btn primary" id="michaelTakeBtn">Взять заказ</button>
+        <button class="btn primary" id="michaelTakeBtn">Взять заказ (угон)</button>
+        <button class="btn primary" id="michaelBoxBtn"
+                style="background:#3a4a5e;border-color:#5a7a9e;color:#a8c8e8;">📦 Взять коробку</button>
         <button class="btn ghost"   id="michaelCloseBtn">Закрыть</button>
       </div>
     </div>
@@ -1163,22 +1165,33 @@ function generateBeachDecor() {
   for (const pc of PATH_COLS) {
     _beachDecor.push({ kind: 'plank_path', r0: 150, r1: 165, c: pc });
   }
-  // 2) Пальмы — детерминированно по пляжу (BEACH_R0..BEACH_R1).
-  //    Плотность ~18% но с зонами разрежения (избегаем дорожек и зонтиков).
-  const UMBRELLA_RC = new Set();
-  // (заранее зарезервируем, чтобы не сажать пальму под зонтиком)
+  // 2) Пальмы — детерминированно по пляжу. Плотность снижена с 18% до 7%
+  //    + минимальная дистанция между пальмами 2.5 тайла, чтобы не было
+  //    «леса» и куч. Также сторонимся центральной тропы и зонтиков.
+  const _palms = [];
+  const MIN_PALM_D2 = 2.5 * 2.5;
   for (let r = BEACH_R0 + 1; r < BEACH_R1 - 1; r++) {
     for (let c = 2; c < MAP_COLS - 2; c++) {
       if (PATH_COLS.some(pc => Math.abs(c - pc) <= 1)) continue;
       // Не на тропе игрока (центральная полоса c=38..46) — здесь ходят
       if (c >= 38 && c <= 46 && r >= BEACH_R1 - 3) continue;
+      // Не на асфальтовой дороге к Майклу (c=40..43, по всей длине пляжа)
+      if (c >= 39 && c <= 44) continue;
       const h = _bhash(r, c, 1);
-      if (h < 0.18) {
-        _beachDecor.push({ kind: 'palm',
-                           r: r + 0.5 + (_bhash(r,c,2) - 0.5) * 0.3,
-                           c: c + 0.5 + (_bhash(r,c,3) - 0.5) * 0.3,
-                           variant: Math.floor(_bhash(r,c,4) * 3) });
+      if (h >= 0.07) continue;
+      const pr = r + 0.5 + (_bhash(r,c,2) - 0.5) * 0.4;
+      const pc = c + 0.5 + (_bhash(r,c,3) - 0.5) * 0.4;
+      // Минимальная дистанция до уже расставленных пальм
+      let tooClose = false;
+      for (const p of _palms) {
+        const dr = p.r - pr, dc = p.c - pc;
+        if (dr*dr + dc*dc < MIN_PALM_D2) { tooClose = true; break; }
       }
+      if (tooClose) continue;
+      const palm = { kind: 'palm', r: pr, c: pc,
+                     variant: Math.floor(_bhash(r,c,4) * 3) };
+      _palms.push(palm);
+      _beachDecor.push(palm);
     }
   }
   // 3) Зонтики с шезлонгами — несколько групп по пляжу
@@ -1204,19 +1217,20 @@ function generateBeachDecor() {
   _beachDecor.push({ kind: 'lifeguard', r: 156, c: 26 });
   // 6) Тропический бар на пляже — деревянная будка с соломенной крышей
   _beachDecor.push({ kind: 'tiki_bar', r: 154, c: 56 });
-  // 7) Сёрфы прислонённые в песок группами
-  _beachDecor.push({ kind: 'surfboard', r: 152, c: 10, col: '#e74c3c', ang: -0.3 });
-  _beachDecor.push({ kind: 'surfboard', r: 152, c: 10.6, col: '#f1c40f', ang: -0.1 });
-  _beachDecor.push({ kind: 'surfboard', r: 152, c: 11.2, col: '#3498db', ang: 0.15 });
-  _beachDecor.push({ kind: 'surfboard', r: 153, c: 64, col: '#2ecc71', ang: 0.2 });
-  _beachDecor.push({ kind: 'surfboard', r: 153, c: 64.6, col: '#9b59b6', ang: 0.05 });
+  // 7) Сёрфы — по одному в разных точках пляжа (раньше стояли кучками
+  //    по 3 шт впритык на одной точке — выглядело как куча хлама).
+  _beachDecor.push({ kind: 'surfboard', r: 152, c: 8,  col: '#e74c3c', ang: -0.3 });
+  _beachDecor.push({ kind: 'surfboard', r: 156, c: 34, col: '#f1c40f', ang: -0.1 });
+  _beachDecor.push({ kind: 'surfboard', r: 153, c: 51, col: '#3498db', ang:  0.15 });
+  _beachDecor.push({ kind: 'surfboard', r: 162, c: 24, col: '#2ecc71', ang:  0.2 });
+  _beachDecor.push({ kind: 'surfboard', r: 159, c: 72, col: '#9b59b6', ang:  0.05 });
   // 8) Пляжные мячи (несколько, разных цветов)
   _beachDecor.push({ kind: 'ball', r: 159, c: 32, col1: '#e74c3c', col2: '#fff' });
   _beachDecor.push({ kind: 'ball', r: 156, c: 50, col1: '#3498db', col2: '#f1c40f' });
   // 9) Полотенца расстелены на песке
   for (const tw of [
     { r: 158, c: 19, col: '#e74c3c' },
-    { r: 161, c: 44, col: '#9b59b6' },
+    { r: 161, c: 46, col: '#9b59b6' },
     { r: 158, c: 67, col: '#1abc9c' },
   ]) _beachDecor.push({ kind: 'towel', r: tw.r, c: tw.c, col: tw.col });
   // 10) Песочные замки (детский антураж)
@@ -1251,6 +1265,32 @@ function generateBeachDecor() {
       }
     }
   }
+  // 13) Пляжная трава на границе с городом — мелкие пучки осоки,
+  //     визуально сглаживают резкий переход «асфальт→песок».
+  for (let r = BEACH_R0; r < BEACH_R0 + 3; r++) {
+    for (let c = 2; c < MAP_COLS - 2; c++) {
+      if (PATH_COLS.some(pc => Math.abs(c - pc) <= 1)) continue;
+      const h = _bhash(r, c, 11);
+      if (h < 0.18) {
+        _beachDecor.push({ kind: 'grass',
+                           r: r + 0.5 + (_bhash(r,c,12) - 0.5) * 0.6,
+                           c: c + 0.5 + (_bhash(r,c,13) - 0.5) * 0.6,
+                           variant: Math.floor(_bhash(r,c,14) * 3) });
+      }
+    }
+  }
+  // 14) Лужицы воды — на полпути между пирсом и водой, небольшие отражающие
+  //     пятна. Дают «после прилива» эффект.
+  for (const sp of [
+    { r: 163, c: 8  }, { r: 163, c: 22 }, { r: 162, c: 56 }, { r: 164, c: 74 },
+  ]) _beachDecor.push({ kind: 'puddle', r: sp.r, c: sp.c });
+  // 15) Плавающие в воде шарики/тюбинги у причала — оживляют береговую
+  //     линию недалеко от пирса (только визуально, не блокируют).
+  for (const sp of [
+    { r: 166, c: 18, col: '#e74c3c' },
+    { r: 167, c: 70, col: '#f1c40f' },
+    { r: 168, c: 50, col: '#2ecc71' },
+  ]) _beachDecor.push({ kind: 'float_ring', r: sp.r, c: sp.c, col: sp.col });
 }
 
 // ── POI районов ────────────────────────────────────────────────
@@ -1410,6 +1450,7 @@ function applyQuestCarsSnapshot(arr) {
       // Серверная позиция → tx/ty/tAng, плавная интерполяция в update()
       prev.tx = c.x; prev.ty = c.y; prev.tAng = c.ang;
       prev.driver_uid = c.driver_uid;
+      prev.passenger_uids = c.passenger_uids || [];
       prev.state      = c.state;
       prev.owner_uid  = c.owner_uid;
       prev.model      = c.model;
@@ -1427,6 +1468,7 @@ function applyQuestCarsSnapshot(arr) {
         vx: c.vx, vy: c.vy,
         owner_uid:  c.owner_uid,
         driver_uid: c.driver_uid,
+        passenger_uids: c.passenger_uids || [],
         state:      c.state,
         reward:     c.reward,
         hp:         c.hp,
@@ -1456,6 +1498,85 @@ function questCarAt(uid) {
 function inDropZone(r, c) {
   return r >= DROP_ZONE.r0 && r <= DROP_ZONE.r1 &&
          c >= DROP_ZONE.c0 && c <= DROP_ZONE.c1;
+}
+
+// ── Пляжники (мирные NPC в купальниках/плавках) ───────────────────
+// Серверная авторитативная позиция. Локально интерполируем как для
+// других игроков (tx/ty → x/y в update).
+const beachgoers = new Map();   // id → {x, y, tx, ty, ang, tAng, act, gender, outfit, skin, hair, walkPhase}
+function applyBeachgoersSnapshot(arr) {
+  const fresh = new Set();
+  for (const b of arr) {
+    fresh.add(b.id);
+    const prev = beachgoers.get(b.id);
+    if (prev) {
+      prev.tx = b.x; prev.ty = b.y; prev.tAng = b.ang;
+      prev.act = b.act;
+    } else {
+      beachgoers.set(b.id, {
+        id: b.id, x: b.x, y: b.y, tx: b.x, ty: b.y,
+        ang: b.ang, tAng: b.ang,
+        act: b.act,
+        gender: b.gender|0, outfit: b.outfit || '#e74c3c',
+        skin:   b.skin|0,   hair:   b.hair|0,
+        walkPhase: 0,
+      });
+    }
+  }
+  for (const id of Array.from(beachgoers.keys())) {
+    if (!fresh.has(id)) beachgoers.delete(id);
+  }
+}
+// ── Охрана Майкла (чёрные рубашки) ────────────────────────────────
+const michaelGuards = new Map();   // id → {x, y, tx, ty, ang, tAng, hp, max_hp, state, weapon, lastShotAt}
+function applyMichaelGuardsSnapshot(arr) {
+  const fresh = new Set();
+  for (const g of arr) {
+    fresh.add(g.id);
+    const prev = michaelGuards.get(g.id);
+    if (prev) {
+      prev.tx = g.x; prev.ty = g.y; prev.tAng = g.ang;
+      prev.hp = g.hp; prev.max_hp = g.max_hp;
+      prev.state = g.state; prev.weapon = g.weapon;
+    } else {
+      michaelGuards.set(g.id, {
+        id: g.id, x: g.x, y: g.y, tx: g.x, ty: g.y,
+        ang: g.ang, tAng: g.ang,
+        hp: g.hp, max_hp: g.max_hp,
+        state: g.state, weapon: g.weapon,
+        lastShotAt: 0,
+      });
+    }
+  }
+  for (const id of Array.from(michaelGuards.keys())) {
+    if (!fresh.has(id)) michaelGuards.delete(id);
+  }
+}
+function _interpMichaelGuards(dt) {
+  for (const g of michaelGuards.values()) {
+    g.x += (g.tx - g.x) * Math.min(1, dt * 8);
+    g.y += (g.ty - g.y) * Math.min(1, dt * 8);
+    let aD = g.tAng - g.ang;
+    while (aD >  Math.PI) aD -= Math.PI * 2;
+    while (aD < -Math.PI) aD += Math.PI * 2;
+    g.ang += aD * Math.min(1, dt * 8);
+  }
+}
+
+function _interpBeachgoers(dt) {
+  for (const b of beachgoers.values()) {
+    b.x += (b.tx - b.x) * Math.min(1, dt * 8);
+    b.y += (b.ty - b.y) * Math.min(1, dt * 8);
+    let aD = b.tAng - b.ang;
+    while (aD >  Math.PI) aD -= Math.PI * 2;
+    while (aD < -Math.PI) aD += Math.PI * 2;
+    b.ang += aD * Math.min(1, dt * 8);
+    // Фаза покачивания при ходьбе/беге для анимации ног-рук
+    const speed = Math.hypot(b.tx - b.x, b.ty - b.y);
+    if (b.act === 'walk' || b.act === 'flee' || speed > 0.05) {
+      b.walkPhase += dt * (b.act === 'flee' ? 14 : 7);
+    }
+  }
 }
 
 // Эхо: моё последнее предупреждение от банды — чтобы рисовать чат-баббл
@@ -2522,6 +2643,18 @@ function updateCars(dt) {
       const fresh = spawnCar(ni);
       if (fresh) Object.assign(car, fresh);
     }
+    // Машина выехала с асфальта (на пляж/в дом/в траву) — переспаун.
+    // Раньше машины уезжали по дороге на юг и упирались в песок, торча
+    // на пляже как памятник. Теперь как только под колёсами не «улица»
+    // — машина исчезает и появляется в новой точке города.
+    const cr = Math.floor(car.r), cc = Math.floor(car.c);
+    if (cr >= 0 && cr < MAP_ROWS && cc >= 0 && cc < MAP_COLS &&
+        MAP[cr][cc] !== 0) {
+      const ni = CARS.indexOf(car);
+      const fresh = spawnCar(ni);
+      if (fresh) Object.assign(car, fresh);
+      continue;
+    }
     // Повороты на перекрёстках ОТКЛЮЧЕНЫ — после поворота направо машина
     // попадает на встречную полосу и создаёт лоб-в-лоб пробку. Едем прямо
     // до края карты, потом ре-спаун.
@@ -2539,6 +2672,11 @@ const cam = {
   x: (SPAWN_C - SPAWN_R) * TS * 0.5,
   y: (SPAWN_C + SPAWN_R) * TS * 0.5 * ISO_Y,
 };
+// Плавный зум камеры. В городе — 1.0. В южной зоне (пляж/пирс/корабль)
+// нет высоких зданий, открытое пространство визуально «отдаляет» вид —
+// игрок становится мелким. Компенсируем масштабом 1.18, плавно лерпим
+// при переходе. Управляется в update(dt) → применяется в render().
+let viewZoom = 1.0;
 
 // Преобразование тайл→экран и обратно
 function w2s(r, c) {
@@ -3201,6 +3339,45 @@ function handleEventPacket(d) {
   } else if (kind === 'cop_leave') {
     // Патруль уехал — чат больше не нужен.
     if (d.cop_id) _copChats.delete(String(d.cop_id));
+  } else if (kind === 'mg_shot') {
+    // Охрана Майкла выстрелила в игрока. Трассер + вспышка дула.
+    {
+      const wp  = d.weapon || 'pistol_heavy';
+      const ang = Math.atan2(d.ty - d.sy, d.tx - d.sx);
+      const md  = (WEAPON_FX_CFG[resolveWeapon(wp)] || {}).muzzleD || 0.8;
+      const sR  = d.sy + Math.sin(ang) * md;
+      const sC  = d.sx + Math.cos(ang) * md;
+      spawnBullet(sR, sC, d.ty, d.tx, { hit: !d.miss, fromNpc: true, weapon: wp });
+      spawnMuzzle(sR, sC, ang, wp);
+      if (!d.miss) spawnImpact(d.ty, d.tx, wp);
+    }
+    if (d.guard_id) {
+      const g = michaelGuards.get(d.guard_id);
+      if (g) g.lastShotAt = performance.now();
+    }
+    if (!d.miss && String(d.target_uid) === String(QP.uid)) {
+      flashHitOverlay();
+      addShake(3);
+      if (d.killed) myDeathBy = 'Охрана Майкла';
+    }
+  } else if (kind === 'mg_hit') {
+    // Игрок попал в охранника — трассер от стрелка + кровь.
+    {
+      const wp  = d.weapon || (currentWeapon || 'pistol');
+      const ang = Math.atan2(d.ty - d.sy, d.tx - d.sx);
+      const md  = (WEAPON_FX_CFG[resolveWeapon(wp)] || {}).muzzleD || 0.8;
+      const sR  = d.sy + Math.sin(ang) * md;
+      const sC  = d.sx + Math.cos(ang) * md;
+      spawnBullet(sR, sC, d.ty, d.tx, { hit: true, fromPlayer: true, weapon: wp });
+      spawnMuzzle(sR, sC, ang, wp);
+      spawnImpact(d.ty, d.tx, wp);
+    }
+    if (d.killed && d.guard_id) {
+      // Локально удаляем из карты — следующий snap либо вернёт его респаун,
+      // либо подтвердит что мёртв. Без локальной правки рисуем мёртвого
+      // ещё 200 мс — выглядит как лаг.
+      michaelGuards.delete(d.guard_id);
+    }
   } else if (kind === 'cop_shot') {
     // Коп выстрелил в игрока — пуля из КОНЦА ствола (pistol_heavy/smg/rpg).
     // При miss=true tx/ty уже сдвинуты на сервере.
@@ -3387,6 +3564,48 @@ function handleEventPacket(d) {
     myGtaStatus.reset_in_s  = d.reset_in_s  | 0;
     myGtaStatus.active      = d.active || null;
     refreshMichaelMenu();
+  } else if (kind === 'box_status') {
+    myBoxStatus.count_today = d.count_today | 0;
+    myBoxStatus.limit       = d.limit       | 0;
+    myBoxStatus.reset_in_s  = d.reset_in_s  | 0;
+    myBoxStatus.active      = d.active || null;
+    refreshMichaelMenu();
+  } else if (kind === 'box_take_reply') {
+    if (d.ok) {
+      myBoxStatus.active = {
+        pickup_x: d.pickup_x, pickup_y: d.pickup_y,
+        dropoff_x: d.dropoff_x, dropoff_y: d.dropoff_y,
+        addr: d.addr, reward: d.reward, state: 'pending',
+      };
+      hideMichaelMenu();
+      showToast(`📦 Возьми ящик на пирсе → ${d.addr}. Награда: ${d.reward}$`, '💼', 4000);
+    } else if (d.reason === 'limit') {
+      const mins = Math.ceil((d.wait_s || 0) / 60);
+      showToast(`🚫 Сегодня уже ${d.limit || 5} доставок — приходи через ~${mins} мин`, '⏳', 4000);
+    } else if (d.reason === 'has_active') {
+      showToast('📦 У тебя уже есть активная доставка', '⚠️', 2500);
+    } else {
+      showToast('❌ Майкл не дал контракт. Попробуй позже.', '⚠️', 2500);
+    }
+  } else if (kind === 'box_pickup_reply') {
+    if (d.ok) {
+      if (myBoxStatus.active) myBoxStatus.active.state = 'carrying';
+      showToast('📦 Коробка у тебя — везти по адресу', '✅', 2500);
+    } else if (d.reason === 'too_far') {
+      showToast('🚫 Подойди ближе к пирсу', '⚠️', 1500);
+    }
+  } else if (kind === 'box_deliver_reply') {
+    if (d.ok) {
+      const r = d.reward | 0;
+      myBoxStatus.active = null;
+      showEventBanner('📦 Доставлено!',
+        `${d.addr} — получено +${r}$. Возвращайся к Майклу за новой работой.`,
+        4500, 'win');
+    } else if (d.reason === 'too_far') {
+      showToast('🚫 Не там, ищи правильный адрес', '⚠️', 1500);
+    } else if (d.reason === 'wrong_state') {
+      showToast('📦 Сначала возьми коробку в порту', '⚠️', 2500);
+    }
   } else if (kind === 'gta_drive_reject') {
     // Сервер отверг мой инпут (например, машина уже у другого водителя).
     if (myDrivingCarId === d.car_id) {
@@ -3929,6 +4148,12 @@ function wsConnect() {
         // ставим в tx/ty для плавной интерполяции (как для других игроков).
         applyQuestCarsSnapshot(d.quest_cars || []);
       }
+      if (d.beachgoers !== undefined) {
+        applyBeachgoersSnapshot(d.beachgoers || []);
+      }
+      if (d.michael_guards !== undefined) {
+        applyMichaelGuardsSnapshot(d.michael_guards || []);
+      }
       if (d.active_captures !== undefined) {
         // Перетираем карту целиком — сервер источник истины. Сохраняем
         // ЛОКАЛЬНЫЕ startedAt где они уже есть (плавнее анимация),
@@ -4041,13 +4266,17 @@ _zoneEl.addEventListener('click', () => {
 const _gtaBtn = document.getElementById('gtaActionBtn');
 let _gtaActionKind = null;   // 'michael' | 'enter' | 'exit'
 let _gtaActionCarId = null;
+let _gtaActionEnterAs = null;   // 'driver' | 'passenger'
+let myIsPassenger = false;      // если я сижу пассажиром — не управляю машиной
 const GTA_INTERACT_R = 1.8;  // тайлов — радиус подхода к Майклу/машине
 
 function updateGtaInteractions() {
   if (myDrivingCarId) {
     _gtaActionKind = 'exit';
     _gtaActionCarId = myDrivingCarId;
-    _gtaBtn.textContent = '🚪 Выйти из машины';
+    _gtaBtn.textContent = myIsPassenger
+      ? '🚪 Выйти (пассажир)'
+      : '🚪 Выйти из машины';
     _gtaBtn.style.display = 'block';
     return;
   }
@@ -4062,23 +4291,55 @@ function updateGtaInteractions() {
     _gtaBtn.style.display = 'block';
     return;
   }
-  // Машина — подходим к ЛЮБОЙ quest_car без водителя (можно угнать чужой
-  // контракт у соперника). Но deliver получит только owner.
+  // Box-доставка: pickup (взять коробку) или dropoff (сдать)
+  if (myBoxStatus.active) {
+    const bq = myBoxStatus.active;
+    if (bq.state === 'pending') {
+      const dx = bq.pickup_x - player.c, dy = bq.pickup_y - player.r;
+      if (Math.hypot(dx, dy) <= 2.5) {
+        _gtaActionKind = 'box_pickup';
+        _gtaActionCarId = null;
+        _gtaBtn.textContent = '📦 Взять коробку';
+        _gtaBtn.style.display = 'block';
+        return;
+      }
+    } else if (bq.state === 'carrying') {
+      const dx = bq.dropoff_x - player.c, dy = bq.dropoff_y - player.r;
+      if (Math.hypot(dx, dy) <= 3.0) {
+        _gtaActionKind = 'box_deliver';
+        _gtaActionCarId = null;
+        _gtaBtn.textContent = `📦 Сдать (${bq.reward}$)`;
+        _gtaBtn.style.display = 'block';
+        return;
+      }
+    }
+  }
+  // 1) Машина моего контракта — приоритет (сесть за руль)
   let nearestQc = null, nearestD = GTA_INTERACT_R;
+  let nearestKind = null;   // 'driver' | 'passenger'
   for (const qc of questCars.values()) {
-    if (qc.driver_uid) continue;       // занята
     const dr = qc.y - player.r, dc = qc.x - player.c;
     const d  = Math.hypot(dr, dc);
-    if (d < nearestD) { nearestD = d; nearestQc = qc; }
+    if (d > GTA_INTERACT_R) continue;
+    const isMine = String(qc.owner_uid) === String(QP.uid);
+    if (isMine && !qc.driver_uid) {
+      if (d < nearestD) { nearestD = d; nearestQc = qc; nearestKind = 'driver'; }
+    } else if (!isMine && qc.driver_uid && qc.driver_uid !== String(QP.uid)) {
+      // Чужая машина с водителем — можно сесть пассажиром, если есть место.
+      const plist = qc.passenger_uids || [];
+      if (plist.length < 1) {
+        if (d < nearestD) { nearestD = d; nearestQc = qc; nearestKind = 'passenger'; }
+      }
+    }
   }
   if (nearestQc) {
     const mdef = QUEST_CAR_MODELS[nearestQc.model] || { label: nearestQc.model };
-    const isMine = String(nearestQc.owner_uid) === String(QP.uid);
     _gtaActionKind = 'enter';
     _gtaActionCarId = nearestQc.id;
-    _gtaBtn.textContent = isMine
-      ? `🚗 Сесть в ${mdef.label}`
-      : `🚗 Угнать ${mdef.label}`;
+    _gtaActionEnterAs = nearestKind;
+    _gtaBtn.textContent = (nearestKind === 'passenger')
+      ? `🚗 Сесть пассажиром (${mdef.label})`
+      : `🚗 Сесть в ${mdef.label}`;
     _gtaBtn.style.display = 'block';
     return;
   }
@@ -4091,9 +4352,13 @@ _gtaBtn.addEventListener('click', () => {
   if (_gtaActionKind === 'michael') {
     openMichaelMenu();
   } else if (_gtaActionKind === 'enter') {
-    enterCar(_gtaActionCarId);
+    enterCar(_gtaActionCarId, _gtaActionEnterAs || 'driver');
   } else if (_gtaActionKind === 'exit') {
     exitCar('manual');
+  } else if (_gtaActionKind === 'box_pickup') {
+    try { ws && ws.send(JSON.stringify({ t: 'box_pickup', d: {} })); } catch(e){}
+  } else if (_gtaActionKind === 'box_deliver') {
+    try { ws && ws.send(JSON.stringify({ t: 'box_deliver', d: {} })); } catch(e){}
   }
 });
 
@@ -4113,6 +4378,7 @@ function openMichaelMenu() {
   _michaelModal.classList.add('show');
   // Запрашиваем актуальный статус с сервера (счётчик угонов + активный квест)
   try { ws && ws.send(JSON.stringify({ t: 'gta_status', d: {} })); } catch(e){}
+  try { ws && ws.send(JSON.stringify({ t: 'box_status', d: {} })); } catch(e){}
   refreshMichaelMenu();
   // Тикаем локальный таймер обратного отсчёта раз в секунду — чтобы
   // «До следующего заказа: 5ч 23м» уменьшался в реальном времени без
@@ -4137,6 +4403,14 @@ _michaelModal.addEventListener('click', (e) => {
 _michaelTakeBtn.addEventListener('click', () => {
   try { ws && ws.send(JSON.stringify({ t: 'gta_take', d: {} })); } catch(e){}
 });
+// Кнопка «📦 Взять коробку» — альтернативная работа от Майкла
+const _michaelBoxBtn = document.getElementById('michaelBoxBtn');
+_michaelBoxBtn.addEventListener('click', () => {
+  try { ws && ws.send(JSON.stringify({ t: 'box_take', d: {} })); } catch(e){}
+});
+// Состояние box-доставки (приходит от box_status / box_take_reply)
+let myBoxStatus = { count_today: 0, limit: 5, reset_in_s: 0, active: null };
+let _boxStatusReqAt = 0;
 // Рендерит карточку машины в маленький canvas — игрок видит ЧТО угонять.
 function renderQuestCarPreview(cv, modelId) {
   const m = QUEST_CAR_MODELS[modelId];
@@ -4230,12 +4504,26 @@ function refreshMichaelMenu() {
         `<br><br>До следующего заказа: <b style="color:#ffd76b">${timerTxt}</b>`;
     } else {
       _michaelTakeBtn.disabled    = false;
-      _michaelTakeBtn.textContent = 'Взять заказ';
+      _michaelTakeBtn.textContent = 'Взять заказ (угон)';
       _michaelTalk.innerHTML =
-        '<b>Эй, есть для тебя работка.</b> Скажу какую модель искать — ' +
-        'угоняешь, везёшь сюда на пирс, <b>в зону сдачи</b>, и получаешь налик. ' +
-        'Только не зевай — в сутки беру максимум ' + limit + ' тачки.';
+        '<b>Эй, есть для тебя работка.</b> Угон тачек или таскать ящики — ' +
+        'выбирай. По угону в сутки беру максимум ' + limit + ' тачки, ' +
+        'по коробкам — ' + (myBoxStatus.limit | 5) + ' ходок.';
     }
+  }
+  // Кнопка box-доставки
+  const bs = myBoxStatus;
+  if (bs.active) {
+    _michaelBoxBtn.disabled = true;
+    _michaelBoxBtn.textContent = (bs.active.state === 'pending')
+      ? '📦 Возьми ящик на пирсе'
+      : `📦 Везёшь: ${bs.active.addr || ''}`;
+  } else if ((bs.count_today | 0) >= (bs.limit | 5)) {
+    _michaelBoxBtn.disabled = true;
+    _michaelBoxBtn.textContent = '📦 Коробок на сегодня хватит';
+  } else {
+    _michaelBoxBtn.disabled = false;
+    _michaelBoxBtn.textContent = `📦 Взять коробку (${bs.count_today | 0}/${bs.limit | 5})`;
   }
 }
 
@@ -4244,19 +4532,34 @@ function refreshMichaelMenu() {
 // проверит что машина свободна; если нет — пришлёт gta_drive_reject
 // и мы сбросим myDrivingCarId.
 let _exitRequested = false;   // нажали «Выйти» на ходу — тормозим, потом выходим
-function enterCar(carId) {
+function enterCar(carId, asKind) {
   const qc = questCars.get(carId);
   if (!qc) return;
-  // Контракт персональный: тачку видят все, но угнать её может только
-  // тот, кто взял заказ у Майкла. Никакого «успей первым».
-  if (String(qc.owner_uid) !== String(QP.uid)) {
-    showToast('🚫 Это не твой контракт', '🤷', 2000);
+  const isMine = (String(qc.owner_uid) === String(QP.uid));
+  // Если я не владелец — пытаемся сесть пассажиром.
+  if (!isMine) {
+    if (!qc.driver_uid) {
+      showToast('🚫 Это не твой контракт', '🤷', 2000);
+      return;
+    }
+    if ((qc.passenger_uids || []).length >= 1) {
+      showToast('🚗 Пассажирское место занято', '🚫', 2000);
+      return;
+    }
+    // Серверу шлём явный gta_enter — он проверит дистанцию и место
+    try { ws && ws.send(JSON.stringify({ t: 'gta_enter', d: { car_id: carId } })); }
+    catch(e) {}
+    myDrivingCarId = carId;
+    myIsPassenger  = true;
+    _exitRequested = false;
+    showToast('🚗 Сел пассажиром', '✅', 1500);
     return;
   }
   if (qc.driver_uid && qc.driver_uid !== String(QP.uid)) {
     showToast('🚗 Уже за рулём другой игрок', '🚫', 2000);
     return;
   }
+  myIsPassenger = false;
   myDrivingCarId = carId;
   _exitRequested = false;
   // Телепортируем игрока на позицию машины (потом он движется ВМЕСТЕ с ней)
@@ -4268,6 +4571,15 @@ function enterCar(carId) {
 function exitCar(reason) {
   if (!myDrivingCarId) return;
   const qc = questCars.get(myDrivingCarId);
+  // Пассажир: можно выйти на ходу, без тормозов
+  if (myIsPassenger) {
+    const cid = myDrivingCarId;
+    try { ws && ws.send(JSON.stringify({ t: 'gta_exit', d: { car_id: cid } })); }
+    catch(e){}
+    myDrivingCarId = null;
+    myIsPassenger  = false;
+    return;
+  }
   // Если едем — сначала тормозим (флаг), реальный exit пошлём из update().
   if (qc && Math.hypot(qc.vx, qc.vy) > 0.3) {
     _exitRequested = true;
@@ -4694,11 +5006,24 @@ function fire(angle = null) {
       }
     }
   }
-  // 4) PvP-игрок (в активной зоне инкассатора или в арене)
-  const pvpTarget = (!chosenConvoy && !chosenCop && !chosenAggro) ? findPvpTargetAlongAim(dirX, dirY) : null;
+  // 4) Охранник Майкла — стрелять можно, но это разозлит охрану
+  let chosenMg = null;
+  if (!chosenConvoy && !chosenCop && !chosenAggro) {
+    for (const g of michaelGuards.values()) {
+      const dx = g.x - player.c, dy = g.y - player.r;
+      const d  = Math.hypot(dx, dy);
+      if (d > FIRE_R_CONVOY) continue;
+      const dn = d > 0.001 ? d : 1;
+      const dot = (dx * dirX + dy * dirY) / dn;
+      if (dot < 0.985) continue;
+      if (!chosenMg || d < chosenMg.d) chosenMg = { id: g.id, x: g.x, y: g.y, d };
+    }
+  }
+  // 5) PvP-игрок (в активной зоне инкассатора или в арене)
+  const pvpTarget = (!chosenConvoy && !chosenCop && !chosenAggro && !chosenMg) ? findPvpTargetAlongAim(dirX, dirY) : null;
   // Если цели нет — стреляем «в пустоту» с визуальным эффектом
   // (трассер летит вперёд + отдача + cd). Локально, серверу не шлём.
-  const noTarget = !chosenConvoy && !chosenCop && !chosenAggro && !pvpTarget;
+  const noTarget = !chosenConvoy && !chosenCop && !chosenAggro && !chosenMg && !pvpTarget;
   lastShotClientT = now;
   _fireBtn.classList.add('cd');
   joyREl.classList.add('cd');
@@ -4725,7 +5050,7 @@ function fire(angle = null) {
   const meInArena = inArena(player.r, player.c);
   // Внутри агрессивной зоны стрельба ВСЕГДА легальна — это PvP-район банды.
   const meInAggro = !!inAggroZone(player.r, player.c);
-  const lawful    = meInArena || meInAggro || pvpActive || chosenConvoy || chosenCop || chosenAggro;
+  const lawful    = meInArena || meInAggro || pvpActive || chosenConvoy || chosenCop || chosenAggro || chosenMg;
   if (!lawful) {
     // Проверка: летит ли пуля в мирного NPC прохожего (стрельба в людей)?
     // Если да — сервер даст СРАЗУ 2★ без предупреждения (бой). Прицеливаемся
@@ -4778,6 +5103,15 @@ function fire(angle = null) {
     try {
       ws && ws.send(JSON.stringify({ t: 'aggro_shoot',
         d: { target: chosenAggro.id, weapon: currentWeapon } }));
+    } catch(e) {}
+    return;
+  }
+  if (chosenMg) {
+    spawnBullet(sR, sC, chosenMg.y, chosenMg.x,
+      { hit: true, fromPlayer: true, weapon: currentWeapon });
+    try {
+      ws && ws.send(JSON.stringify({ t: 'mg_shoot',
+        d: { target: chosenMg.id, weapon: currentWeapon } }));
     } catch(e) {}
     return;
   }
@@ -5193,6 +5527,30 @@ function update(dt) {
     if (!qc) {
       // Машина пропала (сдана/удалена) — сброс
       myDrivingCarId = null;
+      myIsPassenger  = false;
+    } else if (myIsPassenger) {
+      // Я пассажир — не управляю. Просто следую за машиной (позиция
+      // приходит из снапшота через interp, а локально клампим player к ней).
+      player.r = qc.y; player.c = qc.x; player.ang = qc.ang;
+      const targetCamX = (player.c - player.r) * TS * 0.5;
+      const targetCamY = (player.c + player.r) * TS * 0.5 * ISO_Y;
+      cam.x += (targetCamX - cam.x) * Math.min(1, dt * 8);
+      cam.y += (targetCamY - cam.y) * Math.min(1, dt * 8);
+      // Если водитель вышел/пропал, или меня выкинули из пассажиров,
+      // освобождаем myDrivingCarId
+      if (!qc.driver_uid ||
+          !(qc.passenger_uids || []).map(String).includes(String(QP.uid))) {
+        myDrivingCarId = null;
+        myIsPassenger  = false;
+      }
+      updateGtaInteractions();
+      updateZoneBtn();
+      updatePvpUI();
+      updateGtaQuestHud();
+      _interpQuestCars(dt);
+      _interpBeachgoers(dt);
+      _interpMichaelGuards(dt);
+      return;
     } else {
       const CAR_MAX_SPEED   = 8.5;   // тайлов/сек (см. серверный кламп 9.0)
       const CAR_ACCEL       = 6.0;   // как быстро разгоняемся
@@ -5297,6 +5655,8 @@ function update(dt) {
       }
       // Интерполяция чужих quest_cars (которые ведут другие игроки)
       _interpQuestCars(dt);
+      _interpBeachgoers(dt);
+      _interpMichaelGuards(dt);
       return;
     }
   }
@@ -5324,6 +5684,10 @@ function update(dt) {
   const targetCamY = (player.c + player.r) * TS * 0.5 * ISO_Y;
   cam.x += (targetCamX - cam.x) * Math.min(1, dt * 8);
   cam.y += (targetCamY - cam.y) * Math.min(1, dt * 8);
+  // Зум: на пляже/в порту приближаем камеру (открытое пространство визуально
+  // «отдаляет» вид без высоких зданий, игрок казался мелким).
+  const _zTarget = (player.r >= 145) ? 1.20 : 1.0;
+  viewZoom += (_zTarget - viewZoom) * Math.min(1, dt * 3.5);
   // Поиск ближайшего POI: если игрок в радиусе ENTER_R тайлов от вывески,
   // показываем кнопку входа. Возвращение скрывает её, не дёргая DOM зря.
   updateZoneBtn();
@@ -5371,22 +5735,57 @@ function drawSouthTile(r, c, t, p, wx, wy) {
   const h2 = ((r * 257 + c * 379) >>> 0) % 100;
   const h3 = ((r * 419 + c * 569) >>> 0) % 100;
   let color;
-  if (t === 14) {
-    // Песок: 9 градаций + дюнный градиент по дальности от воды.
-    // Чем ближе к воде (r → BEACH_R1), тем темнее (влажный).
-    const dToWater = Math.max(0, BEACH_R1 - r);  // 0 у воды, ~15 у города
-    const wetK     = 1 - Math.min(1, dToWater / 4);  // 0..1, 1 у самой воды
-    if      (h1 < 6)  color = '#d8bc82';  // совсем сухой светлый
-    else if (h1 < 18) color = '#c9a868';
-    else if (h1 < 32) color = '#bf9858';
-    else if (h1 < 48) color = '#b89060';
-    else if (h1 < 62) color = '#b08550';
-    else if (h1 < 75) color = '#a87a44';
-    else if (h1 < 86) color = '#9a7038';
-    else if (h1 < 94) color = '#8c6230';
-    else              color = '#dec090';  // блик дюны
-    // Если близко к воде — затемняем (мокрый песок)
-    if (wetK > 0) color = _shade(color, -0.15 * wetK);
+  // Полоса асфальта от города к пирсу через пляж (c=40..43, r=140..164).
+  // Совпадает с городской вертикальной дорогой → игрок может проехать
+  // на машине от города прямо к Майклу. Тип тайла остаётся 14 (песок,
+  // проходимый), но рендерим как асфальт.
+  const onRoadToMichael = (t === 14 && c >= 40 && c <= 43);
+  let isRoadTile = false;
+  if (onRoadToMichael) {
+    isRoadTile = true;
+    t = 14; // сохраняем песок-проходимость, но рендер ниже — асфальт
+  }
+  if (t === 14 && !isRoadTile) {
+    // Песок: тёплая золотисто-карамельная палитра. 5 близких тонов
+    //    + блики дюн. Чем ближе к воде — тем темнее (мокрый песок).
+    const dToWater = Math.max(0, BEACH_R1 - r);   // 0 у воды, ~15 у города
+    const wetK     = 1 - Math.min(1, dToWater / 5);  // 0..1, 1 у самой воды
+    // Градиент сухой→тёплый по дальности от воды (дальше = светлее)
+    const dryK = Math.min(1, dToWater / 12);      // 0..1, 1 у города
+    // У границы с городом (r=140..149) — переходная зона: серо-бетонные
+    // фрагменты на песке, как будто асфальт постепенно растворяется.
+    const cityTransK = (r < 150)
+      ? Math.max(0, (150 - r) / 10)             // 0..1, 1 у города
+      : 0;
+    if      (h1 < 18) color = '#e6c890';   // светлый тёплый
+    else if (h1 < 42) color = '#d8b478';
+    else if (h1 < 66) color = '#caa468';
+    else if (h1 < 86) color = '#b8945c';
+    else if (h1 < 95) color = '#a8844c';   // тёмные крупицы
+    else              color = '#f2dca5';   // блик дюны (солнце)
+    // В буферной зоне у города — часть тайлов становятся «бетонными»
+    // (как будто остатки разрушенного асфальта на песке). Чем ближе
+    // к r=140, тем больше доля серых тайлов.
+    if (cityTransK > 0 && h2 < cityTransK * 60) {
+      color = (h1 < 50) ? '#4a4a4a' : '#5a5a58';
+    }
+    // Сухой песок чуть светлее, мокрый — заметно темнее и с зеленцой
+    if (dryK > 0) color = _shade(color, 0.04 * dryK);
+    if (wetK > 0) color = _shade(color, -0.22 * wetK);
+  } else if (isRoadTile) {
+    // Асфальтовая дорога к Майклу. Чем ближе к пирсу — тем больше
+    // песка занесло на асфальт (по краям дороги).
+    const sandIngress = Math.max(0, (r - 145) / 20);  // 0 у города, 1 у пирса
+    color = '#36363a';
+    // Текстура дорожного покрытия
+    if      (h1 < 22) color = '#3c3c40';
+    else if (h1 > 88) color = '#2c2c30';
+    // Песок на обочине (c=40 и c=43 края, ближе к пирсу песка больше)
+    const edgeK = (c === 40 || c === 43) ? 1 : (c === 41 || c === 42 ? 0.35 : 0);
+    const sandMix = sandIngress * edgeK;
+    if (sandMix > 0 && h2 < sandMix * 70) {
+      color = (h1 < 50) ? '#b8945c' : '#caa468';
+    }
   } else if (t === 15) {
     // Деревянный причал — доски с тёмными швами вдоль рядов (по r).
     const plank = ((r * 1009) >>> 0) % 4;
@@ -5397,16 +5796,16 @@ function drawSouthTile(r, c, t, p, wx, wy) {
     // Вода: динамические волны с градиентом «глубже = темнее».
     // Чем дальше от берега (r → MAP_ROWS), тем темнее. Также 2 слоя волн
     // (короткая рябь + длинные волны) дают живую анимацию.
-    const tm = performance.now() * 0.0008;
+    const _tmW = performance.now() * 0.0008;
     const depth = Math.min(1, (r - PIER_R0) / 25);          // 0 у берега, 1 далеко
-    const wave1 = Math.sin((r * 0.7  + c * 0.5)  + tm * 2.0) * 0.5 + 0.5;  // длинная
-    const wave2 = Math.sin((r * 2.1  + c * 1.7)  + tm * 3.5) * 0.5 + 0.5;  // мелкая рябь
+    const wave1 = Math.sin((r * 0.7  + c * 0.5)  + _tmW * 2.0) * 0.5 + 0.5;  // длинная
+    const wave2 = Math.sin((r * 2.1  + c * 1.7)  + _tmW * 3.5) * 0.5 + 0.5;  // мелкая рябь
     // Базовая палитра — три тона по h1
     let base;
     if      (h1 < 25) base = '#143040';
     else if (h1 < 60) base = '#1a3a50';
     else              base = '#1f445e';
-    color = _shade(base, -0.18 * depth);
+    color = _shade(base, -0.22 * depth);
     // Гребни длинной волны — голубоватые
     if (wave1 > 0.82) color = _shade(color, 0.30);
     // Мелкая рябь — лёгкие светлые точки сверху
@@ -5425,7 +5824,25 @@ function drawSouthTile(r, c, t, p, wx, wy) {
   ctx.lineTo(p.x - wx, p.y);
   ctx.closePath();
   ctx.fill();
-  if (t === 15 || t === 17) {
+  if (isRoadTile) {
+    // Дорожная разметка: пунктир по центру (между c=41 и c=42),
+    // короткие белые штрихи через каждый 2-й ряд.
+    if ((c === 41 || c === 42) && (r % 2 === 0)) {
+      const edgeOff = (c === 41) ? wx * 0.20 : -wx * 0.20;
+      ctx.fillStyle = 'rgba(245,235,170,.85)';
+      ctx.fillRect(p.x + edgeOff - 1, p.y - 2, 2, 4);
+    }
+    // Тёмные швы по краям дороги (там где переход в песок/тротуар)
+    if (c === 40 || c === 43) {
+      ctx.strokeStyle = 'rgba(0,0,0,.25)';
+      ctx.lineWidth = 0.8;
+      const sx2 = (c === 40) ? -wx : wx;
+      ctx.beginPath();
+      ctx.moveTo(p.x,        p.y - wy);
+      ctx.lineTo(p.x + sx2,  p.y);
+      ctx.stroke();
+    }
+  } else if (t === 15 || t === 17) {
     // Контур доски
     ctx.strokeStyle = 'rgba(0,0,0,.28)';
     ctx.lineWidth = 1;
@@ -5476,26 +5893,63 @@ function drawSouthTile(r, c, t, p, wx, wy) {
       }
     }
   } else if (t === 16) {
-    // Барашек на гребне волны
-    if (h2 < 18) {
-      const tm = performance.now() * 0.0012;
-      const ph = Math.sin((r * 1.1 + c * 0.7) + tm * 3);
-      if (ph > 0.85) {
-        ctx.fillStyle = 'rgba(255,255,255,.55)';
-        ctx.fillRect(p.x - 5, p.y - 1, 10, 1.5);
+    const tm = performance.now() * 0.001;
+    // 1) Длинная пенная волна — выраженный белый изогнутый «барашек»
+    //    идущий по диагонали. Чаще, более крупный, с тенью под собой.
+    const longW = Math.sin((r * 0.6 + c * 0.45) + tm * 1.8);
+    if (longW > 0.55) {
+      const k = (longW - 0.55) / 0.45;          // 0..1 — насыщенность пены
+      ctx.strokeStyle = `rgba(240,250,255,${0.35 + 0.45 * k})`;
+      ctx.lineWidth = 1.4 + k * 1.2;
+      ctx.beginPath();
+      ctx.moveTo(p.x - wx * 0.7, p.y + 1);
+      ctx.quadraticCurveTo(p.x, p.y - 2 - k * 2, p.x + wx * 0.7, p.y + 1);
+      ctx.stroke();
+      // Тёмная ложбина-тень под гребнем
+      ctx.strokeStyle = `rgba(8,18,28,${0.18 + 0.18 * k})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(p.x - wx * 0.6, p.y + 3);
+      ctx.quadraticCurveTo(p.x, p.y + 1, p.x + wx * 0.6, p.y + 3);
+      ctx.stroke();
+    }
+    // 2) Мелкая искрящаяся рябь — короткие штрихи. Плотнее раньше.
+    const ripple = Math.sin((r * 2.3 + c * 1.9) + tm * 3.2);
+    if (ripple > 0.78) {
+      ctx.strokeStyle = 'rgba(220,235,250,.50)';
+      ctx.lineWidth = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(p.x - 6, p.y);
+      ctx.lineTo(p.x - 2, p.y);
+      ctx.moveTo(p.x + 3, p.y + 1);
+      ctx.lineTo(p.x + 7, p.y + 1);
+      ctx.stroke();
+    }
+    // 3) Точечные блики солнца — крупнее, золотистые
+    const sparkle = Math.sin((r * 3.1 + c * 2.7) + tm * 4);
+    if (sparkle > 0.90) {
+      ctx.fillStyle = 'rgba(255,240,200,.65)';
+      ctx.fillRect(p.x - 1, p.y - 1, 2.5, 2.5);
+    }
+    // 4) Прибой у берега — толстая ДВИЖУЩАЯСЯ пенная полоса
+    //    на 2-х первых рядах воды (r=PIER_R0, PIER_R0+1).
+    if (r <= PIER_R0 + 1) {
+      const rowK = (r === PIER_R0) ? 1.0 : 0.55;
+      // Накат: ширина пены модулируется sin по c и времени
+      const surf = Math.sin(c * 0.5 + tm * 2.2) * 0.5 + 0.5;
+      const len  = (wx * 2 - 8) * (0.6 + 0.4 * surf);
+      ctx.fillStyle = `rgba(255,255,255,${0.40 * rowK + 0.35 * surf * rowK})`;
+      ctx.fillRect(p.x - len / 2, p.y - 1, len, 2.5 + rowK);
+      // Лёгкие пенные брызги вверху накатной кромки
+      if (rowK === 1.0 && surf > 0.7) {
+        ctx.fillStyle = 'rgba(255,255,255,.6)';
+        for (let i = 0; i < 3; i++) {
+          const sx2 = p.x - 8 + i * 8 + (h1 % 5 - 2);
+          ctx.beginPath();
+          ctx.arc(sx2, p.y - 3, 1, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
-    }
-    // Лёгкий блик отражения солнца — у поверхности (близко к берегу)
-    const tm2 = performance.now() * 0.0006;
-    const sparkle = Math.sin((r * 3.1 + c * 2.7) + tm2 * 5);
-    if (sparkle > 0.94) {
-      ctx.fillStyle = 'rgba(255,255,255,.5)';
-      ctx.fillRect(p.x - 1, p.y - 1, 2, 2);
-    }
-    // Узкая прибойная полоса у берега (r ≈ PIER_R0..PIER_R0+1)
-    if (r === PIER_R0) {
-      ctx.fillStyle = 'rgba(255,255,255,.30)';
-      ctx.fillRect(p.x - wx + 4, p.y - 1, wx * 2 - 8, 2);
     }
   }
 }
@@ -6577,6 +7031,74 @@ function drawCrab(r, c) {
   ctx.fillStyle = '#000';
   ctx.fillRect(p.x - 1.5, p.y - 2, 1, 1);
   ctx.fillRect(p.x + 0.5, p.y - 2, 1, 1);
+}
+
+// Пляжная трава — пучок 3-5 травинок, торчат вверх. variant: оттенок.
+function drawBeachGrass(r, c, variant) {
+  const p = w2s(r, c);
+  const cols = ['#6a8c3a', '#7ea04a', '#8aa852'];
+  const col  = cols[variant % cols.length];
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 1;
+  // Лёгкий «ветер» — анимация по времени
+  const tm = performance.now() * 0.0015;
+  const sway = Math.sin(tm + r * 0.5 + c * 0.3) * 1.5;
+  for (let i = 0; i < 5; i++) {
+    const off = (i - 2) * 1.5;
+    const tipY = p.y - 5 - (i & 1 ? 1 : 0);
+    ctx.beginPath();
+    ctx.moveTo(p.x + off, p.y + 1);
+    ctx.quadraticCurveTo(p.x + off + sway * 0.5, p.y - 2,
+                         p.x + off + sway, tipY);
+    ctx.stroke();
+  }
+}
+
+// Лужица воды — отражающее тёмное пятно с лёгким бликом.
+function drawBeachPuddle(r, c) {
+  const p = w2s(r, c);
+  ctx.fillStyle = 'rgba(20,40,60,.55)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y, 10, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Внутренний более светлый круг — отражение неба
+  ctx.fillStyle = 'rgba(140,180,210,.35)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y - 0.5, 8, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Маленький солнечный блик
+  const tm = performance.now() * 0.001;
+  const bx = Math.sin(tm) * 2;
+  ctx.fillStyle = 'rgba(255,255,255,.6)';
+  ctx.fillRect(p.x - 3 + bx, p.y - 1.5, 3, 1);
+}
+
+// Плавающее в воде кольцо/тюбинг — мягко покачивается на волне.
+function drawFloatRing(r, c, col) {
+  const tm = performance.now() * 0.0012;
+  const bobR = r + Math.sin(tm + c * 0.3) * 0.12;
+  const bobC = c + Math.cos(tm * 0.8 + r * 0.2) * 0.10;
+  const p = w2s(bobR, bobC);
+  // Тень в воде
+  ctx.fillStyle = 'rgba(0,0,0,.20)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y + 2, 9, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Внешний контур кольца
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y, 9, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Внутреннее отверстие — цвет воды
+  ctx.fillStyle = '#1a3a50';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y, 5, 2.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Блик
+  ctx.fillStyle = 'rgba(255,255,255,.55)';
+  ctx.beginPath();
+  ctx.ellipse(p.x - 4, p.y - 1.5, 2, 0.8, -0.4, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 function drawTile(r, c) {
@@ -7995,6 +8517,175 @@ function drawNpc(npc) {
   }
 }
 
+// Пляжник — мирный NPC в купальнике/плавках. Маленький стилизованный
+// спрайт (не используем drawPerson — у пляжников отдельный визуал:
+// открытое тело + цветной купальник, без штанов/курток). Поза зависит
+// от act: walk/flee — на ногах с покачиванием, drink — со стаканом,
+// sunbathe — лежит горизонтально на полотенце, idle — просто стоит.
+const _BEACH_SKIN = ['#f0c89c', '#d8a07c', '#a87454', '#6c4a30'];
+function drawBeachgoer(b) {
+  const p = w2s(b.y, b.x);
+  const skin = _BEACH_SKIN[b.skin % _BEACH_SKIN.length];
+  const hairCols = ['#3a2418', '#7a4a26', '#d4a44c', '#262626'];
+  const hairCol  = hairCols[b.hair % hairCols.length];
+  const act      = b.act || 'idle';
+  // Тень под NPC
+  ctx.fillStyle = 'rgba(0,0,0,.35)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y + 3, 7, 2.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  if (act === 'sunbathe') {
+    // Лежит на полотенце — горизонтальная поза
+    // Полотенце
+    ctx.fillStyle = b.outfit;
+    ctx.fillRect(p.x - 12, p.y - 1, 24, 8);
+    // Тело-овал
+    ctx.fillStyle = skin;
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y + 2, 10, 3.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Голова
+    ctx.fillStyle = skin;
+    ctx.beginPath();
+    ctx.arc(p.x - 10, p.y + 2, 3, 0, Math.PI * 2);
+    ctx.fill();
+    // Волосы
+    ctx.fillStyle = hairCol;
+    ctx.beginPath();
+    ctx.arc(p.x - 11, p.y + 1, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    // Купальник — пятно посередине
+    ctx.fillStyle = b.outfit;
+    ctx.fillRect(p.x - 2, p.y + 1, 6, 3);
+    return;
+  }
+  // Стоящие позы. Высота фигурки ~ 28 px.
+  // Покачивание ног при ходьбе/беге
+  let legSwing = 0;
+  if (act === 'walk' || act === 'flee') {
+    legSwing = Math.sin(b.walkPhase) * (act === 'flee' ? 4 : 2.5);
+  }
+  // Ноги (2 палки)
+  ctx.strokeStyle = skin;
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(p.x - 2, p.y - 2);
+  ctx.lineTo(p.x - 2 + legSwing * 0.5, p.y + 4);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(p.x + 2, p.y - 2);
+  ctx.lineTo(p.x + 2 - legSwing * 0.5, p.y + 4);
+  ctx.stroke();
+  // Купальник/плавки (нижняя часть туловища)
+  ctx.fillStyle = b.outfit;
+  ctx.fillRect(p.x - 4, p.y - 6, 8, 5);
+  // Туловище (открытое — кожа)
+  ctx.fillStyle = skin;
+  ctx.fillRect(p.x - 4, p.y - 13, 8, 7);
+  if (b.gender === 1) {
+    // Верх купальника — две полоски
+    ctx.fillStyle = b.outfit;
+    ctx.fillRect(p.x - 4, p.y - 12, 8, 2);
+  }
+  // Руки
+  ctx.strokeStyle = skin;
+  ctx.lineWidth = 2;
+  let armSwing = 0;
+  if (act === 'walk' || act === 'flee') {
+    armSwing = -Math.sin(b.walkPhase) * (act === 'flee' ? 4 : 2);
+  }
+  // Левая рука
+  ctx.beginPath();
+  ctx.moveTo(p.x - 4, p.y - 11);
+  ctx.lineTo(p.x - 7 + armSwing * 0.5, p.y - 5 + armSwing * 0.3);
+  ctx.stroke();
+  // Правая рука — если drink, согнута со стаканом
+  if (act === 'drink') {
+    ctx.beginPath();
+    ctx.moveTo(p.x + 4, p.y - 11);
+    ctx.lineTo(p.x + 6, p.y - 14);
+    ctx.stroke();
+    // Стакан с соком
+    ctx.fillStyle = '#fff8c8';
+    ctx.fillRect(p.x + 5, p.y - 17, 3.5, 4);
+    ctx.strokeStyle = '#aa8030';
+    ctx.lineWidth = 0.6;
+    ctx.strokeRect(p.x + 5, p.y - 17, 3.5, 4);
+    // Соломинка
+    ctx.strokeStyle = '#e74c3c';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(p.x + 6.5, p.y - 17);
+    ctx.lineTo(p.x + 7.5, p.y - 20);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(p.x + 4, p.y - 11);
+    ctx.lineTo(p.x + 7 - armSwing * 0.5, p.y - 5 - armSwing * 0.3);
+    ctx.stroke();
+  }
+  // Голова
+  ctx.fillStyle = skin;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y - 16, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+  // Волосы (шапочка сверху)
+  ctx.fillStyle = hairCol;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y - 17, 3.5, Math.PI, 0);
+  ctx.fill();
+  // Восклицательный знак при flee — над головой
+  if (act === 'flee') {
+    ctx.fillStyle = 'rgba(220,40,40,.95)';
+    ctx.font = 'bold 12px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    const bob = Math.sin(performance.now() * 0.02) * 1.5;
+    ctx.fillText('!', p.x, p.y - 22 + bob);
+  }
+  ctx.lineCap = 'butt';
+}
+
+// Охранник Майкла — головорез в чёрной рубашке с пистолетом. Стоит
+// статично возле Майкла. При огне в зоне Майкла открывает огонь.
+const _MG_LOOK = { gender: 0, skin: 1, body: 2, face: 0, hair: 1, hat: 0, gang: 0 };
+function drawMichaelGuard(g) {
+  const p = w2s(g.y, g.x);
+  // Тёмная подсветка под охранником — отличает от обычных NPC
+  ctx.fillStyle = (g.state === 'hostile')
+    ? 'rgba(220,40,40,.35)' : 'rgba(40,40,40,.50)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y + 6, 16, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Используем drawPerson — но потом сверху перерисуем рубашку чёрным
+  drawPerson(p.x, p.y, g.ang || 0, _MG_LOOK, 0, null, null, false,
+             g.hp, g.max_hp, false);
+  // Чёрная рубашка поверх — узкий прямоугольник на туловище
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(p.x - 7, p.y - 14, 14, 11);
+  // Воротник
+  ctx.fillStyle = '#0a0a0a';
+  ctx.fillRect(p.x - 5, p.y - 14, 10, 2);
+  // Пуговицы
+  ctx.fillStyle = '#444';
+  ctx.fillRect(p.x - 0.5, p.y - 12, 1, 1);
+  ctx.fillRect(p.x - 0.5, p.y - 9,  1, 1);
+  ctx.fillRect(p.x - 0.5, p.y - 6,  1, 1);
+  // Оружие в руке
+  const flashAt = g.lastShotAt || 0;
+  drawWeaponInHands(p.x, p.y, g.ang || 0,
+                    g.weapon || 'pistol_heavy', 0.95, flashAt);
+  // Иконка-щит над головой (отличает: охрана Майкла)
+  ctx.font = '12px system-ui, "Segoe UI Emoji", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = '#000'; ctx.shadowBlur = 4;
+  ctx.fillStyle = (g.state === 'hostile') ? '#ff4040' : '#ffd76b';
+  ctx.fillText('🛡', p.x, p.y - 42);
+  ctx.shadowBlur = 0;
+}
+
 // Эмерджентное событие: NPC конвоя (инкассатор или полицейский).
 // isBoss=true → инкассатор (тёмный костюм, эмодзи 💼 над головой);
 // false → полицейский (синяя форма с фуражкой 👮).
@@ -8668,27 +9359,51 @@ function drawMichael() {
   // Спрайт человечка
   const phase = (Math.sin(t) * 0.2);
   drawPerson(p.x, p.y, 0, _MICHAEL_LOOK, phase, 'Майкл', null, false, 1, 1, false);
-  // Иконка над головой — 💼 (бизнесмен) + табличка КУПЛЮ АВТО
+  // Иконка над головой — 💼 (бизнесмен).
   const bob = Math.sin(t * 1.6) * 2;
   ctx.font = '20px system-ui, "Segoe UI Emoji", sans-serif';
   ctx.textAlign = 'center';
   ctx.fillStyle = '#fff';
   ctx.shadowColor = '#000'; ctx.shadowBlur = 6;
   ctx.fillText('💼', p.x, p.y - 56 + bob);
-  // Жёлтая «вывеска» КУПЛЮ АВТО над головой — самый сильный визуальный маркер
   ctx.shadowBlur = 0;
-  const labelY = p.y - 76 + bob;
-  const labelW = 78, labelH = 16;
-  ctx.fillStyle = '#1a1108';
-  ctx.fillRect(p.x - labelW / 2, labelY - labelH / 2, labelW, labelH);
-  ctx.strokeStyle = '#ffd76b';
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(p.x - labelW / 2 + 0.5, labelY - labelH / 2 + 0.5, labelW - 1, labelH - 1);
-  ctx.font = 'bold 10px system-ui, sans-serif';
-  ctx.fillStyle = '#ffd76b';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('КУПЛЮ АВТО', p.x, labelY + 1);
-  ctx.textBaseline = 'alphabetic';
+  // Реплика над головой — только когда игрок подошёл достаточно близко.
+  // Если ещё доступны заказы — «Эй, есть для тебя работка», иначе —
+  // «Приходи позже, скоро будут новые заказы».
+  const dr = MICHAEL_POS.r - player.r;
+  const dc = MICHAEL_POS.c - player.c;
+  const distMichael = Math.hypot(dr, dc);
+  if (distMichael <= 6.0) {
+    const hasWork = !myGtaStatus.active
+      && (myGtaStatus.count_today || 0) < (myGtaStatus.limit || 2);
+    const txt = hasWork
+      ? 'Эй, есть для тебя работка'
+      : 'Приходи позже, скоро будут новые заказы';
+    ctx.font = 'bold 11px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const labelW = ctx.measureText(txt).width + 16;
+    const labelH = 18;
+    const labelY = p.y - 78 + bob;
+    // Плашка-баббл
+    ctx.fillStyle = 'rgba(20,12,4,.92)';
+    ctx.strokeStyle = '#ffd76b';
+    ctx.lineWidth = 1.4;
+    roundRect(p.x - labelW / 2, labelY - labelH / 2, labelW, labelH, 5);
+    ctx.fill();
+    ctx.stroke();
+    // Хвостик к голове
+    ctx.fillStyle = 'rgba(20,12,4,.92)';
+    ctx.beginPath();
+    ctx.moveTo(p.x - 4, labelY + labelH / 2 - 1);
+    ctx.lineTo(p.x + 4, labelY + labelH / 2 - 1);
+    ctx.lineTo(p.x,     labelY + labelH / 2 + 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#ffd76b';
+    ctx.fillText(txt, p.x, labelY + 1);
+    ctx.textBaseline = 'alphabetic';
+  }
   ctx.textAlign = 'left';
 }
 
@@ -8734,6 +9449,49 @@ function drawDropZone() {
   ctx.font = 'bold 10px system-ui, sans-serif';
   ctx.fillStyle = '#ffe890';
   ctx.fillText('СДАЧА', mid.x, mid.y + 14);
+  ctx.shadowBlur = 0;
+  ctx.textAlign = 'left';
+}
+
+// ── Маркеры box-доставки (pickup на пирсе, dropoff в городе) ────
+// Показываем зелёный кружок-маркер на земле в нужной точке + пульс.
+// Когда state=pending → светится pickup. Когда carrying → dropoff.
+function drawBoxQuestMarkers() {
+  const bq = myBoxStatus && myBoxStatus.active;
+  if (!bq) return;
+  const isPickup = (bq.state === 'pending');
+  const tx = isPickup ? bq.pickup_x  : bq.dropoff_x;
+  const ty = isPickup ? bq.pickup_y  : bq.dropoff_y;
+  const p  = w2s(ty, tx);
+  const tm = performance.now() * 0.003;
+  const pulse = 0.55 + Math.sin(tm) * 0.30;
+  // Радиальный градиент-подсветка
+  const grad = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, 38);
+  const col = isPickup ? 'rgba(120,200,255,' : 'rgba(120,255,140,';
+  grad.addColorStop(0, col + `${0.55 * pulse})`);
+  grad.addColorStop(1, col + '0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, 38, 0, Math.PI * 2);
+  ctx.fill();
+  // Тонкое кольцо
+  ctx.strokeStyle = isPickup ? '#6ec8ff' : '#7ee69a';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([4, 3]);
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y, 22, 11, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // Иконка-эмодзи с подпрыгиванием
+  const bob = Math.sin(tm * 1.7) * 3;
+  ctx.font = 'bold 22px system-ui, "Segoe UI Emoji", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fff';
+  ctx.shadowColor = '#000'; ctx.shadowBlur = 6;
+  ctx.fillText(isPickup ? '📦' : '🏠', p.x, p.y - 16 + bob);
+  ctx.font = 'bold 10px system-ui, sans-serif';
+  ctx.fillStyle = isPickup ? '#a8d8ff' : '#a8f0bd';
+  ctx.fillText(isPickup ? 'ВЗЯТЬ' : (bq.addr || 'СДАТЬ'), p.x, p.y + 4);
   ctx.shadowBlur = 0;
   ctx.textAlign = 'left';
 }
@@ -8842,16 +9600,35 @@ function drawBuilding(r, c) {
   ctx.lineTo(p.x - wx, p.y);
   ctx.closePath();
   ctx.fill();
-  // Палитры: каждому типу свой набор оттенков
+  // Палитры: каждому типу свой богатый набор. Город перестаёт быть
+  // монохромным — рядом стоят кирпичный + бирюзовый + охра + горчичный.
   const palettesByType = [
-    // жилое — тёплые кирпично-коричневые
-    [['#5a3e28', '#2a1c10'], ['#4a3a20', '#251c10'], ['#4a2e1a', '#26170c']],
-    // офисное — холодные сине-серые
-    [['#2a3e58', '#10182a'], ['#3a4858', '#171f2a'], ['#1f2e3a', '#0c161f']],
-    // низкое с магазином — тёмно-бежевое
-    [['#5a4838', '#2a1f18'], ['#4a3828', '#28190c']],
-    // высотка — холодная стальная
-    [['#3a4050', '#181c24'], ['#283040', '#10141c'], ['#2a3848', '#0e131c']],
+    // жилое — кирпичные тёплые + цветные штукатурки (Куба-стиль)
+    [['#5a3e28', '#2a1c10'],   // кирпично-коричневый
+     ['#4a3a20', '#251c10'],   // тёмно-горчичный
+     ['#7c3a2e', '#3a160c'],   // тёмно-красный
+     ['#3e7060', '#162820'],   // мятный/изумруд
+     ['#7a6038', '#3a2812'],   // охра
+     ['#6c5478', '#221830'],   // лавандово-серый
+     ['#a06a48', '#4a2a14']],  // терракот
+    // офисное — холодные сине-стальные + слегка тонированные
+    [['#2a3e58', '#10182a'],
+     ['#3a4858', '#171f2a'],
+     ['#1f2e3a', '#0c161f'],
+     ['#3e3050', '#16101e'],   // фиолет-сталь
+     ['#28486a', '#0c1828']],  // глубокий синий
+    // низкое с магазином — пёстрые, с акцентом
+    [['#5a4838', '#2a1f18'],
+     ['#4a3828', '#28190c'],
+     ['#8a4a2a', '#3a1e10'],   // оранжевая штукатурка
+     ['#4a7a3a', '#1f3018'],   // оливковая
+     ['#a08038', '#3e2e10']],  // песочно-горчичная
+    // высотка — холодная стальная + редкие зелёные стеклянные
+    [['#3a4050', '#181c24'],
+     ['#283040', '#10141c'],
+     ['#2a3848', '#0e131c'],
+     ['#2a4a3a', '#0e1c14'],   // зелёное стекло
+     ['#403848', '#181420']],  // тёмная сталь
   ];
   const palList = palettesByType[bldType];
   const palIdx = ((r * 17 + c * 31) % palList.length + palList.length) % palList.length;
@@ -9025,6 +9802,103 @@ function drawBuilding(r, c) {
     for (let i = 0; i < 3; i++) {
       ctx.fillRect(acX - 3, acY - 4 + i * 2, 6, 0.8);
     }
+  }
+  // ── Дополнительные уникальные детали (детерминированно по r,c) ─
+  // Делают город разнообразным: бельё на верёвке, цветочные ящики,
+  // граффити на стене, пожарная лестница, разноцветная маркиза.
+  const detail = ((r * 23 + c * 41) % 9);
+  if (bldType === 0 && detail === 0 && winRows >= 2) {
+    // Бельё на верёвке между окнами (только жилые)
+    const lY = p.y - H * 0.55;
+    ctx.strokeStyle = 'rgba(180,170,140,.8)';
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(p.x + wx * 0.05, lY);
+    ctx.lineTo(p.x + wx * 0.75, lY + 1);
+    ctx.stroke();
+    const shirtCols = ['#e74c3c', '#3498db', '#f1c40f', '#fff', '#2ecc71'];
+    for (let i = 0; i < 4; i++) {
+      const sx = p.x + wx * (0.12 + i * 0.16);
+      ctx.fillStyle = shirtCols[(i + r + c) % shirtCols.length];
+      ctx.fillRect(sx - 2, lY + 1, 4, 5);
+    }
+  }
+  if (bldType === 0 && detail === 1) {
+    // Цветочный ящик под одним из окон (жилые)
+    const boxY = p.y - H * 0.38;
+    const boxX = p.x + wx * 0.22;
+    ctx.fillStyle = '#5a3a1c';
+    ctx.fillRect(boxX - 5, boxY, 10, 3);
+    // Цветочки 3 шт
+    const flowerCols = ['#e74c3c', '#f1c40f', '#fff', '#9b59b6'];
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = flowerCols[(i + r * 7) % flowerCols.length];
+      ctx.beginPath();
+      ctx.arc(boxX - 3 + i * 3, boxY - 1, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  if ((bldType === 0 || bldType === 2) && detail === 2) {
+    // Граффити-тег на стене (полоса краски + кривые буквы)
+    const grafY = p.y - H * 0.20;
+    const grafCols = ['#e91e63', '#03a9f4', '#ffeb3b', '#76ff03'];
+    ctx.fillStyle = grafCols[(r + c) % grafCols.length];
+    ctx.font = 'italic bold 8px "Comic Sans MS", system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const tags = ['MAFIA', 'GANG', '187', 'BOSS', 'KILL'];
+    ctx.save();
+    ctx.translate(p.x + wx * 0.45, grafY);
+    ctx.rotate(-0.04);
+    ctx.fillText(tags[(r * 3 + c) % tags.length], 0, 0);
+    ctx.restore();
+    ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'left';
+  }
+  if (bldType === 1 || bldType === 3) {
+    if (detail === 3) {
+      // Пожарная лестница зигзагом на правой грани (офис/высотка)
+      ctx.strokeStyle = 'rgba(40,40,48,.95)';
+      ctx.lineWidth = 0.8;
+      const segs = Math.max(2, Math.floor(winRows / 1));
+      for (let s = 0; s < segs; s++) {
+        const k = s / segs;
+        const k1 = (s + 1) / segs;
+        const x1 = p.x + wx * 0.55;
+        const y1 = p.y - H * (0.15 + k * 0.7) + wy * (1 - 0.55) * 0.3;
+        const x2 = p.x + wx * 0.85;
+        const y2 = p.y - H * (0.15 + k1 * 0.7) + wy * (1 - 0.85) * 0.3;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+        ctx.stroke();
+      }
+    }
+  }
+  if (bldType === 2 && detail === 4) {
+    // Цветной навес (маркиза) над входом магазина — полосы
+    const aY = p.y - H * 0.18;
+    const stripeCols = [['#c0392b','#fff'],['#2980b9','#fff'],['#27ae60','#fff']];
+    const pair = stripeCols[(r + c) % stripeCols.length];
+    for (let i = 0; i < 6; i++) {
+      ctx.fillStyle = pair[i & 1];
+      ctx.beginPath();
+      ctx.moveTo(p.x + wx * (0.08 + i * 0.10),     aY);
+      ctx.lineTo(p.x + wx * (0.08 + (i+1) * 0.10), aY);
+      ctx.lineTo(p.x + wx * (0.04 + (i+1) * 0.10), aY + 4);
+      ctx.lineTo(p.x + wx * (0.04 + i * 0.10),     aY + 4);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  if (detail === 5 && bldType !== 3) {
+    // Дверь — тёмная плашка у основания, для разнообразия
+    const dY = p.y + wy * 0.30;
+    const dX = p.x + wx * 0.10;
+    ctx.fillStyle = '#1a0e08';
+    ctx.fillRect(dX - 3, dY - 8, 6, 8);
+    // Дверная ручка
+    ctx.fillStyle = '#d4a040';
+    ctx.fillRect(dX + 1.5, dY - 4, 1.2, 1.2);
   }
 }
 
@@ -10441,6 +11315,18 @@ function render() {
   } else {
     camShake = 0;
   }
+  // Зум камеры (для пляжа). Масштабируем вокруг центра экрана. UI (стрелки
+  // POI, ночной тинт, мини-карта) рисуются ПОСЛЕ restore — они не зумятся.
+  const _zoomActive = (viewZoom > 1.001 || viewZoom < 0.999);
+  if (_zoomActive) {
+    ctx.save();
+    const stage = document.getElementById('stage');
+    const _zcx = stage.clientWidth / 2;
+    const _zcy = stage.clientHeight / 2;
+    ctx.translate(_zcx, _zcy);
+    ctx.scale(viewZoom, viewZoom);
+    ctx.translate(-_zcx, -_zcy);
+  }
   // Viewport culling (под более крупный TS уменьшаем радиус)
   const VIS_R = 12;
   const r0 = Math.max(0, Math.floor(player.r - VIS_R));
@@ -10459,6 +11345,8 @@ function render() {
   drawGangNestRings();
   // 1.8) Зона сдачи угнанных машин Майклу — золотая штриховка на пирсе
   drawDropZone();
+  // 1.9) Маркеры box-доставки (pickup на пирсе, dropoff в городе)
+  drawBoxQuestMarkers();
   // 2) Объекты с depth-sort
   const items = [];
   for (let r = r0; r < r1; r++) {
@@ -10505,6 +11393,16 @@ function render() {
   for (const npc of NPCS) {
     if (npc.r < r0 || npc.r >= r1 || npc.c < c0 || npc.c >= c1) continue;
     items.push({ depth: npc.r + npc.c + 0.0005, draw: () => drawNpc(npc) });
+  }
+  // Пляжники — мирные NPC в купальниках/плавках
+  for (const b of beachgoers.values()) {
+    if (b.y < r0 || b.y >= r1 || b.x < c0 || b.x >= c1) continue;
+    items.push({ depth: b.y + b.x + 0.0004, draw: () => drawBeachgoer(b) });
+  }
+  // Охрана Майкла — в чёрных рубашках, по бокам Майкла на палубе
+  for (const g of michaelGuards.values()) {
+    if (g.y < r0 || g.y >= r1 || g.x < c0 || g.x >= c1) continue;
+    items.push({ depth: g.y + g.x + 0.0007, draw: () => drawMichaelGuard(g) });
   }
   // Машины (движущиеся)
   for (const car of CARS) {
@@ -10573,6 +11471,12 @@ function render() {
       items.push({ depth: d.r + d.c - 0.1, draw: () => drawStarfish(d.r, d.c, d.col) });
     else if (d.kind === 'crab')
       items.push({ depth: d.r + d.c - 0.05, draw: () => drawCrab(d.r, d.c) });
+    else if (d.kind === 'grass')
+      items.push({ depth: d.r + d.c - 0.05, draw: () => drawBeachGrass(d.r, d.c, d.variant) });
+    else if (d.kind === 'puddle')
+      items.push({ depth: d.r + d.c - 0.15, draw: () => drawBeachPuddle(d.r, d.c) });
+    else if (d.kind === 'float_ring')
+      items.push({ depth: d.r + d.c, draw: () => drawFloatRing(d.r, d.c, d.col) });
   }
   // Конвой инкассатора (boss + 3 полицейских) — если событие активно
   if (worldEvent) {
@@ -10690,6 +11594,9 @@ function render() {
   drawMuzzles();
   // Импакт-частицы (искры, кровь) — поверх всего
   drawImpacts();
+  // Снимаем zoom-трансформ ПЕРЕД UI-слоем (стрелки POI / мини-карта),
+  // чтобы UI рисовался в нативном 1:1 без масштаба пляжа.
+  if (_zoomActive) ctx.restore();
   // Снимаем shake-трансформ ПЕРЕД UI-слоем (стрелки POI / мини-карта),
   // чтобы UI не дёргался во время отдачи камеры.
   if (shakeNow > 0.05) ctx.restore();
