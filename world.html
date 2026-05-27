@@ -3061,6 +3061,13 @@ function updateServiceVehicles(dt) {
   for (let i = serviceVehicles.length - 1; i >= 0; i--) {
     const v = serviceVehicles[i];
     if (v.state === 'done') { serviceVehicles.splice(i, 1); continue; }
+    // Безопасник: если машина 25 сек катается, но никуда не приехала
+    // (например, BFS не построил путь из-за изменения карты) — убрать.
+    v._aliveT = (v._aliveT || 0) + dt;
+    if (v._aliveT > 25 && v.state !== 'working') {
+      v.state = 'done';
+      continue;
+    }
     if (v.state === 'go_to_scene') {
       if (_vehicleStep(v, dt)) {
         v.state = 'working';
@@ -3079,7 +3086,7 @@ function updateServiceVehicles(dt) {
         if (cr && cr._wrecked) cr._burnedOut = true;
       }
       v.state = 'returning';
-      v.target = { x: v.homeC + 0.5, y: v.homeR + 0.5 };
+      _setVehicleRoute(v, v.y, v.x, v.homeR, v.homeC);
     } else if (v.state === 'returning') {
       if (_vehicleStep(v, dt)) v.state = 'done';
     }
