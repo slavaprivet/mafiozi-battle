@@ -679,6 +679,58 @@ body.in-pvp #gtaActionBtn { top: 104px; }
 #deathOverlay .title { font-size: 24px; font-weight: 800; margin-top: 4px; color: #ff5a5a; }
 #deathOverlay .by    { font-size: 14px; color: #c8d0dc; margin-top: 6px; }
 #deathOverlay .cnt   { font-size: 16px; color: #ffd76b; margin-top: 14px; font-weight: 700; }
+#deathOverlay .rp    { font-size: 12px; color: #b8c0c8; margin-top: 12px; }
+#deathOverlay .rp-btn {
+  margin-top: 8px; padding: 8px 14px; border-radius: 10px;
+  border: 1.5px solid #5a8a4a; background: linear-gradient(135deg,#1e2a18,#2a3a20);
+  color: #c8e8a0; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+#deathOverlay .rp-btn:hover { background: linear-gradient(135deg,#2a3a20,#3a4a28); }
+
+/* Модалка выбора точки респавна */
+#respawnModal {
+  position: absolute; inset: 0; z-index: 20;
+  background: rgba(0,0,0,.7); display: none;
+  align-items: center; justify-content: center;
+}
+#respawnModal.show { display: flex; }
+#respawnModal .card {
+  position: relative; background: linear-gradient(135deg, #15181f, #1a2028);
+  border: 2px solid #5a8a4a; border-radius: 14px;
+  padding: 18px; min-width: 280px; max-width: 90vw;
+  max-height: 80vh; overflow-y: auto;
+  color: #fff; font-family: inherit;
+  box-shadow: 0 0 32px rgba(90,138,74,.3);
+}
+#respawnModal .x {
+  position: absolute; top: 8px; right: 12px;
+  font-size: 22px; color: #888; cursor: pointer; line-height: 1;
+}
+#respawnModal .x:hover { color: #fff; }
+#respawnModal .head { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
+#respawnModal .head .icon { font-size: 32px; }
+#respawnModal .head .nm   { font-size: 16px; font-weight: 800; color: #c8e8a0; }
+#respawnModal .head .sub  { font-size: 11px; color: #88a078; }
+#respawnModal .list { display: flex; flex-direction: column; gap: 6px; }
+#respawnModal .r-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 10px;
+  background: #20262e; border: 1.5px solid #2a323a;
+  cursor: pointer; user-select: none;
+}
+#respawnModal .r-item:hover { background: #262e36; border-color: #3a4a32; }
+#respawnModal .r-item.active {
+  background: linear-gradient(135deg,#1e2a18,#2a3a20);
+  border-color: #5a8a4a; box-shadow: 0 0 10px rgba(90,138,74,.4);
+}
+#respawnModal .r-item.locked {
+  opacity: .5; cursor: not-allowed;
+}
+#respawnModal .r-item .em { font-size: 22px; }
+#respawnModal .r-item .nm { font-size: 13px; font-weight: 700; color: #fff; flex: 1; }
+#respawnModal .r-item .tg { font-size: 10px; color: #7ee69a; font-weight: 700; }
+#respawnModal .r-item.locked .tg { color: #ff7878; }
+#respawnModal .hint { font-size: 10px; color: #88909a; margin-top: 10px; text-align: center; }
 
 /* Баннер «вы в PVP-зоне» */
 #pvpBanner {
@@ -1160,6 +1212,27 @@ body.in-pvp #gtaActionBtn { top: 104px; }
     <div class="title">УБИТ</div>
     <div class="by" id="deathBy">&nbsp;</div>
     <div class="cnt">Респаун через <span id="deathCnt">5</span> сек</div>
+    <div class="rp" id="deathRespawnPoint">Точка респа: 🏥 Госпиталь</div>
+    <button class="rp-btn" id="respawnSetBtn" type="button">🏥 Сменить точку респа</button>
+  </div>
+
+  <!-- Модалка выбора точки респавна. Список: Госпиталь + купленные
+       бизнесы. Открывается с экрана смерти ИЛИ из меню паузы. -->
+  <div id="respawnModal">
+    <div class="card">
+      <div class="x" id="respawnCloseBtn" title="Закрыть">×</div>
+      <div class="head">
+        <div class="icon">🏥</div>
+        <div>
+          <div class="nm">Где возрождаться</div>
+          <div class="sub">Выбери точку — после смерти появишься там</div>
+        </div>
+      </div>
+      <div class="list" id="respawnList">
+        <!-- Заполняется JS из myOwnedBiz + 'hospital' -->
+      </div>
+      <div class="hint">Бизнесы становятся доступны после покупки</div>
+    </div>
   </div>
 
   <!-- Большой баннер эмерджентных событий (инкассатор/куш). Управляется
@@ -2001,6 +2074,159 @@ function territoryAt(r, c) {
     if (r >= t.r0 && r <= t.r1 && c >= t.c0 && c <= t.c1) return t;
   }
   return null;
+}
+
+// ── Автобусная система (чисто клиентский декор) ───────────────────
+// ОДИН автобус ездит по кольцу из 4 остановок (внутри городской дорожной
+// сетки BLOCK=10). На каждой стоит до 2 NPC «ждут». При прибытии автобуса
+// ждущие «заходят» (despawn в сторону автобуса), 1-2 пассажира «выходят»
+// и идут на тротуар, потом исчезают через ~10с. Сервер ничего не знает —
+// это локальный декор, у каждого клиента свой автобус. Допускается лёгкий
+// рассинхрон между клиентами — атмосфера «город живёт» важнее точности.
+const BUS_STOPS = [
+  // r,c — куда автобус приедет (центр полосы дороги).
+  // sign_r,sign_c — где стоит знак/навес/лавочка (тротуар у дороги).
+  { r: 21.5, c: 21.5, sign_r: 24, sign_c: 22 },
+  { r: 21.5, c: 51.5, sign_r: 24, sign_c: 52 },
+  { r: 51.5, c: 51.5, sign_r: 50, sign_c: 52 },
+  { r: 51.5, c: 21.5, sign_r: 50, sign_c: 22 },
+];
+const BUS = {
+  // Стартует чуть западнее первой остановки, чтобы первое прибытие
+  // выглядело как «приехал» а не «спавнился на месте».
+  r: BUS_STOPS[0].r, c: BUS_STOPS[0].c - 6,
+  ang: 0, speed: 5.5,
+  routeIdx: 0,                  // индекс следующей остановки
+  state: 'driving',             // 'driving' | 'stopped'
+  stopUntil: 0,
+  doorPhase: 0,                 // 0..1 — анимация открытия дверей
+};
+const _busWaiters = [];   // {stopIdx, r, c, look, walkPhase, idleT, leaving, ang}
+const _busRiders  = [];   // вышедшие пассажиры: {r,c, tgtR,tgtC, ang, look, walkPhase, life}
+
+function _busRandomLook() {
+  return {
+    gender: Math.random() < 0.5 ? 0 : 1,
+    skin:   Math.floor(Math.random() * 5),
+    body:   Math.floor(Math.random() * 3),
+    face:   Math.floor(Math.random() * 4),
+    hair:   Math.floor(Math.random() * 5),
+    hat:    Math.floor(Math.random() * 4),
+  };
+}
+function _busStopCount(stopIdx) {
+  let n = 0;
+  for (const w of _busWaiters) if (w.stopIdx === stopIdx && !w.leaving) n++;
+  return n;
+}
+function _spawnBusWaiter(stopIdx) {
+  const stop = BUS_STOPS[stopIdx];
+  const cnt  = _busStopCount(stopIdx);
+  // Распределяем 2-х waiters по разным точкам у лавочки
+  const offC = (cnt === 0 ? -0.5 : 0.5) + (Math.random() - 0.5) * 0.2;
+  const offR = (Math.random() - 0.5) * 0.4;
+  _busWaiters.push({
+    stopIdx,
+    r:    stop.sign_r + 0.7 + offR,
+    c:    stop.sign_c + 0.5 + offC,
+    ang:  Math.atan2(stop.r - (stop.sign_r + 0.7), stop.c - (stop.sign_c + 0.5)),
+    look: _busRandomLook(),
+    walkPhase: 0,
+    idleT: Math.random() * 6.28,
+    leaving: false,
+  });
+}
+function _onBusArrival(stopIdx) {
+  // Waiters у этой остановки — помечаем leaving=true, они побегут к BUS
+  // и удалятся когда подойдут вплотную (см. _tickBus).
+  for (const w of _busWaiters) {
+    if (w.stopIdx === stopIdx) w.leaving = true;
+  }
+  // Выходят 1-2 пассажира — спавнятся в позиции дверей, идут к тротуару
+  const stop = BUS_STOPS[stopIdx];
+  const cnt = 1 + Math.floor(Math.random() * 2);
+  for (let i = 0; i < cnt; i++) {
+    const tgtR = stop.sign_r + 0.5 + (Math.random() - 0.5) * 1.2;
+    const tgtC = stop.sign_c + 0.5 + (Math.random() - 0.5) * 1.2;
+    _busRiders.push({
+      r: stop.r + (Math.random() - 0.5) * 0.3,
+      c: stop.c + (Math.random() - 0.5) * 0.3,
+      tgtR, tgtC,
+      ang: 0, walkPhase: 0,
+      look: _busRandomLook(),
+      life: 9 + Math.random() * 3,
+    });
+  }
+}
+function _tickBus(dt) {
+  const now = performance.now();
+  // 1) Регулярно спавним waiters (но не больше 2 на остановку)
+  if (!_tickBus._nextSpawnT) _tickBus._nextSpawnT = now + 400;
+  if (now >= _tickBus._nextSpawnT) {
+    _tickBus._nextSpawnT = now + 5500 + Math.random() * 3500;
+    const idx = Math.floor(Math.random() * BUS_STOPS.length);
+    if (_busStopCount(idx) < 2) _spawnBusWaiter(idx);
+  }
+  // 2) Тикаем waiters
+  for (let i = _busWaiters.length - 1; i >= 0; i--) {
+    const w = _busWaiters[i];
+    w.idleT += dt;
+    if (w.leaving) {
+      // Идём к автобусу (двери), достигнув — исчезаем
+      const dr = BUS.r - w.r, dc = BUS.c - w.c;
+      const d = Math.hypot(dr, dc);
+      if (d < 0.35) { _busWaiters.splice(i, 1); continue; }
+      const step = Math.min(d, 3.0 * dt);
+      w.r += (dr / d) * step;
+      w.c += (dc / d) * step;
+      w.walkPhase += dt * 9;
+      w.ang = Math.atan2(dr, dc);
+    } else {
+      // Idle: лёгкий поворот головы, без ходьбы. walkPhase не растёт.
+      w.ang += Math.sin(w.idleT) * dt * 0.3;
+    }
+  }
+  // 3) Тикаем вышедших пассажиров — идут к тротуару, потом исчезают
+  for (let i = _busRiders.length - 1; i >= 0; i--) {
+    const rd = _busRiders[i];
+    const dr = rd.tgtR - rd.r, dc = rd.tgtC - rd.c;
+    const d = Math.hypot(dr, dc);
+    if (d > 0.1) {
+      const step = Math.min(d, 1.8 * dt);
+      rd.r += (dr / d) * step;
+      rd.c += (dc / d) * step;
+      rd.walkPhase += dt * 7;
+      rd.ang = Math.atan2(dr, dc);
+    } else {
+      rd.life -= dt;
+      if (rd.life <= 0) { _busRiders.splice(i, 1); continue; }
+    }
+  }
+  // 4) Сам автобус
+  if (BUS.state === 'stopped') {
+    BUS.doorPhase = Math.min(1, BUS.doorPhase + dt * 2.5);
+    if (now >= BUS.stopUntil) {
+      BUS.state = 'driving';
+      BUS.routeIdx = (BUS.routeIdx + 1) % BUS_STOPS.length;
+    }
+    return;
+  }
+  BUS.doorPhase = Math.max(0, BUS.doorPhase - dt * 2.5);
+  const target = BUS_STOPS[BUS.routeIdx];
+  const dr = target.r - BUS.r;
+  const dc = target.c - BUS.c;
+  const d  = Math.hypot(dr, dc);
+  if (d < 0.32) {
+    BUS.r = target.r; BUS.c = target.c;
+    BUS.state = 'stopped';
+    BUS.stopUntil = now + 3200;
+    _onBusArrival(BUS.routeIdx);
+    return;
+  }
+  const step = Math.min(d, BUS.speed * dt);
+  BUS.r += (dr / d) * step;
+  BUS.c += (dc / d) * step;
+  BUS.ang = Math.atan2(dr, dc);
 }
 
 // Стабильный цвет игрока по id/имени для подкраски зоны/флага.
@@ -4057,12 +4283,13 @@ const CAR_MODELS = [
   // height — высоты разнесены сильнее (0.30..1.05), чтобы силуэты явно
   // различались в изометрии. wheelR — теперь реально влияет на размер
   // колеса (см. drawCarPretty: ellipse(corner.x, corner.y, wR*22, wR*12)).
-  { name: 'sedan',    L: 1.7,  W: 0.85, palette: ['#3a5a8a','#22386a'], roof: '#1a2848', wheelR: 0.18, height: 0.55 },
-  { name: 'taxi',     L: 1.7,  W: 0.85, palette: ['#ffd700','#b89400'], roof: '#1a1a1a', wheelR: 0.18, taxi: true, height: 0.55 },
+  { name: 'sedan',    L: 1.7,  W: 0.85, palette: ['#3a5a8a','#22386a'], roof: '#1a2848', wheelR: 0.18, height: 0.55, sedan: true },
+  { name: 'taxi',     L: 1.7,  W: 0.85, palette: ['#ffd700','#b89400'], roof: '#1a1a1a', wheelR: 0.18, taxi: true, height: 0.55, sedan: true },
   { name: 'sport',    L: 1.45, W: 0.78, palette: ['#c8202a','#7a0d18'], roof: '#1a0a10', wheelR: 0.16, sport: true, height: 0.32 },
   { name: 'pickup',   L: 1.95, W: 0.95, palette: ['#3a3a3a','#1f1f1f'], roof: '#0f0f0f', wheelR: 0.22, pickup: true, height: 0.62, cabFrac: 0.55 },
   { name: 'van',      L: 2.05, W: 0.98, palette: ['#2f6a3a','#1a3a22'], roof: '#152818', wheelR: 0.20, van: true, height: 0.92 },
   { name: 'coupe',    L: 1.50, W: 0.80, palette: ['#1a1a1a','#0a0a0a'], roof: '#000000', wheelR: 0.16, height: 0.42, sport: true },
+  { name: 'hatch_blue', L: 1.50, W: 0.82, palette: ['#3a78c8','#1a4280'], roof: '#0a2050', wheelR: 0.17, height: 0.55, hatch: true },
   // Спорткары — самые низкие и короткие, клиновидный силуэт
   { name: 'supercar', L: 1.45, W: 0.78, palette: ['#f0a020','#a05a00'], roof: '#2a1a00', wheelR: 0.17, sport: true, fast: true, height: 0.30 },
   { name: 'lambo',    L: 1.45, W: 0.80, palette: ['#3afd6c','#0a8a3a'], roof: '#0a3a14', wheelR: 0.17, sport: true, fast: true, height: 0.28 },
@@ -4071,8 +4298,8 @@ const CAR_MODELS = [
   // Грузовик / минивэн / хэтч / лимузин
   { name: 'truck',    L: 2.30, W: 1.05, palette: ['#6a4020','#3a2210'], roof: '#1a1008', wheelR: 0.24, pickup: true, height: 0.72, cabFrac: 0.40 },
   { name: 'minivan',  L: 1.90, W: 0.95, palette: ['#5a708a','#2f3e54'], roof: '#1a2230', wheelR: 0.20, van: true, height: 0.85 },
-  { name: 'hatch',    L: 1.50, W: 0.82, palette: ['#a06840','#5a3818'], roof: '#1a0e08', wheelR: 0.17, height: 0.50 },
-  { name: 'limo',     L: 2.20, W: 0.88, palette: ['#0a0a14','#000000'], roof: '#000000', wheelR: 0.17, height: 0.48 },
+  { name: 'hatch',    L: 1.50, W: 0.82, palette: ['#a06840','#5a3818'], roof: '#1a0e08', wheelR: 0.17, height: 0.50, hatch: true },
+  { name: 'limo',     L: 2.20, W: 0.88, palette: ['#0a0a14','#000000'], roof: '#000000', wheelR: 0.17, height: 0.48, limo: true },
   // ── Внедорожники — самые высокие (1.0+) и широкие, явно крупные колёса ──
   { name: 'suv_black',   L: 1.95, W: 1.05, palette: ['#1a1a22','#0a0a10'], roof: '#000', wheelR: 0.28, suv: true, height: 1.00 },
   { name: 'suv_white',   L: 1.95, W: 1.05, palette: ['#dadada','#82828a'], roof: '#3a3a44', wheelR: 0.28, suv: true, height: 1.00 },
@@ -4327,8 +4554,258 @@ function initCars() {
   // Логово банды — гангстерская парковка в одном из дальних кварталов.
   // Это 3 сиреневые машины стоят рядом. Их можно расстрелять (+кулачки).
   spawnGangLair();
+  // Большие парковки у POI (казино, бар, клуб, автомойка, кофейня).
+  // Машины стоят рядами с белой разметкой на сером асфальте.
+  _spawnParkingLotCars();
   // Первый кортеж через 25 сек после старта
   _convoyNextAt = performance.now() + 25000;
+}
+
+// ── Парковочные зоны ─────────────────────────────────────────────
+// Большие парковки рядом с POI: серый асфальт с белой разметкой,
+// машины стоят организованными рядами. Каждый слот — фиксированное
+// место для машины (r,c,dir). Машины в init распределяются по слотам
+// с некоторой плотностью (часть слотов пустая, чтобы было видно
+// разметку).
+const PARKING_LOTS = [
+  // У Казино (POI r=13, c=45) — большая парковка под зданием
+  { r0: 15, c0: 47, r1: 17, c1: 56, dir: 'south' },
+  // У Бара «Чёрная вдова» (POI r=43, c=33) — справа
+  { r0: 44, c0: 35, r1: 46, c1: 41, dir: 'south' },
+  // У Клуба (POI r=63, c=53) — снизу
+  { r0: 65, c0: 55, r1: 67, c1: 61, dir: 'south' },
+  // У Автомойки (POI r=23, c=25) — снизу
+  { r0: 25, c0: 27, r1: 27, c1: 33, dir: 'south' },
+  // У Кофейни (POI r=33, c=13) — справа
+  { r0: 34, c0: 15, r1: 36, c1: 19, dir: 'south' },
+];
+function _spawnParkingLotCars() {
+  for (const lot of PARKING_LOTS) {
+    let dirDx = 0, dirDy = 0;
+    if (lot.dir === 'south') dirDy = -1;   // машины носом на север (выезжают вниз)
+    if (lot.dir === 'north') dirDy = 1;
+    if (lot.dir === 'east')  dirDx = -1;
+    if (lot.dir === 'west')  dirDx = 1;
+    lot.slots = [];
+    // Сетка 2×2 — каждые 2 тайла одна машина (длина 1.7 + проход)
+    for (let r = lot.r0; r <= lot.r1; r += 2) {
+      for (let c = lot.c0; c <= lot.c1; c += 2) {
+        lot.slots.push({ r: r + 0.5, c: c + 0.5, dirDx, dirDy });
+      }
+    }
+    // Заполняем ~70% слотов случайными моделями
+    for (const slot of lot.slots) {
+      if (Math.random() > 0.70) continue;
+      const m = CAR_MODELS[Math.floor(Math.random() * CAR_MODELS.length)];
+      CARS.push({
+        r: slot.r, c: slot.c,
+        vr: 0, vc: 0,
+        dirDx: slot.dirDx, dirDy: slot.dirDy,
+        model: m,
+        parked: true, _onParking: lot,
+        braking: false, flash: 0,
+      });
+    }
+  }
+}
+// Рендер парковочного покрытия — серый асфальт + белая разметка слотов.
+// Рисуется ПОД skid-marks/blood (отдельным проходом перед items.sort).
+function drawParkingLots() {
+  for (const lot of PARKING_LOTS) {
+    // Полигон зоны парковки в isometric — 4 угла через w2s
+    const A = w2s(lot.r0,     lot.c0);
+    const B = w2s(lot.r0,     lot.c1 + 1);
+    const C = w2s(lot.r1 + 1, lot.c1 + 1);
+    const D = w2s(lot.r1 + 1, lot.c0);
+    // Базовый асфальт — тёмно-серый
+    ctx.fillStyle = '#2a2c32';
+    ctx.beginPath();
+    ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y);
+    ctx.lineTo(C.x, C.y); ctx.lineTo(D.x, D.y);
+    ctx.closePath(); ctx.fill();
+    // Тонкая белая окантовка зоны
+    ctx.strokeStyle = 'rgba(255,255,255,.35)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    // Белая разметка слотов — короткие поперечные линии между местами.
+    // Для каждого слота рисуем «П»-образную разметку: 2 коротких края.
+    if (!lot.slots) continue;
+    ctx.strokeStyle = 'rgba(255,255,255,.55)';
+    ctx.lineWidth = 1.0;
+    for (const slot of lot.slots) {
+      // Слот занимает 2×2 тайла, центр (slot.r, slot.c). Граничные линии
+      // вдоль КОРОТКОЙ оси (поперёк парковочного места).
+      // Для dir south/north — линии вертикальные (вдоль c), длина 2 тайла.
+      // Для dir east/west — линии горизонтальные.
+      const isHoriz = (slot.dirDx !== 0);
+      let p1, p2, p3, p4;
+      if (isHoriz) {
+        p1 = w2s(slot.r - 1.0, slot.c - 1.0);
+        p2 = w2s(slot.r - 1.0, slot.c + 1.0);
+        p3 = w2s(slot.r + 1.0, slot.c - 1.0);
+        p4 = w2s(slot.r + 1.0, slot.c + 1.0);
+      } else {
+        p1 = w2s(slot.r - 1.0, slot.c - 1.0);
+        p2 = w2s(slot.r + 1.0, slot.c - 1.0);
+        p3 = w2s(slot.r - 1.0, slot.c + 1.0);
+        p4 = w2s(slot.r + 1.0, slot.c + 1.0);
+      }
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+      ctx.moveTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y);
+      ctx.stroke();
+    }
+    // Знак «P» в углу зоны (синий квадрат с белой буквой)
+    const sx = (A.x + B.x) / 2, sy = (A.y + B.y) / 2 - 4;
+    ctx.fillStyle = '#1a4a8a';
+    ctx.fillRect(sx - 7, sy - 9, 14, 12);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('P', sx, sy);
+    ctx.textAlign = 'left';
+  }
+}
+
+// ── AI «жителей» с машинами на парковках ─────────────────────────
+// Каждый житель — пара (parked car ↔ NPC). Хозяин периодически выходит,
+// идёт к ближайшему POI/тротуару, торчит там, возвращается, садится.
+// Состояния:
+//   'sitting'    — внутри машины (NPC невидим)
+//   'walking_to' — идёт к точке tgt
+//   'idle_at'    — стоит у точки, idleUntil = ms
+//   'returning'  — идёт обратно к машине
+//   'getting_in' — приближается к машине, потом state='sitting'
+// Спавн: раз в 6-10 сек случайная припаркованная машина «выпускает»
+// своего хозяина (если уже не активен). Один житель живёт ~30-60 сек,
+// потом снова сидит в машине неактивно.
+const _parkingNpcs = [];   // {car, npc, state, tgtR, tgtC, idleUntil, ang, walkPhase}
+function _spawnParkingNpc() {
+  // Выбираем припаркованную машину которая на парковке И ещё не имеет
+  // активного npc. Чтобы не плодить — не больше 1 на машину.
+  const used = new Set(_parkingNpcs.map(p => p.car));
+  const cands = CARS.filter(c => c.parked && c._onParking && !c._wrecked && !used.has(c));
+  if (!cands.length) return;
+  const car = cands[Math.floor(Math.random() * cands.length)];
+  // Цель — случайный POI или просто точка на тротуаре в радиусе 6-10 тайлов
+  let tgtR, tgtC;
+  // 50% — идти к ближайшему POI (если есть рядом)
+  if (Math.random() < 0.55 && typeof BUSINESS_POIS !== 'undefined') {
+    let nearest = null, best = 999;
+    for (const b of BUSINESS_POIS) {
+      const d = Math.hypot(b.r - car.r, b.c - car.c);
+      if (d < best && d < 12) { best = d; nearest = b; }
+    }
+    if (nearest) {
+      // Стоим рядом с POI (не НА здании — оно непроходимое)
+      tgtR = nearest.r + 1.5 + (Math.random() - 0.5) * 1.2;
+      tgtC = nearest.c + 1.0 + (Math.random() - 0.5) * 1.2;
+    }
+  }
+  // Fallback — точка в радиусе 5-8 тайлов на проходимом тайле
+  if (tgtR == null) {
+    for (let tries = 0; tries < 30; tries++) {
+      const ang = Math.random() * Math.PI * 2;
+      const rad = 4 + Math.random() * 4;
+      const rr = Math.floor(car.r + Math.sin(ang) * rad);
+      const cc = Math.floor(car.c + Math.cos(ang) * rad);
+      if (rr < 2 || rr >= MAP_ROWS - 2 || cc < 2 || cc >= MAP_COLS - 2) continue;
+      const t = MAP[rr] && MAP[rr][cc];
+      if (t === 9 || t === 8 || t === 0) { tgtR = rr + 0.5; tgtC = cc + 0.5; break; }
+    }
+  }
+  if (tgtR == null) { tgtR = car.r + 2; tgtC = car.c; }
+  _parkingNpcs.push({
+    car,
+    state: 'walking_to',
+    tgtR, tgtC,
+    r: car.r, c: car.c,
+    ang: Math.atan2(tgtR - car.r, tgtC - car.c),
+    walkPhase: 0,
+    idleUntil: 0,
+    life: 60,
+    look: {
+      gender: Math.random() < 0.5 ? 0 : 1,
+      skin:   Math.floor(Math.random() * 5),
+      body:   Math.floor(Math.random() * 3),
+      face:   Math.floor(Math.random() * 4),
+      hair:   Math.floor(Math.random() * 5),
+      hat:    Math.floor(Math.random() * 4),
+    },
+  });
+}
+function _tickParkingNpcs(dt) {
+  const now = performance.now();
+  // Спавнер
+  if (!_tickParkingNpcs._nextT) _tickParkingNpcs._nextT = now + 3000;
+  if (now >= _tickParkingNpcs._nextT && _parkingNpcs.length < 8) {
+    _tickParkingNpcs._nextT = now + 6000 + Math.random() * 5000;
+    _spawnParkingNpc();
+  }
+  // Tick жителей
+  for (let i = _parkingNpcs.length - 1; i >= 0; i--) {
+    const n = _parkingNpcs[i];
+    n.life -= dt;
+    // Машина была угнана/уничтожена — житель «теряет» машину и уходит
+    if (!n.car || n.car._wrecked || !n.car.parked) {
+      // Просто исчезаем через короткое время
+      n.life = Math.min(n.life, 4);
+    }
+    const speed = (n.state === 'returning') ? 1.5 : 1.2;
+    if (n.state === 'walking_to') {
+      const dr = n.tgtR - n.r, dc = n.tgtC - n.c;
+      const d = Math.hypot(dr, dc);
+      if (d < 0.3) {
+        n.state = 'idle_at';
+        n.idleUntil = now + 7000 + Math.random() * 8000;
+      } else {
+        const step = Math.min(d, speed * dt);
+        n.r += (dr / d) * step;
+        n.c += (dc / d) * step;
+        n.ang = Math.atan2(dr, dc);
+        n.walkPhase += dt * 7;
+      }
+    } else if (n.state === 'idle_at') {
+      // Стоит — лёгкое idle bobbing головы
+      n.ang += Math.sin(now * 0.001 + i) * dt * 0.4;
+      if (now >= n.idleUntil) n.state = 'returning';
+    } else if (n.state === 'returning') {
+      if (!n.car) { _parkingNpcs.splice(i, 1); continue; }
+      const dr = n.car.r - n.r, dc = n.car.c - n.c;
+      const d = Math.hypot(dr, dc);
+      if (d < 0.5) {
+        n.state = 'getting_in';
+        n.idleUntil = now + 400;
+      } else {
+        const step = Math.min(d, speed * dt);
+        n.r += (dr / d) * step;
+        n.c += (dc / d) * step;
+        n.ang = Math.atan2(dr, dc);
+        n.walkPhase += dt * 8;
+      }
+    } else if (n.state === 'getting_in') {
+      if (now >= n.idleUntil) {
+        // Сел в машину — «отдыхает» до следующего раунда. Чтобы не плодить,
+        // просто удалим (новый житель спавнится отдельно через _spawnParkingNpc).
+        _parkingNpcs.splice(i, 1);
+        continue;
+      }
+    }
+    if (n.life <= 0) _parkingNpcs.splice(i, 1);
+  }
+}
+function drawParkingNpc(n) {
+  // Если внутри машины (state не walking/idle/returning/getting_in) — не рисуем
+  if (n.state === 'sitting') return;
+  const p = w2s(n.r, n.c);
+  // Лёгкое затухание если жизнь кончается
+  let alpha = 1;
+  if (n.life < 1.5) alpha = Math.max(0, n.life / 1.5);
+  ctx.save();
+  if (alpha < 1) ctx.globalAlpha = alpha;
+  drawPerson(p.x, p.y, n.ang, n.look, n.walkPhase, null, null,
+             false, null, null, false, 0);
+  ctx.restore();
 }
 
 // Спавн фиксированной парковки банды — 3 машины подряд у тротуара.
@@ -4458,6 +4935,18 @@ function updateCars(dt) {
     // Парковочные тачки — статичные, не двигаются, не уезжают, не
     // респаунятся за границей карты. Только рисуются + угоняются по lockpick.
     if (car.parked) { car.braking = false; continue; }
+    // Угон в процессе — стоит на месте, ждёт civilian_hijack_reply.
+    // Failsafe: если сервер не ответил за 2с — сбрасываем флаг, машина
+    // продолжит ездить как ни в чём не бывало (вероятно угон зафейлился
+    // молча — например WS-разрыв или race с другим игроком).
+    if (car._hijackPending) {
+      if (performance.now() - car._hijackPending > 2000) {
+        car._hijackPending = 0;
+      } else {
+        car.braking = true;
+        continue;
+      }
+    }
     // Разбитая в столкновении NPC-машина — переспаун через ~600мс.
     // Wrecked-тачки респаунятся ПОДАЛЬШЕ — иначе игрок видит как остов
     // мгновенно «превращается» в новую машину.
@@ -4560,8 +5049,9 @@ function s2w(x, y) {
 // что и drawWeaponInHands — гарантирует «пуля вылетает из дула», а не
 // «из груди» или «из-за спины».
 function muzzleWorldPoint(angleRad) {
-  const wep = resolveWeapon(currentWeapon);
-  const tip = FIREARM_TIP[wep] || 16;
+  // Берём tip по РЕАЛЬНОМУ id (deagle ≠ pistol_heavy по длине ствола),
+  // с fallback'ом через weaponTip на resolved-класс.
+  const tip = weaponTip(currentWeapon);
   const playerScale = 0.9;
   const sc = playerScale * (TS / 60);
   // Экранная позиция игрока (центр клетки)
@@ -4662,10 +5152,314 @@ const WEAPON_FX_CFG = {
   rpg:          { range: 11, color: '#ff6020', spread: 0,    dmg: 90, thick: true, explosive: true, muzzleD: 1.13, twoHanded: true },
 };
 // Foregrip — где вторая рука держит цевье (в долях от длины ствола).
-// Использует drawWeaponInHands при twoHanded=true.
+// Использует drawWeaponInHands при twoHanded=true. Ключи — реальные id,
+// fallback через resolveWeapon.
 const FIREARM_FOREGRIP = {
-  shotgun: 0.40, smg: 0.36, tommy_gun: 0.36,
-  rifle: 0.42, sniper: 0.46, rpg: 0.42,
+  shotgun: 0.40, sawn_off: 0.22,
+  smg: 0.36, uzi: 0.26, mp5: 0.34, ump: 0.40, golden_uzi: 0.26,
+  tommy_gun: 0.42,
+  rifle: 0.42, ak: 0.40, ak74: 0.40, m4: 0.44, m16: 0.46,
+  sniper: 0.46, rpg: 0.42,
+};
+function weaponForegrip(w) {
+  if (FIREARM_FOREGRIP[w] != null) return FIREARM_FOREGRIP[w];
+  return FIREARM_FOREGRIP[resolveWeapon(w)] || 0.36;
+}
+// Карта силуэтов оружий. Заполняется ЗДЕСЬ (а не в конце файла), потому
+// что renderWeaponHud() на верхнем уровне вызывает drawFirearm уже до
+// рисования сцены — таблица должна быть готова. Каждая функция рисует
+// силуэт оружия: ствол вправо, хват в (0,0), масштаб через sc.
+const _FIREARM_DRAW = {
+  pistol: (c, sc) => {
+    c.fillStyle = '#2a2a30'; c.fillRect(-2*sc, -3*sc, 16*sc, 5*sc);
+    c.fillStyle = '#1a1a20'; c.fillRect(0, -5*sc, 13*sc, 2*sc);
+    c.fillStyle = '#3a3a3a'; c.fillRect(11*sc, -6*sc, 1.5*sc, 1.5*sc);
+    c.fillStyle = '#1a1010'; c.fillRect(-3*sc, 1*sc, 5*sc, 7*sc);
+  },
+  tt: (c, sc) => {
+    c.fillStyle = '#3a2a26'; c.fillRect(-3*sc, 1*sc, 5*sc, 8*sc);
+    c.fillStyle = '#5a1010'; c.beginPath();
+    c.arc(-0.5*sc, 5*sc, 1.4*sc, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#1c1c22'; c.fillRect(-1*sc, -3*sc, 17*sc, 4.5*sc);
+    c.fillStyle = '#2a2a30'; c.fillRect(2*sc, -4.5*sc, 13*sc, 1.5*sc);
+    c.fillStyle = '#0a0a10'; c.fillRect(-3*sc, -3*sc, 1.5*sc, 4*sc);
+    c.fillStyle = '#3a3a3a'; c.fillRect(13*sc, -5*sc, 1.5*sc, 1.5*sc);
+  },
+  tt_pistol: (c, sc) => _FIREARM_DRAW.tt(c, sc),
+  nagan: (c, sc) => {
+    c.fillStyle = '#1a1a1e'; c.fillRect(-3*sc, 1*sc, 5*sc, 7*sc);
+    c.fillStyle = '#2a2a30'; c.fillRect(-1*sc, -2*sc, 4*sc, 4*sc);
+    c.fillStyle = '#1a1a20';
+    c.beginPath(); c.arc(2*sc, -0.5*sc, 3.4*sc, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#3a3a44';
+    c.beginPath(); c.arc(2*sc, -0.5*sc, 2.5*sc, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#0a0a10';
+    for (let i = 0; i < 5; i++) {
+      const a = (Math.PI*2*i)/5 - Math.PI/2;
+      c.beginPath();
+      c.arc(2*sc + Math.cos(a)*1.5*sc, -0.5*sc + Math.sin(a)*1.5*sc, 0.6*sc, 0, Math.PI*2);
+      c.fill();
+    }
+    c.fillStyle = '#1c1c22'; c.fillRect(5*sc, -1.4*sc, 8*sc, 2.4*sc);
+    c.fillStyle = '#2a2a30'; c.fillRect(5*sc, -2*sc, 8*sc, 0.8*sc);
+    c.fillStyle = '#444';    c.fillRect(12*sc, -2.5*sc, 0.8*sc, 0.8*sc);
+  },
+  glock: (c, sc) => {
+    c.fillStyle = '#1a1a1e'; c.fillRect(-2*sc, -3*sc, 15*sc, 5*sc);
+    c.fillStyle = '#0e0e12'; c.fillRect(-2*sc, -3*sc, 15*sc, 1*sc);
+    c.fillStyle = '#26262c'; c.fillRect(-2*sc, 1*sc, 15*sc, 1*sc);
+    c.fillStyle = '#2a2a30'; c.fillRect(11*sc, -4*sc, 1.5*sc, 1.5*sc);
+    c.fillStyle = '#15151a'; c.fillRect(-3*sc, 2*sc, 5*sc, 7*sc);
+    c.fillStyle = '#0a0a10';
+    c.fillRect(-3*sc, 4*sc, 5*sc, 0.6*sc);
+    c.fillRect(-3*sc, 6*sc, 5*sc, 0.6*sc);
+  },
+  pm: (c, sc) => {
+    c.fillStyle = '#1c1c1e'; c.fillRect(-2*sc, -3*sc, 13*sc, 5*sc);
+    c.fillStyle = '#0e0e12'; c.fillRect(-2*sc, -4*sc, 11*sc, 1.5*sc);
+    c.fillStyle = '#2a2a30'; c.fillRect(9*sc, -5*sc, 1.5*sc, 1.5*sc);
+    c.fillStyle = '#2a1410'; c.fillRect(-3*sc, 1*sc, 5*sc, 6*sc);
+  },
+  pistol_heavy: (c, sc) => {
+    c.fillStyle = '#2a2226'; c.fillRect(-3*sc, -4*sc, 22*sc, 6*sc);
+    c.fillStyle = '#1a1216'; c.fillRect(0, -6*sc, 18*sc, 2*sc);
+    c.fillStyle = '#3a3a3a'; c.fillRect(16*sc, -7*sc, 2*sc, 1.5*sc);
+    c.fillStyle = '#5a3a1a'; c.fillRect(-4*sc, 1*sc, 6*sc, 8*sc);
+    c.fillStyle = '#3a2410'; c.fillRect(-4*sc, 1*sc, 6*sc, 1*sc);
+  },
+  desert_eagle: (c, sc) => {
+    c.fillStyle = '#3a3038'; c.fillRect(-3*sc, -4*sc, 23*sc, 6.5*sc);
+    c.fillStyle = '#5a4a55'; c.fillRect(0, -6*sc, 20*sc, 2*sc);
+    c.fillStyle = '#1a1216';
+    for (let i = 0; i < 5; i++) c.fillRect((4 + i*3)*sc, -5.4*sc, 1.6*sc, 0.7*sc);
+    c.fillStyle = '#5a5a5a'; c.fillRect(18*sc, -7*sc, 2*sc, 1.6*sc);
+    c.fillStyle = '#1a0808'; c.fillRect(-4*sc, 1*sc, 6.5*sc, 8.5*sc);
+    c.fillStyle = '#3a1a0a'; c.fillRect(-4*sc, 1*sc, 6.5*sc, 1*sc);
+  },
+  deagle: (c, sc) => _FIREARM_DRAW.desert_eagle(c, sc),
+  revolver: (c, sc) => {
+    c.fillStyle = '#1a1a22'; c.fillRect(-3*sc, 1*sc, 5*sc, 8*sc);
+    c.fillStyle = '#2a2a32'; c.fillRect(-1*sc, -2*sc, 5*sc, 4*sc);
+    c.fillStyle = '#1a1a20';
+    c.beginPath(); c.arc(2.5*sc, -0.5*sc, 4*sc, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#3a3a44';
+    c.beginPath(); c.arc(2.5*sc, -0.5*sc, 3*sc, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#0a0a10';
+    for (let i = 0; i < 6; i++) {
+      const a = (Math.PI*2*i)/6 - Math.PI/2;
+      c.beginPath();
+      c.arc(2.5*sc + Math.cos(a)*1.8*sc, -0.5*sc + Math.sin(a)*1.8*sc, 0.7*sc, 0, Math.PI*2);
+      c.fill();
+    }
+    c.fillStyle = '#1c1c24'; c.fillRect(6*sc, -1.4*sc, 8*sc, 2.6*sc);
+    c.fillStyle = '#2a2a30'; c.fillRect(6*sc, -2.2*sc, 8*sc, 1*sc);
+    c.fillStyle = '#444';    c.fillRect(13*sc, -3*sc, 1*sc, 1*sc);
+  },
+  pistol_gold: (c, sc) => {
+    c.fillStyle = '#c89030'; c.fillRect(-3*sc, -4*sc, 20*sc, 6*sc);
+    c.fillStyle = '#ffd76b'; c.fillRect(0, -6*sc, 16*sc, 2*sc);
+    c.fillStyle = '#a06010'; c.fillRect(0, 0, 16*sc, 1*sc);
+    c.fillStyle = '#3a1a0a'; c.fillRect(-4*sc, 1*sc, 6*sc, 7*sc);
+    c.fillStyle = '#e8c96e'; c.fillRect(-3*sc, 2*sc, 1*sc, 5*sc);
+  },
+  golden_colt: (c, sc) => {
+    c.fillStyle = '#c89030'; c.fillRect(-3*sc, -4*sc, 20*sc, 6*sc);
+    c.fillStyle = '#ffd76b'; c.fillRect(0, -6*sc, 16*sc, 2*sc);
+    c.fillStyle = '#a06010'; c.fillRect(0, 0, 16*sc, 1*sc);
+    c.fillStyle = '#5a3010'; c.fillRect(-4*sc, 1*sc, 6*sc, 7.5*sc);
+    c.fillStyle = '#3a1a0a'; c.fillRect(-4*sc, 1*sc, 6*sc, 1*sc);
+    c.fillStyle = '#ffd76b';
+    c.beginPath(); c.arc(-1*sc, 4*sc, 0.6*sc, 0, Math.PI*2); c.fill();
+    c.beginPath(); c.arc(-1*sc, 6*sc, 0.6*sc, 0, Math.PI*2); c.fill();
+  },
+  shotgun: (c, sc) => {
+    c.fillStyle = '#5a3a1a'; c.fillRect(-15*sc, -2*sc, 13*sc, 6*sc);
+    c.fillStyle = '#3a2410'; c.fillRect(-15*sc, 3*sc, 13*sc, 1*sc);
+    c.fillStyle = '#2a2628'; c.fillRect(-3*sc, -4*sc, 30*sc, 4*sc);
+    c.fillStyle = '#4a3a1a'; c.fillRect(8*sc, -1*sc, 9*sc, 4*sc);
+    c.fillStyle = '#1a1618'; c.fillRect(24*sc, -5*sc, 4*sc, 2*sc);
+    c.fillStyle = '#1a1010'; c.fillRect(-4*sc, 1*sc, 5*sc, 7*sc);
+  },
+  sawn_off: (c, sc) => {
+    c.fillStyle = '#5a3a1a'; c.fillRect(-8*sc, -1*sc, 7*sc, 5*sc);
+    c.fillStyle = '#3a2410'; c.fillRect(-8*sc, 3*sc, 7*sc, 1*sc);
+    c.fillStyle = '#2a2628'; c.fillRect(-2*sc, -4*sc, 16*sc, 2.6*sc);
+    c.fillStyle = '#2a2628'; c.fillRect(-2*sc, -0.7*sc, 16*sc, 2.6*sc);
+    c.fillStyle = '#1a1618'; c.fillRect(-2*sc, -1.4*sc, 16*sc, 0.7*sc);
+    c.fillStyle = '#3a3a3a'; c.fillRect(12*sc, -5*sc, 1.5*sc, 1.2*sc);
+    c.fillStyle = '#1a1010'; c.fillRect(-3*sc, 1*sc, 4*sc, 7*sc);
+  },
+  smg: (c, sc) => {
+    c.fillStyle = '#1a1a20'; c.fillRect(-4*sc, -3*sc, 22*sc, 5*sc);
+    c.fillStyle = '#0a0a0c'; c.fillRect(16*sc, -4*sc, 5*sc, 2*sc);
+    c.fillStyle = '#2a2a32'; c.fillRect(2*sc, 2*sc, 4.5*sc, 11*sc);
+    c.fillStyle = '#1a1a20'; c.fillRect(13*sc, 1*sc, 3.5*sc, 6*sc);
+    c.fillStyle = '#1a1010'; c.fillRect(-5*sc, 1*sc, 5*sc, 7*sc);
+    c.fillStyle = '#2a2a30'; c.fillRect(2*sc, -5*sc, 6*sc, 2*sc);
+  },
+  uzi: (c, sc) => {
+    c.fillStyle = '#1a1a22'; c.fillRect(-4*sc, -3.5*sc, 14*sc, 6*sc);
+    c.fillStyle = '#0a0a10'; c.fillRect(-4*sc, -3.5*sc, 14*sc, 1*sc);
+    c.fillStyle = '#2a2a32'; c.fillRect(10*sc, -2*sc, 6*sc, 3*sc);
+    c.fillStyle = '#3a3a40'; c.fillRect(8*sc, -5*sc, 2*sc, 2*sc);
+    c.fillStyle = '#1a1a20'; c.fillRect(-2.5*sc, 2.5*sc, 4*sc, 11*sc);
+    c.fillStyle = '#3a3a40'; c.fillRect(-2.5*sc, 12.5*sc, 4*sc, 1.5*sc);
+    c.fillStyle = '#0a0a10'; c.fillRect(-3.5*sc, 0.5*sc, 6*sc, 2*sc);
+  },
+  golden_uzi: (c, sc) => {
+    c.fillStyle = '#c89030'; c.fillRect(-4*sc, -3.5*sc, 14*sc, 6*sc);
+    c.fillStyle = '#a06010'; c.fillRect(-4*sc, -3.5*sc, 14*sc, 1*sc);
+    c.fillStyle = '#ffd76b'; c.fillRect(10*sc, -2*sc, 6*sc, 3*sc);
+    c.fillStyle = '#ffe88a'; c.fillRect(8*sc, -5*sc, 2*sc, 2*sc);
+    c.fillStyle = '#c89030'; c.fillRect(-2.5*sc, 2.5*sc, 4*sc, 11*sc);
+    c.fillStyle = '#ffd76b'; c.fillRect(-2.5*sc, 12.5*sc, 4*sc, 1.5*sc);
+    c.fillStyle = '#a06010'; c.fillRect(-3.5*sc, 0.5*sc, 6*sc, 2*sc);
+  },
+  mp5: (c, sc) => {
+    c.fillStyle = '#1a1a20'; c.fillRect(-4*sc, -3*sc, 20*sc, 5*sc);
+    c.fillStyle = '#0e0e14'; c.fillRect(-4*sc, -3*sc, 20*sc, 1*sc);
+    c.fillStyle = '#2a2a32'; c.fillRect(15*sc, -2.5*sc, 5*sc, 3*sc);
+    c.fillStyle = '#1c1c24';
+    c.beginPath();
+    c.moveTo(2*sc, 2*sc);  c.lineTo(7*sc, 2*sc);
+    c.lineTo(8*sc, 12*sc); c.lineTo(1*sc, 13*sc);
+    c.closePath(); c.fill();
+    c.fillStyle = '#0a0a10'; c.fillRect(1*sc, 12.5*sc, 8*sc, 1*sc);
+    c.fillStyle = '#1a1010'; c.fillRect(-5*sc, 1*sc, 5*sc, 7*sc);
+    c.fillStyle = '#3a3a40'; c.fillRect(15*sc, -5*sc, 1*sc, 2*sc);
+  },
+  ump: (c, sc) => {
+    c.fillStyle = '#23232a'; c.fillRect(-6*sc, -3*sc, 22*sc, 5*sc);
+    c.fillStyle = '#15151a'; c.fillRect(-6*sc, -3*sc, 22*sc, 1*sc);
+    c.fillStyle = '#33333a'; c.fillRect(16*sc, -2.5*sc, 6*sc, 3*sc);
+    c.fillStyle = '#1c1c22'; c.fillRect(0*sc, 2*sc, 5*sc, 12*sc);
+    c.fillStyle = '#0a0a10'; c.fillRect(0*sc, 13.5*sc, 5*sc, 0.8*sc);
+    c.fillStyle = '#1a1010'; c.fillRect(-7*sc, 1*sc, 5*sc, 7*sc);
+    c.fillStyle = '#0a0a10';
+    for (let i = 0; i < 6; i++) c.fillRect((-3+i*2.5)*sc, -4*sc, 1.5*sc, 1*sc);
+  },
+  tommy_gun: (c, sc) => {
+    c.fillStyle = '#5a3a1a'; c.fillRect(-9*sc, -1.5*sc, 6*sc, 5*sc);
+    c.fillStyle = '#3a2410'; c.fillRect(-9*sc, 3*sc, 6*sc, 1*sc);
+    c.fillStyle = '#1c1c22'; c.fillRect(-3*sc, -3*sc, 22*sc, 5*sc);
+    c.fillStyle = '#2a2a32'; c.fillRect(-3*sc, -3*sc, 22*sc, 1*sc);
+    c.fillStyle = '#0a0a10'; c.fillRect(19*sc, -2.5*sc, 6*sc, 2.6*sc);
+    c.fillStyle = '#5a3a1a'; c.fillRect(12*sc, 2*sc, 4*sc, 7*sc);
+    c.fillStyle = '#3a2410'; c.fillRect(12*sc, 2*sc, 4*sc, 1*sc);
+    c.fillStyle = '#0a0a12';
+    c.beginPath(); c.arc(5*sc, 6*sc, 5.5*sc, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#3a3a45';
+    c.beginPath(); c.arc(5*sc, 6*sc, 4.5*sc, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#1a1a22';
+    c.beginPath(); c.arc(5*sc, 6*sc, 1.5*sc, 0, Math.PI*2); c.fill();
+    c.strokeStyle = '#0a0a12'; c.lineWidth = 0.8*sc;
+    for (let i = 0; i < 4; i++) {
+      const a = i * Math.PI / 4;
+      c.beginPath();
+      c.moveTo(5*sc + Math.cos(a)*1.5*sc, 6*sc + Math.sin(a)*1.5*sc);
+      c.lineTo(5*sc + Math.cos(a)*4.4*sc, 6*sc + Math.sin(a)*4.4*sc);
+      c.stroke();
+    }
+    c.fillStyle = '#1a1010'; c.fillRect(-4*sc, 1*sc, 4*sc, 6*sc);
+  },
+  rifle: (c, sc) => {
+    c.fillStyle = '#5a3a1a'; c.fillRect(-15*sc, -2*sc, 13*sc, 6*sc);
+    c.fillStyle = '#3a2410'; c.fillRect(-15*sc, 3*sc, 13*sc, 1*sc);
+    c.fillStyle = '#2a2a30'; c.fillRect(-3*sc, -3*sc, 34*sc, 4*sc);
+    c.fillStyle = '#3a3a40'; c.fillRect(2*sc, -5*sc, 5*sc, 2*sc);
+    c.fillRect(26*sc, -5*sc, 2*sc, 2*sc);
+    c.fillStyle = '#1a1010'; c.fillRect(-1*sc, 1*sc, 4*sc, 9*sc);
+    c.fillStyle = '#1a1010'; c.fillRect(-5*sc, 1*sc, 5*sc, 7*sc);
+  },
+  ak: (c, sc) => {
+    c.fillStyle = '#5a3a1a'; c.fillRect(-15*sc, -2*sc, 11*sc, 6*sc);
+    c.fillStyle = '#3a2410'; c.fillRect(-15*sc, 3*sc, 11*sc, 1*sc);
+    c.fillStyle = '#2a2228'; c.fillRect(-5*sc, -3*sc, 22*sc, 4*sc);
+    c.fillStyle = '#5a3a1a'; c.fillRect(8*sc, -3.5*sc, 10*sc, 1*sc);
+    c.fillStyle = '#1c1c22'; c.fillRect(17*sc, -3*sc, 14*sc, 3*sc);
+    c.fillStyle = '#3a3a40'; c.fillRect(20*sc, -5*sc, 2*sc, 2*sc);
+    c.fillStyle = '#3a3a40'; c.fillRect(28*sc, -5*sc, 1.5*sc, 2*sc);
+    c.fillStyle = '#1c1c22';
+    c.beginPath();
+    c.moveTo(-2*sc, 1*sc); c.lineTo(6*sc, 1*sc);
+    c.lineTo(8*sc, 11*sc); c.lineTo(-4*sc, 12*sc);
+    c.closePath(); c.fill();
+    c.fillStyle = '#0a0a10'; c.fillRect(-4*sc, 11.5*sc, 12.5*sc, 1*sc);
+    c.fillStyle = '#1a1010'; c.fillRect(-5*sc, 1*sc, 4.5*sc, 6.5*sc);
+  },
+  ak74: (c, sc) => {
+    c.fillStyle = '#46202a'; c.fillRect(-15*sc, -2*sc, 11*sc, 6*sc);
+    c.fillStyle = '#2a1018'; c.fillRect(-15*sc, 3*sc, 11*sc, 1*sc);
+    c.fillStyle = '#1c1c20'; c.fillRect(-5*sc, -3*sc, 22*sc, 4*sc);
+    c.fillStyle = '#46202a'; c.fillRect(8*sc, -3.5*sc, 10*sc, 1*sc);
+    c.fillStyle = '#1a1a1e'; c.fillRect(17*sc, -3*sc, 12*sc, 3*sc);
+    c.fillStyle = '#2a2a30'; c.fillRect(20*sc, -5*sc, 2*sc, 2*sc);
+    c.fillStyle = '#1a1a1e'; c.fillRect(28*sc, -3.6*sc, 4*sc, 4.2*sc);
+    c.fillStyle = '#3a3a44'; c.fillRect(28*sc, -3.6*sc, 4*sc, 1*sc);
+    c.fillStyle = '#46202a';
+    c.beginPath();
+    c.moveTo(-2*sc, 1*sc); c.lineTo(6*sc, 1*sc);
+    c.lineTo(8*sc, 11*sc); c.lineTo(-4*sc, 12*sc);
+    c.closePath(); c.fill();
+    c.fillStyle = '#1a1010'; c.fillRect(-5*sc, 1*sc, 4.5*sc, 6.5*sc);
+  },
+  m4: (c, sc) => {
+    c.fillStyle = '#22222a'; c.fillRect(-14*sc, -2*sc, 11*sc, 5.5*sc);
+    c.fillStyle = '#0e0e14'; c.fillRect(-14*sc, 0.5*sc, 11*sc, 1*sc);
+    c.fillStyle = '#15151a'; c.fillRect(-5*sc, -3*sc, 24*sc, 4*sc);
+    c.fillStyle = '#1c1c22'; c.fillRect(19*sc, -2.5*sc, 13*sc, 3*sc);
+    c.fillStyle = '#0a0a10';
+    for (let i = 0; i < 8; i++) c.fillRect((-3+i*2.6)*sc, -4*sc, 1.6*sc, 1*sc);
+    c.fillStyle = '#3a3a44'; c.fillRect(29*sc, -4*sc, 1.5*sc, 1.5*sc);
+    c.fillStyle = '#1c1c22'; c.fillRect(0*sc, 1*sc, 5*sc, 11*sc);
+    c.fillStyle = '#0a0a10'; c.fillRect(0*sc, 11.5*sc, 5*sc, 1*sc);
+    c.fillStyle = '#1a1010'; c.fillRect(-6*sc, 1*sc, 5*sc, 6.5*sc);
+  },
+  m16: (c, sc) => {
+    c.fillStyle = '#22222a'; c.fillRect(-15*sc, -2*sc, 12*sc, 5.5*sc);
+    c.fillStyle = '#0e0e14'; c.fillRect(-15*sc, 0.5*sc, 12*sc, 1*sc);
+    c.fillStyle = '#15151a'; c.fillRect(-5*sc, -3*sc, 26*sc, 4*sc);
+    c.fillStyle = '#1c1c22'; c.fillRect(21*sc, -2.5*sc, 13*sc, 3*sc);
+    c.fillStyle = '#3a3a44';
+    c.beginPath();
+    c.moveTo(30*sc, -5*sc); c.lineTo(33*sc, -3*sc); c.lineTo(27*sc, -3*sc);
+    c.closePath(); c.fill();
+    c.fillStyle = '#1c1c22'; c.fillRect(0*sc, -5*sc, 12*sc, 2*sc);
+    c.fillStyle = '#0a0a10'; c.fillRect(0*sc, -5*sc, 12*sc, 0.6*sc);
+    c.fillStyle = '#1c1c22'; c.fillRect(0*sc, 1*sc, 5*sc, 11*sc);
+    c.fillStyle = '#0a0a10'; c.fillRect(0*sc, 11.5*sc, 5*sc, 1*sc);
+    c.fillStyle = '#1a1010'; c.fillRect(-6*sc, 1*sc, 5*sc, 6.5*sc);
+  },
+  sniper: (c, sc) => {
+    c.fillStyle = '#5a3a1a'; c.fillRect(-16*sc, -2*sc, 14*sc, 7*sc);
+    c.fillStyle = '#3a2410'; c.fillRect(-16*sc, 4*sc, 14*sc, 1*sc);
+    c.fillStyle = '#2a352a'; c.fillRect(-3*sc, -2.5*sc, 44*sc, 3*sc);
+    c.fillStyle = '#1a251a'; c.fillRect(40*sc, -4*sc, 5*sc, 2*sc);
+    c.fillStyle = '#0a0a0c'; c.fillRect(2*sc, -8*sc, 14*sc, 4*sc);
+    c.fillStyle = '#1a1a20'; c.fillRect(2*sc, -9*sc, 14*sc, 1.5*sc);
+    c.fillStyle = '#3a3a45'; c.fillRect(15*sc, -7*sc, 1*sc, 3*sc);
+    c.fillStyle = '#1a1010'; c.fillRect(-5*sc, 1*sc, 5*sc, 7*sc);
+    c.strokeStyle = '#1a1a20'; c.lineWidth = 1.3*sc;
+    c.beginPath();
+    c.moveTo(32*sc, 0); c.lineTo(35*sc, 8*sc);
+    c.moveTo(32*sc, 0); c.lineTo(29*sc, 8*sc);
+    c.stroke();
+  },
+  rpg: (c, sc) => {
+    c.fillStyle = '#3a4a30'; c.fillRect(-20*sc, -5*sc, 52*sc, 8*sc);
+    c.fillStyle = '#2a3a20'; c.fillRect(-20*sc, -6*sc, 52*sc, 1.2*sc);
+    c.fillStyle = '#5a6a45'; c.fillRect(-20*sc, 2*sc, 52*sc, 1*sc);
+    c.fillStyle = '#2a1a10';
+    c.beginPath();
+    c.moveTo(32*sc, -5*sc); c.lineTo(44*sc, 0); c.lineTo(32*sc, 3*sc);
+    c.closePath(); c.fill();
+    c.fillStyle = '#5a2010'; c.fillRect(28*sc, -5*sc, 4*sc, 8*sc);
+    c.fillStyle = '#2a2a30'; c.fillRect(-2*sc, -8*sc, 5*sc, 3*sc);
+    c.fillStyle = '#1a1010'; c.fillRect(-5*sc, 3*sc, 5*sc, 9*sc);
+  },
+  _default: (c, sc) => {
+    c.fillStyle = '#333'; c.fillRect(0, -2*sc, 16*sc, 4*sc);
+  },
 };
 // Тайлов/сек. Было 12 — пуля видимо «летела», но сервер отнимал hp мгновенно,
 // и игрок видел «hp упало, а пули нет». 22 — баланс между видимостью трассера
@@ -4676,8 +5470,12 @@ const ARM_TILES = 0.36;   // длина руки в тайлах (см. handAnch
 // Используем в spawnBullet/spawnMuzzle чтобы пуля стартовала ровно с
 // кончика рисованного ствола (а не «из груди» или из-за дула).
 function weaponMuzzleD(weapon, scale) {
-  const w   = resolveWeapon(weapon);
-  const tip = FIREARM_TIP_DEFER[w] != null ? FIREARM_TIP_DEFER[w] : 16;
+  // Сначала пробуем реальный id, потом resolved-класс.
+  let tip = FIREARM_TIP_DEFER[weapon];
+  if (tip == null) {
+    const w = resolveWeapon(weapon);
+    tip = FIREARM_TIP_DEFER[w] != null ? FIREARM_TIP_DEFER[w] : 16;
+  }
   return (ARM_TILES + tip / 60) * (scale || 1.0);
 }
 // FIREARM_TIP объявлен ниже в файле — здесь только прокси-объект, его
@@ -5719,10 +6517,28 @@ function handleEventPacket(d) {
       _exitRequested = false;
       player.r = d.y;
       player.c = d.x;
-    } else if (d.reason === 'busy') {
-      showToast('🚗 Сначала выйди из текущей машины', '⚠️', 2200);
+      // Сейчас quest_car-civilian создан — пора убрать NPC-«двойника»
+      // из CARS (он стоял с _hijackPending до этого момента). Берём
+      // ближайший к позиции серверного спавна.
+      let bestIdx = -1, bestD = Infinity;
+      for (let i = 0; i < CARS.length; i++) {
+        const c = CARS[i];
+        if (!c._hijackPending) continue;
+        const dd = Math.hypot(c.r - d.y, c.c - d.x);
+        if (dd < bestD) { bestD = dd; bestIdx = i; }
+      }
+      if (bestIdx >= 0) CARS.splice(bestIdx, 1);
     } else {
-      showToast('❌ Не получилось угнать', '⚠️', 2000);
+      // Сервер не подтвердил — возвращаем NPC-машине нормальное состояние,
+      // иначе она навсегда останется «замороженной» с _hijackPending.
+      for (const c of CARS) {
+        if (c._hijackPending) { c._hijackPending = 0; }
+      }
+      if (d.reason === 'busy') {
+        showToast('🚗 Сначала выйди из текущей машины', '⚠️', 2200);
+      } else {
+        showToast('❌ Не получилось угнать', '⚠️', 2000);
+      }
     }
   } else if (kind === 'gta_take_reply') {
     if (d.ok) {
@@ -5775,7 +6591,43 @@ function handleEventPacket(d) {
     myBoxStatus.limit       = d.limit       | 0;
     myBoxStatus.reset_in_s  = d.reset_in_s  | 0;
     myBoxStatus.active      = d.active || null;
+    const fcd = d.fail_cd_s | 0;
+    myBoxStatus.fail_cd_s     = fcd;
+    myBoxStatus._fail_until_t = fcd > 0 ? (performance.now() + fcd * 1000) : 0;
     refreshMichaelMenu();
+  } else if (kind === 'box_abandon_reply') {
+    // Сервер подтвердил отмену — фиксируем кулдаун локально сразу,
+    // чтобы кнопка Майкла показала отсчёт без ожидания box_status.
+    if (d.ok) {
+      const w = d.wait_s | 0;
+      myBoxStatus.fail_cd_s     = w;
+      myBoxStatus._fail_until_t = performance.now() + w * 1000;
+      refreshMichaelMenu();
+    }
+  } else if (kind === 'respawn_status') {
+    // Снапшот: текущая точка + список купленных бизнесов.
+    // Приходит при коннекте, при открытии модалки выбора, и после
+    // покупки нового бизнеса (сервер обновляет _owned_biz и шлёт нам).
+    myRespawnPoint = String(d.point || 'hospital');
+    myOwnedBiz = Array.isArray(d.owned) ? d.owned.slice() : [];
+    refreshDeathRpLabel();
+    if (_respawnModal && _respawnModal.classList.contains('show')) {
+      refreshRespawnList();
+    }
+  } else if (kind === 'set_respawn_reply') {
+    if (d.ok) {
+      myRespawnPoint = String(d.respawn_point || 'hospital');
+      refreshDeathRpLabel();
+      if (_respawnModal && _respawnModal.classList.contains('show')) {
+        refreshRespawnList();
+      }
+      const lbl = _respawnPointLabel(myRespawnPoint);
+      showToast(`✅ Точка респа: ${lbl}`, '🏥', 2200);
+    } else if (d.reason === 'not_owned') {
+      showToast('🔒 Сначала купи этот бизнес', '⚠️', 2200);
+    } else if (d.reason === 'bad_biz') {
+      showToast('❌ Неизвестная точка', '⚠️', 1800);
+    }
   } else if (kind === 'box_take_reply') {
     if (d.ok) {
       myBoxStatus.active = {
@@ -5790,6 +6642,15 @@ function handleEventPacket(d) {
       showToast(`🚫 Сегодня уже ${d.limit || 5} доставок — приходи через ~${mins} мин`, '⏳', 4000);
     } else if (d.reason === 'has_active') {
       showToast('📦 У тебя уже есть активная доставка', '⚠️', 2500);
+    } else if (d.reason === 'fail_cd') {
+      // Штраф за провал прошлой доставки — сохраняем дедлайн локально,
+      // чтобы кнопка Майкла тикала без лишних round-trip к серверу.
+      const w = d.wait_s | 0;
+      myBoxStatus.fail_cd_s     = w;
+      myBoxStatus._fail_until_t = performance.now() + w * 1000;
+      const mins = Math.ceil(w / 60);
+      showToast(`🚷 Майкл зол — приходи через ~${mins} мин`, '⏳', 3500);
+      refreshMichaelMenu();
     } else {
       showToast('❌ Майкл не дал контракт. Попробуй позже.', '⚠️', 2500);
     }
@@ -5797,8 +6658,6 @@ function handleEventPacket(d) {
     if (d.ok) {
       if (myBoxStatus.active) myBoxStatus.active.state = 'carrying';
       showToast('📦 Коробка у тебя — везти по адресу', '✅', 2500);
-      // Анимация поднятия: коробка появляется на земле рядом и за
-      // 700мс «всплывает» к финальной позиции над головой.
       _boxAnim = { kind: 'pickup', startT: performance.now(), dur: 700 };
     } else if (d.reason === 'too_far') {
       showToast('🚫 Подойди ближе к пирсу', '⚠️', 1500);
@@ -6274,6 +7133,9 @@ function wsConnect() {
       // Запрашиваем GTA-статус (активный контракт + счётчик) сразу после
       // hello — чтобы HUD при перезаходе показывал текущий заказ Майкла.
       try { ws.send(JSON.stringify({ t: 'gta_status', d: {} })); } catch(e){}
+      // Точка респавна + список купленных бизнесов — чтобы при выходе
+      // из dead-overlay лейбл уже знал «🏥 Госпиталь» или «☕ Кофейня».
+      try { ws.send(JSON.stringify({ t: 'respawn_status', d: {} })); } catch(e){}
     } else if (pkt.t === 'shot') {
       // Серверный broadcast выстрела. Рисуем трассер и при попадании —
       // эффект на цели.
@@ -6332,8 +7194,17 @@ function wsConnect() {
         if (!wasDead && myDead) {
           // Только что умер — экран смерти
         } else if (wasDead && !myDead) {
-          // Респаун — сбрасываем причину смерти
+          // Респаун — сбрасываем причину смерти. Принудительно
+          // телепортируемся в серверную spawn-точку: иначе клиент
+          // остаётся на месте смерти (там где dead-snapshot его
+          // оставил) и при первом движении сервер откатывает назад.
           myDeathBy = '';
+          player.r = d.me.y;
+          player.c = d.me.x;
+          // Сброс камеры на новую позицию, чтобы не «летела» туда
+          // через лерп — иначе экран дёргается на полсекунды.
+          cam.x = (player.c - player.r) * TS * 0.5;
+          cam.y = (player.c + player.r) * TS * 0.5 * ISO_Y;
         }
         // Сервер шлёт авторитативный look (из БД через creator) — перетираем
         // QP.look, чтобы рисовался ТОТ перс которого ты создал в creator,
@@ -6807,6 +7678,10 @@ function buyBusinessHere(biz_id) {
         4000, 'win');
       _bizLastSync = 0;
       syncMyBusinesses();
+      // Перезапрашиваем точку респа — чтобы новый бизнес сразу появился
+      // в меню выбора как «доступный». Без этого пользователь не видит
+      // купленный объект до переподключения.
+      try { ws && ws.send(JSON.stringify({ t: 'respawn_status', d: {} })); } catch(e){}
     } else if (j.error === 'no cash') {
       showToast('💸 Не хватает денег', '⚠️', 2200);
     } else if (j.error === 'already owned') {
@@ -7143,8 +8018,14 @@ _lpModal.addEventListener('click', (e) => {
 //      Успех = тихий угон. Провал = сигналка 10с, повтор недоступен.
 //      Отмена = ничего.
 function _completeHijack(car) {
-  const idx = CARS.indexOf(car);
-  if (idx >= 0) CARS.splice(idx, 1);
+  // НЕ удаляем машину из CARS сразу: между splice и приходом серверного
+  // civilian_hijack_reply (~100мс RTT) клиент видел «дырку» — машина
+  // пропадала с экрана пока серверный quest_car не появится. Теперь
+  // помечаем _hijackPending, останавливаем NPC-движение, и реальный
+  // splice делается в civilian_hijack_reply (ok). Failsafe: если за 2с
+  // ответа не пришло — сбрасываем флаг и машина продолжит ездить.
+  car._hijackPending = performance.now();
+  car.vr = 0; car.vc = 0;
   try {
     ws && ws.send(JSON.stringify({ t: 'civilian_carjack', d: {
       x: +car.c.toFixed(2), y: +car.r.toFixed(2),
@@ -7252,7 +8133,79 @@ _michaelBoxBtn.addEventListener('click', () => {
   try { ws && ws.send(JSON.stringify({ t: 'box_take', d: {} })); } catch(e){}
 });
 // Состояние box-доставки (приходит от box_status / box_take_reply)
-let myBoxStatus = { count_today: 0, limit: 5, reset_in_s: 0, active: null };
+let myBoxStatus = { count_today: 0, limit: 5, reset_in_s: 0, active: null,
+                    fail_cd_s: 0, _fail_until_t: 0 };
+
+// ── Точка респавна ────────────────────────────────────────────────
+// 'hospital' = у больницы (default). Иначе biz_id ('coffee'/'bar'/...).
+// Серверная сторона: set_respawn_point / respawn_status в mafiozi_bot.
+// myOwnedBiz — кеш купленных бизнесов (только id'шники), нужен чтобы
+// показать в меню «доступно/заблокировано». Обновляется по hub_money
+// (после покупки сервер шлёт respawn_status) и при коннекте.
+let myRespawnPoint = 'hospital';
+let myOwnedBiz = [];
+const _respawnModal   = document.getElementById('respawnModal');
+const _respawnList    = document.getElementById('respawnList');
+const _respawnSetBtn  = document.getElementById('respawnSetBtn');
+const _deathRpLabel   = document.getElementById('deathRespawnPoint');
+function _respawnPointLabel(rp) {
+  if (rp === 'hospital' || !rp) return '🏥 Госпиталь';
+  const b = BUSINESS_POIS.find(x => x.id === rp);
+  return b ? `${b.emoji} ${b.name}` : '🏥 Госпиталь';
+}
+function refreshDeathRpLabel() {
+  if (_deathRpLabel) {
+    _deathRpLabel.textContent = 'Точка респа: ' + _respawnPointLabel(myRespawnPoint);
+  }
+}
+function refreshRespawnList() {
+  if (!_respawnList) return;
+  const items = [{ id: 'hospital', em: '🏥', nm: 'Госпиталь', owned: true }];
+  for (const b of BUSINESS_POIS) {
+    items.push({
+      id: b.id, em: b.emoji, nm: b.name,
+      owned: myOwnedBiz.includes(b.id),
+    });
+  }
+  _respawnList.innerHTML = '';
+  for (const it of items) {
+    const row = document.createElement('div');
+    row.className = 'r-item'
+      + (it.id === myRespawnPoint ? ' active' : '')
+      + (!it.owned ? ' locked' : '');
+    row.innerHTML =
+      `<div class="em">${it.em}</div>` +
+      `<div class="nm">${it.nm}</div>` +
+      `<div class="tg">${it.id === myRespawnPoint ? '✓ ВЫБРАНО' : (it.owned ? '' : '🔒 КУПИ')}</div>`;
+    if (it.owned) {
+      row.addEventListener('click', () => {
+        try {
+          ws && ws.send(JSON.stringify({ t: 'set_respawn_point', d: { point: it.id } }));
+        } catch(e) {}
+      });
+    }
+    _respawnList.appendChild(row);
+  }
+}
+function showRespawnModal() {
+  if (!_respawnModal) return;
+  // Запрашиваем актуальное состояние — на случай если пользователь
+  // купил новый бизнес в другой сессии и кеш в this-клиенте устарел.
+  try { ws && ws.send(JSON.stringify({ t: 'respawn_status', d: {} })); } catch(e){}
+  refreshRespawnList();
+  _respawnModal.classList.add('show');
+}
+function hideRespawnModal() {
+  if (_respawnModal) _respawnModal.classList.remove('show');
+}
+if (_respawnSetBtn) _respawnSetBtn.addEventListener('click', showRespawnModal);
+document.getElementById('respawnCloseBtn').addEventListener('click', hideRespawnModal);
+_respawnModal.addEventListener('click', (e) => {
+  if (e.target === _respawnModal) hideRespawnModal();
+});
+// Анимация поднятия коробки: {startT, dur, kind}. Активна 700мс после
+// box_pickup_reply ok — коробка «всплывает» от земли к финальной позиции.
+let _boxAnim = null;
 let _boxStatusReqAt = 0;
 
 // ── Box-quest: угроза от копов при перевозке и обработка fail ──────
@@ -7489,11 +8442,21 @@ function refreshMichaelMenu() {
   }
   // Кнопка box-доставки
   const bs = myBoxStatus;
+  // Локальный отсчёт штраф-кулдауна (за провал прошлой доставки)
+  let failLeft = 0;
+  if (bs._fail_until_t && bs._fail_until_t > performance.now()) {
+    failLeft = Math.ceil((bs._fail_until_t - performance.now()) / 1000);
+  }
   if (bs.active) {
     _michaelBoxBtn.disabled = true;
     _michaelBoxBtn.textContent = (bs.active.state === 'pending')
       ? '📦 Возьми ящик на пирсе'
       : `📦 Везёшь: ${bs.active.addr || ''}`;
+  } else if (failLeft > 0) {
+    _michaelBoxBtn.disabled = true;
+    const mm = Math.floor(failLeft / 60);
+    const ss = String(failLeft % 60).padStart(2, '0');
+    _michaelBoxBtn.textContent = `🚷 Майкл зол — ${mm}:${ss}`;
   } else if ((bs.count_today | 0) >= (bs.limit | 5)) {
     _michaelBoxBtn.disabled = true;
     _michaelBoxBtn.textContent = '📦 Коробок на сегодня хватит';
@@ -8783,6 +9746,8 @@ function update(dt) {
       _interpQuestCars(dt);
       _interpBeachgoers(dt);
       _interpMichaelGuards(dt);
+      _tickBus(dt);
+      _tickParkingNpcs(dt);
       return;
     } else {
       // Параметры аркадной езды. Серверный кламп QUEST_CAR_MAX_SPEED=14.
@@ -9101,6 +10066,8 @@ function update(dt) {
       _interpQuestCars(dt);
       _interpBeachgoers(dt);
       _interpMichaelGuards(dt);
+      _tickBus(dt);
+      _tickParkingNpcs(dt);
       return;
     }
   }
@@ -9147,6 +10114,10 @@ function update(dt) {
   updateBoxThreat(dt);
   // Интерполяция чужих quest_cars (которые ведут другие игроки)
   _interpQuestCars(dt);
+  // Локальный декор-автобус (тикает всегда, независимо от состояния игрока)
+  _tickBus(dt);
+  // AI «жителей» с машинами на парковках (вышел, погулял, вернулся)
+  _tickParkingNpcs(dt);
   // Стрельба в открытом мире: ОБЯЗАТЕЛЕН lockedTarget (см. tryTapLock).
   // Правый стик ТОЛЬКО метит цели (тап + удержание лазера = auto-lock).
   // Стрелять можно ИСКЛЮЧИТЕЛЬНО кнопкой fireBtn (или Space на десктопе).
@@ -12281,8 +13252,45 @@ function drawCarPretty(car) {
     ctx.moveTo(rFf.x, rFf.y - H); ctx.lineTo(rFl.x, rFl.y - H);
     ctx.lineTo(rBl.x, rBl.y - H); ctx.lineTo(rBf.x, rBf.y - H);
     ctx.closePath(); ctx.fill();
+  } else if (m.sedan || m.hatch || m.limo) {
+    // СЕДАН / ХЭТЧБЕК / ЛИМУЗИН — настоящий силуэт с капотом + кабиной +
+    // багажником. Раньше эти попадали в общий else и рисовались как
+    // плоский ромб — отсюда «фургонный» вид у всех машин. Теперь:
+    // — sedan: крыша 0.30..0.72 длины (короткая + длинный багажник)
+    // — hatch: крыша 0.28..0.92 (короткий капот + длинная крыша до зада)
+    // — limo:  крыша 0.18..0.82 (длинная средняя секция, два B-pillars)
+    let fF, fB;
+    if (m.hatch)      { fF = 0.28; fB = 0.92; }
+    else if (m.limo)  { fF = 0.18; fB = 0.82; }
+    else              { fF = 0.30; fB = 0.72; }   // sedan/coupe/classic-ish
+    function lerpRoof(a, b, t) { return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }; }
+    const rFf = lerpRoof(FR, BR, fF), rFl = lerpRoof(FL, BL, fF);
+    const rBf = lerpRoof(FR, BR, fB), rBl = lerpRoof(FL, BL, fB);
+    // Передний капот — наклонная грань от низа (FR-FL) к верху крыши (rFf-rFl)
+    ctx.fillStyle = sideC;
+    ctx.beginPath();
+    ctx.moveTo(FR.x, FR.y); ctx.lineTo(FL.x, FL.y);
+    ctx.lineTo(rFl.x, rFl.y - H); ctx.lineTo(rFf.x, rFf.y - H);
+    ctx.closePath(); ctx.fill();
+    // Задний багажник — наклонная грань от крыши вниз к BR-BL
+    ctx.fillStyle = sideC;
+    ctx.beginPath();
+    ctx.moveTo(rBf.x, rBf.y - H); ctx.lineTo(rBl.x, rBl.y - H);
+    ctx.lineTo(BL.x, BL.y); ctx.lineTo(BR.x, BR.y);
+    ctx.closePath(); ctx.fill();
+    // Сама крыша — ромб поднятый на H, занимающий fF..fB длины
+    ctx.fillStyle = m.roof || topC;
+    ctx.beginPath();
+    ctx.moveTo(rFf.x, rFf.y - H); ctx.lineTo(rFl.x, rFl.y - H);
+    ctx.lineTo(rBl.x, rBl.y - H); ctx.lineTo(rBf.x, rBf.y - H);
+    ctx.closePath(); ctx.fill();
+    // Хромированная окантовка верхней грани крыши — тонкая линия, делает
+    // силуэт чище и отделяет крышу от стёкол визуально.
+    ctx.strokeStyle = 'rgba(255,255,255,.18)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
   } else {
-    // Обычная крыша — ромб поднятый на H
+    // Обычная крыша — ромб поднятый на H (van, всё что без sedan/hatch/limo)
     ctx.fillStyle = m.roof || topC;
     ctx.beginPath();
     ctx.moveTo(FR.x, FR.y - H); ctx.lineTo(FL.x, FL.y - H);
@@ -14300,6 +15308,115 @@ function drawTrafficLight(r, c) {
 }
 
 // ── NPC прохожий (упрощённый человечек) ──────────────────────────
+// ── Графика автобуса и остановок ─────────────────────────────────
+// Используем drawCarPretty (уже умеет isometric корпус + тень) с
+// собственной моделью BUS_MODEL. Окна и лейбл рисуем поверх.
+const BUS_MODEL = {
+  name: 'bus', L: 2.85, W: 1.05,
+  palette: ['#ffc832', '#c89820'],
+  roof: '#a07020',
+  wheelR: 0.22, height: 1.05,
+  bus: true, label: 'BUS',
+};
+function drawBus() {
+  // 4-сторонний snap из BUS.ang (drawCarPretty работает только с
+  // dirDx/dirDy ∈ {-1,0,+1}, ровно одно из них ненулевое).
+  const cosA = Math.cos(BUS.ang), sinA = Math.sin(BUS.ang);
+  let dirDx = 0, dirDy = 0;
+  if (Math.abs(cosA) >= Math.abs(sinA)) dirDx = (cosA >= 0) ? 1 : -1;
+  else                                   dirDy = (sinA >= 0) ? 1 : -1;
+  drawCarPretty({
+    r: BUS.r, c: BUS.c,
+    dirDx, dirDy,
+    model: BUS_MODEL,
+    braking: (BUS.state === 'stopped'),
+  });
+  const p = w2s(BUS.r + 0.5, BUS.c + 0.5);
+  // Полоса окон поверх кузова — простая жёлто-чёрная лента
+  ctx.save();
+  ctx.fillStyle = 'rgba(20,20,30,.65)';
+  const winW = TS * 2.2, winH = 6;
+  ctx.fillRect(p.x - winW/2, p.y - isoH(0.85), winW, winH);
+  // Делим на 5 окон тонкими разделителями
+  ctx.fillStyle = '#a07020';
+  for (let i = 1; i < 5; i++) {
+    const sx = p.x - winW/2 + (winW / 5) * i;
+    ctx.fillRect(sx - 0.6, p.y - isoH(0.85), 1.2, winH);
+  }
+  ctx.restore();
+  // Лейбл «🚌» над крышей чтобы автобус был заметен издалека
+  ctx.save();
+  ctx.font = 'bold 11px system-ui, "Segoe UI Emoji", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#000';
+  ctx.fillText('🚌 АВТОБУС', p.x + 1, p.y - isoH(1.5) + 1);
+  ctx.fillStyle = '#ffd76b';
+  ctx.shadowColor = '#000'; ctx.shadowBlur = 4;
+  ctx.fillText('🚌 АВТОБУС', p.x, p.y - isoH(1.5));
+  ctx.shadowBlur = 0;
+  ctx.textAlign = 'left';
+  ctx.restore();
+}
+function drawBusStop(stop) {
+  const p = w2s(stop.sign_r + 0.5, stop.sign_c + 0.5);
+  ctx.save();
+  // Тень
+  ctx.fillStyle = 'rgba(0,0,0,.30)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y + 6, 22, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Лавочка
+  ctx.fillStyle = '#5a3a1a';
+  ctx.fillRect(p.x - 18, p.y + 2, 36, 5);
+  ctx.fillStyle = '#3a2410';
+  ctx.fillRect(p.x - 18, p.y + 6, 36, 1.5);
+  ctx.fillStyle = '#222';
+  ctx.fillRect(p.x - 16, p.y + 7, 2, 5);
+  ctx.fillRect(p.x + 14, p.y + 7, 2, 5);
+  // Стойки навеса
+  ctx.fillStyle = '#888';
+  ctx.fillRect(p.x - 19, p.y - 26, 1.8, 32);
+  ctx.fillRect(p.x + 17, p.y - 26, 1.8, 32);
+  // Крыша навеса
+  ctx.fillStyle = '#2a4a8a';
+  ctx.beginPath();
+  ctx.moveTo(p.x - 26, p.y - 26);
+  ctx.lineTo(p.x + 26, p.y - 26);
+  ctx.lineTo(p.x + 23, p.y - 30);
+  ctx.lineTo(p.x - 23, p.y - 30);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#1a3060';
+  ctx.fillRect(p.x - 26, p.y - 26, 52, 2);
+  // Табличка «🚌» на правом столбе
+  ctx.fillStyle = '#ffd76b';
+  ctx.fillRect(p.x + 10, p.y - 24, 16, 14);
+  ctx.fillStyle = '#1a1a20';
+  ctx.fillRect(p.x + 10, p.y - 24, 16, 2);
+  ctx.font = 'bold 12px system-ui, "Segoe UI Emoji", sans-serif';
+  ctx.fillStyle = '#1a1a20';
+  ctx.textAlign = 'center';
+  ctx.fillText('🚌', p.x + 18, p.y - 12);
+  ctx.textAlign = 'left';
+  ctx.restore();
+}
+function drawBusWaiter(w) {
+  const p = w2s(w.r, w.c);
+  drawPerson(p.x, p.y, w.ang, w.look, w.walkPhase, null, null,
+             false, null, null, false, 0);
+}
+function drawBusRider(rd) {
+  const p = w2s(rd.r, rd.c);
+  // Лёгкое затухание перед исчезновением — последние 1.5 сек жизни
+  let alpha = 1;
+  if (rd.life < 1.5) alpha = Math.max(0, rd.life / 1.5);
+  ctx.save();
+  if (alpha < 1) ctx.globalAlpha = alpha;
+  drawPerson(p.x, p.y, rd.ang, rd.look, rd.walkPhase, null, null,
+             false, null, null, false, 0);
+  ctx.restore();
+}
+
 function drawNpc(npc) {
   const p = w2s(npc.r, npc.c);
   drawPerson(p.x, p.y, npc.ang, npc.look, npc.walkPhase, null, null, false, null, null,
@@ -17073,93 +18190,17 @@ function drawFirearm(wepKey, hx, hy, sx, sy, scale, ctxOverride) {
   c.scale(1, flip);
   c.shadowColor = 'rgba(0,0,0,.5)';
   c.shadowBlur = 3;
-  switch (wepKey) {
-    case 'pistol':
-    case 'nagan': {
-      c.fillStyle = '#2a2a30'; c.fillRect(-2*sc, -3*sc, 16*sc, 5*sc);
-      c.fillStyle = '#1a1a20'; c.fillRect(0, -5*sc, 13*sc, 2*sc);
-      c.fillStyle = '#3a3a3a'; c.fillRect(11*sc, -6*sc, 1.5*sc, 1.5*sc);
-      c.fillStyle = '#1a1010'; c.fillRect(-3*sc, 1*sc, 5*sc, 7*sc);
-      break;
-    }
-    case 'pistol_heavy': {
-      c.fillStyle = '#2a2226'; c.fillRect(-3*sc, -4*sc, 22*sc, 6*sc);
-      c.fillStyle = '#1a1216'; c.fillRect(0, -6*sc, 18*sc, 2*sc);
-      c.fillStyle = '#3a3a3a'; c.fillRect(16*sc, -7*sc, 2*sc, 1.5*sc);
-      c.fillStyle = '#5a3a1a'; c.fillRect(-4*sc, 1*sc, 6*sc, 8*sc);
-      c.fillStyle = '#3a2410'; c.fillRect(-4*sc, 1*sc, 6*sc, 1*sc);
-      break;
-    }
-    case 'pistol_gold': {
-      c.fillStyle = '#c89030'; c.fillRect(-3*sc, -4*sc, 20*sc, 6*sc);
-      c.fillStyle = '#ffd76b'; c.fillRect(0, -6*sc, 16*sc, 2*sc);
-      c.fillStyle = '#a06010'; c.fillRect(0, 0, 16*sc, 1*sc);
-      c.fillStyle = '#3a1a0a'; c.fillRect(-4*sc, 1*sc, 6*sc, 7*sc);
-      c.fillStyle = '#e8c96e'; c.fillRect(-3*sc, 2*sc, 1*sc, 5*sc);
-      break;
-    }
-    case 'shotgun': {
-      c.fillStyle = '#5a3a1a'; c.fillRect(-15*sc, -2*sc, 13*sc, 6*sc);
-      c.fillStyle = '#3a2410'; c.fillRect(-15*sc, 3*sc, 13*sc, 1*sc);
-      c.fillStyle = '#2a2628'; c.fillRect(-3*sc, -4*sc, 30*sc, 4*sc);
-      c.fillStyle = '#4a3a1a'; c.fillRect(8*sc, -1*sc, 9*sc, 4*sc);
-      c.fillStyle = '#1a1618'; c.fillRect(24*sc, -5*sc, 4*sc, 2*sc);
-      c.fillStyle = '#1a1010'; c.fillRect(-4*sc, 1*sc, 5*sc, 7*sc);
-      break;
-    }
-    case 'smg':
-    case 'tommy_gun': {
-      c.fillStyle = '#1a1a20'; c.fillRect(-4*sc, -3*sc, 22*sc, 5*sc);
-      c.fillStyle = '#0a0a0c'; c.fillRect(16*sc, -4*sc, 5*sc, 2*sc);
-      c.fillStyle = '#2a2a32'; c.fillRect(2*sc, 2*sc, 4.5*sc, 11*sc);
-      c.fillStyle = '#1a1a20'; c.fillRect(13*sc, 1*sc, 3.5*sc, 6*sc);
-      c.fillStyle = '#1a1010'; c.fillRect(-5*sc, 1*sc, 5*sc, 7*sc);
-      c.fillStyle = '#2a2a30'; c.fillRect(2*sc, -5*sc, 6*sc, 2*sc);
-      break;
-    }
-    case 'rifle': {
-      c.fillStyle = '#5a3a1a'; c.fillRect(-15*sc, -2*sc, 13*sc, 6*sc);
-      c.fillStyle = '#3a2410'; c.fillRect(-15*sc, 3*sc, 13*sc, 1*sc);
-      c.fillStyle = '#2a2a30'; c.fillRect(-3*sc, -3*sc, 34*sc, 4*sc);
-      c.fillStyle = '#3a3a40'; c.fillRect(2*sc, -5*sc, 5*sc, 2*sc);
-      c.fillRect(26*sc, -5*sc, 2*sc, 2*sc);
-      c.fillStyle = '#1a1010'; c.fillRect(-1*sc, 1*sc, 4*sc, 9*sc);
-      c.fillStyle = '#1a1010'; c.fillRect(-5*sc, 1*sc, 5*sc, 7*sc);
-      break;
-    }
-    case 'sniper': {
-      c.fillStyle = '#5a3a1a'; c.fillRect(-16*sc, -2*sc, 14*sc, 7*sc);
-      c.fillStyle = '#3a2410'; c.fillRect(-16*sc, 4*sc, 14*sc, 1*sc);
-      c.fillStyle = '#2a352a'; c.fillRect(-3*sc, -2.5*sc, 44*sc, 3*sc);
-      c.fillStyle = '#1a251a'; c.fillRect(40*sc, -4*sc, 5*sc, 2*sc);
-      c.fillStyle = '#0a0a0c'; c.fillRect(2*sc, -8*sc, 14*sc, 4*sc);
-      c.fillStyle = '#1a1a20'; c.fillRect(2*sc, -9*sc, 14*sc, 1.5*sc);
-      c.fillStyle = '#3a3a45'; c.fillRect(15*sc, -7*sc, 1*sc, 3*sc);
-      c.fillStyle = '#1a1010'; c.fillRect(-5*sc, 1*sc, 5*sc, 7*sc);
-      c.strokeStyle = '#1a1a20'; c.lineWidth = 1.3*sc;
-      c.beginPath();
-      c.moveTo(32*sc, 0); c.lineTo(35*sc, 8*sc);
-      c.moveTo(32*sc, 0); c.lineTo(29*sc, 8*sc);
-      c.stroke();
-      break;
-    }
-    case 'rpg': {
-      c.fillStyle = '#3a4a30'; c.fillRect(-20*sc, -5*sc, 52*sc, 8*sc);
-      c.fillStyle = '#2a3a20'; c.fillRect(-20*sc, -6*sc, 52*sc, 1.2*sc);
-      c.fillStyle = '#5a6a45'; c.fillRect(-20*sc, 2*sc, 52*sc, 1*sc);
-      c.fillStyle = '#2a1a10';
-      c.beginPath();
-      c.moveTo(32*sc, -5*sc); c.lineTo(44*sc, 0); c.lineTo(32*sc, 3*sc);
-      c.closePath(); c.fill();
-      c.fillStyle = '#5a2010'; c.fillRect(28*sc, -5*sc, 4*sc, 8*sc);
-      c.fillStyle = '#2a2a30'; c.fillRect(-2*sc, -8*sc, 5*sc, 3*sc);
-      c.fillStyle = '#1a1010'; c.fillRect(-5*sc, 3*sc, 5*sc, 9*sc);
-      break;
-    }
-    default: {
-      c.fillStyle = '#333'; c.fillRect(0, -2*sc, 16*sc, 4*sc);
-    }
+  // Силуэты — таблица _FIREARM_DRAW (определена в начале файла). Если
+  // приходит неизвестный id, пробуем resolveWeapon (deagle → pistol_heavy
+  // и т.п.), и только потом _default. Это критично для НОВЫХ ID из
+  // инвентаря (ak, m4, uzi, deagle...) — без lookup'а они рисовались
+  // как «серая палка».
+  let drawer = _FIREARM_DRAW[wepKey];
+  if (!drawer) {
+    const resolved = (typeof resolveWeapon === 'function') ? resolveWeapon(wepKey) : wepKey;
+    drawer = _FIREARM_DRAW[resolved] || _FIREARM_DRAW._default;
   }
+  drawer(c, sc);
   c.shadowBlur = 0;
   c.restore();
 }
@@ -17167,12 +18208,33 @@ function drawFirearm(wepKey, hx, hy, sx, sy, scale, ctxOverride) {
 // Длина ствола «вперёд» — где появляется вспышка дула и откуда летит пуля.
 // Числа примерно соответствуют графической длине из drawFirearm выше.
 const FIREARM_TIP = {
-  pistol: 14, nagan: 14,
-  pistol_heavy: 20, pistol_gold: 18,
-  shotgun: 28, smg: 22, tommy_gun: 22,
-  rifle: 32, sniper: 44, rpg: 46,
+  // Пистолеты
+  pistol: 14, nagan: 14, tt: 16, tt_pistol: 16,
+  glock: 14, pm: 12, revolver: 14,
+  pistol_heavy: 20, desert_eagle: 22, deagle: 22,
+  pistol_gold: 18, golden_colt: 18,
+  // Дробовики
+  shotgun: 28, sawn_off: 14,
+  // SMG
+  smg: 22, uzi: 18, golden_uzi: 18, mp5: 22, ump: 24,
+  // Авто
+  tommy_gun: 22,
+  rifle: 32, ak: 28, ak74: 28, m4: 28, m16: 30,
+  // Снайперки / РПГ
+  sniper: 44, rpg: 46,
 };
-function weaponTip(w) { return (FIREARM_TIP[w] || 16); }
+// fallback через resolveWeapon — на случай неизвестных id ИЛИ нового
+// id, для которого ещё нет своего числа в таблице выше. Не используем
+// «или 16» вслепую: deagle без fallback'а вернёт 16 и пуля прилетит
+// «из груди» вместо длинного ствола.
+function weaponTip(w) {
+  if (FIREARM_TIP[w] != null) return FIREARM_TIP[w];
+  if (typeof resolveWeapon === 'function') {
+    const r = resolveWeapon(w);
+    if (FIREARM_TIP[r] != null) return FIREARM_TIP[r];
+  }
+  return 16;
+}
 // Зеркалим в FIREARM_TIP_DEFER — нужно для weaponMuzzleD выше в файле
 Object.assign(FIREARM_TIP_DEFER, FIREARM_TIP);
 
@@ -17534,6 +18596,34 @@ function render() {
     if (b.y < r0 || b.y >= r1 || b.x < c0 || b.x >= c1) continue;
     items.push({ depth: b.y + b.x + 0.0004, draw: () => drawBeachgoer(b) });
   }
+  // Автобусные остановки — знак, навес, лавочка. Декор у дороги.
+  for (const stop of BUS_STOPS) {
+    if (stop.sign_r < r0 || stop.sign_r >= r1 ||
+        stop.sign_c < c0 || stop.sign_c >= c1) continue;
+    // Глубина — по знаку (он стоит за лавочкой, должен быть ПОЗАДИ людей)
+    items.push({ depth: stop.sign_r + stop.sign_c - 0.05,
+                 draw: () => drawBusStop(stop) });
+  }
+  // Ожидающие на остановках — обычные пешеходы (idle стоят, leaving идут)
+  for (const w of _busWaiters) {
+    if (w.r < r0 || w.r >= r1 || w.c < c0 || w.c >= c1) continue;
+    items.push({ depth: w.r + w.c + 0.0006, draw: () => drawBusWaiter(w) });
+  }
+  // Вышедшие пассажиры — идут к тротуару
+  for (const rd of _busRiders) {
+    if (rd.r < r0 || rd.r >= r1 || rd.c < c0 || rd.c >= c1) continue;
+    items.push({ depth: rd.r + rd.c + 0.0006, draw: () => drawBusRider(rd) });
+  }
+  // «Жители» — хозяева припаркованных машин (вышли погулять, вернутся)
+  for (const n of _parkingNpcs) {
+    if (n.state === 'sitting') continue;
+    if (n.r < r0 || n.r >= r1 || n.c < c0 || n.c >= c1) continue;
+    items.push({ depth: n.r + n.c + 0.0006, draw: () => drawParkingNpc(n) });
+  }
+  // Сам автобус
+  if (BUS.r >= r0 && BUS.r < r1 && BUS.c >= c0 && BUS.c < c1) {
+    items.push({ depth: BUS.r + BUS.c + 0.0009, draw: () => drawBus() });
+  }
   // Охрана Майкла — в чёрных рубашках, по бокам Майкла на палубе
   for (const g of michaelGuards.values()) {
     if (g.y < r0 || g.y >= r1 || g.x < c0 || g.x >= c1) continue;
@@ -17754,6 +18844,9 @@ function render() {
       if ((o.jail_in || 0) > 0) drawJailTimer(p.x, p.y, o.jail_in);
     } });
   }
+  // Парковочный асфальт — лежит под всем, рисуется ДО кровавых пятен
+  // и тормозных следов чтобы они были видны на разметке.
+  drawParkingLots();
   // Splat'ы крови — на земле, ПОД персонажами (depth-sort кладёт их
   // в самый низ списка через прямой вызов до items)
   drawBloodSplats();
