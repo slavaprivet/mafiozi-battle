@@ -5797,6 +5797,9 @@ function handleEventPacket(d) {
     if (d.ok) {
       if (myBoxStatus.active) myBoxStatus.active.state = 'carrying';
       showToast('📦 Коробка у тебя — везти по адресу', '✅', 2500);
+      // Анимация поднятия: коробка появляется на земле рядом и за
+      // 700мс «всплывает» к финальной позиции над головой.
+      _boxAnim = { kind: 'pickup', startT: performance.now(), dur: 700 };
     } else if (d.reason === 'too_far') {
       showToast('🚫 Подойди ближе к пирсу', '⚠️', 1500);
     }
