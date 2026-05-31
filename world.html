@@ -3155,6 +3155,7 @@ function hitNpc(npc, dirY, dirX, weapon, damage) {
     npc.deadAt = performance.now();
     // Большой splat крови на месте смерти + взрыв-фонтан частиц по сторонам
     for (let i = 0; i < 6; i++) {
+      _capArr(bloodSplats, _MAX_BLOOD);
       bloodSplats.push({
         r: npc.r + (Math.random() - 0.5) * 0.7,
         c: npc.c + (Math.random() - 0.5) * 0.7,
@@ -3176,6 +3177,7 @@ function hitNpc(npc, dirY, dirX, weapon, damage) {
         size: 2.0 + Math.random() * 2.0,
       });
     }
+    _capArr(impacts, _MAX_IMPACTS);
     impacts.push({ r: npc.r, c: npc.c, parts });
     // Короткий предсмертный крик (если ещё не кричал — выставляем cryUntil)
     npc.cryText  = ['АА!', 'НЕТ!', 'ПОМО…'][Math.floor(Math.random()*3)];
@@ -6181,6 +6183,14 @@ const shells  = [];       // {x,y,vx,vy,vz,z,rot,vrot,life,max}
 const impacts = [];       // {r,c,parts:[{vr,vc,life,max,color,isBlood,size}]}
 // Пятна крови на земле — splat-ы живут 8 сек после попадания.
 const bloodSplats = [];   // {r,c,radius,life,max,rot}
+// Жёсткие потолки массивов visual-эффектов: в долгой перестрелке (банда
+// + копы шлют десятки 'aggro_shot'/'cop_shot' пакетов в секунду) без
+// капов impacts/bloodSplats/bullets разрастаются до тысяч и фризят
+// рендер. Спавнеры дропают самое старое если упёрлись в лимит.
+const _MAX_BULLETS = 80, _MAX_IMPACTS = 24, _MAX_BLOOD = 60,
+      _MAX_MUZZLES = 40, _MAX_SHOCKW = 40, _MAX_SMOKE = 60,
+      _MAX_SHELLS = 60;
+function _capArr(arr, cap) { if (arr.length >= cap) arr.shift(); }
 // Тормозные следы — два чёрных штриха от задних колёс при резком повороте
 // или жёстком тормозе на скорости. Затухают за 6 секунд.
 // {r, c, ang, life, max}
@@ -6221,6 +6231,7 @@ function spawnSmokePuff(r, c, angle) {
   for (let i = 0; i < 2; i++) {
     const a = angle + (Math.random() - 0.5) * 0.7;
     const sp = 0.6 + Math.random() * 0.5;
+    _capArr(smokePuffs, _MAX_SMOKE);
     smokePuffs.push({
       r, c,
       vr: Math.sin(a) * sp * 0.4 - 0.3,   // чуть вверх (отриц. vr = вверх в иксометрии)
@@ -6232,6 +6243,7 @@ function spawnSmokePuff(r, c, angle) {
 }
 function spawnShockwave(r, c, opts) {
   opts = opts || {};
+  _capArr(shockwaves, _MAX_SHOCKW);
   shockwaves.push({
     r, c,
     rad: opts.rad0 || 4,
@@ -6285,9 +6297,16 @@ function hapticHit() {
 function spawnBullet(sr, sc, er, ec, opts) {
   opts = opts || {};
   const dr = er - sr, dc = ec - sc;
-  const dist = Math.hypot(dr, dc) || 0.001;
+  const rawDist = Math.hypot(dr, dc);
+  // Защита от «бессмертной» пули: если src ≈ dst (дегенеративный шот —
+  // например, бот стоит вплотную к игроку или сервер прислал кривой
+  // pkt), без этого vr/vc = 0 и b.dist никогда не дорастёт до maxDist
+  // → пуля висит в bullets навсегда и тормозит рендер.
+  if (!isFinite(rawDist) || rawDist < 0.05) return;
+  const dist = rawDist;
   const speed = opts.speed || BULLET_SPEED;
   const wcfg = WEAPON_FX_CFG[resolveWeapon(opts.weapon)] || {};
+  _capArr(bullets, _MAX_BULLETS);
   bullets.push({
     r: sr, c: sc,
     vr: (dr / dist) * speed,
@@ -6308,6 +6327,7 @@ function spawnMuzzle(r, c, angle, weapon) {
   const w = resolveWeapon(weapon);
   const wcfg = WEAPON_FX_CFG[w] || {};
   const heavy = !!wcfg.thick;
+  _capArr(muzzles, _MAX_MUZZLES);
   muzzles.push({
     r, c, angle,
     life: heavy ? 140 : 110, max: heavy ? 140 : 110,
@@ -11666,6 +11686,7 @@ function update(dt) {
             npc.c += Math.cos(ang) * 0.6;
             // Кровь
             for (let i = 0; i < 5; i++) {
+              _capArr(bloodSplats, _MAX_BLOOD);
               bloodSplats.push({
                 r: npc.r + (Math.random() - 0.5) * 0.7,
                 c: npc.c + (Math.random() - 0.5) * 0.7,
@@ -11687,6 +11708,7 @@ function update(dt) {
                 size: 2.2 + Math.random() * 2.0,
               });
             }
+            _capArr(impacts, _MAX_IMPACTS);
             impacts.push({ r: npc.r, c: npc.c, parts });
             // Сообщаем серверу (как стрельба со свидетелями)
             try {
@@ -20299,6 +20321,7 @@ function spawnImpact(wr, wc, weapon) {
       size: isBlood ? (2.8 + Math.random() * 2.4) : (1.8 + Math.random() * 1.0),
     });
   }
+  _capArr(impacts, _MAX_IMPACTS);
   impacts.push({ r: wr, c: wc, parts });
   // Shockwave при попадании — оранжевое расширяющееся кольцо
   spawnShockwave(wr, wc, {
@@ -20312,6 +20335,7 @@ function spawnImpact(wr, wc, weapon) {
   // следом боя. Кол-во зависит от оружия (тяжёлое — больше).
   const splatN = fx.thick ? 3 : 1;
   for (let i = 0; i < splatN; i++) {
+    _capArr(bloodSplats, _MAX_BLOOD);
     bloodSplats.push({
       r: wr + (Math.random() - 0.5) * 0.6,
       c: wc + (Math.random() - 0.5) * 0.6,
@@ -20348,6 +20372,7 @@ function reportCarCrash(qc, impact, kind) {
       size: 1.4 + Math.random() * 1.4,
     });
   }
+  _capArr(impacts, _MAX_IMPACTS);
   impacts.push({ r: qc.y, c: qc.x, parts });
   // Метка тряски: drawQuestCar читает qc._shakeUntil для жесть-вибрации
   qc._shakeUntil = now + 280;
@@ -20391,8 +20416,10 @@ function spawnCarExplosion(wr, wc) {
       size: 2.0 + Math.random() * 2.4,
     });
   }
+  _capArr(impacts, _MAX_IMPACTS);
   impacts.push({ r: wr, c: wc, parts });
   // Чёрная копоть-пятно на земле
+  _capArr(bloodSplats, _MAX_BLOOD);
   bloodSplats.push({
     r: wr, c: wc, radius: 18 + Math.random() * 6,
     life: 14000, max: 14000, rot: Math.random() * Math.PI,
