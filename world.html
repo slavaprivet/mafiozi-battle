@@ -110,6 +110,17 @@ body.in-pvp #zoneBtn { top: 104px; }
   letter-spacing: 0.5px;
 }
 body.in-pvp #gtaActionBtn { top: 104px; }
+/* Ручной тормоз — круглая кнопка справа снизу, видна только за рулём */
+#handbrakeBtn {
+  position: absolute; right: 16px; bottom: 120px;
+  width: 54px; height: 54px; border-radius: 50%;
+  background: linear-gradient(135deg, #7a1010, #c02020);
+  border: 2px solid #ff5040; color: #fff; font-size: 22px;
+  cursor: pointer; display: none; z-index: 8;
+  box-shadow: 0 4px 14px rgba(160,0,0,.5);
+  touch-action: none; user-select: none;
+}
+#handbrakeBtn.active { background: linear-gradient(135deg, #c02020, #ff3030); box-shadow: 0 0 18px rgba(255,60,60,.8); }
 /* Если активна обычная зона-кнопка и GTA-кнопка — раздвигаем */
 #zoneBtn[style*="block"] ~ #gtaActionBtn { top: 110px; }
 
@@ -1073,6 +1084,8 @@ body.in-pvp #robActionBtn { top: 152px; }
   <!-- GTA-кнопка: Майкл / сесть в машину / выйти. Текст и обработчик
        задаются в updateGtaInteractions(). -->
   <button id="gtaActionBtn"></button>
+  <!-- Ручной тормоз — видна только за рулём -->
+  <button id="handbrakeBtn" style="display:none">⛓</button>
   <!-- Альтернативная кнопка «Ограбить» — появляется одновременно с
        «Купить бизнес». Стиль красный, чтобы было ясно что это криминал. -->
   <button id="robActionBtn"></button>
@@ -9579,6 +9592,12 @@ if (_robBtn) {
 
 // ── GTA: взаимодействия (Майкл / сесть-выйти из машины) ────────────
 const _gtaBtn = document.getElementById('gtaActionBtn');
+const _handbrakeBtn = document.getElementById('handbrakeBtn');
+// Ручной тормоз — hold для дрифта
+_handbrakeBtn.addEventListener('touchstart', e => { e.preventDefault(); _handbrakeActive = true; _handbrakeBtn.classList.add('active'); }, { passive: false });
+_handbrakeBtn.addEventListener('touchend',   e => { e.preventDefault(); _handbrakeActive = false; _handbrakeBtn.classList.remove('active'); }, { passive: false });
+_handbrakeBtn.addEventListener('mousedown',  () => { _handbrakeActive = true;  _handbrakeBtn.classList.add('active'); });
+_handbrakeBtn.addEventListener('mouseup',    () => { _handbrakeActive = false; _handbrakeBtn.classList.remove('active'); });
 let _gtaActionKind = null;   // 'michael' | 'enter' | 'exit' | 'hijack'
 let _gtaActionCarId = null;
 let _gtaActionEnterAs = null;   // 'driver' | 'passenger'
@@ -9601,6 +9620,8 @@ function playEnterCarAnim(r, c) {
 }
 
 function updateGtaInteractions() {
+  // Кнопка ручника — видна только за рулём (не пассажир)
+  _handbrakeBtn.style.display = (myDrivingCarId && !myIsPassenger) ? 'flex' : 'none';
   // Кнопка «Ограбить» по умолчанию скрыта — показывается только в
   // блоке biz_buy (когда подошёл к чужому бизнесу). Прячем здесь чтобы
   // не торчала после ухода от точки. Идёт ограбление — НЕ трогаем,
@@ -11056,7 +11077,8 @@ function refreshMichaelMenu() {
 // Локально: запоминаем myDrivingCarId. Сервер при первом gta_drive
 // проверит что машина свободна; если нет — пришлёт gta_drive_reject
 // и мы сбросим myDrivingCarId.
-let _exitRequested = false;   // нажали «Выйти» на ходу — тормозим, потом выходим
+let _exitRequested   = false;   // нажали «Выйти» на ходу — тормозим, потом выходим
+let _handbrakeActive = false;   // ручной тормоз — удерживается кнопкой ⛓
 function enterCar(carId, asKind) {
   const qc = questCars.get(carId);
   if (!qc) return;
@@ -12425,6 +12447,11 @@ function update(dt) {
   // Нормализация если выходит за круг
   const inMag = Math.hypot(inDx, inDy);
   if (inMag > 1) { inDx /= inMag; inDy /= inMag; }
+  // Сохраняем для курсор-рендера в drawQuestCar
+  if (myDrivingCarId) {
+    const _qcRef = questCars.get(myDrivingCarId);
+    if (_qcRef) { _qcRef._inDx = inDx; _qcRef._inDy = inDy; }
+  }
 
   // ── В МАШИНЕ ── левый стик = газ + руль, правый отключён ──
   if (myDrivingCarId) {
@@ -12460,24 +12487,37 @@ function update(dt) {
       return;
     } else {
       // Параметры аркадной езды. Серверный кламп QUEST_CAR_MAX_SPEED=14.
-      const CAR_MAX_SPEED   = 13.0;  // было 9 — заметно живее, ниже 14 серв-клампа
-      const CAR_ACCEL       = 13.0;  // было 9 — быстрее набирает скорость
-      const CAR_BRAKE       = 16.0;  // активное торможение и exit
-      const CAR_COAST_DRAG  = 0.85;  // пассивный «накат» при отпущенном стике
-      // Поворот — угловая скорость, зависит от скорости движения. Заметно
-      // отзывчивее чем раньше, но не моментальная — машина чувствуется.
-      const CAR_TURN_RATE_BASE = 3.4;  // было 2.4 — острее руль
-      const CAR_DRIFT_GRIP     = 5.0;  // было 1.5 — шины «держат», без болтанки
+      const CAR_MAX_SPEED      = 13.0;
+      const CAR_ACCEL          = 13.0;
+      const CAR_BRAKE          = 16.0;
+      const CAR_COAST_DRAG     = 0.85;
+      const CAR_TURN_RATE_BASE = 3.4;
+      // Ручной тормоз активен — сцепление резко падает (дрифт)
+      const grip = _handbrakeActive ? 1.8 : 5.0;
+      const CAR_DRIFT_GRIP     = grip;
       // Текущая скорость по локальному состоянию qc
       let curVx = qc.vx || 0, curVy = qc.vy || 0;
       let curSpeed = Math.hypot(curVx, curVy);
       // Если игрок попросил выйти — игнорируем стик, тормозим до 0
       const wantingExit = _exitRequested;
       let throttle = 0, steer = 0;
+      let _carTargetAng = qc.ang;   // для bodyRoll — обновится ниже
+      // Задний ход: машина почти стоит + стик смотрит назад → reverse
+      let inReverse = false;
+      if (!wantingExit && curSpeed < 1.2 && !_handbrakeActive &&
+          (Math.abs(inDx) > 0.08 || Math.abs(inDy) > 0.08)) {
+        const d0 = inDx, s0 = inDy / ISO_Y;
+        const wantAng = Math.atan2((s0 - d0) * 0.5, (s0 + d0) * 0.5);
+        let adf = wantAng - qc.ang;
+        while (adf >  Math.PI) adf -= Math.PI * 2;
+        while (adf < -Math.PI) adf += Math.PI * 2;
+        if (Math.abs(adf) > Math.PI * 0.65) inReverse = true;
+      }
       if (!wantingExit && (Math.abs(inDx) > 0.08 || Math.abs(inDy) > 0.08)) {
         // Стик → желаемое направление движения в WORLD-координатах (тайлы)
         const d = inDx, s = inDy / ISO_Y;
         const targetAng = Math.atan2((s - d) * 0.5, (s + d) * 0.5);
+        _carTargetAng = targetAng;
         // Плавно поворачиваем angle машины к targetAng. Угловая скорость
         // зависит от скорости движения (как настоящая машина):
         //   v < 1   — поворот ~70% (нельзя крутиться на месте, но на старте
@@ -12541,15 +12581,23 @@ function update(dt) {
         // повороте на скорости проекция forwardSpeed на новое направление
         // ненадолго слегка отрицательная — это НЕ тормоз, а просто инерция,
         // которую разгребает CAR_DRIFT_GRIP.
-        if (forwardSpeed < -3.0) {
+        if (inReverse) {
+          // Задний ход — едем назад без разворота носа
+          const revSpeed = 5.5;
+          curVx -= dirVx * CAR_ACCEL * 0.55 * throttle * dt;
+          curVy -= dirVy * CAR_ACCEL * 0.55 * throttle * dt;
+          const rs = Math.hypot(curVx, curVy);
+          if (rs > revSpeed) { curVx *= revSpeed / rs; curVy *= revSpeed / rs; }
+          qc._reversing = true;
+        } else if (forwardSpeed < -3.0) {
           activeBrake = true;
-          // Гасим обратное движение быстрее
           const dec = CAR_BRAKE * dt;
           if (curSpeed <= dec) { curVx = 0; curVy = 0; }
           else { const k = (curSpeed - dec) / curSpeed; curVx *= k; curVy *= k; }
         } else {
           curVx += dirVx * CAR_ACCEL * throttle * dt;
           curVy += dirVy * CAR_ACCEL * throttle * dt;
+          qc._reversing = false;
         }
       } else {
         // Отпустили газ — мягкий «накат» (как в аркаде). Если просили выход —
@@ -12601,9 +12649,21 @@ function update(dt) {
         qc.x = newX; qc.y = newY;
       } else {
         const impact = curSpeed;
-        // Просто остановка о стену + лёгкий урон только при ощутимой скорости.
-        curVx = 0; curVy = 0;
-        if (impact > 5.5) reportCarCrash(qc, impact, 'wall');
+        // Скольжение вдоль стены: пробуем двигаться только по X или только по Y
+        const slideX = !isBlocked(qc.y, newX);
+        const slideY = !isBlocked(newY, qc.x);
+        if (slideX) {
+          qc.x = newX;
+          curVy *= 0.35;   // гасим перпендикулярную составляющую
+        } else if (slideY) {
+          qc.y = newY;
+          curVx *= 0.35;
+        } else {
+          // Прямой удар — полная остановка
+          curVx = 0; curVy = 0;
+          if (impact > 5.5) reportCarCrash(qc, impact, 'wall');
+        }
+        if (impact > 5.5 && !slideX && !slideY) reportCarCrash(qc, impact, 'wall');
       }
       // Столкновение с NPC-трафиком (декоративный CARS). Включается только
       // если мы реально в неё «врезались на скорости» (curSpeed>4) и игрок
@@ -12775,6 +12835,24 @@ function update(dt) {
       const targetCamY = (aimC + aimR) * TS * 0.5 * ISO_Y;
       cam.x += (targetCamX - cam.x) * Math.min(1, dt * 5);
       cam.y += (targetCamY - cam.y) * Math.min(1, dt * 5);
+      // Зум от скорости: стоим=1.0, макс. скорость=0.80 (видно больше дороги)
+      {
+        const sp = Math.hypot(curVx, curVy) / CAR_MAX_SPEED;
+        const tzoom = (player.r >= 140) ? 1.18 : (1.0 - Math.min(1, sp) * 0.20);
+        viewZoom += (tzoom - viewZoom) * Math.min(1, dt * 2.5);
+      }
+      // Крен/клевок кузова (для рендера)
+      qc._bodyPitch = (qc._bodyPitch || 0);
+      qc._bodyRoll  = (qc._bodyRoll  || 0);
+      const pitchTarget = activeBrake ? 0.06 : (throttle > 0.05 && !inReverse ? -0.04 : 0);
+      const rollTarget  = (() => {
+        let aDiff2 = _carTargetAng - qc.ang;
+        while (aDiff2 >  Math.PI) aDiff2 -= Math.PI * 2;
+        while (aDiff2 < -Math.PI) aDiff2 += Math.PI * 2;
+        return Math.max(-0.07, Math.min(0.07, -aDiff2 * 0.4 * Math.min(1, curSpeed / 4)));
+      })();
+      qc._bodyPitch += (pitchTarget - qc._bodyPitch) * Math.min(1, dt * 6);
+      qc._bodyRoll  += (rollTarget  - qc._bodyRoll)  * Math.min(1, dt * 6);
       updateGtaInteractions();
       updateZoneBtn();
       updatePvpUI();
@@ -19342,21 +19420,57 @@ function drawQuestCar(qc) {
     _shakeRX = (Math.random() - 0.5) * mag;
     _shakeRY = (Math.random() - 0.5) * mag;
   }
+  // Крен/клевок кузова: _bodyPitch (вперёд-назад) и _bodyRoll (влево-вправо)
+  // преобразуем в смещение позиции в тайлах (tiny, ~0.05 тайла макс)
+  const _pitch = qc._bodyPitch || 0;
+  const _roll  = qc._bodyRoll  || 0;
+  // Клевок — вдоль направления машины; крен — поперёк
+  const _pR = _shakeRY + Math.sin(qc.ang) * _pitch - Math.cos(qc.ang) * _roll;
+  const _pC = _shakeRX + Math.cos(qc.ang) * _pitch + Math.sin(qc.ang) * _roll;
   // Мотоцикл — отдельный изорендер (узкий корпус, 2 колеса). Иначе —
   // обычная тачка через drawCarPretty (с braking для стоп-сигналов).
   if (m.is_bike) {
     drawBike({
-      r: qc.y + _shakeRY, c: qc.x + _shakeRX,
+      r: qc.y + _pR, c: qc.x + _pC,
       dirDx, dirDy,
       model: m,
     });
   } else {
     drawCarPretty({
-      r: qc.y + _shakeRY, c: qc.x + _shakeRX,
+      r: qc.y + _pR, c: qc.x + _pC,
       dirDx, dirDy,
       model: m,
       braking: !!qc.braking,
     });
+  }
+  // Курсор-указатель (только для машины игрока, пока едет)
+  if (drivenByMe && !myIsPassenger && (Math.abs(qc._inDx || 0) > 0.08 || Math.abs(qc._inDy || 0) > 0.08)) {
+    const cursorDist = 2.2 + Math.hypot(qc.vx || 0, qc.vy || 0) * 0.14;
+    const cAng = qc.ang;
+    const cR = qc.y + Math.sin(cAng) * cursorDist;
+    const cC = qc.x + Math.cos(cAng) * cursorDist;
+    const cp2 = w2s(cR + 0.5, cC + 0.5);
+    // Проверяем стену — меняем цвет
+    const wallAhead = isBlocked(cR, cC);
+    ctx.save();
+    ctx.globalAlpha = 0.7;
+    ctx.fillStyle   = wallAhead ? 'rgba(255,60,60,0.5)' : 'rgba(255,255,255,0.4)';
+    ctx.strokeStyle = wallAhead ? '#ff3030' : '#ffffff';
+    ctx.lineWidth   = 1.5;
+    ctx.beginPath();
+    ctx.arc(cp2.x, cp2.y, 9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // Стрелка в направлении движения
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = wallAhead ? '#ff6060' : '#ffffff';
+    ctx.lineWidth   = 2;
+    ctx.beginPath();
+    const arrowLen = 10;
+    ctx.moveTo(cp2.x, cp2.y - 5);
+    ctx.lineTo(cp2.x, cp2.y - 5 - arrowLen);
+    ctx.stroke();
+    ctx.restore();
   }
   // ── Дым/огонь на низком HP ──
   //   < 50%  — лёгкий дымок из-под капота
