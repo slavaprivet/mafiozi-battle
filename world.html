@@ -22683,13 +22683,13 @@ function _drawLimbAnim(drawPx, drawPy) {
 
   if (!isKick) {
     // ── УДАР: рисуем обе руки ──────────────────────────────────────
-    // Ширина тела в игровых пикселях зависит от body-типа
-    const bdSwM = [34, 44, 58, 52], bdSwF = [30, 36, 48, 34];
-    const bdSw = (gender === 0 ? bdSwM : bdSwF)[bodyIdx % 4];
-    // Горизонтальные смещения плеч (от center спрайта в пикселях игры)
-    const shoulderSpread = bdSw * 0.5 * (68 / 110);
-    const lShouX = drawPx - shoulderSpread + 1;
-    const rShouX = drawPx + shoulderSpread - 1;
+    // Точные смещения плеч [лево, право] от центра персонажа в пикселях игры.
+    // Вычислены из формул drawMale/drawFemale + масштаб спрайта 110→68px.
+    const mArmOff = [[-4.7,6.2],[-6.2,7.7],[-8.4,9.9],[-7.4,9.5]];
+    const fArmOff = [[-4.1,6.5],[-3.7,7.4],[-5.6,9.3],[-3.4,7.1]];
+    const [lOff, rOff] = (gender === 0 ? mArmOff : fArmOff)[bodyIdx % 4];
+    const lShouX = drawPx + lOff;
+    const rShouX = drawPx + rOff;
     const shouY  = drawPy - 22;   // высота плеча
     const restY  = drawPy - 14;   // рука опущена
 
@@ -23815,8 +23815,11 @@ function render() {
         drawPy = py + (_lsy / _ll) * _lean;
       }
     }
-    // Когда бьём — спрайт без рук/ног, конечности рисуем процедурно
-    const _limbSkip = (_punchAnim && !myDead)
+    // Когда бьём — спрайт без рук/ног, конечности рисуем процедурно.
+    // _punchElapsed < 380 чтобы не рендерить спрайт без рук на последнем кадре
+    // (когда _punchAnim ещё существует но _drawLimbAnim уже вернул ничего).
+    const _punchElapsed = _punchAnim ? performance.now() - _punchAnim.startAt : Infinity;
+    const _limbSkip = (_punchAnim && !myDead && _punchElapsed < 380)
       ? (_punchAnim.type === 'kick' ? { legs: true } : { arms: true })
       : null;
     drawPerson(drawPx, drawPy, player.ang, QP.look,
