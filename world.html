@@ -24388,8 +24388,9 @@ function _updateTargetLock(dt) {
     // Если кандидат уже залочен — не копим таймер, ищем другого
     const candId = cand ? _lockId(cand) : null;
     if (cand && !lockedTargets.has(candId)) {
+      const holdMs = _isArmed() ? AUTO_LOCK_HOLD_MS : 0;  // без оружия — мгновенно
       if (_autoLockCandidate && _lockId(_autoLockCandidate) === candId) {
-        if (now - _autoLockStartAt >= AUTO_LOCK_HOLD_MS) {
+        if (now - _autoLockStartAt >= holdMs) {
           if (lockedTargets.size >= MAX_LOCKS) {
             const oldestId = lockedTargets.keys().next().value;
             lockedTargets.delete(oldestId);
@@ -24646,7 +24647,8 @@ function drawAimLaser() {
   const dirY = _dr / mag, dirX = _dc / mag;
 
   // Стартовая точка и дальность зависят от режима
-  const range = armed ? (WEAPON_FX_CFG[resolveWeapon(currentWeapon)]?.range || 8) : PUNCH_RANGE;
+  // В безоружном режиме лазер тянется до 6 тайлов — достаёт до NPC визуально
+  const range = armed ? (WEAPON_FX_CFG[resolveWeapon(currentWeapon)]?.range || 8) : 6;
   const muzD  = armed ? weaponMuzzleD(currentWeapon, 0.9) : 0.25;
   const sR = player.r + dirY * muzD;
   const sC = player.c + dirX * muzD;
