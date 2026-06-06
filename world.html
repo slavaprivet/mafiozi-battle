@@ -22527,8 +22527,7 @@ function _drawPunchAnim(px, py) {
   if (_punchAnim.type === 'kick') { _drawKickAnim(px, py, elapsed); return; }
 
   const ang = _punchAnim.ang;
-  const bY  = Math.round(TS * 0.289);
-  const a   = handAnchor(px, py - bY, ang);
+  const a   = handAnchor(px, py, ang);
 
   // Плечо — базовая точка (hx - sx*armLen)
   const armLen   = TS * 0.36;
@@ -22702,9 +22701,9 @@ function _drawKickAnim(px, py, elapsed) {
   const perpSx = -fwdSy * side;
   const perpSy =  fwdSx * side;
 
-  // Точка бедра — нижняя часть туловища
+  // Точка бедра — нижняя часть туловища (на уровне руки/пояса)
   const hipX = px + perpSx * TS * 0.10;
-  const hipY = py - TS * 0.06 + perpSy * TS * 0.10;
+  const hipY = py - TS * 0.17 + perpSy * TS * 0.10;
 
   const MAX_KICK = TS * 0.52;
   const UP       = TS * 0.32;   // высота подъёма колена
