@@ -21818,7 +21818,7 @@ const SKINS = ['#FDDBB4','#F0C27F','#D4935A','#A0622A','#7A3B10','#C8A882'];
 const HAIR_COLORS_M = ['#1a0e00','#3d2200','#8b6333','#b8860b','#888','#111'];
 const HAIR_COLORS_F = ['#1a0e00','#8b1a1a','#b8860b','#3d2200','#888','#c87050','#e0c080'];
 
-function drawChar(ctx, W, H, opts) {
+function drawChar(ctx, W, H, opts, skip) {
   const { gender, skin, body, face, hair, hat } = opts;
   ctx.clearRect(0, 0, W, H);
   const cx = W / 2;
@@ -21826,11 +21826,11 @@ function drawChar(ctx, W, H, opts) {
   function px(x) { return cx + x * sc; }
   function py(y) { return H * 0.92 - y * sc; }
   const skinCol = SKINS[skin] || SKINS[0];
-  if (gender === 0) drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat);
-  else              drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat);
+  if (gender === 0) drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat, skip);
+  else              drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat, skip);
 }
 
-function drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat) {
+function drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat, skip) {
   const bodyDefs = [
     { sw: 34, sh: 80, nw: 14, nh: 22, hw: 26 },
     { sw: 44, sh: 85, nw: 16, nh: 22, hw: 30 },
@@ -21840,12 +21840,14 @@ function drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat) {
   const bd = bodyDefs[body] || bodyDefs[1];
   const suitCol = ['#1a1a2e','#1a2e1a','#2e1a1a','#1a1e2e'][body % 4];
   const tieCol  = ['#c0392b','#e8c96e','#8e44ad','#2980b9'][face % 4];
-  ctx.fillStyle = suitCol;
-  const legW = bd.sw * 0.38; const legH = 55 * sc;
-  ctx.beginPath(); ctx.roundRect(px(-bd.sw*0.22), py(legH), legW*sc, legH, 4*sc); ctx.fill();
-  ctx.beginPath(); ctx.roundRect(px(bd.sw*0.22 - legW), py(legH), legW*sc, legH, 4*sc); ctx.fill();
-  ctx.fillStyle = '#111';
-  [-1,1].forEach(s => { ctx.beginPath(); ctx.ellipse(px(s*bd.sw*0.1), py(2), 10*sc, 5*sc, 0, 0, Math.PI*2); ctx.fill(); });
+  if (!skip?.legs) {
+    ctx.fillStyle = suitCol;
+    const legW = bd.sw * 0.38; const legH = 55 * sc;
+    ctx.beginPath(); ctx.roundRect(px(-bd.sw*0.22), py(legH), legW*sc, legH, 4*sc); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(px(bd.sw*0.22 - legW), py(legH), legW*sc, legH, 4*sc); ctx.fill();
+    ctx.fillStyle = '#111';
+    [-1,1].forEach(s => { ctx.beginPath(); ctx.ellipse(px(s*bd.sw*0.1), py(2), 10*sc, 5*sc, 0, 0, Math.PI*2); ctx.fill(); });
+  }
   ctx.fillStyle = suitCol;
   ctx.beginPath(); ctx.roundRect(px(-bd.sw/2), py(bd.sh), bd.sw*sc, bd.sh*sc, [0,0,6*sc,6*sc]); ctx.fill();
   ctx.fillStyle = '#ddd';
@@ -21858,13 +21860,15 @@ function drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat) {
   ctx.fillStyle = suitCol;
   ctx.beginPath(); ctx.moveTo(px(0), py(bd.sh-2)); ctx.lineTo(px(-bd.sw/2), py(bd.sh)); ctx.lineTo(px(-bd.sw/2), py(bd.sh-20)); ctx.closePath(); ctx.fill();
   ctx.beginPath(); ctx.moveTo(px(0), py(bd.sh-2)); ctx.lineTo(px(bd.sw/2), py(bd.sh)); ctx.lineTo(px(bd.sw/2), py(bd.sh-20)); ctx.closePath(); ctx.fill();
-  const armLen = body===3?65:60, armW = body===3?13:10;
-  ctx.fillStyle = suitCol;
-  ctx.beginPath(); ctx.roundRect(px(-bd.sw/2-armW*sc+2), py(bd.sh), armW*sc, armLen*sc, 5*sc); ctx.fill();
-  ctx.beginPath(); ctx.roundRect(px(bd.sw/2-2), py(bd.sh), armW*sc, armLen*sc, 5*sc); ctx.fill();
-  ctx.fillStyle = skinCol;
-  ctx.beginPath(); ctx.ellipse(px(-bd.sw/2-armW*sc/2+2), py(armLen-10), 7*sc, 9*sc, 0, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(px(bd.sw/2+armW*sc/2-2), py(armLen-10), 7*sc, 9*sc, 0, 0, Math.PI*2); ctx.fill();
+  if (!skip?.arms) {
+    const armLen = body===3?65:60, armW = body===3?13:10;
+    ctx.fillStyle = suitCol;
+    ctx.beginPath(); ctx.roundRect(px(-bd.sw/2-armW*sc+2), py(bd.sh), armW*sc, armLen*sc, 5*sc); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(px(bd.sw/2-2), py(bd.sh), armW*sc, armLen*sc, 5*sc); ctx.fill();
+    ctx.fillStyle = skinCol;
+    ctx.beginPath(); ctx.ellipse(px(-bd.sw/2-armW*sc/2+2), py(armLen-10), 7*sc, 9*sc, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(px(bd.sw/2+armW*sc/2-2), py(armLen-10), 7*sc, 9*sc, 0, 0, Math.PI*2); ctx.fill();
+  }
   ctx.fillStyle = skinCol;
   ctx.beginPath(); ctx.roundRect(px(-bd.nw/2), py(bd.sh+bd.nh), bd.nw*sc, bd.nh*sc, 4*sc); ctx.fill();
   const headH = bd.hw*1.22;
@@ -21880,7 +21884,7 @@ function drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat) {
   if (hat > 0)  drawHat(ctx, hat, px, py, bd, headY, headH, sc);
 }
 
-function drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat) {
+function drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat, skip) {
   const bodyDefs = [
     { sw: 30, sh: 78, nw: 12, nh: 20, hw: 24, hip: 32 },
     { sw: 36, sh: 80, nw: 13, nh: 20, hw: 27, hip: 40 },
@@ -21890,16 +21894,18 @@ function drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat) {
   const bd = bodyDefs[body] || bodyDefs[1];
   const dressCol = ['#3a1a3a','#1a2a3a','#3a1a1a','#1a3a2a'][body % 4];
   const accentCol = ['#e8c96e','#c0392b','#8e44ad','#2980b9'][face % 4];
-  ctx.fillStyle = dressCol;
-  ctx.beginPath();
-  ctx.moveTo(px(-bd.sw/2), py(bd.sh)); ctx.lineTo(px(-bd.hip/2), py(0));
-  ctx.lineTo(px(bd.hip/2), py(0)); ctx.lineTo(px(bd.sw/2), py(bd.sh));
-  ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#111';
-  [-1,1].forEach(s => {
-    ctx.beginPath(); ctx.ellipse(px(s*bd.hip*0.18), py(3), 8*sc, 4*sc, 0, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.roundRect(px(s*bd.hip*0.18+4*sc), py(0), 3*sc, 8*sc, 1*sc); ctx.fill();
-  });
+  if (!skip?.legs) {
+    ctx.fillStyle = dressCol;
+    ctx.beginPath();
+    ctx.moveTo(px(-bd.sw/2), py(bd.sh)); ctx.lineTo(px(-bd.hip/2), py(0));
+    ctx.lineTo(px(bd.hip/2), py(0)); ctx.lineTo(px(bd.sw/2), py(bd.sh));
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#111';
+    [-1,1].forEach(s => {
+      ctx.beginPath(); ctx.ellipse(px(s*bd.hip*0.18), py(3), 8*sc, 4*sc, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(px(s*bd.hip*0.18+4*sc), py(0), 3*sc, 8*sc, 1*sc); ctx.fill();
+    });
+  }
   ctx.fillStyle = dressCol;
   ctx.beginPath();
   ctx.roundRect(px(-bd.sw/2), py(bd.sh), bd.sw*sc, bd.sh*sc, [0,0,6*sc,6*sc]); ctx.fill();
@@ -21910,13 +21916,15 @@ function drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat) {
   ctx.beginPath(); ctx.moveTo(px(0), py(bd.sh-4)); ctx.lineTo(px(bd.sw/2), py(bd.sh)); ctx.lineTo(px(bd.sw/2), py(bd.sh-18)); ctx.closePath(); ctx.fill();
   ctx.fillStyle = accentCol;
   ctx.beginPath(); ctx.arc(px(-8), py(bd.sh-10), 4*sc, 0, Math.PI*2); ctx.fill();
-  const armLen = 58, armW = 8;
-  ctx.fillStyle = dressCol;
-  ctx.beginPath(); ctx.roundRect(px(-bd.sw/2-armW*sc+2), py(bd.sh), armW*sc, armLen*sc, 4*sc); ctx.fill();
-  ctx.beginPath(); ctx.roundRect(px(bd.sw/2-2), py(bd.sh), armW*sc, armLen*sc, 4*sc); ctx.fill();
-  ctx.fillStyle = skinCol;
-  ctx.beginPath(); ctx.ellipse(px(-bd.sw/2-armW*sc/2+2), py(armLen-10), 6*sc, 8*sc, 0, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(px(bd.sw/2+armW*sc/2-2), py(armLen-10), 6*sc, 8*sc, 0, 0, Math.PI*2); ctx.fill();
+  if (!skip?.arms) {
+    const armLen = 58, armW = 8;
+    ctx.fillStyle = dressCol;
+    ctx.beginPath(); ctx.roundRect(px(-bd.sw/2-armW*sc+2), py(bd.sh), armW*sc, armLen*sc, 4*sc); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(px(bd.sw/2-2), py(bd.sh), armW*sc, armLen*sc, 4*sc); ctx.fill();
+    ctx.fillStyle = skinCol;
+    ctx.beginPath(); ctx.ellipse(px(-bd.sw/2-armW*sc/2+2), py(armLen-10), 6*sc, 8*sc, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(px(bd.sw/2+armW*sc/2-2), py(armLen-10), 6*sc, 8*sc, 0, 0, Math.PI*2); ctx.fill();
+  }
   ctx.fillStyle = skinCol;
   ctx.beginPath(); ctx.roundRect(px(-bd.nw/2), py(bd.sh+bd.nh), bd.nw*sc, bd.nh*sc, 4*sc); ctx.fill();
   ctx.strokeStyle = accentCol; ctx.lineWidth = 2*sc;
@@ -22197,12 +22205,13 @@ function drawHat(ctx, hatId, px, py, bd, headY, headH, sc) {
 // Кеш спрайтов — каждый уникальный look рендерится один раз в офскрин-canvas.
 const SPRITE_W = 110, SPRITE_H = 200;
 const _spriteCache = new Map();
-function getSprite(look) {
-  const key = [look.gender|0, look.skin|0, look.body|0, look.face|0, look.hair|0, look.hat|0].join('.');
+function getSprite(look, skip) {
+  const skipKey = skip ? (skip.arms ? 'a' : '') + (skip.legs ? 'l' : '') : '';
+  const key = [look.gender|0, look.skin|0, look.body|0, look.face|0, look.hair|0, look.hat|0].join('.') + skipKey;
   if (_spriteCache.has(key)) return _spriteCache.get(key);
   const off = document.createElement('canvas');
   off.width = SPRITE_W; off.height = SPRITE_H;
-  drawChar(off.getContext('2d'), SPRITE_W, SPRITE_H, look);
+  drawChar(off.getContext('2d'), SPRITE_W, SPRITE_H, look, skip);
   _spriteCache.set(key, off);
   return off;
 }
@@ -22639,6 +22648,133 @@ function _drawPunchAnim(px, py) {
   ctx.restore();
 }
 
+// Анимированные конечности поверх спрайта без рук/ног.
+// Рисует руки при ударе или ноги при пинке, цвета берёт из look игрока.
+function _drawLimbAnim(drawPx, drawPy) {
+  if (!_punchAnim) return;
+  const elapsed = performance.now() - _punchAnim.startAt;
+  const TOTAL = 380;
+  if (elapsed >= TOTAL) return;
+
+  const { ang, type } = _punchAnim;
+  const isKick = type === 'kick';
+  const look   = QP.look || {};
+  const gender = look.gender | 0;
+  const bodyIdx = look.body | 0;
+  const skinCol  = SKINS[look.skin | 0] || SKINS[0];
+  const clothCol = gender === 0
+    ? ['#1a1a2e','#1a2e1a','#2e1a1a','#1a1e2e'][bodyIdx % 4]
+    : ['#3a1a3a','#1a2a3a','#3a1a1a','#1a3a2a'][bodyIdx % 4];
+
+  // Изо-направление удара/пинка
+  const dx = Math.cos(ang), dy = Math.sin(ang);
+  const sxR = (dx - dy) * 0.5, syR = (dx + dy) * 0.5 * ISO_Y;
+  const iL  = Math.hypot(sxR, syR) || 1;
+  const fwdX = sxR / iL, fwdY = syR / iL;
+  const perpX = -fwdY, perpY = fwdX;
+
+  // Фаза: быстрый подъём → пик → возврат
+  const t = elapsed / TOTAL;
+  const ext = Math.pow(Math.sin(t * Math.PI), 0.7);
+
+  ctx.save();
+  ctx.lineCap  = 'round';
+  ctx.lineJoin = 'round';
+
+  if (!isKick) {
+    // ── УДАР: рисуем обе руки ──────────────────────────────────────
+    // Ширина тела в игровых пикселях зависит от body-типа
+    const bdSwM = [34, 44, 58, 52], bdSwF = [30, 36, 48, 34];
+    const bdSw = (gender === 0 ? bdSwM : bdSwF)[bodyIdx % 4];
+    // Горизонтальные смещения плеч (от center спрайта в пикселях игры)
+    const shoulderSpread = bdSw * 0.5 * (68 / 110);
+    const lShouX = drawPx - shoulderSpread + 1;
+    const rShouX = drawPx + shoulderSpread - 1;
+    const shouY  = drawPy - 22;   // высота плеча
+    const restY  = drawPy - 14;   // рука опущена
+
+    // Атакующая рука: та, что ближе к цели по perp-стороне
+    const atkRight = perpX >= 0;
+    const atkShouX = atkRight ? rShouX : lShouX;
+    const defShouX = atkRight ? lShouX : rShouX;
+
+    const REACH = TS * 0.44; // максимальный вынос кулака
+
+    // Кулак атаки: от покоя → вынос в направлении удара
+    const atkRestX = atkShouX, atkRestY = restY;
+    const atkExtX  = atkShouX + fwdX * REACH;
+    const atkExtY  = shouY    + fwdY * REACH;
+    const atkFistX = atkRestX + (atkExtX - atkRestX) * ext;
+    const atkFistY = atkRestY + (atkExtY - atkRestY) * ext;
+    // Локоть: середина с чуть наружным изгибом
+    const atkBend = (1 - ext) * 5 * (atkRight ? 1 : -1);
+    const atkElbX = (atkShouX + atkFistX) / 2 + perpX * atkBend;
+    const atkElbY = (shouY    + atkFistY) / 2 + perpY * atkBend;
+
+    ctx.lineWidth = 5; ctx.strokeStyle = clothCol;
+    ctx.beginPath(); ctx.moveTo(atkShouX, shouY); ctx.lineTo(atkElbX, atkElbY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(atkElbX, atkElbY); ctx.lineTo(atkFistX, atkFistY); ctx.stroke();
+    ctx.fillStyle = skinCol;
+    ctx.beginPath(); ctx.ellipse(atkFistX, atkFistY, 5, 4, Math.atan2(fwdY, fwdX), 0, Math.PI * 2); ctx.fill();
+
+    // Защитная рука: лёгкий контрбаланс назад
+    const defRestX = defShouX, defRestY = restY;
+    const defFistX = defRestX - fwdX * 4 * ext;
+    const defFistY = defRestY - fwdY * 4 * ext - ext * 3;
+    const defElbX  = (defShouX + defFistX) / 2;
+    const defElbY  = (shouY    + defFistY) / 2;
+
+    ctx.lineWidth = 4; ctx.strokeStyle = clothCol;
+    ctx.beginPath(); ctx.moveTo(defShouX, shouY); ctx.lineTo(defElbX, defElbY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(defElbX, defElbY); ctx.lineTo(defFistX, defFistY); ctx.stroke();
+    ctx.fillStyle = skinCol;
+    ctx.beginPath(); ctx.ellipse(defFistX, defFistY, 4, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+
+  } else {
+    // ── ПИНОК: рисуем обе ноги ────────────────────────────────────
+    const hipY      = drawPy - 8;
+    const footRestY = drawPy + 5;
+    const lHipX = drawPx - 3, rHipX = drawPx + 3;
+
+    const atkRight = perpX >= 0;
+    const atkHipX  = atkRight ? rHipX : lHipX;
+    const defHipX  = atkRight ? lHipX : rHipX;
+
+    const KICK_REACH = TS * 0.50;
+
+    // Нога атаки
+    const atkFootRestX = atkHipX, atkFootRestY = footRestY;
+    const atkFootExtX  = atkHipX + fwdX * KICK_REACH;
+    const atkFootExtY  = hipY    + fwdY * KICK_REACH;
+    const atkFootX = atkFootRestX + (atkFootExtX - atkFootRestX) * ext;
+    const atkFootY = atkFootRestY + (atkFootExtY - atkFootRestY) * ext;
+    // Колено поднимается во время пинка
+    const atkKneeX = (atkHipX + atkFootX) / 2;
+    const atkKneeY = (hipY    + atkFootY) / 2 - ext * 12;
+
+    ctx.lineWidth = 8; ctx.strokeStyle = clothCol;
+    ctx.beginPath(); ctx.moveTo(atkHipX, hipY); ctx.lineTo(atkKneeX, atkKneeY); ctx.stroke();
+    ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.moveTo(atkKneeX, atkKneeY); ctx.lineTo(atkFootX, atkFootY); ctx.stroke();
+    ctx.fillStyle = '#111';
+    ctx.beginPath(); ctx.ellipse(atkFootX, atkFootY, 7, 4, Math.atan2(fwdY, fwdX), 0, Math.PI * 2); ctx.fill();
+
+    // Опорная нога
+    const defFootX = defHipX, defFootY = footRestY;
+    const defKneeX = (defHipX + defFootX) / 2;
+    const defKneeY = (hipY    + defFootY) / 2;
+
+    ctx.lineWidth = 8; ctx.strokeStyle = clothCol;
+    ctx.beginPath(); ctx.moveTo(defHipX, hipY); ctx.lineTo(defKneeX, defKneeY); ctx.stroke();
+    ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.moveTo(defKneeX, defKneeY); ctx.lineTo(defFootX, defFootY); ctx.stroke();
+    ctx.fillStyle = '#111';
+    ctx.beginPath(); ctx.ellipse(defFootX, defFootY, 6, 3, 0, 0, Math.PI * 2); ctx.fill();
+  }
+
+  ctx.restore();
+}
+
 // ── Визуал оружия в руках (порт из demo_isometric.html) ───────────
 // Полностью совместимо с тем, как стволы рисуются в боёвке против
 // босса. hx,hy — точка хвата (рука персонажа); sx,sy — единичный
@@ -22762,7 +22898,7 @@ function drawWeaponInHands(x, y, ang, weapon, scale /*shotAtMs ignored: см. dr
   }
 }
 
-function drawPerson(x, y, ang, look, walkPhase, name, chat, isSelf, hp, maxHp, isDead, deadAt) {
+function drawPerson(x, y, ang, look, walkPhase, name, chat, isSelf, hp, maxHp, isDead, deadAt, skip) {
   // Анимация падения: первые 400мс — поворот 0→90° и смещение вниз; дальше
   // — статично лежит с alpha 0.55. До этого было просто globalAlpha 0.35 без
   // движения — выглядело как «исчезает», не как «упал».
@@ -22778,7 +22914,7 @@ function drawPerson(x, y, ang, look, walkPhase, name, chat, isSelf, hp, maxHp, i
   ctx.ellipse(x, y + 3, 14, 5, 0, 0, Math.PI * 2);
   ctx.fill();
   // Спрайт из креатора. Лёгкая ходьба: вертикальный bob + сжатие.
-  const sprite = getSprite(look || {});
+  const sprite = getSprite(look || {}, skip);
   const sh = TS * 1.7;
   const sw = sh * 0.72;
   const ph = walkPhase || 0;
@@ -23679,12 +23815,17 @@ function render() {
         drawPy = py + (_lsy / _ll) * _lean;
       }
     }
+    // Когда бьём — спрайт без рук/ног, конечности рисуем процедурно
+    const _limbSkip = (_punchAnim && !myDead)
+      ? (_punchAnim.type === 'kick' ? { legs: true } : { arms: true })
+      : null;
     drawPerson(drawPx, drawPy, player.ang, QP.look,
                player.walking ? player.walkPhase : 0, QP.name, myChat, true,
-               myHp, PVP.max_hp, myDead);
+               myHp, PVP.max_hp, myDead, undefined, _limbSkip);
     if (myMode !== 'pve' && !myDead) {
       drawWeaponInHands(drawPx, drawPy, player.ang, currentWeapon, 0.9, lastShotClientT);
-      if (_punchAnim) _drawPunchAnim(drawPx, drawPy);
+      if (_punchAnim) _drawLimbAnim(drawPx, drawPy);   // конечности под вспышкой
+      if (_punchAnim) _drawPunchAnim(drawPx, drawPy);  // вспышка удара сверху
     }
     if (myWanted > 0) drawWantedStars(px, py, myWanted);
     if (myGangs  > 0) drawWantedGangs(px, py, myGangs);
