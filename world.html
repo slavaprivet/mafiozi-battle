@@ -23815,16 +23815,9 @@ function render() {
         drawPy = py + (_lsy / _ll) * _lean;
       }
     }
-    // Когда бьём — спрайт без рук/ног, конечности рисуем процедурно.
-    // _punchElapsed < 380 чтобы не рендерить спрайт без рук на последнем кадре
-    // (когда _punchAnim ещё существует но _drawLimbAnim уже вернул ничего).
-    const _punchElapsed = _punchAnim ? performance.now() - _punchAnim.startAt : Infinity;
-    const _limbSkip = (_punchAnim && !myDead && _punchElapsed < 380)
-      ? (_punchAnim.type === 'kick' ? { legs: true } : { arms: true })
-      : null;
     drawPerson(drawPx, drawPy, player.ang, QP.look,
                player.walking ? player.walkPhase : 0, QP.name, myChat, true,
-               myHp, PVP.max_hp, myDead, undefined, _limbSkip);
+               myHp, PVP.max_hp, myDead);
     if (myMode !== 'pve' && !myDead) {
       drawWeaponInHands(drawPx, drawPy, player.ang, currentWeapon, 0.9, lastShotClientT);
       if (_punchAnim) _drawLimbAnim(drawPx, drawPy);   // конечности под вспышкой
