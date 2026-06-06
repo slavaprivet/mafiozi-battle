@@ -22542,94 +22542,89 @@ function _drawPunchAnim(px, py) {
   const ipX = px + sx * REACH;
   const ipY = py + sy * REACH - (isKick ? 2 : 12);
 
-  ctx.save();
-  ctx.lineCap = 'round';
+  // Перп-вектор (для изгиба дуги свинга)
+  const perpX = -sy, perpY = sx;
 
-  // ── Фаза 1: замах — «вихрь» позади (0–120мс) ─────────────────────
-  if (elapsed < 120) {
-    const t = elapsed / 120;
-    const alpha = t * 0.75;
-    const swingColor = isKick ? 'rgba(180,80,255,' : 'rgba(255,140,30,';
-    ctx.globalAlpha = alpha;
-    ctx.shadowColor = isKick ? '#9030cc' : '#e06000';
-    ctx.shadowBlur  = 12;
-    // Дуга замаха — от игрока назад
-    ctx.strokeStyle = swingColor + '0.6)';
-    ctx.lineWidth   = 5;
-    ctx.beginPath();
-    const backX = px - sx * TS * 0.35 * t;
-    const backY = py - sy * TS * 0.35 * t;
-    ctx.moveTo(px, py - 14);
-    ctx.lineTo(backX, backY - 14);
-    ctx.stroke();
-    // Маленький кружок в точке замаха
-    ctx.globalAlpha = alpha * 0.6;
-    ctx.fillStyle = isKick ? '#d060ff' : '#ffb040';
-    ctx.beginPath();
-    ctx.arc(backX, backY - 14, 5 + t * 3, 0, Math.PI * 2);
-    ctx.fill();
+  // Начальная точка свинга (откуда «выходит» рука/нога)
+  const originX = px - sx * TS * 0.10;
+  const originY = py - sy * TS * 0.10 - (isKick ? 4 : 14);
+
+  ctx.save();
+  ctx.lineCap  = 'round';
+  ctx.lineJoin = 'round';
+
+  // ── Свинг-дуга: след движения руки/ноги (40–220мс) ───────────────
+  if (elapsed >= 40 && elapsed <= 220) {
+    const tSwing = (elapsed - 40) / 180;          // 0→1
+    // Текущий конец дуги двигается от origin к impact
+    const curX = originX + (ipX - originX) * Math.min(1, tSwing * 1.4);
+    const curY = originY + (ipY - originY) * Math.min(1, tSwing * 1.4);
+    // Контрольная точка — отклоняем в сторону для кривизны дуги
+    const curveSide = isKick ? -1 : 1;
+    const cpX = (originX + curX) * 0.5 + perpX * TS * 0.22 * curveSide;
+    const cpY = (originY + curY) * 0.5 + perpY * TS * 0.22 * curveSide;
+
+    const STEPS = 5;
+    for (let i = STEPS; i >= 1; i--) {
+      const pastT   = Math.max(0, tSwing - (STEPS - i) * 0.06);
+      const pastCurX = originX + (ipX - originX) * Math.min(1, pastT * 1.4);
+      const pastCurY = originY + (ipY - originY) * Math.min(1, pastT * 1.4);
+      const alpha   = (i / STEPS) * tSwing * 0.85;
+      const width   = (isKick ? 8 : 7) * (i / STEPS);
+      ctx.globalAlpha = alpha;
+      ctx.lineWidth   = width;
+      ctx.shadowColor = isKick ? '#aa30ee' : '#e06000';
+      ctx.shadowBlur  = 8 * (i / STEPS);
+      ctx.strokeStyle = isKick ? `rgba(210,80,255,0.9)` : `rgba(255,130,30,0.9)`;
+      ctx.beginPath();
+      ctx.moveTo(originX, originY);
+      ctx.quadraticCurveTo(cpX, cpY, pastCurX, pastCurY);
+      ctx.stroke();
+    }
   }
 
-  // ── Фаза 2: вспышка удара (120–320мс) ────────────────────────────
-  if (elapsed >= 120 && elapsed <= 320) {
-    const t  = (elapsed - 120) / 200;
-    const fl = Math.sin(t * Math.PI);         // 0→1→0
+  // ── Импакт-вспышка при ударе (130–310мс) ─────────────────────────
+  if (elapsed >= 130 && elapsed <= 310) {
+    const t  = (elapsed - 130) / 180;
+    const fl = Math.sin(t * Math.PI);
 
-    ctx.globalAlpha = 0.25 + fl * 0.75;        // минимум 25% видимость
+    ctx.globalAlpha = 0.3 + fl * 0.7;
 
     if (isKick) {
-      // Фиолетовый импакт
-      ctx.shadowColor = '#c050ff';
-      ctx.shadowBlur  = 28;
-      ctx.strokeStyle = '#dd60ff';
-      ctx.lineWidth   = 3.5;
-      ctx.beginPath();
-      ctx.arc(ipX, ipY, 6 + t * 18, 0, Math.PI * 2);
-      ctx.stroke();
-      // Лучи
-      ctx.shadowBlur  = 14;
-      ctx.lineWidth   = 2.2;
+      ctx.shadowColor = '#c050ff'; ctx.shadowBlur = 28;
+      ctx.strokeStyle = '#dd60ff'; ctx.lineWidth  = 3.5;
+      ctx.beginPath(); ctx.arc(ipX, ipY, 5 + t * 18, 0, Math.PI * 2); ctx.stroke();
+      ctx.shadowBlur = 12; ctx.lineWidth = 2;
       for (let i = 0; i < 6; i++) {
-        const ra = (i / 6) * Math.PI * 2 + t * 0.6;
-        const r0 = 8 + t * 4;
-        const r1 = r0 + (12 + (i % 2) * 6) * fl;
+        const ra = (i / 6) * Math.PI * 2;
+        const r0 = 7 + t * 4, r1 = r0 + (12 + (i % 2) * 6) * fl;
         ctx.strokeStyle = i % 2 ? '#ff88ff' : '#cc44ff';
         ctx.beginPath();
         ctx.moveTo(ipX + Math.cos(ra) * r0, ipY + Math.sin(ra) * r0);
         ctx.lineTo(ipX + Math.cos(ra) * r1, ipY + Math.sin(ra) * r1);
         ctx.stroke();
       }
-      // Центральный блик
       ctx.shadowBlur = 0;
       const gk = ctx.createRadialGradient(ipX, ipY, 0, ipX, ipY, 14 * fl);
-      gk.addColorStop(0, `rgba(255,220,255,${fl * 0.9})`);
-      gk.addColorStop(1, 'rgba(140,30,200,0)');
+      gk.addColorStop(0, `rgba(255,210,255,${fl * 0.9})`);
+      gk.addColorStop(1, 'rgba(120,20,180,0)');
       ctx.fillStyle = gk;
       ctx.beginPath(); ctx.arc(ipX, ipY, 14 * fl, 0, Math.PI * 2); ctx.fill();
     } else {
-      // Оранжевый импакт
-      ctx.shadowColor = '#ff6000';
-      ctx.shadowBlur  = 28;
-      ctx.strokeStyle = '#ff9020';
-      ctx.lineWidth   = 3.5;
-      ctx.beginPath();
-      ctx.arc(ipX, ipY, 5 + t * 20, 0, Math.PI * 2);
-      ctx.stroke();
-      // Лучи (8 штук)
+      ctx.shadowColor = '#ff6000'; ctx.shadowBlur = 28;
+      ctx.strokeStyle = '#ff9020'; ctx.lineWidth  = 3.5;
+      ctx.beginPath(); ctx.arc(ipX, ipY, 4 + t * 20, 0, Math.PI * 2); ctx.stroke();
       const rl = [16, 10, 18, 9, 15, 11, 17, 8];
-      ctx.shadowBlur = 12;
-      ctx.lineWidth  = 2.2;
+      ctx.shadowBlur = 12; ctx.lineWidth = 2;
       for (let i = 0; i < 8; i++) {
         const ra = (i / 8) * Math.PI * 2;
-        const r0 = 7 + t * 5;
-        const r1 = r0 + rl[i] * fl;
+        const r0 = 6 + t * 5, r1 = r0 + rl[i] * fl;
         ctx.strokeStyle = i % 2 ? '#ffe060' : '#ff8020';
         ctx.beginPath();
         ctx.moveTo(ipX + Math.cos(ra) * r0, ipY + Math.sin(ra) * r0);
         ctx.lineTo(ipX + Math.cos(ra) * r1, ipY + Math.sin(ra) * r1);
         ctx.stroke();
       }
-      // Центральный блик
       ctx.shadowBlur = 0;
       const gp = ctx.createRadialGradient(ipX, ipY, 0, ipX, ipY, 16 * fl);
       gp.addColorStop(0, `rgba(255,255,200,${fl * 0.92})`);
