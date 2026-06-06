@@ -24388,9 +24388,8 @@ function _updateTargetLock(dt) {
     // Если кандидат уже залочен — не копим таймер, ищем другого
     const candId = cand ? _lockId(cand) : null;
     if (cand && !lockedTargets.has(candId)) {
-      const holdMs = _isArmed() ? AUTO_LOCK_HOLD_MS : 0;  // без оружия — мгновенно
       if (_autoLockCandidate && _lockId(_autoLockCandidate) === candId) {
-        if (now - _autoLockStartAt >= holdMs) {
+        if (now - _autoLockStartAt >= AUTO_LOCK_HOLD_MS) {
           if (lockedTargets.size >= MAX_LOCKS) {
             const oldestId = lockedTargets.keys().next().value;
             lockedTargets.delete(oldestId);
