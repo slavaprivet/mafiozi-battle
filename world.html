@@ -8,7 +8,8 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; padding: 0; height: 100%; background: #0b0d12; color: #fff;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+  overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;
+  overscroll-behavior: none; -webkit-overflow-scrolling: auto; }
 #stage { position: fixed; inset: 0; overflow: hidden; }
 #gc    { display: block; width: 100%; height: 100%; touch-action: none; background: #0a0a10; }
 
@@ -1497,6 +1498,20 @@ async function _fetchApiFallback() {
 // Запрещаем вертикальный свайп вниз чтобы свайп по джойстику не закрывал
 // мини-апп. API 7.7+; на старых версиях просто игнорируется.
 try { if (tg && typeof tg.disableVerticalSwipes === 'function') tg.disableVerticalSwipes(); } catch(e) {}
+// Если Telegram всё равно свернул приложение свайпом — немедленно разворачиваем обратно
+try {
+  if (tg && typeof tg.onEvent === 'function') {
+    tg.onEvent('viewportChanged', () => {
+      try { if (tg && !tg.isExpanded) tg.expand(); } catch(_) {}
+    });
+  }
+} catch(e) {}
+// Блокируем touchstart на body кроме интерактивных элементов (доп. защита от свайпа)
+document.body.addEventListener('touchstart', (e) => {
+  if (e.target === document.body || e.target === document.documentElement) {
+    e.preventDefault();
+  }
+}, { passive: false });
 // На всякий случай — глушим touchmove на body (но не на canvas/joystick,
 // они и так останавливают через preventDefault выше).
 document.addEventListener('touchmove', (e) => {
@@ -3192,7 +3207,7 @@ function hitGangCar(car, damage) {
   // Лёгкая встряска корпуса
   car._shakeUntil = performance.now() + 200;
   if (car.gangHp <= 0) {
-    spawnCarExplosion(car.r, car.c);
+    spawnCarExplosion(car.r, car.c, car);
     car._wrecked   = true;
     car._respawnAt = performance.now() + 9999999;  // не респаунить — это уникальный кортеж
   }
@@ -3239,6 +3254,8 @@ function hitNpc(npc, dirY, dirX, weapon, damage) {
   if (npc.hp <= 0) {
     npc.dead = true;
     npc.deadAt = performance.now();
+    // Копы рядом реагируют на убийство
+    _alertNearbyCops('kill');
     // Большой splat крови на месте смерти + взрыв-фонтан частиц по сторонам
     for (let i = 0; i < 6; i++) {
       _capArr(bloodSplats, _MAX_BLOOD);
@@ -3751,6 +3768,48 @@ const CITY_COPS_TARGET = 6;
 const cityCops = [];
 let _cityCopId = 0;
 
+// Реакция ближайших копов на стрельбу / драку / убийство рядом с игроком.
+// reason: 'shot' | 'fight' | 'kill'
+// Немедленно: cop смотрит на игрока + кричит. Сервер увеличит wanted через open_fire.
+const COP_REACT_R = 10;   // радиус реакции в тайлах
+const _COP_REACT_CRIES = {
+  shot:  ['Стоять! Полиция!', 'Брось оружие!', 'Огонь! К бою!', 'Стой, стрелять буду!'],
+  fight: ['Разойтись! Полиция!', 'Прекратить драку!', 'Стоять оба!', 'Спокойно!'],
+  kill:  ['Убийца! Стоять!', 'Ты арестован!', 'Руки за голову!', 'Никуда не денешься!'],
+};
+function _alertNearbyCops(reason) {
+  const cries = _COP_REACT_CRIES[reason] || _COP_REACT_CRIES.shot;
+  const now = performance.now();
+  let reacted = false;
+  for (const cop of cityCops) {
+    if (!cop.alive) continue;
+    const d = Math.hypot(cop.y - player.r, cop.x - player.c);
+    if (d > COP_REACT_R) continue;
+    cop.ang = Math.atan2(player.r - cop.y, player.c - cop.x);
+    cop._reactUntil = now + 2800;
+    // Показываем фразу через _copChats (тот же механизм что cop_warn)
+    const existing = _copChats.get(cop.id);
+    if (!existing || existing.untilMs < now + 1000) {
+      _copChats.set(cop.id, {
+        text: cries[Math.floor(Math.random() * cries.length)],
+        untilMs: now + 2500,
+      });
+    }
+    // Убийство — немедленно гонится даже без wanted
+    if (reason === 'kill') cop._pursuing = true;
+    reacted = true;
+  }
+  // Сообщаем серверу: свидетель-коп зафиксировал инцидент → увеличивает wanted
+  if (reacted) {
+    try {
+      ws && ws.send(JSON.stringify({ t: 'open_fire',
+        d: { x: +player.c.toFixed(2), y: +player.r.toFixed(2),
+             weapon: currentWeapon || 'fists',
+             civilian: false, witness: true } }));
+    } catch(e) {}
+  }
+}
+
 function spawnCityCop() {
   for (let tries = 0; tries < 60; tries++) {
     const r = 4 + Math.floor(Math.random() * 72);
@@ -3885,6 +3944,23 @@ function updateCityCops(dt) {
       continue;
     }
     cop._pursuing = false;
+    // ── РЕАКЦИЯ НА ИНЦИДЕНТ (стрельба/драка рядом) ─────────────────
+    if (cop._reactUntil && now < cop._reactUntil) {
+      const dpr2 = player.r - cop.y, dpc2 = player.c - cop.x;
+      const distP2 = Math.hypot(dpr2, dpc2);
+      cop.ang = Math.atan2(dpr2, dpc2);
+      // Идёт к игроку, но медленнее чем pursue
+      if (distP2 > 2.5) {
+        const sp2 = cop.speed * 1.2 * dt;
+        const nx2 = cop.x + (dpc2 / distP2) * sp2;
+        const ny2 = cop.y + (dpr2 / distP2) * sp2;
+        if (npcPassableForSnitch(ny2, nx2)) {
+          cop.x = nx2; cop.y = ny2;
+          cop.walkPhase = (cop.walkPhase || 0) + dt * 8;
+        }
+      }
+      continue;
+    }
     // ── ОБЫЧНОЕ ПАТРУЛИРОВАНИЕ ─────────────────────────────────────
     const dr = cop.ty - cop.y, dc = cop.tx - cop.x;
     const d = Math.hypot(dr, dc);
@@ -4367,6 +4443,253 @@ function drawPet(pet) {
 }
 
 function drawServiceVehicle(v) {
+  const isAmb = v.kind === 'ambulance';
+  let workFrac = 0, workLabel = null;
+  if (v.state === 'working' && v.workUntil) {
+    const total = isAmb ? 2500 : 4000;
+    const remain = Math.max(0, v.workUntil - performance.now());
+    workFrac = 1 - remain / total;
+    workLabel = isAmb ? 'Погрузка' : 'Тушение';
+  }
+
+  // Изометрические размеры (в тайлах, как у drawCarPretty)
+  const mL   = isAmb ? 2.05 : 2.40;
+  const mW   = isAmb ? 0.98 : 1.10;
+  const mHt  = isAmb ? 0.88 : 1.05;
+  const halfL = mL * 0.45;
+  const halfW = mW * 0.45;
+  const H = isoH(mHt);
+
+  const ang = v.ang;
+  const sinA = Math.sin(ang), cosA = Math.cos(ang);
+  const r = v.y, c = v.x;
+
+  // 4 угла основания → экран (как в drawCarPretty)
+  const FR = w2s(r + sinA * halfL - cosA * halfW + 0.5, c + cosA * halfL + sinA * halfW + 0.5);
+  const FL = w2s(r + sinA * halfL + cosA * halfW + 0.5, c + cosA * halfL - sinA * halfW + 0.5);
+  const BR = w2s(r - sinA * halfL - cosA * halfW + 0.5, c - cosA * halfL + sinA * halfW + 0.5);
+  const BL = w2s(r - sinA * halfL + cosA * halfW + 0.5, c - cosA * halfL - sinA * halfW + 0.5);
+
+  // Тень
+  ctx.fillStyle = 'rgba(0,0,0,.42)';
+  ctx.beginPath();
+  ctx.moveTo(FR.x + 2, FR.y + 4); ctx.lineTo(FL.x + 2, FL.y + 4);
+  ctx.lineTo(BL.x + 2, BL.y + 4); ctx.lineTo(BR.x + 2, BR.y + 4);
+  ctx.closePath(); ctx.fill();
+
+  // Вспомогательные функции
+  function lerpPt(a, b, t) { return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }; }
+  // Точка на крыше (u=0→перёд,1→зад; vv=0→право,1→лево)
+  function roofPt(u, vv) {
+    const f = lerpPt(FR, FL, vv), b = lerpPt(BR, BL, vv);
+    const p = lerpPt(f, b, u);
+    return { x: p.x, y: p.y - H };
+  }
+  // Грань-квад между двумя нижними точками
+  function sideQuad(a, b, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+    ctx.lineTo(b.x, b.y - H); ctx.lineTo(a.x, a.y - H);
+    ctx.closePath(); ctx.fill();
+  }
+  // Полоса на грани (y0→y1 — доля высоты от земли)
+  function faceStripe(a, b, y0, y1, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y - H * y0); ctx.lineTo(b.x, b.y - H * y0);
+    ctx.lineTo(b.x, b.y - H * y1); ctx.lineTo(a.x, a.y - H * y1);
+    ctx.closePath(); ctx.fill();
+  }
+  // Квад на крыше по 4 UV-точкам
+  function roofQuad(u0, v0, u1, v1, u2, v2, u3, v3, color) {
+    const p0 = roofPt(u0, v0), p1 = roofPt(u1, v1);
+    const p2 = roofPt(u2, v2), p3 = roofPt(u3, v3);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y); ctx.lineTo(p3.x, p3.y);
+    ctx.closePath(); ctx.fill();
+  }
+
+  // Какие 2 грани смотрят к камере (как в drawCarPretty)
+  const edges = [
+    { a: FR, b: FL }, { a: FL, b: BL },
+    { a: BL, b: BR }, { a: BR, b: FR },
+  ];
+  edges.sort((x, y) => (y.a.y + y.b.y) - (x.a.y + x.b.y));
+  const vis = edges.slice(0, 2);
+
+  if (isAmb) {
+    // ── СКОРАЯ (Mercedes Sprinter) ─────────────────────────────────
+    sideQuad(vis[0].a, vis[0].b, '#b8b8c0');
+    sideQuad(vis[1].a, vis[1].b, '#d8d8e0');
+
+    // Синяя полоса скорой
+    faceStripe(vis[0].a, vis[0].b, 0.30, 0.50, '#1040a8');
+    faceStripe(vis[1].a, vis[1].b, 0.30, 0.50, '#1650c0');
+    // Красные линии вверху/внизу синей полосы
+    faceStripe(vis[0].a, vis[0].b, 0.50, 0.57, '#b80e0e');
+    faceStripe(vis[1].a, vis[1].b, 0.50, 0.57, '#b80e0e');
+    faceStripe(vis[0].a, vis[0].b, 0.23, 0.30, '#b80e0e');
+    faceStripe(vis[1].a, vis[1].b, 0.23, 0.30, '#b80e0e');
+
+    // Стекло: боковые окна (более видимая грань)
+    faceStripe(vis[1].a, vis[1].b, 0.58, 0.88, 'rgba(110,165,210,.55)');
+    // Лобовое (передняя/фронтальная грань)
+    faceStripe(vis[0].a, vis[0].b, 0.58, 0.92, 'rgba(60,115,175,.65)');
+
+    // Белая крыша
+    ctx.fillStyle = '#f0f0f0';
+    ctx.beginPath();
+    ctx.moveTo(FR.x, FR.y - H); ctx.lineTo(FL.x, FL.y - H);
+    ctx.lineTo(BL.x, BL.y - H); ctx.lineTo(BR.x, BR.y - H);
+    ctx.closePath(); ctx.fill();
+
+    // Световая панель (лайтбар) на крыше
+    roofQuad(0.16, 0.22, 0.16, 0.78, 0.58, 0.78, 0.58, 0.22, '#1a1a28');
+
+    // Красный крест (продольная рука)
+    roofQuad(0.62, 0.36, 0.62, 0.64, 0.92, 0.64, 0.92, 0.36, '#cc0000');
+    // Красный крест (поперечная рука)
+    roofQuad(0.68, 0.15, 0.68, 0.85, 0.86, 0.85, 0.86, 0.15, '#cc0000');
+
+    // Колёса (как в drawCarPretty)
+    const wR = 4.5, wR2 = 2.4;
+    for (const corner of [FR, FL, BR, BL]) {
+      ctx.fillStyle = '#0a0a0a';
+      ctx.beginPath(); ctx.ellipse(corner.x, corner.y, wR, wR2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#8a8a92';
+      ctx.beginPath(); ctx.ellipse(corner.x, corner.y, wR * 0.52, wR2 * 0.52, 0, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Контур
+    ctx.strokeStyle = '#222228'; ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(FR.x, FR.y - H); ctx.lineTo(FL.x, FL.y - H);
+    ctx.lineTo(BL.x, BL.y - H); ctx.lineTo(BR.x, BR.y - H); ctx.closePath();
+    ctx.moveTo(FR.x, FR.y); ctx.lineTo(FL.x, FL.y);
+    ctx.lineTo(BL.x, BL.y); ctx.lineTo(BR.x, BR.y); ctx.closePath();
+    for (const pt of [FR, FL, BR, BL]) { ctx.moveTo(pt.x, pt.y); ctx.lineTo(pt.x, pt.y - H); }
+    ctx.stroke();
+
+  } else {
+    // ── ПОЖАРНАЯ (Pumper) ──────────────────────────────────────────
+    sideQuad(vis[0].a, vis[0].b, '#880e0e');
+    sideQuad(vis[1].a, vis[1].b, '#b01212');
+
+    // Жёлтые световозвращающие полосы
+    faceStripe(vis[0].a, vis[0].b, 0.05, 0.17, '#d0aa08');
+    faceStripe(vis[1].a, vis[1].b, 0.05, 0.17, '#d0aa08');
+    faceStripe(vis[0].a, vis[0].b, 0.83, 0.95, '#d0aa08');
+    faceStripe(vis[1].a, vis[1].b, 0.83, 0.95, '#d0aa08');
+
+    // Отсеки (3 перегородки)
+    ctx.strokeStyle = '#5a0808'; ctx.lineWidth = 0.9;
+    for (const e of vis) {
+      for (const t of [0.30, 0.55, 0.75]) {
+        const m = lerpPt(e.a, e.b, t);
+        ctx.beginPath();
+        ctx.moveTo(m.x, m.y - H * 0.14); ctx.lineTo(m.x, m.y - H * 0.86);
+        ctx.stroke();
+      }
+    }
+
+    // Лобовое стекло кабины (передняя грань)
+    faceStripe(vis[0].a, vis[0].b, 0.55, 0.88, 'rgba(50,90,160,.62)');
+
+    // Красная крыша
+    ctx.fillStyle = '#c41414';
+    ctx.beginPath();
+    ctx.moveTo(FR.x, FR.y - H); ctx.lineTo(FL.x, FL.y - H);
+    ctx.lineTo(BL.x, BL.y - H); ctx.lineTo(BR.x, BR.y - H);
+    ctx.closePath(); ctx.fill();
+
+    // Лестница на крыше (2 рельса + перекладины)
+    const ladF0 = roofPt(0.10, 0.27), ladF1 = roofPt(0.10, 0.73);
+    const ladB0 = roofPt(0.88, 0.27), ladB1 = roofPt(0.88, 0.73);
+    ctx.strokeStyle = '#b8b8b8'; ctx.lineWidth = 2.0;
+    ctx.beginPath(); ctx.moveTo(ladF0.x, ladF0.y); ctx.lineTo(ladB0.x, ladB0.y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ladF1.x, ladF1.y); ctx.lineTo(ladB1.x, ladB1.y); ctx.stroke();
+    ctx.lineWidth = 1.0;
+    for (let ri = 0; ri <= 8; ri++) {
+      const t = ri / 8;
+      const p0 = lerpPt(ladF0, ladB0, t), p1 = lerpPt(ladF1, ladB1, t);
+      ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+    }
+
+    // Световой блок на крыше кабины
+    roofQuad(0.05, 0.25, 0.05, 0.75, 0.22, 0.75, 0.22, 0.25, '#1a1a1a');
+
+    // Надпись «01»
+    const lblPt = roofPt(0.12, 0.50);
+    ctx.fillStyle = '#f0d010';
+    ctx.font = `bold ${Math.round(TS * 0.13)}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('01', lblPt.x, lblPt.y);
+    ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+
+    // Колёса
+    const wR = 5.2, wR2 = 2.7;
+    for (const corner of [FR, FL, BR, BL]) {
+      ctx.fillStyle = '#080808';
+      ctx.beginPath(); ctx.ellipse(corner.x, corner.y, wR, wR2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#888890';
+      ctx.beginPath(); ctx.ellipse(corner.x, corner.y, wR * 0.52, wR2 * 0.52, 0, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Контур
+    ctx.strokeStyle = '#1a0404'; ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(FR.x, FR.y - H); ctx.lineTo(FL.x, FL.y - H);
+    ctx.lineTo(BL.x, BL.y - H); ctx.lineTo(BR.x, BR.y - H); ctx.closePath();
+    ctx.moveTo(FR.x, FR.y); ctx.lineTo(FL.x, FL.y);
+    ctx.lineTo(BL.x, BL.y); ctx.lineTo(BR.x, BR.y); ctx.closePath();
+    for (const pt of [FR, FL, BR, BL]) { ctx.moveTo(pt.x, pt.y); ctx.lineTo(pt.x, pt.y - H); }
+    ctx.stroke();
+  }
+
+  // Мигалки сирены на крыше
+  const p = w2s(r + 0.5, c + 0.5);
+  const t = performance.now();
+  const blink  = Math.floor(t / 200) % 2;
+  const col1 = isAmb ? '#2860ff' : '#ff2020';
+  const col2 = isAmb ? '#ff2828' : '#2860ff';
+
+  const s1 = roofPt(0.18, 0.38), s2 = roofPt(0.50, 0.50), s3 = roofPt(0.82, 0.62);
+  const sirenPts = isAmb
+    ? [[s1.x, s1.y], [s2.x, s2.y], [s3.x, s3.y]]
+    : [[s1.x, s1.y], [s3.x, s3.y]];
+
+  ctx.save();
+  for (let fi = 0; fi < sirenPts.length; fi++) {
+    const [fx, fy] = sirenPts[fi];
+    ctx.fillStyle = (fi % 2 === blink) ? col1 : col2;
+    ctx.shadowColor = ctx.fillStyle;
+    ctx.shadowBlur = 14;
+    ctx.beginPath(); ctx.arc(fx, fy - 2, 3.2, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.shadowBlur = 0;
+  ctx.restore();
+
+  // Прогресс-бар работы (подобрать, погрузка)
+  if (workLabel) {
+    const barW = 36, barH = 4;
+    const bx = p.x - barW / 2, by = p.y - H - 16;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,.6)';
+    ctx.fillRect(bx - 1, by - 1, barW + 2, barH + 2);
+    ctx.fillStyle = isAmb ? '#3ec070' : '#ffb040';
+    ctx.fillRect(bx, by, barW * workFrac, barH);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 9px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText(workLabel, p.x, by - 2);
+    ctx.restore();
+  }
+}
+
+function _drawServiceVehicle_OLD_FLAT(v) {
   const p = w2s(v.y, v.x);
   const isAmb = v.kind === 'ambulance';
   let workFrac = 0;
@@ -5073,14 +5396,17 @@ function updateNpcs(dt) {
         const isHit = Math.abs(miss) < 0.42 && d < 9;
         const wep = n._fightWeapon || 'pistol';
         spawnBullet(muzR, muzC, tR, tC, { hit: isHit, fromNpc: true, weapon: wep });
-        spawnMuzzle(muzR, muzC, shootAng, wep);
+        spawnMuzzle(muzR, muzC, shootAng, wep, true);
         n._lastShotAt = now;
         if (isHit) {
+          const npcDmg = 8 + Math.floor(Math.random() * 7);
           spawnImpact(tR, tC, wep);
-          addShake(1.5);
+          addShake(2.5);
+          flashHitOverlay();
+          myHp = Math.max(0, myHp - npcDmg);  // локальный урон (сервер подтвердит в снапе)
+          spawnFloatText(player.r - 0.4, player.c, `−${npcDmg}`, { color: '#ff4444', size: 16, life: 1100 });
           try { ws && ws.send(JSON.stringify({ t: 'npc_melee_shoot',
-            d: { dmg: 8 + Math.floor(Math.random() * 7),
-                 sx: +n.c.toFixed(2), sy: +n.r.toFixed(2) } })); } catch(e) {}
+            d: { dmg: npcDmg, sx: +n.c.toFixed(2), sy: +n.r.toFixed(2) } })); } catch(e) {}
         }
         if (Math.random() < 0.4) {
           n.cryText  = ['Стой!', 'Получи!', 'Умри!', 'Не уйдёшь!'][Math.floor(Math.random()*4)];
@@ -5107,7 +5433,7 @@ function updateNpcs(dt) {
             const ctR = n.r + cmiss, ctC = n.c + cmiss;
             const cHit = Math.abs(cmiss) < 0.3;
             spawnBullet(cmR, cmC, ctR, ctC, { hit: cHit, fromNpc: true, weapon: 'pistol' });
-            spawnMuzzle(cmR, cmC, copAng, 'pistol');
+            spawnMuzzle(cmR, cmC, copAng, 'pistol', true);
             if (cHit) {
               // Наносим урон NPC от копа
               hitNpc(n, Math.sin(copAng), Math.cos(copAng), 'pistol', 18 + Math.floor(Math.random()*10));
@@ -5157,9 +5483,12 @@ function updateNpcs(dt) {
         }
         _capArr(impacts, _MAX_IMPACTS);
         impacts.push({ r: impR, c: impC, parts });
-        addShake(1.2);
+        addShake(1.5);
         hapticHit();
+        flashHitOverlay();
         const dmg = 5 + Math.floor(Math.random() * 6);
+        myHp = Math.max(0, myHp - dmg);
+        spawnFloatText(player.r - 0.4, player.c, `−${dmg}`, { color: '#ff6644', size: 14, life: 1000 });
         try { ws && ws.send(JSON.stringify({ t: 'npc_melee_shoot',
           d: { dmg, sx: +n.c.toFixed(2), sy: +n.r.toFixed(2) } })); } catch(e) {}
         // Боевой выкрик
@@ -6055,7 +6384,7 @@ function updateGangAggression(dt) {
   const tC = player.c + missC;
   const isHit = (Math.abs(missR) < 0.35 && Math.abs(missC) < 0.35);
   spawnBullet(muzR, muzC, tR, tC, { hit: isHit, fromNpc: true, weapon: 'pistol_heavy' });
-  spawnMuzzle(muzR, muzC, ang, 'pistol_heavy');
+  spawnMuzzle(muzR, muzC, ang, 'pistol_heavy', true);
   if (isHit) {
     spawnImpact(tR, tC, 'pistol_heavy');
     addShake(1.8);
@@ -6468,7 +6797,7 @@ function _spawnCrashEvent() {
     if (!c) continue;
     c.vr = 0; c.vc = 0; c._wrecked = true;
     c._respawnAt = performance.now() + 25000;   // через 25с переспаунится
-    spawnCarExplosion(c.r, c.c);
+    spawnCarExplosion(c.r, c.c, c);
   }
   pushFeedEvent('💥', 'Авария — ДТП на дороге', { accent: '#ff7030' });
   return true;
@@ -6657,6 +6986,7 @@ let myDeathBy = '';       // uid того кто убил (последний)
 let myDeathLeft = 0;      // сколько сек до респауна
 let myKills = 0, myDeaths = 0;
 let lastShotClientT = 0;  // локальный cooldown (предотвращает спам)
+let _recoilUntil = 0;    // до этого момента рука/оружие «отдыхает» назад
 // Активные пули на клиенте — летящие объекты с реальной физикой (как в
 // demo_isometric). Каждая пуля движется со speed тайлов/сек по вектору
 // vr/vc от точки выстрела к цели. По истечении maxDist (расстояние от
@@ -7076,9 +7406,9 @@ const bloodSplats = [];   // {r,c,radius,life,max,rot}
 // + копы шлют десятки 'aggro_shot'/'cop_shot' пакетов в секунду) без
 // капов impacts/bloodSplats/bullets разрастаются до тысяч и фризят
 // рендер. Спавнеры дропают самое старое если упёрлись в лимит.
-const _MAX_BULLETS = 80, _MAX_IMPACTS = 24, _MAX_BLOOD = 60,
-      _MAX_MUZZLES = 40, _MAX_SHOCKW = 40, _MAX_SMOKE = 60,
-      _MAX_SHELLS = 60;
+const _MAX_BULLETS = 50, _MAX_IMPACTS = 16, _MAX_BLOOD = 40,
+      _MAX_MUZZLES = 16, _MAX_SHOCKW = 18, _MAX_SMOKE = 30,
+      _MAX_SHELLS = 30;
 function _capArr(arr, cap) { if (arr.length >= cap) arr.shift(); }
 // Тормозные следы — два чёрных штриха от задних колёс при резком повороте
 // или жёстком тормозе на скорости. Затухают за 6 секунд.
@@ -7269,31 +7599,32 @@ function spawnBullet(sr, sc, er, ec, opts) {
 // spawnMuzzle(r,c, angle, weapon) — вспышка дула. Живёт 120мс (стало длиннее
 // чтобы лепестки пламени успели разлететься). Плюс: маленькое shockwave-кольцо
 // у ствола + 2 клуба дыма (порохового), стелющиеся вверх.
-function spawnMuzzle(r, c, angle, weapon) {
+// npc=true — упрощённая вспышка без shockwave и дыма (иначе при 100 NPC крэш)
+function spawnMuzzle(r, c, angle, weapon, npc) {
   const w = resolveWeapon(weapon);
   const wcfg = WEAPON_FX_CFG[w] || {};
-  const heavy = !!wcfg.thick;
+  const heavy = !!wcfg.thick && !npc;  // NPC всегда light
   _capArr(muzzles, _MAX_MUZZLES);
   muzzles.push({
     r, c, angle,
-    life: heavy ? 140 : 110, max: heavy ? 140 : 110,
+    life: heavy ? 100 : (npc ? 50 : 75), max: heavy ? 100 : (npc ? 50 : 75),
     color: wcfg.color || '#ffd76b',
     weapon: w,
-    // Фиксированный «сид» для лепестков пламени — каждая вспышка уникальна,
-    // но в течение своей жизни лепестки не «прыгают» от кадра к кадру.
     seed: Math.random() * 1000,
     heavy,
+    npc: !!npc,
   });
-  // Shockwave у дула — короткая белая волна, расширяется на ~0.7 TS
-  spawnShockwave(r, c, {
-    rad0: 3,
-    maxRad: heavy ? 32 : 22,
-    life: heavy ? 200 : 150,
-    color: heavy ? '#ffd070' : '#fff5c0',
-    thick: heavy ? 2.5 : 1.8,
-  });
-  // Дымок из ствола — клубы тянутся назад
-  spawnSmokePuff(r, c, angle);
+  if (!npc) {
+    // Shockwave и дым только для выстрела игрока — слишком дорого для NPC
+    spawnShockwave(r, c, {
+      rad0: 3,
+      maxRad: heavy ? 32 : 22,
+      life: heavy ? 180 : 130,
+      color: heavy ? '#ffd070' : '#fff5c0',
+      thick: heavy ? 2.5 : 1.8,
+    });
+    spawnSmokePuff(r, c, angle);
+  }
 }
 
 // ── Локальный игрок (predict) ───────────────────────────────────
@@ -7390,8 +7721,9 @@ joyLEl.addEventListener('pointerdown', (e) => {
 joyLEl.addEventListener('pointermove', (e) => {
   if (joyL.active && e.pointerId === joyL.id) {
     joyLMove(e.clientX, e.clientY);
+    e.preventDefault();
   }
-});
+}, { passive: false });
 joyLEl.addEventListener('pointerup',     (e) => { if (joyL.active && e.pointerId === joyL.id) joyLEnd(); });
 joyLEl.addEventListener('pointercancel', (e) => { if (joyL.active && e.pointerId === joyL.id) joyLEnd(); });
 // Fallback на touch — с фильтром по identifier, чтобы движения другого
@@ -7463,8 +7795,9 @@ joyREl.addEventListener('pointerdown', (e) => {
 joyREl.addEventListener('pointermove', (e) => {
   if (joyR.active && e.pointerId === joyR.id) {
     joyRMove(e.clientX, e.clientY);
+    e.preventDefault();
   }
-});
+}, { passive: false });
 joyREl.addEventListener('pointerup',     (e) => { if (joyR.active && e.pointerId === joyR.id) joyREnd(); });
 joyREl.addEventListener('pointercancel', (e) => { if (joyR.active && e.pointerId === joyR.id) joyREnd(); });
 // Touch fallback с фильтром по identifier — каждый стик отвечает
@@ -7576,6 +7909,7 @@ function tryMove(obj, dr, dc) {
 // ── WebSocket ──────────────────────────────────────────────────
 let ws = null;
 let wsConnected = false;
+let _firstSnap = true;   // первый снап — всегда телепорт + сброс камеры
 let lastInputSent = 0;
 let onlineCount = 1;
 // Счётчик подряд неудачных попыток коннекта (для подавления баннера
@@ -7826,7 +8160,7 @@ function handleEventPacket(d) {
       const sR  = d.sy + Math.sin(ang) * md;
       const sC  = d.sx + Math.cos(ang) * md;
       spawnBullet(sR, sC, d.ty, d.tx, { hit: !d.miss, fromNpc: true, weapon: wep });
-      spawnMuzzle(sR, sC, ang, wep);
+      spawnMuzzle(sR, sC, ang, wep, true);
       if (!d.miss) spawnImpact(d.ty, d.tx, wep);
     }
     if (d.shooter_id) lastBossShotAt.set(d.shooter_id, performance.now());
@@ -7938,7 +8272,7 @@ function handleEventPacket(d) {
       const sR  = d.sy + Math.sin(ang) * md;
       const sC  = d.sx + Math.cos(ang) * md;
       spawnBullet(sR, sC, d.ty, d.tx, { hit: !d.miss, fromNpc: true, weapon: wp });
-      spawnMuzzle(sR, sC, ang, wp);
+      spawnMuzzle(sR, sC, ang, wp, true);
       if (!d.miss) spawnImpact(d.ty, d.tx, wp);
     }
     if (d.guard_id) {
@@ -7979,7 +8313,7 @@ function handleEventPacket(d) {
       const sR  = d.sy + Math.sin(ang) * md;
       const sC  = d.sx + Math.cos(ang) * md;
       spawnBullet(sR, sC, d.ty, d.tx, { hit: !d.miss, fromNpc: true, weapon: wp });
-      spawnMuzzle(sR, sC, ang, wp);
+      spawnMuzzle(sR, sC, ang, wp, true);
       if (!d.miss) spawnImpact(d.ty, d.tx, wp);
     }
     if (d.cop_id) lastBossShotAt.set(d.cop_id, performance.now());
@@ -8010,7 +8344,7 @@ function handleEventPacket(d) {
       const sR  = d.sy + Math.sin(ang) * md;
       const sC  = d.sx + Math.cos(ang) * md;
       spawnBullet(sR, sC, d.ty, d.tx, { hit: !d.miss, fromNpc: true, weapon: wp });
-      spawnMuzzle(sR, sC, ang, wp);
+      spawnMuzzle(sR, sC, ang, wp, true);
       if (!d.miss) spawnImpact(d.ty, d.tx, wp);
     }
     if (d.cop_id) lastBossShotAt.set(d.cop_id, performance.now());
@@ -8113,7 +8447,7 @@ function handleEventPacket(d) {
       const sR  = d.sy + Math.sin(ang) * md;
       const sC  = d.sx + Math.cos(ang) * md;
       spawnBullet(sR, sC, d.ty, d.tx, { hit: !d.miss, fromNpc: true, weapon: wp });
-      spawnMuzzle(sR, sC, ang, wp);
+      spawnMuzzle(sR, sC, ang, wp, true);
       if (!d.miss) {
         // Искры от корпуса (не кровь) — переиспользуем spawnImpact с force-sparks
         spawnImpact(d.ty, d.tx, wp);
@@ -8357,7 +8691,7 @@ function handleEventPacket(d) {
       const sR  = d.sy + Math.sin(ang) * md;
       const sC  = d.sx + Math.cos(ang) * md;
       spawnBullet(sR, sC, d.ty, d.tx, { hit: !d.miss, fromPlayer: false, weapon: wp });
-      spawnMuzzle(sR, sC, ang, wp);
+      spawnMuzzle(sR, sC, ang, wp, true);
       if (!d.miss) spawnImpact(d.ty, d.tx, wp);
     }
     if (String(d.target_uid) === String(QP.uid) && !d.miss) {
@@ -8670,7 +9004,7 @@ function handleEventPacket(d) {
         opts.speed = d.bullet_speed;
       }
       spawnBullet(sR, sC, tR, tC, opts);
-      spawnMuzzle(sR, sC, ang, wep);
+      spawnMuzzle(sR, sC, ang, wep, true);
       spawnImpact(tR, tC, wep);
     }
     if (d.bot_id) lastBossShotAt.set(d.bot_id, performance.now());
@@ -9091,8 +9425,13 @@ function wsConnect() {
         // Внутри банка координаты — комнатные, не мировые → snap игнорируем
         if (!_bankInt) {
         const dist = Math.hypot(player.r - d.me.y, player.c - d.me.x);
-        if (dist > 15.0) {
+        if (_firstSnap || dist > 15.0) {
           player.r = d.me.y; player.c = d.me.x;
+          // Сбрасываем камеру: на первом снапе или большом desync
+          // иначе камера летит с 0,0 к реальной позиции через лерп → 3 скачка
+          cam.x = (player.c - player.r) * TS * 0.5;
+          cam.y = (player.c + player.r) * TS * 0.5 * ISO_Y;
+          _firstSnap = false;
         } else if (dist > 5.0) {
           const k = 0.10;
           player.r += (d.me.y - player.r) * k;
@@ -9149,8 +9488,19 @@ function wsConnect() {
         // QP.look, чтобы рисовался ТОТ перс которого ты создал в creator,
         // даже если hub.html не подсунул правильные параметры в URL.
         if (d.me.look && (d.me.look.skin !== undefined || d.me.look.hair !== undefined)) {
-          QP.look = Object.assign({}, QP.look, d.me.look);
-          QP.has_look = 1;
+          const srv = d.me.look;
+          // Не перетираем URL-look дефолтными нулями сервера (skin=0,body=0,hair=0 = дефолт)
+          const srvIsDefault = !srv.skin && !srv.hair && !srv.hat && !srv.face;
+          if (!srvIsDefault || !QP.has_look) {
+            const merged = Object.assign({}, QP.look, srv);
+            const mkKey = l => [l.gender|0, l.skin|0, l.body|0, l.face|0, l.hair|0, l.hat|0].join('.');
+            if (mkKey(merged) !== mkKey(QP.look)) {
+              _spriteCache.clear();
+              QP.look = merged;
+              getSprite(QP.look);
+            }
+            QP.has_look = 1;
+          }
         }
         // ИМЯ НЕ ТРОГАЕМ — берём только из URL (DATA.name в hub).
         // В БД может лежать старое/дефолтное «Гангстер», перезапись его
@@ -9323,17 +9673,17 @@ function updateZoneBtn() {
   if (_bankInt) {
     const int = _bankInt;
     let label;
-    const r = int.room;
-    if (r==='lobby') {
-      if (int.phase==='lobby')       label='🔓 Взломать хранилище';
-      else if (int.phase==='cracking') label=`🔒 Взлом ${(int.crackProg*100).toFixed(0)}%`;
-      else if (int.myBag)            label='🚪 Выйти с мешком';
-      else                           label='💰 Иди в хранилище';
-    } else if (r==='vault') {
-      label = int.myBag?'🚪 Выйти с мешком':'🚪 ← В лобби';
+    const nearVault = player.r < int.counterRow - 1;  // игрок у прилавка/хранилища
+    if (int.phase==='lobby') {
+      label = nearVault ? '🔓 Взломать хранилище' : null;
+    } else if (int.phase==='cracking') {
+      label = `🔒 Взлом ${(int.crackProg*100).toFixed(0)}%`;
+    } else if (int.myBag) {
+      label = '🚪 Выйти с мешком';
     } else {
-      label = '🚪 ← В лобби';
+      label = '💰 Иди в хранилище';
     }
+    if (!label) { _zoneEl.style.display = 'none'; return; }
     _zoneEl.textContent = label;
     _zoneEl.style.display = 'block';
     _zoneEl.dataset.bankId = int.bank.id;
@@ -9429,20 +9779,20 @@ _zoneEl.addEventListener('click', () => {
     // Интерьер активен — кнопка внутри банка
     if (_bankInt && _bankInt.bank.id === bank.id) {
       const int = _bankInt;
-      if (int.room==='lobby') {
-        if (int.phase==='lobby') {
-          int.phase='cracking'; int._crackStartedAt=performance.now();
-          showToast('🔒 Взламываешь хранилище — стой у прилавка','⏳',2200);
-          return;
+      if (int.phase==='lobby') {
+        int.phase='cracking'; int._crackStartedAt=performance.now();
+        int.alarmTriggered=true;
+        int.panicAt=performance.now(); // все NPC сразу паникуют и бегут из банка
+        // Теперь это ограбление — сообщаем серверу
+        if (ws&&ws.readyState===1){
+          try{ws.send(JSON.stringify({t:'bank_rob_start',d:{bank_id:int.bank.id}}));}catch(e){}
         }
-        if (int.myBag) { exitBankInterior(true); return; }
-        exitBankInterior(false); return;
-      }
-      if (int.room==='vault') {
-        _switchBankRoom('lobby');  // всегда возвращаем в лобби (с мешком или без)
+        showToast('🚨 Ограбление! Все бегут!','🔒',2200);
         return;
       }
-      _switchBankRoom('lobby'); return;
+      if (int.phase==='cracking') return; // взлом идёт — ничего
+      if (int.myBag) { exitBankInterior(true); return; }
+      exitBankInterior(false); return;
     }
     // Войти в банк
     enterBankInterior(bank);
@@ -12224,6 +12574,8 @@ function fire(angle = null) {
   // (трассер летит вперёд + отдача + cd). Локально, серверу не шлём.
   const noTarget = !chosenConvoy && !chosenCop && !chosenAggro && !chosenMg && !pvpTarget;
   lastShotClientT = now;
+  // Копы в радиусе реагируют на выстрел
+  _alertNearbyCops('shot');
   _fireBtn.classList.add('cd');
   joyREl.classList.add('cd');
   // Cd снимаем в момент когда реально можно снова стрелять (зависит от оружия)
@@ -12242,6 +12594,7 @@ function fire(angle = null) {
   // и пуля вылетает не из видимого ствола. Особенно заметно при
   // autoLock когда игрок бежит вбок и стреляет в чела позади.
   player.ang = _shotAng;
+  _recoilUntil = now + (wcfg.twoHanded ? 220 : 160);  // отдача: двуручка дольше
   // Стартовая точка пули — РЕАЛЬНЫЙ кончик ствола, рассчитанный через
   // handAnchor + FIREARM_TIP в пикселях и переведённый обратно в мир.
   // Это гарантирует что пуля вылетает РОВНО из дула на экране, а не
@@ -12262,7 +12615,7 @@ function fire(angle = null) {
   // Даёт ощущение «веса» удара (как в Hotline Miami / Hyper Light Drifter).
   const _hitSomeone = !!(chosenConvoy || chosenCop || chosenAggro || chosenMg || pvpTarget);
   if (_hitSomeone) {
-    triggerHitStop(weaponFx(currentWeapon).thick ? 100 : 65);
+    triggerHitStop(weaponFx(currentWeapon).thick ? 35 : 18);
     addShake(weaponFx(currentWeapon).thick ? 3.5 : 2);
     hapticHit();
   }
@@ -12321,7 +12674,7 @@ function fire(angle = null) {
       { hit: true, fromPlayer: true, weapon: currentWeapon });
     spawnImpact(hitG.point.r, hitG.point.c, currentWeapon);
     hitGangCar(hitG.car, wcfg.dmg || 20);
-    triggerHitStop(40);
+    triggerHitStop(15);
     addShake(2);
     hapticHit();
     return;
@@ -12337,7 +12690,7 @@ function fire(angle = null) {
       { hit: true, fromPlayer: true, weapon: currentWeapon });
     spawnImpact(hitN.point.r, hitN.point.c, currentWeapon);
     hitNpc(hitN.npc, dirY, dirX, currentWeapon, wcfg.dmg || 20);
-    triggerHitStop(wcfg.thick ? 100 : 65);
+    triggerHitStop(wcfg.thick ? 35 : 18);
     addShake(wcfg.thick ? 3.5 : 2);
     hapticHit();
     return;
@@ -12400,6 +12753,33 @@ const PUNCH_DAMAGE  = 12;     // урон за удар
 let lastPunchClientT = 0;
 let _punchAnim = null;        // { startAt, ang, type:'punch'|'kick', dmg } | null
 
+// Поиск ближайшей цели для удара без lock (авто-захват в ближнем бою)
+function _findNearestMeleeTarget() {
+  let best = null, bestD = PUNCH_RANGE;
+  // Обычные NPC
+  for (let i = 0; i < NPCS.length; i++) {
+    const n = NPCS[i];
+    if (n.dead) continue;
+    const d = Math.hypot(n.r - player.r, n.c - player.c);
+    if (d < bestD) {
+      bestD = d;
+      best = { kind:'npc', id:i, getPos:()=>({r:n.r,c:n.c}) };
+    }
+  }
+  // Бандиты-боты из логов (aggroZones)
+  for (const zone of Object.values(aggroZones || {})) {
+    for (const b of (zone.bots || [])) {
+      if (b.dead || b.hp <= 0) continue;
+      const d = Math.hypot(b.y - player.r, b.x - player.c);
+      if (d < bestD) {
+        bestD = d;
+        best = { kind:'aggro_bot', id:b.id, getPos:()=>({r:b.y,c:b.x}) };
+      }
+    }
+  }
+  return best;
+}
+
 function punch() {
   if (myMode === 'pve') { showToast('🕵️ Наблюдатель не может драться', 'ℹ️', 1500); return; }
   if (myDead || myDrivingCarId || _inBus) return;
@@ -12407,8 +12787,9 @@ function punch() {
   const now = performance.now();
   if (now - lastPunchClientT < PUNCH_CD_MS) return;
 
-  // Берём ближайшую locked-цель
-  const tgt = getActiveTarget();
+  // Берём locked-цель, или авто-выбираем ближайшую в PUNCH_RANGE
+  let tgt = getActiveTarget();
+  if (!tgt) tgt = _findNearestMeleeTarget();
   if (!tgt) return;
   const pos = tgt.getPos();
   if (!pos) return;
@@ -12476,9 +12857,12 @@ function punch() {
       _spawnPunchBlood(npc.r, npc.c, ang);
       const dmgCol = isKick ? '#ff4080' : '#ff8040';
       spawnFloatText(pos.r, pos.c, `−${hitDmg}`, { color: dmgCol, size: 18, life: 1200 });
-      triggerHitStop(80);
+      if (isKick) spawnFloatText(pos.r - 0.5, pos.c, 'КРИТ!', { color: '#ffdd00', size: 13, life: 900 });
+      triggerHitStop(25);
       addShake(1.5);
       hapticHit();
+      // Копы рядом реагируют на драку
+      _alertNearbyCops('fight');
       // Бандит и любой обозлённый NPC достаёт пушку и отвечает
       _npcTriggerFight(npc);
     }
@@ -12492,8 +12876,9 @@ function punch() {
       ws && ws.send(JSON.stringify(msg));
     } catch(e) {}
     _spawnPunchBlood(pos.r, pos.c, ang);
-    spawnFloatText(pos.r, pos.c, `−${hitDmg}`, { color: '#ff8040', size: 18, life: 1200 });
-    triggerHitStop(80);
+    spawnFloatText(pos.r, pos.c, `−${hitDmg}`, { color: isKick ? '#ff4080' : '#ff8040', size: 18, life: 1200 });
+    if (isKick) spawnFloatText(pos.r - 0.5, pos.c, 'КРИТ!', { color: '#ffdd00', size: 13, life: 900 });
+    triggerHitStop(25);
     addShake(1.5);
     hapticHit();
   }
@@ -13367,7 +13752,7 @@ function update(dt) {
           // gang_threat бамп кулачка. Игроку через сервер срезаем hp.
           if (npcCar.gang) {
             reportCarCrash(qc, impact + 4, 'gang_car');
-            spawnCarExplosion(npcCar.r, npcCar.c);
+            spawnCarExplosion(npcCar.r, npcCar.c, npcCar);
             npcCar._wrecked   = true;
             npcCar._respawnAt = performance.now() + 9999999;
             // Игрок получает значительный урон (примерно 25 hp за таран на
@@ -13391,7 +13776,7 @@ function update(dt) {
           }
           // Обычная гражданская — взрываем, лёгкий урон нам
           reportCarCrash(qc, impact, 'car');
-          spawnCarExplosion(npcCar.r, npcCar.c);
+          spawnCarExplosion(npcCar.r, npcCar.c, npcCar);
           npcCar._wrecked   = true;
           npcCar._respawnAt = performance.now() + 600;
           curVx *= 0.3; curVy *= 0.3;
@@ -13866,7 +14251,13 @@ function update(dt) {
     const active = getActiveTarget();
     const pos = active && active.getPos();
     if (pos) {
-      player.ang = Math.atan2(pos.r - player.r, pos.c - player.c);
+      const tgtAng = Math.atan2(pos.r - player.r, pos.c - player.c);
+      // Плавный поворот к цели (540°/сек) — вместо мгновенного snap
+      let diff = tgtAng - player.ang;
+      while (diff > Math.PI)  diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      const rotSpeed = Math.PI * 3;  // рад/сек
+      player.ang += Math.sign(diff) * Math.min(Math.abs(diff), rotSpeed * dt);
     }
   }
   // Пули и вспышки — двигаем тут, рисуем потом в render()
@@ -16791,42 +17182,89 @@ function drawBankPlayerBadge(bank) {
 // остов с пламенем. Если её уже потушили пожарные (car._burnedOut),
 // вместо огня — только тонкий струящийся дым.
 function drawWreckedCar(car) {
-  // Тёмная палитра — обугленный остов; модель та же.
   const burnedModel = Object.assign({}, car.model, {
     palette: ['#2a2520', '#16120e'],
     roof: '#16120e',
   });
   drawCarPretty(Object.assign({}, car, { model: burnedModel }));
   const p = w2s(car.r + 0.5, car.c + 0.5);
-  const t = performance.now() * 0.006;
+  const now = performance.now();
+  const t = now * 0.006;
+
+  // Ударная волна сразу после взрыва
+  if (car._explosionT) {
+    const age = now - car._explosionT;
+    if (age < 900) {
+      const frac = age / 900;
+      // Внешнее кольцо
+      const rad = age * 0.12;
+      const alpha = Math.max(0, 1 - frac) * 0.85;
+      ctx.strokeStyle = `rgba(255,160,50,${alpha})`;
+      ctx.lineWidth = 5 * (1 - frac);
+      ctx.beginPath(); ctx.arc(p.x, p.y - 4, rad, 0, Math.PI * 2); ctx.stroke();
+      // Внутреннее кольцо (быстрее, ярче)
+      if (age < 500) {
+        const frac2 = age / 500;
+        const rad2 = age * 0.07;
+        ctx.strokeStyle = `rgba(255,240,180,${(1 - frac2) * 0.7})`;
+        ctx.lineWidth = 8 * (1 - frac2);
+        ctx.beginPath(); ctx.arc(p.x, p.y - 4, rad2, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
+  }
+
   if (!car._burnedOut) {
-    // Пляшущее пламя над крышей
-    const flameH = 14 + Math.sin(t) * 2.5;
-    const flameW = 6 + Math.sin(t * 1.7) * 0.8;
-    const fy0 = p.y - 6;
-    const fg = ctx.createLinearGradient(p.x, fy0 - flameH, p.x, fy0);
-    fg.addColorStop(0,    '#ffe070');
-    fg.addColorStop(0.45, '#ff7020');
-    fg.addColorStop(1,    '#a01010');
-    ctx.fillStyle = fg;
-    ctx.beginPath();
-    ctx.moveTo(p.x, fy0 - flameH);
-    ctx.quadraticCurveTo(p.x + flameW, fy0 - flameH * 0.4,
-                         p.x + flameW * 0.5, fy0);
-    ctx.lineTo(p.x - flameW * 0.5, fy0);
-    ctx.quadraticCurveTo(p.x - flameW, fy0 - flameH * 0.4,
-                         p.x, fy0 - flameH);
-    ctx.closePath();
-    ctx.fill();
-    // Искорка
-    ctx.fillStyle = '#fff5b0';
-    ctx.beginPath();
-    ctx.arc(p.x + Math.sin(t * 7) * 3,
-            fy0 - flameH - 3 - Math.sin(t * 4) * 2,
-            1.0, 0, Math.PI * 2);
-    ctx.fill();
+    const fy0 = p.y - 7;
+    // 4 языка пламени (разной высоты/смещения)
+    const tongues = [
+      { ox: -6, h: 0.85, w: 0.7, phase: 0 },
+      { ox:  1, h: 1.00, w: 1.0, phase: 1.1 },
+      { ox:  8, h: 0.75, w: 0.8, phase: 2.3 },
+      { ox: -2, h: 0.60, w: 0.6, phase: 3.7 },
+    ];
+    for (const { ox, h, w, phase } of tongues) {
+      const fH = (14 + Math.sin(t * 1.8 + phase) * 3.5) * h;
+      const fW = (5 + Math.sin(t * 2.3 + phase) * 1.2) * w;
+      const cx = p.x + ox + Math.sin(t * 0.9 + phase) * 1.5;
+      const fg = ctx.createLinearGradient(cx, fy0 - fH, cx, fy0);
+      fg.addColorStop(0,    h > 0.9 ? '#fff8c0' : '#ffee80');
+      fg.addColorStop(0.35, '#ff8020');
+      fg.addColorStop(0.75, '#cc3010');
+      fg.addColorStop(1,    '#801010');
+      ctx.fillStyle = fg;
+      ctx.beginPath();
+      ctx.moveTo(cx, fy0 - fH);
+      ctx.quadraticCurveTo(cx + fW, fy0 - fH * 0.38, cx + fW * 0.5, fy0);
+      ctx.lineTo(cx - fW * 0.5, fy0);
+      ctx.quadraticCurveTo(cx - fW, fy0 - fH * 0.38, cx, fy0 - fH);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // Летящие искры
+    for (let si = 0; si < 8; si++) {
+      const phase = t * (1.4 + si * 0.22) + si * 1.1;
+      const px2 = p.x + Math.sin(phase * 1.9) * 10;
+      const py2 = fy0 - 4 - (phase % (Math.PI * 2)) * 2.8;
+      const sa = Math.max(0, 1 - (phase % (Math.PI * 2)) / (Math.PI * 2));
+      if (sa > 0.05) {
+        ctx.fillStyle = `rgba(255,${180 + si * 8},40,${sa})`;
+        ctx.beginPath(); ctx.arc(px2, py2, 1.3, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    // Чёрный дым сверху
+    for (let i = 0; i < 5; i++) {
+      const phase = (t * 0.4 + i * 0.6);
+      const off = i * 8;
+      const a = Math.max(0, 0.55 - i * 0.10);
+      ctx.fillStyle = `rgba(30,28,26,${a})`;
+      ctx.beginPath();
+      ctx.arc(p.x + Math.sin(phase) * 3.5,
+              fy0 - 18 - off,
+              3.5 + i * 0.9, 0, Math.PI * 2);
+      ctx.fill();
+    }
   } else {
-    // Тонкий серый дым (после тушения) — три «облачка», поднимаются.
+    // Тонкий серый дым (после тушения) — облачка поднимаются.
     for (let i = 0; i < 4; i++) {
       const phase = (t * 0.5 + i * 0.7);
       const off = i * 6;
@@ -21818,19 +22256,19 @@ const SKINS = ['#FDDBB4','#F0C27F','#D4935A','#A0622A','#7A3B10','#C8A882'];
 const HAIR_COLORS_M = ['#1a0e00','#3d2200','#8b6333','#b8860b','#888','#111'];
 const HAIR_COLORS_F = ['#1a0e00','#8b1a1a','#b8860b','#3d2200','#888','#c87050','#e0c080'];
 
-function drawChar(ctx, W, H, opts, skip) {
-  const { gender, skin, body, face, hair, hat } = opts;
+function drawChar(ctx, W, H, opts) {
+  const { gender, skin, body, face, hair, hat, skipArms } = opts;
   ctx.clearRect(0, 0, W, H);
   const cx = W / 2;
   const sc = Math.min(W, H) / 220;
   function px(x) { return cx + x * sc; }
   function py(y) { return H * 0.92 - y * sc; }
   const skinCol = SKINS[skin] || SKINS[0];
-  if (gender === 0) drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat, skip);
-  else              drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat, skip);
+  if (gender === 0) drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms);
+  else              drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms);
 }
 
-function drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat, skip) {
+function drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms) {
   const bodyDefs = [
     { sw: 34, sh: 80, nw: 14, nh: 22, hw: 26 },
     { sw: 44, sh: 85, nw: 16, nh: 22, hw: 30 },
@@ -21840,14 +22278,12 @@ function drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat, skip) {
   const bd = bodyDefs[body] || bodyDefs[1];
   const suitCol = ['#1a1a2e','#1a2e1a','#2e1a1a','#1a1e2e'][body % 4];
   const tieCol  = ['#c0392b','#e8c96e','#8e44ad','#2980b9'][face % 4];
-  if (!skip?.legs) {
-    ctx.fillStyle = suitCol;
-    const legW = bd.sw * 0.38; const legH = 55 * sc;
-    ctx.beginPath(); ctx.roundRect(px(-bd.sw*0.22), py(legH), legW*sc, legH, 4*sc); ctx.fill();
-    ctx.beginPath(); ctx.roundRect(px(bd.sw*0.22 - legW), py(legH), legW*sc, legH, 4*sc); ctx.fill();
-    ctx.fillStyle = '#111';
-    [-1,1].forEach(s => { ctx.beginPath(); ctx.ellipse(px(s*bd.sw*0.1), py(2), 10*sc, 5*sc, 0, 0, Math.PI*2); ctx.fill(); });
-  }
+  ctx.fillStyle = suitCol;
+  const legW = bd.sw * 0.38; const legH = 55 * sc;
+  ctx.beginPath(); ctx.roundRect(px(-bd.sw*0.22), py(legH), legW*sc, legH, 4*sc); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(px(bd.sw*0.22 - legW), py(legH), legW*sc, legH, 4*sc); ctx.fill();
+  ctx.fillStyle = '#111';
+  [-1,1].forEach(s => { ctx.beginPath(); ctx.ellipse(px(s*bd.sw*0.1), py(2), 10*sc, 5*sc, 0, 0, Math.PI*2); ctx.fill(); });
   ctx.fillStyle = suitCol;
   ctx.beginPath(); ctx.roundRect(px(-bd.sw/2), py(bd.sh), bd.sw*sc, bd.sh*sc, [0,0,6*sc,6*sc]); ctx.fill();
   ctx.fillStyle = '#ddd';
@@ -21860,8 +22296,8 @@ function drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat, skip) {
   ctx.fillStyle = suitCol;
   ctx.beginPath(); ctx.moveTo(px(0), py(bd.sh-2)); ctx.lineTo(px(-bd.sw/2), py(bd.sh)); ctx.lineTo(px(-bd.sw/2), py(bd.sh-20)); ctx.closePath(); ctx.fill();
   ctx.beginPath(); ctx.moveTo(px(0), py(bd.sh-2)); ctx.lineTo(px(bd.sw/2), py(bd.sh)); ctx.lineTo(px(bd.sw/2), py(bd.sh-20)); ctx.closePath(); ctx.fill();
-  if (!skip?.arms) {
-    const armLen = body===3?65:60, armW = body===3?13:10;
+  const armLen = body===3?65:60, armW = body===3?13:10;
+  if (!skipArms) {
     ctx.fillStyle = suitCol;
     ctx.beginPath(); ctx.roundRect(px(-bd.sw/2-armW*sc+2), py(bd.sh), armW*sc, armLen*sc, 5*sc); ctx.fill();
     ctx.beginPath(); ctx.roundRect(px(bd.sw/2-2), py(bd.sh), armW*sc, armLen*sc, 5*sc); ctx.fill();
@@ -21884,7 +22320,7 @@ function drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat, skip) {
   if (hat > 0)  drawHat(ctx, hat, px, py, bd, headY, headH, sc);
 }
 
-function drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat, skip) {
+function drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms) {
   const bodyDefs = [
     { sw: 30, sh: 78, nw: 12, nh: 20, hw: 24, hip: 32 },
     { sw: 36, sh: 80, nw: 13, nh: 20, hw: 27, hip: 40 },
@@ -21894,18 +22330,16 @@ function drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat, skip) {
   const bd = bodyDefs[body] || bodyDefs[1];
   const dressCol = ['#3a1a3a','#1a2a3a','#3a1a1a','#1a3a2a'][body % 4];
   const accentCol = ['#e8c96e','#c0392b','#8e44ad','#2980b9'][face % 4];
-  if (!skip?.legs) {
-    ctx.fillStyle = dressCol;
-    ctx.beginPath();
-    ctx.moveTo(px(-bd.sw/2), py(bd.sh)); ctx.lineTo(px(-bd.hip/2), py(0));
-    ctx.lineTo(px(bd.hip/2), py(0)); ctx.lineTo(px(bd.sw/2), py(bd.sh));
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#111';
-    [-1,1].forEach(s => {
-      ctx.beginPath(); ctx.ellipse(px(s*bd.hip*0.18), py(3), 8*sc, 4*sc, 0, 0, Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.roundRect(px(s*bd.hip*0.18+4*sc), py(0), 3*sc, 8*sc, 1*sc); ctx.fill();
-    });
-  }
+  ctx.fillStyle = dressCol;
+  ctx.beginPath();
+  ctx.moveTo(px(-bd.sw/2), py(bd.sh)); ctx.lineTo(px(-bd.hip/2), py(0));
+  ctx.lineTo(px(bd.hip/2), py(0)); ctx.lineTo(px(bd.sw/2), py(bd.sh));
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#111';
+  [-1,1].forEach(s => {
+    ctx.beginPath(); ctx.ellipse(px(s*bd.hip*0.18), py(3), 8*sc, 4*sc, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(px(s*bd.hip*0.18+4*sc), py(0), 3*sc, 8*sc, 1*sc); ctx.fill();
+  });
   ctx.fillStyle = dressCol;
   ctx.beginPath();
   ctx.roundRect(px(-bd.sw/2), py(bd.sh), bd.sw*sc, bd.sh*sc, [0,0,6*sc,6*sc]); ctx.fill();
@@ -21916,8 +22350,8 @@ function drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat, skip) {
   ctx.beginPath(); ctx.moveTo(px(0), py(bd.sh-4)); ctx.lineTo(px(bd.sw/2), py(bd.sh)); ctx.lineTo(px(bd.sw/2), py(bd.sh-18)); ctx.closePath(); ctx.fill();
   ctx.fillStyle = accentCol;
   ctx.beginPath(); ctx.arc(px(-8), py(bd.sh-10), 4*sc, 0, Math.PI*2); ctx.fill();
-  if (!skip?.arms) {
-    const armLen = 58, armW = 8;
+  const armLen = 58, armW = 8;
+  if (!skipArms) {
     ctx.fillStyle = dressCol;
     ctx.beginPath(); ctx.roundRect(px(-bd.sw/2-armW*sc+2), py(bd.sh), armW*sc, armLen*sc, 4*sc); ctx.fill();
     ctx.beginPath(); ctx.roundRect(px(bd.sw/2-2), py(bd.sh), armW*sc, armLen*sc, 4*sc); ctx.fill();
@@ -22205,13 +22639,12 @@ function drawHat(ctx, hatId, px, py, bd, headY, headH, sc) {
 // Кеш спрайтов — каждый уникальный look рендерится один раз в офскрин-canvas.
 const SPRITE_W = 110, SPRITE_H = 200;
 const _spriteCache = new Map();
-function getSprite(look, skip) {
-  const skipKey = skip ? (skip.arms ? 'a' : '') + (skip.legs ? 'l' : '') : '';
-  const key = [look.gender|0, look.skin|0, look.body|0, look.face|0, look.hair|0, look.hat|0].join('.') + skipKey;
+function getSprite(look, skipArms) {
+  const key = [look.gender|0, look.skin|0, look.body|0, look.face|0, look.hair|0, look.hat|0, skipArms?1:0].join('.');
   if (_spriteCache.has(key)) return _spriteCache.get(key);
   const off = document.createElement('canvas');
   off.width = SPRITE_W; off.height = SPRITE_H;
-  drawChar(off.getContext('2d'), SPRITE_W, SPRITE_H, look, skip);
+  drawChar(off.getContext('2d'), SPRITE_W, SPRITE_H, Object.assign({}, look, { skipArms: !!skipArms }));
   _spriteCache.set(key, off);
   return off;
 }
@@ -22312,8 +22745,10 @@ function spawnShot(wr, wc, ang, weapon, isMyShot) {
   // Вспышка у дула — дублирует mini-flash в drawWeaponInHands, но
   // эта живёт дольше и рисует лучи + ядро в мировых координатах
   // (для NPC/чужих игроков она важна, у них нет своего timer'а)
+  // NPC/чужой выстрел — npc:true → упрощённый дешёвый рендер в drawMuzzles
+  const _mLife = isMyShot ? 80 : 50;
   muzzles.push({ r: wr, c: wc, ang: ang || 0,
-                 life: 110, max: 110, weapon });
+                 life: _mLife, max: _mLife, weapon, npc: !isMyShot });
   // Гильзы — 1-3шт вылетают вбок от ствола. Для огнестрела (не melee)
   const nShells = (weapon === 'shotgun') ? 2 :
                   (weapon === 'rpg' || weapon === 'sniper') ? 0 : 1;
@@ -22444,41 +22879,57 @@ function reportCarCrash(qc, impact, kind) {
 
 // Взрыв машины — мощный «мясной» эффект: 36 искр + чёрный круг копоти
 // + бочка дыма. Переиспользуем impacts/bloodSplats.
-function spawnCarExplosion(wr, wc) {
+function spawnCarExplosion(wr, wc, car) {
+  // Запоминаем время взрыва на объекте машины — нужно для ударной волны
+  if (car) car._explosionT = performance.now();
+
   const parts = [];
-  for (let i = 0; i < 36; i++) {
+  // Огненные частицы (больше + быстрее)
+  for (let i = 0; i < 55; i++) {
     const a = Math.random() * Math.PI * 2;
-    const sp = 1.5 + Math.random() * 3.5;
+    const sp = 2.0 + Math.random() * 5.0;
     const t  = Math.random();
     parts.push({
       vr: Math.sin(a) * sp, vc: Math.cos(a) * sp,
-      life: 600 + Math.random() * 600, max: 1200,
-      color: t < 0.4 ? '#ffe080'
-           : t < 0.75 ? '#ff7820'
-           : '#7a2010',
+      life: 500 + Math.random() * 800, max: 1300,
+      color: t < 0.35 ? '#fff8a0'
+           : t < 0.60 ? '#ffb830'
+           : t < 0.82 ? '#ff6010'
+           : '#801010',
       isBlood: false,
-      size: 2.0 + Math.random() * 2.4,
+      size: 2.2 + Math.random() * 3.2,
+    });
+  }
+  // Металлические обломки (крупнее + дальше летят)
+  for (let i = 0; i < 18; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = 2.5 + Math.random() * 5.5;
+    parts.push({
+      vr: Math.sin(a) * sp, vc: Math.cos(a) * sp,
+      life: 1000 + Math.random() * 600, max: 1600,
+      color: i % 3 === 0 ? '#5a4a3a' : i % 3 === 1 ? '#2a2a2a' : '#3a1a10',
+      isBlood: false,
+      size: 2.8 + Math.random() * 2.0,
     });
   }
   _capArr(impacts, _MAX_IMPACTS);
   impacts.push({ r: wr, c: wc, parts });
-  // Чёрная копоть-пятно на земле
+
+  // Большое чёрное пятно копоти
   _capArr(bloodSplats, _MAX_BLOOD);
   bloodSplats.push({
-    r: wr, c: wc, radius: 18 + Math.random() * 6,
-    life: 14000, max: 14000, rot: Math.random() * Math.PI,
+    r: wr, c: wc, radius: 24 + Math.random() * 10,
+    life: 18000, max: 18000, rot: Math.random() * Math.PI,
     _isSoot: true,
   });
-  // Ещё пара частиц «отлетающих обломков» — серые
-  for (let i = 0; i < 14; i++) {
-    const a = Math.random() * Math.PI * 2;
-    parts.push({
-      vr: Math.sin(a) * (1.2 + Math.random() * 2.0),
-      vc: Math.cos(a) * (1.2 + Math.random() * 2.0),
-      life: 900 + Math.random() * 400, max: 1300,
-      color: '#3a3a3a',
-      isBlood: false,
-      size: 1.6 + Math.random() * 1.4,
+  // Несколько меньших пятен копоти вокруг
+  for (let i = 0; i < 3; i++) {
+    const dr = (Math.random() - 0.5) * 0.8, dc = (Math.random() - 0.5) * 0.8;
+    _capArr(bloodSplats, _MAX_BLOOD);
+    bloodSplats.push({
+      r: wr + dr, c: wc + dc, radius: 8 + Math.random() * 8,
+      life: 14000, max: 14000, rot: Math.random() * Math.PI,
+      _isSoot: true,
     });
   }
 }
@@ -22526,250 +22977,373 @@ function handAnchor(x, y, ang) {
   };
 }
 
-// ── Анимация удара кулаком / ногой ────────────────────────────────
-// Фаза 1 (0–120мс):  замах — дуга-«хвост» за спрайтом
-// Фаза 2 (120–270мс): вспышка удара перед спрайтом
-// Наклон спрайта — через drawPx/drawPy в render-секции.
+// ── Анимация удара кулаком / ногой (без оружия) ───────────────────
+// px, py — экранная позиция игрока (с отдачей камеры).
 function _drawPunchAnim(px, py) {
   if (!_punchAnim) return;
   const elapsed = performance.now() - _punchAnim.startAt;
-  const TOTAL = 380;
+  const TOTAL = 400;
   if (elapsed >= TOTAL) { _punchAnim = null; return; }
+  if (_punchAnim.type === 'kick') { _drawKickAnim(px, py, elapsed); return; }
 
-  const ang    = _punchAnim.ang;
-  const isKick = _punchAnim.type === 'kick';
-  const dx = Math.cos(ang), dy = Math.sin(ang);
+  const ang = _punchAnim.ang;
+  const bY  = Math.round(TS * 0.289);
+  const a   = handAnchor(px, py - bY, ang);
 
-  // ISO-вектор направления удара
-  const sxRaw = (dx - dy) * 0.5;
-  const syRaw = (dx + dy) * 0.5 * ISO_Y;
-  const isoLen = Math.hypot(sxRaw, syRaw) || 1;
-  const sx = sxRaw / isoLen, sy = syRaw / isoLen;
+  // Плечо — базовая точка (hx - sx*armLen)
+  const armLen   = TS * 0.36;
+  const sx = a.sx, sy = a.sy;
+  const shdX = a.hx - sx * armLen;
+  const shdY = a.hy - sy * armLen;
 
-  // Точка удара перед игроком (чуть дальше — чтоб видно было)
-  const REACH = TS * (isKick ? 0.60 : 0.55);
-  const ipX = px + sx * REACH;
-  const ipY = py + sy * REACH - (isKick ? 2 : 12);
+  // k: [-1..1], отрицательный = замах назад, 1 = полный выброс кулака
+  const MAX_REACH = TS * 0.44;   // ~25 px — не слишком длинно
+  let k;
+  if (elapsed < 120) {
+    // Замах — дуга назад
+    const t = elapsed / 120;
+    k = -0.28 * Math.sin(t * Math.PI);
+  } else if (elapsed < 200) {
+    // Резкий удар — ease-out^3
+    const t = (elapsed - 120) / 80;
+    k = 1 - Math.pow(1 - t, 3);
+  } else {
+    // Пружинный отскок назад — cosine ease
+    const t = (elapsed - 200) / 200;
+    k = Math.cos(t * Math.PI * 0.5);
+  }
 
-  // Перп-вектор (для изгиба дуги свинга)
-  const perpX = -sy, perpY = sx;
+  // Позиция кулака
+  const fistX = a.hx + sx * MAX_REACH * k;
+  const fistY = a.hy + sy * MAX_REACH * k;
 
-  // Начальная точка свинга (откуда «выходит» рука/нога)
-  const originX = px - sx * TS * 0.10;
-  const originY = py - sy * TS * 0.10 - (isKick ? 4 : 14);
+  // Локоть — 52% между плечом и кулаком + перпендикулярный выпуклость
+  const elbT  = 0.52;
+  const eMidX = shdX + (fistX - shdX) * elbT;
+  const eMidY = shdY + (fistY - shdY) * elbT;
+  // Локоть выпирает больше при замахе/покое, выпрямляется на ударе
+  const bulgeFactor = Math.max(0, 1 - Math.abs(k) * 1.3);
+  const bulge = 13 * bulgeFactor;
+  const elbX = eMidX + a.perpX * bulge;
+  const elbY = eMidY + a.perpY * bulge;
 
   ctx.save();
   ctx.lineCap  = 'round';
   ctx.lineJoin = 'round';
 
-  // ── Свинг-дуга: след движения руки/ноги (40–220мс) ───────────────
-  if (elapsed >= 40 && elapsed <= 220) {
-    const tSwing = (elapsed - 40) / 180;          // 0→1
-    // Текущий конец дуги двигается от origin к impact
-    const curX = originX + (ipX - originX) * Math.min(1, tSwing * 1.4);
-    const curY = originY + (ipY - originY) * Math.min(1, tSwing * 1.4);
-    // Контрольная точка — отклоняем в сторону для кривизны дуги
-    const curveSide = isKick ? -1 : 1;
-    const cpX = (originX + curX) * 0.5 + perpX * TS * 0.22 * curveSide;
-    const cpY = (originY + curY) * 0.5 + perpY * TS * 0.22 * curveSide;
-
-    const STEPS = 5;
-    for (let i = STEPS; i >= 1; i--) {
-      const pastT   = Math.max(0, tSwing - (STEPS - i) * 0.06);
-      const pastCurX = originX + (ipX - originX) * Math.min(1, pastT * 1.4);
-      const pastCurY = originY + (ipY - originY) * Math.min(1, pastT * 1.4);
-      const alpha   = (i / STEPS) * tSwing * 0.85;
-      const width   = (isKick ? 8 : 7) * (i / STEPS);
-      ctx.globalAlpha = alpha;
-      ctx.lineWidth   = width;
-      ctx.shadowColor = isKick ? '#aa30ee' : '#e06000';
-      ctx.shadowBlur  = 8 * (i / STEPS);
-      ctx.strokeStyle = isKick ? `rgba(210,80,255,0.9)` : `rgba(255,130,30,0.9)`;
+  // ── Трейл движения (только фаза удара 120–210 мс) ─────────────────
+  if (elapsed > 120 && elapsed < 215) {
+    const steps = 4;
+    for (let i = steps; i >= 1; i--) {
+      const pastT  = Math.max(0, (elapsed - i * 16 - 120) / 80);
+      const pastK  = Math.max(0, 1 - Math.pow(1 - pastT, 3));
+      const pfx    = a.hx + sx * MAX_REACH * pastK;
+      const pfy    = a.hy + sy * MAX_REACH * pastK;
+      ctx.globalAlpha = 0.22 - i * 0.04;
+      ctx.fillStyle = '#e08030';
       ctx.beginPath();
-      ctx.moveTo(originX, originY);
-      ctx.quadraticCurveTo(cpX, cpY, pastCurX, pastCurY);
+      ctx.arc(pfx, pfy, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ── Плечо → локоть (верхнее плечо) ───────────────────────────────
+  const _pSkin = SKINS[(QP.look && QP.look.skin) || 0] || '#FDDBB4';
+  ctx.shadowColor = 'rgba(0,0,0,.55)';
+  ctx.shadowBlur  = 5;
+  ctx.lineWidth   = 7.5;
+  ctx.strokeStyle = _pSkin;
+  ctx.beginPath();
+  ctx.moveTo(shdX, shdY);
+  ctx.lineTo(elbX, elbY);
+  ctx.stroke();
+
+  // ── Локоть → кулак (предплечье) ───────────────────────────────────
+  ctx.lineWidth   = 6;
+  ctx.strokeStyle = _pSkin;
+  ctx.beginPath();
+  ctx.moveTo(elbX, elbY);
+  ctx.lineTo(fistX, fistY);
+  ctx.stroke();
+
+  // ── Кулак (прямоугольник с костяшками) ────────────────────────────
+  ctx.shadowBlur  = 7;
+  ctx.shadowColor = '#000';
+  const fistW = 11, fistH = 9;
+  const fistAng = Math.atan2(sy, sx);
+  ctx.save();
+  ctx.translate(fistX, fistY);
+  ctx.rotate(fistAng);
+  // Тело кулака — цвет из скина игрока (чуть темнее)
+  ctx.fillStyle = _pSkin;
+  ctx.beginPath();
+  ctx.roundRect(-fistW * 0.45, -fistH * 0.5, fistW, fistH, 2.5);
+  ctx.fill();
+  // Костяшки
+  ctx.shadowBlur = 0;
+  ctx.fillStyle  = 'rgba(255,180,100,0.45)';
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.arc(-fistW * 0.35 + i * 2.9, -fistH * 0.5 + 1.8, 1.1, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Светлая полоска на ребре кулака
+  ctx.fillStyle = 'rgba(255,220,160,0.25)';
+  ctx.fillRect(-fistW * 0.45, -fistH * 0.5, fistW, 1.5);
+  ctx.restore();
+
+  // ── Импакт-эффект на пике удара (130–280 мс) ──────────────────────
+  if (elapsed > 130 && elapsed < 280) {
+    const peakAt = 180;
+    const fl = elapsed < peakAt
+      ? (elapsed - 130) / (peakAt - 130)
+      : 1 - (elapsed - peakAt) / (280 - peakAt);
+    const fl2 = Math.max(0, fl);
+
+    ctx.globalAlpha = fl2 * 0.92;
+
+    // Расширяющееся кольцо
+    ctx.shadowColor = '#ff7010';
+    ctx.shadowBlur  = 18 * fl2;
+    ctx.strokeStyle = `rgba(255,${130 + Math.round(80*fl2)},20,${0.9})`;
+    ctx.lineWidth   = 2.5 + fl2 * 1.5;
+    ctx.beginPath();
+    ctx.arc(fistX, fistY, 7 + (1 - fl2) * 16, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Радиальные лучи (8 штук, разная длина)
+    const rayLens = [14, 10, 16, 9, 13, 11, 15, 8];
+    ctx.strokeStyle = '#ffe040';
+    ctx.lineWidth   = 1.8;
+    ctx.shadowColor = '#ff8010';
+    ctx.shadowBlur  = 10;
+    for (let i = 0; i < 8; i++) {
+      const rAng  = (i / 8) * Math.PI * 2;
+      const rLen  = rayLens[i] * fl2;
+      const r0    = 8 + (1 - fl2) * 6;
+      ctx.beginPath();
+      ctx.moveTo(fistX + Math.cos(rAng) * r0,       fistY + Math.sin(rAng) * r0);
+      ctx.lineTo(fistX + Math.cos(rAng) * (r0+rLen), fistY + Math.sin(rAng) * (r0+rLen));
       ctx.stroke();
     }
+
+    // Заполненный внутренний блик (белый центр → оранжевый)
+    const grd = ctx.createRadialGradient(fistX, fistY, 0, fistX, fistY, 8 * fl2);
+    grd.addColorStop(0,   `rgba(255,255,200,${fl2 * 0.85})`);
+    grd.addColorStop(0.5, `rgba(255,160,30,${fl2 * 0.5})`);
+    grd.addColorStop(1,   'rgba(255,80,10,0)');
+    ctx.shadowBlur  = 0;
+    ctx.fillStyle   = grd;
+    ctx.beginPath();
+    ctx.arc(fistX, fistY, 8 * fl2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 1;
   }
 
-  // ── Импакт-вспышка при ударе (130–310мс) ─────────────────────────
-  if (elapsed >= 130 && elapsed <= 310) {
-    const t  = (elapsed - 130) / 180;
-    const fl = Math.sin(t * Math.PI);
-
-    ctx.globalAlpha = 0.3 + fl * 0.7;
-
-    if (isKick) {
-      ctx.shadowColor = '#c050ff'; ctx.shadowBlur = 28;
-      ctx.strokeStyle = '#dd60ff'; ctx.lineWidth  = 3.5;
-      ctx.beginPath(); ctx.arc(ipX, ipY, 5 + t * 18, 0, Math.PI * 2); ctx.stroke();
-      ctx.shadowBlur = 12; ctx.lineWidth = 2;
-      for (let i = 0; i < 6; i++) {
-        const ra = (i / 6) * Math.PI * 2;
-        const r0 = 7 + t * 4, r1 = r0 + (12 + (i % 2) * 6) * fl;
-        ctx.strokeStyle = i % 2 ? '#ff88ff' : '#cc44ff';
-        ctx.beginPath();
-        ctx.moveTo(ipX + Math.cos(ra) * r0, ipY + Math.sin(ra) * r0);
-        ctx.lineTo(ipX + Math.cos(ra) * r1, ipY + Math.sin(ra) * r1);
-        ctx.stroke();
-      }
-      ctx.shadowBlur = 0;
-      const gk = ctx.createRadialGradient(ipX, ipY, 0, ipX, ipY, 14 * fl);
-      gk.addColorStop(0, `rgba(255,210,255,${fl * 0.9})`);
-      gk.addColorStop(1, 'rgba(120,20,180,0)');
-      ctx.fillStyle = gk;
-      ctx.beginPath(); ctx.arc(ipX, ipY, 14 * fl, 0, Math.PI * 2); ctx.fill();
-    } else {
-      ctx.shadowColor = '#ff6000'; ctx.shadowBlur = 28;
-      ctx.strokeStyle = '#ff9020'; ctx.lineWidth  = 3.5;
-      ctx.beginPath(); ctx.arc(ipX, ipY, 4 + t * 20, 0, Math.PI * 2); ctx.stroke();
-      const rl = [16, 10, 18, 9, 15, 11, 17, 8];
-      ctx.shadowBlur = 12; ctx.lineWidth = 2;
-      for (let i = 0; i < 8; i++) {
-        const ra = (i / 8) * Math.PI * 2;
-        const r0 = 6 + t * 5, r1 = r0 + rl[i] * fl;
-        ctx.strokeStyle = i % 2 ? '#ffe060' : '#ff8020';
-        ctx.beginPath();
-        ctx.moveTo(ipX + Math.cos(ra) * r0, ipY + Math.sin(ra) * r0);
-        ctx.lineTo(ipX + Math.cos(ra) * r1, ipY + Math.sin(ra) * r1);
-        ctx.stroke();
-      }
-      ctx.shadowBlur = 0;
-      const gp = ctx.createRadialGradient(ipX, ipY, 0, ipX, ipY, 16 * fl);
-      gp.addColorStop(0, `rgba(255,255,200,${fl * 0.92})`);
-      gp.addColorStop(0.5, `rgba(255,150,20,${fl * 0.6})`);
-      gp.addColorStop(1, 'rgba(255,60,0,0)');
-      ctx.fillStyle = gp;
-      ctx.beginPath(); ctx.arc(ipX, ipY, 16 * fl, 0, Math.PI * 2); ctx.fill();
-    }
-  }
-
-  ctx.globalAlpha = 1;
   ctx.restore();
 }
 
-// Анимированные конечности поверх спрайта без рук/ног.
-// Рисует руки при ударе или ноги при пинке, цвета берёт из look игрока.
-function _drawLimbAnim(drawPx, drawPy) {
-  if (!_punchAnim) return;
-  const elapsed = performance.now() - _punchAnim.startAt;
-  const TOTAL = 380;
-  if (elapsed >= TOTAL) return;
+// ── Анимация удара ногой ──────────────────────────────────────────
+// Фазы: подъём колена (0–75мс) → резкий выброс (75–160мс) → возврат (160–380мс)
+function _drawKickAnim(px, py, elapsed) {
+  const ang = _punchAnim.ang;
+  const dx  = Math.cos(ang), dy = Math.sin(ang);
 
-  const { ang, type } = _punchAnim;
-  const isKick = type === 'kick';
-  const look   = QP.look || {};
-  const gender = look.gender | 0;
-  const bodyIdx = look.body | 0;
-  const skinCol  = SKINS[look.skin | 0] || SKINS[0];
-  const clothCol = gender === 0
-    ? ['#1a1a2e','#1a2e1a','#2e1a1a','#1a1e2e'][bodyIdx % 4]
-    : ['#3a1a3a','#1a2a3a','#3a1a1a','#1a3a2a'][bodyIdx % 4];
+  // ISO-вектор направления удара (единичный в экранных координатах)
+  const fwdSxRaw = (dx - dy) * 0.5;
+  const fwdSyRaw = (dx + dy) * 0.5 * ISO_Y;
+  const fwdLen   = Math.hypot(fwdSxRaw, fwdSyRaw) || 1;
+  const fwdSx = fwdSxRaw / fwdLen;
+  const fwdSy = fwdSyRaw / fwdLen;
 
-  // Изо-направление удара/пинка
-  const dx = Math.cos(ang), dy = Math.sin(ang);
-  const sxR = (dx - dy) * 0.5, syR = (dx + dy) * 0.5 * ISO_Y;
-  const iL  = Math.hypot(sxR, syR) || 1;
-  const fwdX = sxR / iL, fwdY = syR / iL;
-  const perpX = -fwdY, perpY = fwdX;
+  // ISO-перпендикуляр (для смещения бедра чуть в сторону)
+  const side   = dx >= 0 ? 1 : -1;
+  const perpSx = -fwdSy * side;
+  const perpSy =  fwdSx * side;
 
-  // Фаза: быстрый подъём → пик → возврат
-  const t = elapsed / TOTAL;
-  const ext = Math.pow(Math.sin(t * Math.PI), 0.7);
+  // Точка бедра — нижняя часть туловища
+  const hipX = px + perpSx * TS * 0.12;
+  const hipY = py + TS * 0.02 + perpSy * TS * 0.08;
+
+  const MAX_KICK = TS * 0.68;   // размашистый удар
+  const UP       = TS * 0.38;   // высота подъёма колена
+
+  // k=0..1 (выброс ноги вперёд), upK=0..1 (подъём колена вверх)
+  let k, upK;
+  if (elapsed < 75) {
+    const t = elapsed / 75;
+    k   = 0;
+    upK = Math.sin(t * Math.PI * 0.9);    // быстрый подъём колена
+  } else if (elapsed < 160) {
+    const t = (elapsed - 75) / 85;
+    k   = 1 - Math.pow(1 - t, 4);         // сверхрезкий выброс ease-out⁴
+    upK = Math.max(0, 1 - t * 0.7);
+  } else {
+    const t = (elapsed - 160) / 220;
+    k   = Math.cos(t * Math.PI * 0.5);    // плавный возврат
+    upK = (1 - t) * 0.3;
+  }
+
+  // Позиция стопы
+  const footX = hipX + fwdSx * MAX_KICK * k;
+  const footY = hipY + fwdSy * MAX_KICK * k - UP * Math.max(0, upK * (1 - k * 0.6));
+
+  // Колено: ~50% пути от бедра до стопы + вверх на upK
+  const kneeX = hipX + (footX - hipX) * 0.50;
+  const kneeY = hipY + (footY - hipY) * 0.50 - UP * upK * 1.05;
 
   ctx.save();
   ctx.lineCap  = 'round';
   ctx.lineJoin = 'round';
 
-  if (!isKick) {
-    // ── УДАР: рисуем обе руки ──────────────────────────────────────
-    // Точные смещения плеч [лево, право] от центра персонажа в пикселях игры.
-    // Вычислены из формул drawMale/drawFemale + масштаб спрайта 110→68px.
-    const mArmOff = [[-4.7,6.2],[-6.2,7.7],[-8.4,9.9],[-7.4,9.5]];
-    const fArmOff = [[-4.1,6.5],[-3.7,7.4],[-5.6,9.3],[-3.4,7.1]];
-    const [lOff, rOff] = (gender === 0 ? mArmOff : fArmOff)[bodyIdx % 4];
-    const lShouX = drawPx + lOff;
-    const rShouX = drawPx + rOff;
-    const shouY  = drawPy - 22;   // высота плеча
-    const restY  = drawPy - 14;   // рука опущена
+  // ── Трейл стопы во время удара (75–185мс), 6 призраков ──────────
+  if (elapsed > 75 && elapsed < 185) {
+    for (let i = 6; i >= 1; i--) {
+      const pt  = Math.max(0, (elapsed - i * 14 - 75) / 85);
+      const pk  = Math.max(0, 1 - Math.pow(1 - pt, 4));
+      const pfx = hipX + fwdSx * MAX_KICK * pk;
+      const pfy = hipY + fwdSy * MAX_KICK * pk - UP * (1 - pk * 0.6) * 0.5;
+      ctx.globalAlpha = 0.22 - i * 0.03;
+      ctx.fillStyle = '#3050a0';
+      ctx.beginPath();
+      ctx.arc(pfx, pfy, 5 - i * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
 
-    // Атакующая рука: та, что ближе к цели по perp-стороне
-    const atkRight = perpX >= 0;
-    const atkShouX = atkRight ? rShouX : lShouX;
-    const defShouX = atkRight ? lShouX : rShouX;
+  // Цвет брюк из скина игрока
+  const _kBody = (QP.look && QP.look.body) || 0;
+  const _kGender = (QP.look && QP.look.gender) || 0;
+  const _legCol = _kGender === 0
+    ? ['#1a1a2e','#1a2e1a','#2e1a1a','#1a1e2e'][_kBody % 4]
+    : ['#3a1a3a','#1a2a3a','#3a1a1a','#1a3a2a'][_kBody % 4];
 
-    const REACH = TS * 0.44; // максимальный вынос кулака
+  // ── Бедро (hip → knee) ────────────────────────────────────────────
+  ctx.shadowColor = 'rgba(0,0,0,.65)';
+  ctx.shadowBlur  = 6;
+  ctx.lineWidth   = 10;
+  ctx.strokeStyle = _legCol;
+  ctx.beginPath();
+  ctx.moveTo(hipX, hipY);
+  ctx.lineTo(kneeX, kneeY);
+  ctx.stroke();
+  // Световая полоска на бедре (блик)
+  ctx.shadowBlur  = 0;
+  ctx.lineWidth   = 2.5;
+  ctx.strokeStyle = 'rgba(120,120,160,0.4)';
+  ctx.beginPath();
+  ctx.moveTo(hipX, hipY);
+  ctx.lineTo(kneeX, kneeY);
+  ctx.stroke();
 
-    // Кулак атаки: от покоя → вынос в направлении удара
-    const atkRestX = atkShouX, atkRestY = restY;
-    const atkExtX  = atkShouX + fwdX * REACH;
-    const atkExtY  = shouY    + fwdY * REACH;
-    const atkFistX = atkRestX + (atkExtX - atkRestX) * ext;
-    const atkFistY = atkRestY + (atkExtY - atkRestY) * ext;
-    // Локоть: середина с чуть наружным изгибом
-    const atkBend = (1 - ext) * 5 * (atkRight ? 1 : -1);
-    const atkElbX = (atkShouX + atkFistX) / 2 + perpX * atkBend;
-    const atkElbY = (shouY    + atkFistY) / 2 + perpY * atkBend;
+  // ── Голень (knee → foot) ──────────────────────────────────────────
+  ctx.shadowColor = 'rgba(0,0,0,.6)';
+  ctx.shadowBlur  = 5;
+  ctx.lineWidth   = 8;
+  ctx.strokeStyle = _legCol;
+  ctx.beginPath();
+  ctx.moveTo(kneeX, kneeY);
+  ctx.lineTo(footX, footY);
+  ctx.stroke();
 
-    ctx.lineWidth = 5; ctx.strokeStyle = clothCol;
-    ctx.beginPath(); ctx.moveTo(atkShouX, shouY); ctx.lineTo(atkElbX, atkElbY); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(atkElbX, atkElbY); ctx.lineTo(atkFistX, atkFistY); ctx.stroke();
-    ctx.fillStyle = skinCol;
-    ctx.beginPath(); ctx.ellipse(atkFistX, atkFistY, 5, 4, Math.atan2(fwdY, fwdX), 0, Math.PI * 2); ctx.fill();
+  // Колено — шар
+  ctx.shadowBlur  = 4;
+  ctx.fillStyle   = _legCol;
+  ctx.beginPath();
+  ctx.arc(kneeX, kneeY, 5, 0, Math.PI * 2);
+  ctx.fill();
 
-    // Защитная рука: лёгкий контрбаланс назад
-    const defRestX = defShouX, defRestY = restY;
-    const defFistX = defRestX - fwdX * 4 * ext;
-    const defFistY = defRestY - fwdY * 4 * ext - ext * 3;
-    const defElbX  = (defShouX + defFistX) / 2;
-    const defElbY  = (shouY    + defFistY) / 2;
+  // ── Ботинок (крупнее и детальнее) ─────────────────────────────────
+  ctx.shadowBlur  = 8;
+  ctx.shadowColor = '#000';
+  const shoeAng = Math.atan2(fwdSy, fwdSx);
+  // Вращение носка вперёд при выбросе
+  const toeRot  = k * 0.35;
+  ctx.save();
+  ctx.translate(footX, footY);
+  ctx.rotate(shoeAng + toeRot);
+  // Подошва (чёрная)
+  ctx.fillStyle = '#0a0a0a';
+  ctx.beginPath();
+  ctx.roundRect(-5, -6, 20, 10, 4);
+  ctx.fill();
+  // Верх обуви
+  ctx.fillStyle = '#1a1a2e';
+  ctx.beginPath();
+  ctx.roundRect(-4, -7, 18, 7, 3);
+  ctx.fill();
+  // Носок — более тёмный, скруглённый
+  ctx.fillStyle = '#111128';
+  ctx.beginPath();
+  ctx.ellipse(13, -3, 5, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Белая полоска (кроссовок)
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.beginPath();
+  ctx.roundRect(-2, -5, 14, 2, 1);
+  ctx.fill();
+  // Подошвенный блик
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.fillRect(-5, 3, 20, 1.5);
+  ctx.restore();
 
-    ctx.lineWidth = 4; ctx.strokeStyle = clothCol;
-    ctx.beginPath(); ctx.moveTo(defShouX, shouY); ctx.lineTo(defElbX, defElbY); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(defElbX, defElbY); ctx.lineTo(defFistX, defFistY); ctx.stroke();
-    ctx.fillStyle = skinCol;
-    ctx.beginPath(); ctx.ellipse(defFistX, defFistY, 4, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+  // ── Импакт на пике (90–290мс), синий → белый ─────────────────────
+  if (elapsed > 90 && elapsed < 290) {
+    const peakAt = 155;
+    const fl = elapsed < peakAt
+      ? (elapsed - 90) / (peakAt - 90)
+      : 1 - (elapsed - peakAt) / (290 - peakAt);
+    const fl2 = Math.max(0, fl);
 
-  } else {
-    // ── ПИНОК: рисуем обе ноги ────────────────────────────────────
-    const hipY      = drawPy - 8;
-    const footRestY = drawPy + 5;
-    const lHipX = drawPx - 3, rHipX = drawPx + 3;
+    ctx.globalAlpha = fl2 * 0.95;
 
-    const atkRight = perpX >= 0;
-    const atkHipX  = atkRight ? rHipX : lHipX;
-    const defHipX  = atkRight ? lHipX : rHipX;
+    // Двойное кольцо (внешнее + внутреннее)
+    ctx.shadowColor = '#2060ff';
+    ctx.shadowBlur  = 22 * fl2;
+    ctx.strokeStyle = `rgba(80,160,255,${0.95 * fl2})`;
+    ctx.lineWidth   = 3.0;
+    ctx.beginPath();
+    ctx.arc(footX, footY, 9 + (1 - fl2) * 18, 0, Math.PI * 2);
+    ctx.stroke();
 
-    const KICK_REACH = TS * 0.50;
+    ctx.strokeStyle = `rgba(200,230,255,${0.6 * fl2})`;
+    ctx.lineWidth   = 1.5;
+    ctx.beginPath();
+    ctx.arc(footX, footY, 5 + (1 - fl2) * 10, 0, Math.PI * 2);
+    ctx.stroke();
 
-    // Нога атаки
-    const atkFootRestX = atkHipX, atkFootRestY = footRestY;
-    const atkFootExtX  = atkHipX + fwdX * KICK_REACH;
-    const atkFootExtY  = hipY    + fwdY * KICK_REACH;
-    const atkFootX = atkFootRestX + (atkFootExtX - atkFootRestX) * ext;
-    const atkFootY = atkFootRestY + (atkFootExtY - atkFootRestY) * ext;
-    // Колено поднимается во время пинка
-    const atkKneeX = (atkHipX + atkFootX) / 2;
-    const atkKneeY = (hipY    + atkFootY) / 2 - ext * 12;
+    // 10 лучей разной длины (асимметрия = живость)
+    const lens = [18, 11, 20, 9, 16, 12, 19, 10, 15, 13];
+    ctx.lineWidth   = 2.0;
+    ctx.shadowColor = '#4080ff';
+    ctx.shadowBlur  = 10;
+    for (let i = 0; i < 10; i++) {
+      const ra = (i / 10) * Math.PI * 2;
+      const r0 = 10 + (1 - fl2) * 5;
+      const r1 = r0 + lens[i] * fl2;
+      const alpha = (0.55 + (i % 3) * 0.12) * fl2;
+      ctx.strokeStyle = `rgba(${160 + i*8},${200 + i*4},255,${alpha})`;
+      ctx.beginPath();
+      ctx.moveTo(footX + Math.cos(ra) * r0, footY + Math.sin(ra) * r0);
+      ctx.lineTo(footX + Math.cos(ra) * r1, footY + Math.sin(ra) * r1);
+      ctx.stroke();
+    }
 
-    ctx.lineWidth = 8; ctx.strokeStyle = clothCol;
-    ctx.beginPath(); ctx.moveTo(atkHipX, hipY); ctx.lineTo(atkKneeX, atkKneeY); ctx.stroke();
-    ctx.lineWidth = 7;
-    ctx.beginPath(); ctx.moveTo(atkKneeX, atkKneeY); ctx.lineTo(atkFootX, atkFootY); ctx.stroke();
-    ctx.fillStyle = '#111';
-    ctx.beginPath(); ctx.ellipse(atkFootX, atkFootY, 7, 4, Math.atan2(fwdY, fwdX), 0, Math.PI * 2); ctx.fill();
+    // Центральная вспышка (белое ядро → синий ореол)
+    const grd = ctx.createRadialGradient(footX, footY, 0, footX, footY, 11 * fl2);
+    grd.addColorStop(0,   `rgba(255,255,255,${fl2 * 0.9})`);
+    grd.addColorStop(0.4, `rgba(120,180,255,${fl2 * 0.6})`);
+    grd.addColorStop(1,   'rgba(30,80,200,0)');
+    ctx.shadowBlur  = 0;
+    ctx.fillStyle   = grd;
+    ctx.beginPath();
+    ctx.arc(footX, footY, 11 * fl2, 0, Math.PI * 2);
+    ctx.fill();
 
-    // Опорная нога
-    const defFootX = defHipX, defFootY = footRestY;
-    const defKneeX = (defHipX + defFootX) / 2;
-    const defKneeY = (hipY    + defFootY) / 2;
-
-    ctx.lineWidth = 8; ctx.strokeStyle = clothCol;
-    ctx.beginPath(); ctx.moveTo(defHipX, hipY); ctx.lineTo(defKneeX, defKneeY); ctx.stroke();
-    ctx.lineWidth = 7;
-    ctx.beginPath(); ctx.moveTo(defKneeX, defKneeY); ctx.lineTo(defFootX, defFootY); ctx.stroke();
-    ctx.fillStyle = '#111';
-    ctx.beginPath(); ctx.ellipse(defFootX, defFootY, 6, 3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
   }
 
   ctx.restore();
@@ -22848,7 +23422,23 @@ function drawWeaponInHands(x, y, ang, weapon, scale /*shotAtMs ignored: см. dr
   if (!weapon) return;
   weapon = resolveWeapon(weapon);   // 'uzi' → 'smg', 'deagle' → 'pistol_heavy' и т.д.
   const a = handAnchor(x, y, ang);
-  const { hx, hy, sx, sy, px, shY, perpX, perpY, shoulderD } = a;
+  let { hx, hy, sx, sy, px, shY, perpX, perpY, shoulderD } = a;
+  // Отдача: рука с оружием сдвигается назад от цели (против направления стрельбы)
+  // Только для игрока (у NPC _recoilUntil не выставляется)
+  const recoilLeft = _recoilUntil - performance.now();
+  if (recoilLeft > 0) {
+    const wcfgR = WEAPON_FX_CFG[weapon] || {};
+    const maxPull = wcfgR.twoHanded ? TS * 0.06 : TS * 0.045;
+    // Пик отдачи в первые 30% времени, затем пружина обратно
+    const dur = wcfgR.twoHanded ? 220 : 160;
+    const t = 1 - recoilLeft / dur;
+    const pull = maxPull * (t < 0.3
+      ? t / 0.3                           // нарастание
+      : Math.pow(1 - (t - 0.3) / 0.7, 2) // пружина назад
+    );
+    hx -= sx * pull;
+    hy -= sy * pull;
+  }
   // Масштаб ровно как в demo: gunScale = 1.0 * (TS / 60) для миньона,
   // 1.3 * (TS / 60) для босса. scale — лёгкая подкрутка.
   const sc = (scale || 1.0) * (TS / 60);
@@ -22898,7 +23488,7 @@ function drawWeaponInHands(x, y, ang, weapon, scale /*shotAtMs ignored: см. dr
   }
 }
 
-function drawPerson(x, y, ang, look, walkPhase, name, chat, isSelf, hp, maxHp, isDead, deadAt, skip) {
+function drawPerson(x, y, ang, look, walkPhase, name, chat, isSelf, hp, maxHp, isDead, deadAt, skipArms) {
   // Анимация падения: первые 400мс — поворот 0→90° и смещение вниз; дальше
   // — статично лежит с alpha 0.55. До этого было просто globalAlpha 0.35 без
   // движения — выглядело как «исчезает», не как «упал».
@@ -22914,7 +23504,7 @@ function drawPerson(x, y, ang, look, walkPhase, name, chat, isSelf, hp, maxHp, i
   ctx.ellipse(x, y + 3, 14, 5, 0, 0, Math.PI * 2);
   ctx.fill();
   // Спрайт из креатора. Лёгкая ходьба: вертикальный bob + сжатие.
-  const sprite = getSprite(look || {}, skip);
+  const sprite = getSprite(look || {}, skipArms);
   const sh = TS * 1.7;
   const sw = sh * 0.72;
   const ph = walkPhase || 0;
@@ -23799,29 +24389,12 @@ function render() {
       py -= Math.sin(player.ang) * k;
     }
     const myChat = (_localChat && performance.now() - _localChatT < chatDuration(_localChat)) ? _localChat : null;
-    // Лёгкий наклон спрайта вперёд в момент удара — имитирует движение тела
-    let drawPx = px, drawPy = py;
-    if (_punchAnim && !myDead) {
-      const _el = performance.now() - _punchAnim.startAt;
-      const _hs = _punchAnim.type === 'kick' ? 110 : 115;
-      const _he = _punchAnim.type === 'kick' ? 265 : 270;
-      if (_el >= _hs && _el <= _he) {
-        const _t   = (_el - _hs) / (_he - _hs);
-        const _lean = Math.sin(_t * Math.PI) * 3.5;
-        const _ldx = Math.cos(_punchAnim.ang), _ldy = Math.sin(_punchAnim.ang);
-        const _lsx = (_ldx - _ldy) * 0.5, _lsy = (_ldx + _ldy) * 0.5 * ISO_Y;
-        const _ll  = Math.hypot(_lsx, _lsy) || 1;
-        drawPx = px + (_lsx / _ll) * _lean;
-        drawPy = py + (_lsy / _ll) * _lean;
-      }
-    }
-    drawPerson(drawPx, drawPy, player.ang, QP.look,
+    drawPerson(px, py, player.ang, QP.look,
                player.walking ? player.walkPhase : 0, QP.name, myChat, true,
-               myHp, PVP.max_hp, myDead);
+               myHp, PVP.max_hp, myDead, null, !!_punchAnim);
     if (myMode !== 'pve' && !myDead) {
-      drawWeaponInHands(drawPx, drawPy, player.ang, currentWeapon, 0.9, lastShotClientT);
-      if (_punchAnim) _drawLimbAnim(drawPx, drawPy);   // конечности под вспышкой
-      if (_punchAnim) _drawPunchAnim(drawPx, drawPy);  // вспышка удара сверху
+      drawWeaponInHands(px, py, player.ang, currentWeapon, 0.9, lastShotClientT);
+      if (_punchAnim) _drawPunchAnim(px, py);
     }
     if (myWanted > 0) drawWantedStars(px, py, myWanted);
     if (myGangs  > 0) drawWantedGangs(px, py, myGangs);
@@ -24198,7 +24771,8 @@ function tryTapLock(canvasX, canvasY) {
   // Не локаемся на арене (free-aim only) и когда я мёртв / в машине / PvE
   if (myDead || myMode === 'pve' || myDrivingCarId) return false;
   if (inArena(player.r, player.c)) return false;
-  const MAX_PX = 80;          // палец рядом — не дальше 80 пикселей от спрайта
+  // В ближнем бою (без оружия) радиус тапа шире — мобилка, пальцы толще
+  const MAX_PX = _isArmed() ? 80 : 120;
   let best = null, bestD = MAX_PX;
   // 1) NPC прохожие
   for (const n of NPCS) {
@@ -24595,8 +25169,7 @@ function drawAimLaser() {
   const dirY = _dr / mag, dirX = _dc / mag;
 
   // Стартовая точка и дальность зависят от режима
-  // В безоружном режиме лазер тянется до 6 тайлов — достаёт до NPC визуально
-  const range = armed ? (WEAPON_FX_CFG[resolveWeapon(currentWeapon)]?.range || 8) : 6;
+  const range = armed ? (WEAPON_FX_CFG[resolveWeapon(currentWeapon)]?.range || 8) : PUNCH_RANGE;
   const muzD  = armed ? weaponMuzzleD(currentWeapon, 0.9) : 0.25;
   const sR = player.r + dirY * muzD;
   const sC = player.c + dirX * muzD;
@@ -24710,15 +25283,14 @@ function drawBullets() {
     // вдвое — пуля заметна как трассер, но без halo во весь экран.
     ctx.lineWidth = b.thick ? 3.5 : 2;
     ctx.lineCap = 'round';
-    ctx.shadowColor = b.color;
-    ctx.shadowBlur = b.thick ? 7 : 4;
+    ctx.shadowBlur = 0;   // без shadow на шлейфе — дорого при 50 пулях
     ctx.beginPath();
     ctx.moveTo(tx, ty);
     ctx.lineTo(hx, hy);
     ctx.stroke();
-    // Ядро головы — ярко-белая точка, делает пулю «живой»
-    ctx.shadowBlur = b.thick ? 9 : 5;
-    ctx.shadowColor = '#fff';
+    // Ядро головы — минимальный glow только на самой точке
+    ctx.shadowBlur = b.thick ? 5 : 3;
+    ctx.shadowColor = b.color;
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.arc(hx, hy, b.thick ? 2.0 : 1.3, 0, Math.PI * 2);
@@ -24753,36 +25325,49 @@ function drawMuzzles() {
   const dy = _bulletY();
   for (const m of muzzles) {
     const t = m.life / m.max;        // 1..0
-    const t2 = Math.sqrt(t);         // более «жирная» нелинейность для размера
+    const t2 = Math.sqrt(t);
     const p = w2s(m.r + 0.5, m.c + 0.5);
     const cx = p.x, cy = p.y - dy;
-    // Совместимость: spawnShot пишет .ang, spawnMuzzle — .angle
     const ang = (m.angle != null ? m.angle : (m.ang || 0));
+
+    // NPC-вспышка: простой дешёвый круг — без градиентов
+    if (m.npc) {
+      ctx.globalAlpha = t * 0.75;
+      ctx.fillStyle = m.color || '#ffd76b';
+      ctx.beginPath();
+      ctx.arc(cx, cy, TS * 0.14 * t2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      continue;
+    }
+
     const heavy = !!m.heavy;
-    const sizeMul = heavy ? 1.45 : 1.0;
+    const sizeMul = heavy ? 1.2 : 1.0;
     const seed = m.seed || 0;
-    // 1. ореол (большая мягкая клякса)
+    // 1. ореол — radial gradient (уменьшен вдвое от прежнего)
     ctx.save();
-    ctx.shadowColor = '#ff9020';
-    ctx.shadowBlur = 32 * t2 * sizeMul;
-    ctx.fillStyle = `rgba(255,150,40,${t * 0.55})`;
+    const oreolR = TS * 0.26 * t2 * sizeMul;
+    const og = ctx.createRadialGradient(cx, cy, 0, cx, cy, oreolR);
+    og.addColorStop(0,   `rgba(255,180,60,${t * 0.65})`);
+    og.addColorStop(0.5, `rgba(255,130,30,${t * 0.30})`);
+    og.addColorStop(1,   'rgba(255,80,10,0)');
+    ctx.fillStyle = og;
     ctx.beginPath();
-    ctx.arc(cx, cy, TS * 0.50 * t2 * sizeMul, 0, Math.PI * 2);
+    ctx.arc(cx, cy, oreolR, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
-    // 2. лепестки пламени (5 шт., разные углы и длины — детерминированно по seed)
+    // 2. лепестки пламени
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(ang);
-    const petals = heavy ? 6 : 5;
+    const petals = heavy ? 5 : 4;
     for (let k = 0; k < petals; k++) {
-      // Псевдослучайный угол вокруг основного направления, фиксированный per-shot
       const s1 = Math.sin(seed + k * 13.37) * 0.5 + 0.5;
       const s2 = Math.sin(seed * 1.7 + k * 7.11) * 0.5 + 0.5;
-      const dev = (s1 - 0.5) * (heavy ? 0.9 : 0.7);    // отклонение от прицельной оси
-      const len = TS * (0.55 + s2 * 0.45) * t2 * sizeMul;
-      const wid = TS * (0.06 + s1 * 0.06) * t2;
-      ctx.fillStyle = `rgba(255,${200 + Math.floor(s2 * 50)},${80 + Math.floor(s1 * 60)},${t * 0.85})`;
+      const dev = (s1 - 0.5) * (heavy ? 0.7 : 0.55);
+      const len = TS * (0.28 + s2 * 0.20) * t2 * sizeMul;
+      const wid = TS * (0.04 + s1 * 0.04) * t2;
+      ctx.fillStyle = `rgba(255,${200 + Math.floor(s2 * 50)},${80 + Math.floor(s1 * 60)},${t * 0.80})`;
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.lineTo(Math.cos(dev) * len * 0.6, Math.sin(dev) * len * 0.6 - wid);
@@ -24791,23 +25376,26 @@ function drawMuzzles() {
       ctx.closePath();
       ctx.fill();
     }
-    // Центральный главный «луч» — самый яркий
-    ctx.fillStyle = `rgba(255,245,200,${t * 0.95})`;
+    // Центральный луч
+    ctx.fillStyle = `rgba(255,245,200,${t * 0.90})`;
     ctx.beginPath();
     ctx.moveTo(0, 0);
-    ctx.lineTo(TS * 0.62 * t2 * sizeMul, -TS * 0.07 * t2);
-    ctx.lineTo(TS * 0.85 * t2 * sizeMul, 0);
-    ctx.lineTo(TS * 0.62 * t2 * sizeMul,  TS * 0.07 * t2);
+    ctx.lineTo(TS * 0.32 * t2 * sizeMul, -TS * 0.055 * t2);
+    ctx.lineTo(TS * 0.44 * t2 * sizeMul, 0);
+    ctx.lineTo(TS * 0.32 * t2 * sizeMul,  TS * 0.055 * t2);
     ctx.closePath();
     ctx.fill();
     ctx.restore();
-    // 3. ярко-белое ядро
+    // 3. ярко-белое ядро (меньше)
     ctx.save();
-    ctx.shadowColor = '#fff';
-    ctx.shadowBlur = 16 * t * sizeMul;
-    ctx.fillStyle = `rgba(255,255,240,${Math.min(1, t * 1.05)})`;
+    const coreR = TS * 0.10 * t2 * sizeMul;
+    const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
+    cg.addColorStop(0,   `rgba(255,255,255,${Math.min(1, t)})`);
+    cg.addColorStop(0.6, `rgba(255,240,180,${t * 0.6})`);
+    cg.addColorStop(1,   'rgba(255,200,80,0)');
+    ctx.fillStyle = cg;
     ctx.beginPath();
-    ctx.arc(cx, cy, TS * 0.17 * t2 * sizeMul, 0, Math.PI * 2);
+    ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
@@ -24819,20 +25407,18 @@ function drawMuzzles() {
 function drawShockwaves() {
   const dy = _bulletY();
   ctx.save();
+  ctx.shadowBlur = 0;   // shadowBlur на shockwaves убивает мобильный GPU
   for (const s of shockwaves) {
     const t = s.life / s.max;       // 1..0
     const p = w2s(s.r + 0.5, s.c + 0.5);
-    ctx.globalAlpha = Math.max(0, t * 0.75);
+    ctx.globalAlpha = Math.max(0, t * 0.65);
     ctx.strokeStyle = s.color;
     ctx.lineWidth = (s.thick || 2) * (0.4 + t * 0.6);
-    ctx.shadowColor = s.color;
-    ctx.shadowBlur = 8 * t;
     ctx.beginPath();
     ctx.arc(p.x, p.y - dy, s.rad, 0, Math.PI * 2);
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
-  ctx.shadowBlur = 0;
   ctx.restore();
 }
 
@@ -26563,6 +27149,7 @@ function enterBankInterior(bank) {
       c:W/2-3+(i/Math.max(1,bagCount-1))*6+(Math.random()-.5)*.5});
   }
   _bankInt={bank,W,H,crackTime,counterRow,
+    room:'lobby',
     phase:vaultOpen?'vault_open':'lobby',
     crackProg:vaultOpen?1:0,_crackStartedAt:null,
     bags,myBag:false,_bagsLoaded:existingRob?_bankRob.bagsLoaded:0,
@@ -26577,7 +27164,8 @@ function enterBankInterior(bank) {
   cam.y=(player.c+player.r)*TS*0.5*ISO_Y;
   showToast(vaultOpen?`🏦 ${bank.name} — хранилище открыто!`:`🏦 ${bank.name}`,vaultOpen?'💰':'🏦',2000);
   try{hapticHit&&hapticHit();}catch(e){}
-  if (!vaultOpen&&ws&&ws.readyState===1){
+  // bank_rob_start шлём только когда реально начинаем взлом (не при входе)
+  if (vaultOpen&&ws&&ws.readyState===1){
     try{ws.send(JSON.stringify({t:'bank_rob_start',d:{bank_id:bank.id}}));}catch(e){}
   }
   _updateBankZoneBtn();
@@ -26649,32 +27237,32 @@ function _updateBankInterior(dt) {
     }
   }
   const hasWeapon=_isArmed();
-  // Сотрудники видят оружие → немедленно убегают жаловаться (snitch)
-  if (hasWeapon && !int._weaponPanicTriggered) {
-    for (const npc of int.npcs) {
-      if (npc.type==='guard'||npc.state!=='normal') continue;
-      const dist=Math.hypot(player.r-npc.r,player.c-npc.c);
-      if (dist<9) {
-        int._weaponPanicTriggered=true;
-        npc.state='panic';
-        npc.cryText='Помогите! Он вооружён!'; npc.cryUntil=now+3000;
-        const dr=H+1-npc.r,dc=W/2-npc.c,mag=Math.hypot(dr,dc)||1;
-        npc.fleeVr=dr/mag*4; npc.fleeVc=dc/mag*4;
-        showToast('😱 Сотрудник бежит звонить в полицию!','🚨',2500);
-        break;
+  const isRobbery=(int.phase==='cracking'||int.phase==='vault_open');
+  // Охрана и паника — только когда уже идёт ограбление (нажали «Взломать»)
+  if (isRobbery) {
+    // Сотрудники видят оружие → убегают
+    if (hasWeapon && !int._weaponPanicTriggered) {
+      for (const npc of int.npcs) {
+        if (npc.type==='guard'||npc.state!=='normal') continue;
+        const dist=Math.hypot(player.r-npc.r,player.c-npc.c);
+        if (dist<9) {
+          int._weaponPanicTriggered=true;
+          npc.state='panic';
+          npc.cryText='Помогите! Он вооружён!'; npc.cryUntil=now+3000;
+          const dr=H+1-npc.r,dc=W/2-npc.c,mag=Math.hypot(dr,dc)||1;
+          npc.fleeVr=dr/mag*4; npc.fleeVc=dc/mag*4;
+          break;
+        }
       }
     }
-  }
-  if (!hasWeapon) int._weaponPanicTriggered=false;  // убрал — сброс флага
-  for (const npc of int.npcs) {
-    if (npc.type!=='guard') continue;
-    if (npc.state!=='normal') continue;
-    const dist=Math.hypot(player.r-npc.r,player.c-npc.c);
-    if (dist<6&&(hasWeapon||(player.r<counterRow&&int.phase!=='vault_open'))) {
-      if (!npc._alertAt){npc._alertAt=now;npc.cryText=hasWeapon?'Брось оружие!':'Туда нельзя!';npc.cryUntil=now+2500;}
-    }
-    if ((int.phase==='cracking'||int.phase==='vault_open')&&dist<8) {
-      npc.state='hostile'; npc.cryText='Стоять! Полиция!'; npc.cryUntil=now+99999;
+    if (!hasWeapon) int._weaponPanicTriggered=false;
+    // Охранники идут к игроку
+    for (const npc of int.npcs) {
+      if (npc.type!=='guard'||npc.state!=='normal') continue;
+      const dist=Math.hypot(player.r-npc.r,player.c-npc.c);
+      if (dist<8) {
+        npc.state='hostile'; npc.cryText='Стоять! Полиция!'; npc.cryUntil=now+99999;
+      }
     }
   }
   if (int.panicAt!==null) {
@@ -26766,7 +27354,20 @@ function _updateBankInterior(dt) {
     if (npc.state==='panic') {
       npc.r+=(npc.fleeVr||0)*dt;npc.c+=(npc.fleeVc||0)*dt;
       npc.ang=Math.atan2(npc.fleeVr||0,npc.fleeVc||0);
-      if (npc.r>H+1){npc.state='fled';int._snitches.push({r:int.bank.r+3,c:int.bank.c+1});}
+      if (npc.r>H+1 && npc.state!=='fled'){
+        npc.state='fled';
+        // Спавним мирового NPC у выхода из банка — он побежит в полицию
+        const exitR=int.bank.r+3+Math.random()*0.6-0.3;
+        const exitC=int.bank.c+1.5+Math.random()*1-0.5;
+        const snitchLook=npc.look||{gender:Math.floor(Math.random()*2),skin:Math.floor(Math.random()*5),body:1,face:Math.floor(Math.random()*4),hair:Math.floor(Math.random()*5),hat:0};
+        const cries=['ОГРАБЛЕНИЕ!! КОПЫ!','ГРАБЯТ БАНК!! ПОМОГИТЕ!','ВЫЗЫВАЙТЕ ПОЛИЦИЮ!!'];
+        NPCS.push({r:exitR,c:exitC,tr:exitR,tc:exitC,speed:1.6,ang:0,walkPhase:0,idleUntil:0,
+          look:snitchLook,snitching:true,
+          snitchUntil:performance.now()+90000,
+          cryUntil:performance.now()+2500,
+          cryText:cries[Math.floor(Math.random()*cries.length)],
+          ejected:true});
+      }
     }
   }
   if (int.phase==='vault_open'&&!int.myBag) {
@@ -27080,8 +27681,8 @@ function drawBankInteriorScene() {
   // Игрок
   items.push({d:player.r+player.c+.05,fn:()=>{
     const p=w2s(player.r+.5,player.c+.5);
-    drawPerson(p.x,p.y,player.ang,QP.look,player.walking?player.walkPhase:0,QP.name,null,true,myHp,PVP.max_hp||100,myDead);
-    if (!myDead) drawWeaponInHands(p.x,p.y,player.ang,currentWeapon,.9,lastShotClientT);
+    drawPerson(p.x,p.y,player.ang,QP.look,player.walking?player.walkPhase:0,QP.name,null,true,myHp,PVP.max_hp||100,myDead,null,!!_punchAnim);
+    if (!myDead) { drawWeaponInHands(p.x,p.y,player.ang,currentWeapon,.9,lastShotClientT); if (_punchAnim) _drawPunchAnim(p.x,p.y); }
     if (myBag){ctx.font='16px sans-serif';ctx.textAlign='center';ctx.fillText('💼',p.x,p.y-40);ctx.textAlign='left';}
   }});
 
@@ -27243,42 +27844,47 @@ function drawBankInteriorScene() {
     })(_c,isStaff,isLounge,isVault)});
   }
 
-  // Дверь хранилища
-  if(phase!=='vault_open'){
-    const vc=w2s(0,W/2),vcy=vc.y-wallH*.5,vr=isoH(.52);
-    ctx.save();
-    const dg=ctx.createLinearGradient(vc.x-vr,vcy-vr,vc.x+vr,vcy+vr);
-    dg.addColorStop(0,'#5a6070');dg.addColorStop(.5,'#3a4050');dg.addColorStop(1,'#282e38');
-    ctx.fillStyle=dg;ctx.beginPath();ctx.arc(vc.x,vcy,vr,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle='#909aa8';ctx.lineWidth=2;ctx.stroke();
-    ctx.strokeStyle='#a0acb8';ctx.lineWidth=1;ctx.beginPath();ctx.arc(vc.x,vcy,vr*.82,0,Math.PI*2);ctx.stroke();
-    for(let i=0;i<8;i++){const ag=i*Math.PI/4,bx2=vc.x+Math.cos(ag)*vr*.92,by2=vcy+Math.sin(ag)*vr*.92;ctx.fillStyle='#b0bac8';ctx.beginPath();ctx.arc(bx2,by2,2.5,0,Math.PI*2);ctx.fill();}
-    ctx.strokeStyle='#d0d8e0';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(vc.x,vcy,vr*.42,0,Math.PI*2);ctx.stroke();
-    ctx.strokeStyle='#e0e8f0';ctx.lineWidth=1.8;
-    for(let i=0;i<4;i++){const ag=i*Math.PI/4+Math.PI/8;ctx.beginPath();ctx.moveTo(vc.x,vcy);ctx.lineTo(vc.x+Math.cos(ag)*vr*.4,vcy+Math.sin(ag)*vr*.4);ctx.stroke();}
-    ctx.fillStyle='#c0ccd8';ctx.beginPath();ctx.arc(vc.x,vcy,vr*.1,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='rgba(80,120,220,.9)';ctx.font='bold 7px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText('🔒 ХРАНИЛИЩЕ',vc.x,vcy-vr-8);
-    ctx.restore();ctx.textAlign='left';ctx.textBaseline='alphabetic';
-  } else {
-    const vc=w2s(0,W/2);ctx.save();
-    ctx.fillStyle='rgba(40,180,60,.15)';ctx.beginPath();ctx.arc(vc.x,vc.y-wallH*.5,isoH(.5),0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='rgba(80,220,80,.9)';ctx.font='bold 7px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText('🔓 ОТКРЫТО',vc.x,vc.y-wallH*.5-isoH(.5)-6);
-    ctx.restore();ctx.textAlign='left';ctx.textBaseline='alphabetic';
-  }
+  // Дверь хранилища — В depth-sort поверх северной стены (иначе стена перекрывала дверь)
+  items.push({d: W/2*0.01+0.3, fn:()=>{
+    if(phase!=='vault_open'){
+      const vc=w2s(0,W/2),vcy=vc.y-wallH*.5,vr=isoH(.52);
+      ctx.save();
+      const dg=ctx.createLinearGradient(vc.x-vr,vcy-vr,vc.x+vr,vcy+vr);
+      dg.addColorStop(0,'#5a6070');dg.addColorStop(.5,'#3a4050');dg.addColorStop(1,'#282e38');
+      ctx.fillStyle=dg;ctx.beginPath();ctx.arc(vc.x,vcy,vr,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='#909aa8';ctx.lineWidth=2;ctx.stroke();
+      ctx.strokeStyle='#a0acb8';ctx.lineWidth=1;ctx.beginPath();ctx.arc(vc.x,vcy,vr*.82,0,Math.PI*2);ctx.stroke();
+      for(let i=0;i<8;i++){const ag=i*Math.PI/4,bx2=vc.x+Math.cos(ag)*vr*.92,by2=vcy+Math.sin(ag)*vr*.92;ctx.fillStyle='#b0bac8';ctx.beginPath();ctx.arc(bx2,by2,2.5,0,Math.PI*2);ctx.fill();}
+      ctx.strokeStyle='#d0d8e0';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(vc.x,vcy,vr*.42,0,Math.PI*2);ctx.stroke();
+      ctx.strokeStyle='#e0e8f0';ctx.lineWidth=1.8;
+      for(let i=0;i<4;i++){const ag=i*Math.PI/4+Math.PI/8;ctx.beginPath();ctx.moveTo(vc.x,vcy);ctx.lineTo(vc.x+Math.cos(ag)*vr*.4,vcy+Math.sin(ag)*vr*.4);ctx.stroke();}
+      ctx.fillStyle='#c0ccd8';ctx.beginPath();ctx.arc(vc.x,vcy,vr*.1,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='rgba(80,120,220,.9)';ctx.font='bold 7px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('🔒 ХРАНИЛИЩЕ',vc.x,vcy-vr-8);
+      ctx.restore();ctx.textAlign='left';ctx.textBaseline='alphabetic';
+    } else {
+      const vc=w2s(0,W/2);ctx.save();
+      ctx.fillStyle='rgba(40,180,60,.15)';ctx.beginPath();ctx.arc(vc.x,vc.y-wallH*.5,isoH(.5),0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='rgba(80,220,80,.9)';ctx.font='bold 7px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('🔓 ОТКРЫТО',vc.x,vc.y-wallH*.5-isoH(.5)-6);
+      ctx.restore();ctx.textAlign='left';ctx.textBaseline='alphabetic';
+    }
+  }});
 
-  // Касса
+  // Касса — В depth-sort поверх пола и за NPC которые стоят перед ней
   if(phase!=='vault_open'){
     const gL=Math.floor(W/2)-2,gR=Math.floor(W/2)+2,cH=isoH(.9);
     for(let c=0;c<W;c++){
       if(c>=gL&&c<gR)continue;
-      const p1=w2s(counterRow,c),p2=w2s(counterRow,c+1);
-      ctx.fillStyle='#e0d8c0';ctx.strokeStyle='#b0a880';ctx.lineWidth=.8;
-      ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.lineTo(p2.x,p2.y-cH);ctx.lineTo(p1.x,p1.y-cH);ctx.closePath();ctx.fill();ctx.stroke();
-      ctx.fillStyle='rgba(180,220,255,.12)';const gH=isoH(.5);
-      ctx.beginPath();ctx.moveTo(p1.x,p1.y-cH);ctx.lineTo(p2.x,p2.y-cH);ctx.lineTo(p2.x,p2.y-cH-gH);ctx.lineTo(p1.x,p1.y-cH-gH);ctx.closePath();ctx.fill();
-      ctx.strokeStyle='rgba(180,220,255,.3)';ctx.lineWidth=.5;ctx.stroke();
+      const _c=c;
+      items.push({d:counterRow+_c+0.05, fn:((__c)=>()=>{
+        const p1=w2s(counterRow,__c),p2=w2s(counterRow,__c+1);
+        ctx.fillStyle='#e0d8c0';ctx.strokeStyle='#b0a880';ctx.lineWidth=.8;
+        ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.lineTo(p2.x,p2.y-cH);ctx.lineTo(p1.x,p1.y-cH);ctx.closePath();ctx.fill();ctx.stroke();
+        ctx.fillStyle='rgba(180,220,255,.12)';const gH=isoH(.5);
+        ctx.beginPath();ctx.moveTo(p1.x,p1.y-cH);ctx.lineTo(p2.x,p2.y-cH);ctx.lineTo(p2.x,p2.y-cH-gH);ctx.lineTo(p1.x,p1.y-cH-gH);ctx.closePath();ctx.fill();
+        ctx.strokeStyle='rgba(180,220,255,.3)';ctx.lineWidth=.5;ctx.stroke();
+      })(_c)});
     }
   }
 
