@@ -4001,10 +4001,109 @@ function updateCityCops(dt) {
   // Не трогаем если игрок мёртв, в тюрьме или в машине (за рулём всё равно
   // патруль пеший не догонит — wantedcops с тачкой это уже worldCops).
   const playerWanted = (typeof myWanted === 'number') && myWanted >= 1
-    && !myDead && !_meInJail;
+    && !myDead && !(typeof myJailIn === 'number' && myJailIn > 0);
   for (let i = cityCops.length - 1; i >= 0; i--) {
     const cop = cityCops[i];
     if (!cop.alive) { cityCops.splice(i, 1); continue; }
+    // ── КОП-ОТВЕТНИК (приехал на ограбление банка) ─────────────────
+    if (cop.kind === 'response') {
+      // Ограбление кончилось или игрок мёртв/в тюрьме — становится
+      // обычным патрульным (вся логика ниже подхватит его как patrol)
+      if (!_bankRob || myDead || (typeof myJailIn === 'number' && myJailIn > 0)) {
+        cop.kind = 'patrol';
+        cop._pursuing = false;
+        cop._post = null;
+        pickCityCopWaypoint(cop);
+        continue;
+      }
+      const bank = _bankRob.bank;
+      if (_bankInt) {
+        // Игрок ВНУТРИ банка (player.r/c — координаты интерьера, их
+        // использовать нельзя) — держим позицию у входа, ствол на дверь
+        if (!cop._post) {
+          cop._post = {
+            r: bank.r + 3.4 + Math.random() * 1.4,
+            c: bank.c + 0.4 + Math.random() * 2.6,
+          };
+        }
+        const pdr = cop._post.r - cop.y, pdc = cop._post.c - cop.x;
+        const pd = Math.hypot(pdr, pdc);
+        if (pd > 0.4) {
+          const sp = cop.speed * 1.6 * dt;
+          const nx = cop.x + (pdc / pd) * sp, ny = cop.y + (pdr / pd) * sp;
+          if (npcPassableForSnitch(ny, nx)) {
+            cop.x = nx; cop.y = ny;
+            cop.walkPhase += dt * 10;
+          }
+          cop.ang = Math.atan2(pdr, pdc);
+        } else {
+          // На посту — смотрим на вход банка, иногда кричим
+          cop.ang = Math.atan2(bank.r + 1.5 - cop.y, bank.c + 1.5 - cop.x);
+          if (!cop._nextCryAt) cop._nextCryAt = now + 2000 + Math.random() * 4000;
+          if (now > cop._nextCryAt) {
+            cop._nextCryAt = now + 5000 + Math.random() * 5000;
+            const cries = ['Выходи с поднятыми руками!', 'Здание окружено!', 'Бросай оружие и выходи!', 'Сопротивление бесполезно!'];
+            _copChats.set(cop.id, {
+              text: cries[Math.floor(Math.random() * cries.length)],
+              untilMs: now + 2800,
+            });
+          }
+        }
+        continue;
+      }
+      // Игрок СНАРУЖИ — преследуем и стреляем
+      cop._post = null;
+      cop._pursuing = true;
+      const rdr = player.r - cop.y, rdc = player.c - cop.x;
+      const rdist = Math.hypot(rdr, rdc) || 0.001;
+      cop.ang = Math.atan2(rdr, rdc);
+      // Держим дистанцию стрельбы: ближе 4 не лезем (не дубинкой же),
+      // дальше 7 — бежим следом
+      if (rdist > 7) {
+        const sp = cop.speed * 2.0 * dt;
+        const nx = cop.x + (rdc / rdist) * sp, ny = cop.y + (rdr / rdist) * sp;
+        if (npcPassableForSnitch(ny, nx)) {
+          cop.x = nx; cop.y = ny;
+          cop.walkPhase += dt * 12;
+        } else {
+          // Обход препятствия по перпендикуляру
+          const tries = [
+            [ (rdr / rdist) * sp * 0.7, -(rdc / rdist) * sp * 0.7 ],
+            [ -(rdr / rdist) * sp * 0.7, (rdc / rdist) * sp * 0.7 ],
+          ];
+          for (const [dr2, dc2] of tries) {
+            if (npcPassableForSnitch(cop.y + dr2, cop.x + dc2)) {
+              cop.x += dc2; cop.y += dr2;
+              cop.walkPhase += dt * 12;
+              break;
+            }
+          }
+        }
+      }
+      // Стрельба по игроку на дистанции 1.5–13 (как охрана банка, но
+      // на улице: трассер + вспышка + урон + рапорт серверу)
+      if (rdist > 1.5 && rdist < 13 && !myDead) {
+        if (!cop._nextShootAt) cop._nextShootAt = now + 700 + Math.random() * 700;
+        if (now > cop._nextShootAt) {
+          cop._nextShootAt = now + 1400 + Math.random() * 600;
+          const muzR = cop.y + Math.sin(cop.ang) * 0.45;
+          const muzC = cop.x + Math.cos(cop.ang) * 0.45;
+          spawnBullet(muzR, muzC, player.r, player.c, { hit: true, fromNpc: true, weapon: 'pistol' });
+          spawnMuzzle(muzR, muzC, cop.ang, 'pistol', true);
+          spawnImpact(player.r, player.c, 'pistol');
+          if (typeof addShake === 'function') addShake(2.5);
+          const dmg = 7 + Math.floor(Math.random() * 5);
+          myHp = Math.max(0, myHp - dmg);
+          if (myHp <= 0 && !myDead) { myDead = true; _localDeath = true; myDeathBy = 'Полиция'; myDeathLeft = 5; }
+          flashHitOverlay();
+          spawnFloatText(player.r - 0.4, player.c, `−${dmg}`, { color: '#ff4422', size: 13, life: 900 });
+          try { hapticHit && hapticHit(); } catch(e) {}
+          try { ws && ws.readyState === 1 && ws.send(JSON.stringify({ t: 'npc_melee_shoot',
+            d: { dmg, sx: +cop.x.toFixed(2), sy: +cop.y.toFixed(2) } })); } catch(e) {}
+        }
+      }
+      continue;
+    }
     // ── PURSUE MODE ────────────────────────────────────────────────
     // Если игрок розыскной и в радиусе видимости — бежим к нему,
     // быстрее обычного. На дистанции захвата шлём серверу citycop_arrest.
@@ -4323,6 +4422,70 @@ function spawnFireTruck(targetR, targetC, fireRef, carRef) {
   serviceVehicles.push(v);
 }
 
+// ── Полиция при ограблении банка ────────────────────────────────────
+// Когда policeTimer дотикал — от участка к банку едут реальные машины
+// (small=1, medium=2, large=3). На месте — режим «осада»: из каждой
+// выходят 2 копа-ответника (kind:'response' в cityCops). Пока игрок
+// внутри банка они держат позиции у входа, снаружи — преследуют и
+// стреляют. Ограбление кончилось → копы становятся патрульными,
+// машины возвращаются в участок.
+function _policeDoor() {
+  const d = _nearestRoadTile(POLICE_STATION_R, POLICE_STATION_C);
+  return d ? { r: d.r + 0.5, c: d.c + 0.5 } : { r: POLICE_STATION_R, c: POLICE_STATION_C };
+}
+
+function spawnPoliceCar(targetR, targetC) {
+  // Не дублировать машину на ту же точку (вторая встанет сзади в «пробке»)
+  for (const v of serviceVehicles) {
+    if (v.kind !== 'police' || v.state === 'done') continue;
+    const ft = v.finalTarget || { x: 0, y: 0 };
+    if (Math.hypot(ft.y - targetR, ft.x - targetC) < 1.0) return;
+  }
+  const door = _policeDoor();
+  const v = {
+    id: 'pol_' + (++_svcVehId), kind: 'police',
+    x: door.c, y: door.r,
+    ang: 0, speed: 4.5,                   // быстрее скорой — код 3
+    state: 'go_to_scene', workUntil: 0,
+    payload: {},
+    homeR: POLICE_STATION_R, homeC: POLICE_STATION_C,
+    path: [], pathIdx: 0, finalTarget: null,
+  };
+  _setVehicleRoute(v, door.r, door.c, targetR, targetC);
+  serviceVehicles.push(v);
+}
+
+// Из приехавшей машины выходят 2 копа-ответника
+function _spawnResponseCops(v) {
+  if (!_bankRob) return;
+  for (let i = 0; i < 2; i++) {
+    const a = Math.random() * Math.PI * 2;
+    cityCops.push({
+      id: 'respcop_' + (++_cityCopId),
+      x: v.x + Math.cos(a) * 0.9, y: v.y + Math.sin(a) * 0.9,
+      tx: v.x, ty: v.y,
+      ang: 0, walkPhase: 0,
+      kind: 'response',
+      weapon: 'pistol',
+      hp: 100, max_hp: 100,
+      alive: true,
+      speed: 1.5 + Math.random() * 0.3,
+      _wayUntil: 0,
+      _post: null,
+    });
+  }
+}
+
+// Вызов нарядов к банку (по размеру банка)
+function _dispatchHeistPolice(rob) {
+  const bank = rob.bank;
+  const carsN = { small: 1, medium: 2, large: 3 }[bank.size] || 2;
+  for (let i = 0; i < carsN; i++) {
+    // Цели чуть разнесены, чтобы машины не лезли в один тайл
+    spawnPoliceCar(bank.r + 3 + (i % 2) * 1.5, bank.c + 1.5 + i * 1.5);
+  }
+}
+
 function updateServiceVehicles(dt) {
   const now = performance.now();
   for (let i = serviceVehicles.length - 1; i >= 0; i--) {
@@ -4337,7 +4500,7 @@ function updateServiceVehicles(dt) {
     const px = v._prevX, py = v._prevY;
     if (px != null && py != null) {
       const moved = Math.hypot(v.x - px, v.y - py);
-      if (moved > 0.04 || v.state === 'working') v._lastMoveT = now;
+      if (moved > 0.04 || v.state === 'working' || v.state === 'siege') v._lastMoveT = now;
     } else {
       v._lastMoveT = now;
     }
@@ -4356,8 +4519,20 @@ function updateServiceVehicles(dt) {
         continue;
       }
       if (_vehicleStep(v, dt)) {
-        v.state = 'working';
-        v.workUntil = now + (v.kind === 'ambulance' ? 2500 : 4000);
+        if (v.kind === 'police') {
+          // Прибыли к банку — осада: копы выходят, машина стоит с мигалкой
+          v.state = 'siege';
+          _spawnResponseCops(v);
+        } else {
+          v.state = 'working';
+          v.workUntil = now + (v.kind === 'ambulance' ? 2500 : 4000);
+        }
+      }
+    } else if (v.state === 'siege') {
+      // Ограбление закончилось (сдали мешки / отмена / смерть) — домой
+      if (!_bankRob) {
+        v.state = 'returning';
+        _setVehicleRoute(v, v.y, v.x, v.homeR, v.homeC);
       }
     } else if (v.state === 'working') {
       if (now < v.workUntil) continue;
@@ -4563,6 +4738,7 @@ function drawPet(pet) {
 
 function drawServiceVehicle(v) {
   const isAmb = v.kind === 'ambulance';
+  const isPolice = v.kind === 'police';
   let workFrac = 0, workLabel = null;
   if (v.state === 'working' && v.workUntil) {
     const total = isAmb ? 2500 : 4000;
@@ -4572,9 +4748,9 @@ function drawServiceVehicle(v) {
   }
 
   // Изометрические размеры (в тайлах, как у drawCarPretty)
-  const mL   = isAmb ? 2.05 : 2.40;
-  const mW   = isAmb ? 0.98 : 1.10;
-  const mHt  = isAmb ? 0.88 : 1.05;
+  const mL   = isAmb ? 2.05 : isPolice ? 1.90 : 2.40;
+  const mW   = isAmb ? 0.98 : isPolice ? 0.90 : 1.10;
+  const mHt  = isAmb ? 0.88 : isPolice ? 0.70 : 1.05;
   const halfL = mL * 0.45;
   const halfW = mW * 0.45;
   const H = isoH(mHt);
@@ -4684,6 +4860,60 @@ function drawServiceVehicle(v) {
 
     // Контур
     ctx.strokeStyle = '#222228'; ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(FR.x, FR.y - H); ctx.lineTo(FL.x, FL.y - H);
+    ctx.lineTo(BL.x, BL.y - H); ctx.lineTo(BR.x, BR.y - H); ctx.closePath();
+    ctx.moveTo(FR.x, FR.y); ctx.lineTo(FL.x, FL.y);
+    ctx.lineTo(BL.x, BL.y); ctx.lineTo(BR.x, BR.y); ctx.closePath();
+    for (const pt of [FR, FL, BR, BL]) { ctx.moveTo(pt.x, pt.y); ctx.lineTo(pt.x, pt.y - H); }
+    ctx.stroke();
+
+  } else if (isPolice) {
+    // ── ПОЛИЦЕЙСКАЯ (чёрно-белый круизер) ──────────────────────────
+    sideQuad(vis[0].a, vis[0].b, '#16161c');
+    sideQuad(vis[1].a, vis[1].b, '#24242c');
+
+    // Белые двери (центральная часть борта)
+    faceStripe(vis[0].a, vis[0].b, 0.18, 0.55, '#d8d8e0');
+    faceStripe(vis[1].a, vis[1].b, 0.18, 0.55, '#e8e8f0');
+    // Синяя полоса POLICE по дверям
+    faceStripe(vis[0].a, vis[0].b, 0.32, 0.44, '#1545b0');
+    faceStripe(vis[1].a, vis[1].b, 0.32, 0.44, '#1a50c8');
+
+    // Стёкла
+    faceStripe(vis[1].a, vis[1].b, 0.58, 0.88, 'rgba(100,150,200,.55)');
+    faceStripe(vis[0].a, vis[0].b, 0.58, 0.92, 'rgba(55,105,165,.65)');
+
+    // Чёрная крыша
+    ctx.fillStyle = '#1c1c24';
+    ctx.beginPath();
+    ctx.moveTo(FR.x, FR.y - H); ctx.lineTo(FL.x, FL.y - H);
+    ctx.lineTo(BL.x, BL.y - H); ctx.lineTo(BR.x, BR.y - H);
+    ctx.closePath(); ctx.fill();
+
+    // Лайтбар поперёк крыши (красная и синяя половины)
+    roofQuad(0.30, 0.18, 0.30, 0.50, 0.42, 0.50, 0.42, 0.18, '#c01818');
+    roofQuad(0.30, 0.50, 0.30, 0.82, 0.42, 0.82, 0.42, 0.50, '#1838c0');
+
+    // Белая надпись на крыше (номер наряда)
+    const lblPt = roofPt(0.68, 0.50);
+    ctx.fillStyle = '#e8e8f0';
+    ctx.font = `bold ${Math.round(TS * 0.11)}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('911', lblPt.x, lblPt.y);
+    ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+
+    // Колёса
+    const wR = 4.2, wR2 = 2.2;
+    for (const corner of [FR, FL, BR, BL]) {
+      ctx.fillStyle = '#0a0a0a';
+      ctx.beginPath(); ctx.ellipse(corner.x, corner.y, wR, wR2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#9a9aa2';
+      ctx.beginPath(); ctx.ellipse(corner.x, corner.y, wR * 0.5, wR2 * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Контур
+    ctx.strokeStyle = '#0c0c12'; ctx.lineWidth = 0.8;
     ctx.beginPath();
     ctx.moveTo(FR.x, FR.y - H); ctx.lineTo(FL.x, FL.y - H);
     ctx.lineTo(BL.x, BL.y - H); ctx.lineTo(BR.x, BR.y - H); ctx.closePath();
@@ -26069,8 +26299,10 @@ function _updateBankRobbery(dt) {
     if (rob.policeTimer < 0) rob.policeTimer = 0;
     if (rob.policeTimer === 0 && !rob._policeArrived) {
       rob._policeArrived = true;
-      showToast('🚓 Полиция приехала! Бежим!', '🚨', 3000);
+      showToast('🚓 Полиция выехала к банку!', '🚨', 3000);
       try { hapticHit && hapticHit(); } catch(e) {}
+      // Реальные наряды: машины едут от участка, копы осаждают вход
+      _dispatchHeistPolice(rob);
     }
   }
 
@@ -27593,10 +27825,15 @@ function _drawVaultRoom(int) {
     const _r=r;
     items.push({d:_r+0.01, fn:((__r)=>()=>_wV(__r,0,__r+1,0,'#1a1c2e','#0c0e1e'))(_r)});
   }
-  // Восточная стена
+  // Восточная стена — полупрозрачная: она между камерой и комнатой и
+  // раньше полностью загораживала мешки/игрока рядом с ней
   for (let r=0;r<H-1;r++) {
     const _r=r;
-    items.push({d:_r+W-0.01, fn:((__r)=>()=>_wV(__r,W,__r+1,W,'#242638','#14162a'))(_r)});
+    items.push({d:_r+W-0.01, fn:((__r)=>()=>{
+      ctx.save(); ctx.globalAlpha=0.38;
+      _wV(__r,W,__r+1,W,'#242638','#14162a');
+      ctx.restore();
+    })(_r)});
   }
 
   // Сейфовые ячейки — общая отрисовка одной дверцы
@@ -27667,7 +27904,8 @@ function _drawVaultRoom(int) {
     })(_r,_num)});
   }
 
-  // Сейфовые ячейки вдоль ВОСТОЧНОЙ стены
+  // Сейфовые ячейки вдоль ВОСТОЧНОЙ стены — тоже полупрозрачные (висят
+  // на прозрачной стене, иначе перекрывали бы мешки сплошными блоками)
   for (let r=1;r<H-2;r+=1.6) {
     const _r=r, _num=_vaultCellNum; _vaultCellNum+=2;
     items.push({d:_r+W-0.3, fn:((__r,num)=>()=>{
@@ -27676,7 +27914,9 @@ function _drawVaultRoom(int) {
       const sh=isoH(1.1);
       const pulse=0.8+0.2*Math.sin(now*0.0011+__r*0.7+3);
       const hp=w2s(__r+0.6,c-0.12);
+      ctx.save(); ctx.globalAlpha=0.5;
       _drawDepositCell(sp,sp2,sp3,sp4,sh,pulse,num,'#3a3148','#2c2438','#20192c',hp);
+      ctx.restore();
     })(_r,_num)});
   }
 
@@ -27835,10 +28075,15 @@ function _drawVaultRoom(int) {
     if (int.myBag) _drawCarryingBag(p.x, p.y);
   }});
 
-  // Южная стена + дверь выхода
+  // Южная стена + дверь выхода — полупрозрачная (ближайшая к камере,
+  // загораживала мешки и игрока у южного края комнаты)
   for (let c=0;c<W;c++) {
     const _c=c;
-    items.push({d:H+_c, fn:((__c)=>()=>_wV(H,__c,H,__c+1,'#1e2035','#0e1020'))(_c)});
+    items.push({d:H+_c, fn:((__c)=>()=>{
+      ctx.save(); ctx.globalAlpha=0.42;
+      _wV(H,__c,H,__c+1,'#1e2035','#0e1020');
+      ctx.restore();
+    })(_c)});
   }
 
   // Рендер в глубину
@@ -28552,34 +28797,44 @@ function drawBankInteriorScene() {
       ctx.globalAlpha=1;
       ctx.restore();
 
-      // Сама дверная плита — откатывается вправо за раму
-      ctx.save();
-      ctx.beginPath();ctx.rect(vc.x-frameW/2-2,vcy-frameH-2,frameW+4,frameH+4);ctx.clip();
-      ctx.translate(slideX,0);
-      const grd=ctx.createLinearGradient(vc.x-dw/2,vcy-dh,vc.x+dw/2,vcy);
-      grd.addColorStop(0,'#565c78');grd.addColorStop(0.5,'#363c54');grd.addColorStop(1,'#22263a');
-      ctx.fillStyle=grd;
-      ctx.fillRect(vc.x-dw/2,vcy-dh,dw,dh);
-      ctx.strokeStyle='#10121e';ctx.lineWidth=1.5;
-      ctx.strokeRect(vc.x-dw/2,vcy-dh,dw,dh);
-      // Горизонтальные рёбра жёсткости
-      ctx.strokeStyle='rgba(140,150,190,0.35)';ctx.lineWidth=2;
-      for(let i=1;i<5;i++){
-        const ry=vcy-dh+dh*i/5;
-        ctx.beginPath();ctx.moveTo(vc.x-dw/2+5,ry);ctx.lineTo(vc.x+dw/2-5,ry);ctx.stroke();
+      // Дверная плита: рисуем ТОЛЬКО пока идёт анимация отката. Когда
+      // дверь полностью открыта, плита «ушла» в карман стены — раньше её
+      // остаток + штурвал торчали поверх стены и выглядели чужеродно
+      // («открытое хранилище в стену не вписывается»).
+      if (openAnim < 1) {
+        ctx.save();
+        ctx.beginPath();ctx.rect(vc.x-dw/2,vcy-frameH-2,dw,frameH+4);ctx.clip();
+        ctx.translate(slideX,0);
+        const grd=ctx.createLinearGradient(vc.x-dw/2,vcy-dh,vc.x+dw/2,vcy);
+        grd.addColorStop(0,'#565c78');grd.addColorStop(0.5,'#363c54');grd.addColorStop(1,'#22263a');
+        ctx.fillStyle=grd;
+        ctx.fillRect(vc.x-dw/2,vcy-dh,dw,dh);
+        ctx.strokeStyle='#10121e';ctx.lineWidth=1.5;
+        ctx.strokeRect(vc.x-dw/2,vcy-dh,dw,dh);
+        // Горизонтальные рёбра жёсткости
+        ctx.strokeStyle='rgba(140,150,190,0.35)';ctx.lineWidth=2;
+        for(let i=1;i<5;i++){
+          const ry=vcy-dh+dh*i/5;
+          ctx.beginPath();ctx.moveTo(vc.x-dw/2+5,ry);ctx.lineTo(vc.x+dw/2-5,ry);ctx.stroke();
+        }
+        // Замковый штурвал — повёрнут, блик
+        const wheelGrd=ctx.createRadialGradient(vc.x-vr*0.3,vcy-dh*0.45-vr*0.3,1,vc.x,vcy-dh*0.45,vr*0.9);
+        wheelGrd.addColorStop(0,'#9aa4c8');wheelGrd.addColorStop(1,'#3a3e58');
+        ctx.fillStyle=wheelGrd;
+        ctx.beginPath();ctx.arc(vc.x,vcy-dh*0.45,vr*0.85,0,Math.PI*2);ctx.fill();
+        ctx.strokeStyle='#20223a';ctx.lineWidth=2;ctx.stroke();
+        ctx.restore();
+      } else {
+        // Торец спрятанной плиты — узкая стальная полоса у правого косяка,
+        // намёк что массивная дверь сидит в кармане стены
+        const edgeW=5;
+        const eg=ctx.createLinearGradient(vc.x+dw/2-edgeW,0,vc.x+dw/2,0);
+        eg.addColorStop(0,'#2a2e44');eg.addColorStop(1,'#565c78');
+        ctx.fillStyle=eg;
+        ctx.fillRect(vc.x+dw/2-edgeW,vcy-dh,edgeW,dh);
+        ctx.strokeStyle='#10121e';ctx.lineWidth=1;
+        ctx.strokeRect(vc.x+dw/2-edgeW,vcy-dh,edgeW,dh);
       }
-      // Ригели втянуты внутрь двери (видны только обрубки)
-      ctx.fillStyle='#6a7090';
-      for(const bx of [-0.38,0.38]) for(const by of [-0.78,-0.22]){
-        ctx.beginPath();ctx.arc(vc.x+bx*dw,vcy+by*dh,3,0,Math.PI*2);ctx.fill();
-      }
-      // Замковый штурвал — повёрнут, блик
-      const wheelGrd=ctx.createRadialGradient(vc.x-vr*0.3,vcy-dh*0.45-vr*0.3,1,vc.x,vcy-dh*0.45,vr*0.9);
-      wheelGrd.addColorStop(0,'#9aa4c8');wheelGrd.addColorStop(1,'#3a3e58');
-      ctx.fillStyle=wheelGrd;
-      ctx.beginPath();ctx.arc(vc.x,vcy-dh*0.45,vr*0.85,0,Math.PI*2);ctx.fill();
-      ctx.strokeStyle='#20223a';ctx.lineWidth=2;ctx.stroke();
-      ctx.restore();
 
       ctx.fillStyle='rgba(120,220,140,0.95)';
       ctx.shadowColor='#000';ctx.shadowBlur=4;
@@ -28682,6 +28937,34 @@ function drawBankInteriorScene() {
         const ry=vcy-dh+dh*i/5;
         ctx.beginPath();ctx.moveTo(vc.x-dw/2+5,ry);ctx.lineTo(vc.x+dw/2-5,ry);ctx.stroke();
       }
+      // Шлифованный металл — вертикальные мягкие блики (brushed steel)
+      ctx.save();
+      ctx.beginPath();ctx.rect(vc.x-dw/2,vcy-dh,dw,dh);ctx.clip();
+      for(let i=0;i<3;i++){
+        const bx2=vc.x-dw/2+dw*(0.2+i*0.3);
+        const bg2=ctx.createLinearGradient(bx2-7,0,bx2+7,0);
+        bg2.addColorStop(0,'rgba(255,255,255,0)');
+        bg2.addColorStop(0.5,'rgba(255,255,255,0.05)');
+        bg2.addColorStop(1,'rgba(255,255,255,0)');
+        ctx.fillStyle=bg2;
+        ctx.fillRect(bx2-7,vcy-dh,14,dh);
+      }
+      ctx.restore();
+      // Мелкие заклёпки по периметру плиты
+      ctx.fillStyle='rgba(160,170,210,0.55)';
+      for(let i=0;i<7;i++){
+        const rx=vc.x-dw/2+6+(dw-12)*(i/6);
+        ctx.beginPath();ctx.arc(rx,vcy-dh+5,1.4,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.arc(rx,vcy-5,1.4,0,Math.PI*2);ctx.fill();
+      }
+      for(let i=1;i<5;i++){
+        const ry2=vcy-dh+6+(dh-12)*(i/5);
+        ctx.beginPath();ctx.arc(vc.x-dw/2+5,ry2,1.4,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.arc(vc.x+dw/2-5,ry2,1.4,0,Math.PI*2);ctx.fill();
+      }
+      // Тень под штурвалом — даёт объём, штурвал не «плоский»
+      ctx.fillStyle='rgba(0,0,0,0.28)';
+      ctx.beginPath();ctx.ellipse(vc.x+2,vcy-dh*0.45+3,vr*0.98,vr*0.88,0,0,Math.PI*2);ctx.fill();
       // Массивные ригели (болты-засовы) по периметру — полностью выдвинуты
       ctx.fillStyle='#6a7090';ctx.strokeStyle='#1a1c2c';ctx.lineWidth=0.8;
       const boltSpots=[
