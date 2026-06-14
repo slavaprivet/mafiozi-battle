@@ -2155,6 +2155,22 @@ let gangNests = [];
 // Зона сдачи — прямоугольник в порту. Выход в зоне = автопродажа.
 // Координаты совпадают с серверными WorldSim.MICHAEL_X/Y, DROP_ZONE_*.
 const MICHAEL_POS = { r: 183, c: 42 };         // нос корабля Майкла — лицом к пирсу, не за краном
+// Декоративная охрана Майкла — ФОЛБЭК когда сервер не прислал реальную
+// (офлайн/превью или серверный сбой «пропала охрана»). Чисто визуальные
+// стражи по бокам Майкла, чтобы порт не выглядел пустым. Если сервер
+// присылает michaelGuards — рисуем настоящих, а эти прячем.
+let _michaelDecorGuards = null;
+function _michaelDecor() {
+  if (_michaelDecorGuards) return _michaelDecorGuards;
+  const M = MICHAEL_POS;
+  _michaelDecorGuards = [
+    { x: M.c - 1.8, y: M.r + 0.6, ang: 0.5,  hp: 100, max_hp: 100, state: 'idle', weapon: 'pistol_heavy', lastShotAt: 0 },
+    { x: M.c + 2.8, y: M.r + 0.6, ang: -0.5, hp: 100, max_hp: 100, state: 'idle', weapon: 'pistol_heavy', lastShotAt: 0 },
+    { x: M.c - 0.8, y: M.r + 2.2, ang: 0.9,  hp: 100, max_hp: 100, state: 'idle', weapon: 'tommy_gun',     lastShotAt: 0 },
+    { x: M.c + 1.9, y: M.r + 2.2, ang: -0.9, hp: 100, max_hp: 100, state: 'idle', weapon: 'tommy_gun',     lastShotAt: 0 },
+  ];
+  return _michaelDecorGuards;
+}
 const DROP_ZONE = { r0: 167, r1: 173, c0: 37, c1: 43 };  // деревянный пирс — сюда подгонять угнанные тачки
 // Snapshot quest_cars: {id, model, x, y, ang, vx, vy, owner_uid, driver_uid,
 //                       state, reward, tx, ty, tAng}
@@ -12562,18 +12578,21 @@ function fire(angle = null) {
       if (!chosenMg || d < chosenMg.d) chosenMg = { id: g.id, x: g.x, y: g.y, d };
     }
   }
-  // 4b) Враждебный охранник банка (внутри интерьера банка) — локальная цель,
-  // на сервер не шлём (как обычный NPC), но и не привязан к карте мира.
+  // 4b) ЛЮБОЙ NPC банка (внутри интерьера) — цель. Раньше можно было
+  // попасть только в guard со state==='hostile', из-за чего пули «не
+  // попадали по персонажам» (охрана не успевала стать hostile, а в
+  // клиентов/кассиров вообще нельзя было целиться). Теперь — любой живой
+  // NPC. Конус мягче (±18°) — ближний бой в тесном лобби.
   let chosenBankGuard = null;
   if (!chosenConvoy && !chosenCop && !chosenCityCop && !chosenAggro && !chosenMg && _bankInt && _bankInt.npcs) {
     for (const npc of _bankInt.npcs) {
-      if (npc.type !== 'guard' || npc.state !== 'hostile' || npc.dead) continue;
+      if (npc.dead || npc.state === 'fled') continue;
       const dx = npc.c - player.c, dy = npc.r - player.r;
       const d  = Math.hypot(dx, dy);
       if (d > FIRE_R_CONVOY) continue;
       const dn = d > 0.001 ? d : 1;
       const dot = (dx * dirX + dy * dirY) / dn;
-      if (dot < 0.985) continue;
+      if (dot < 0.95) continue;   // ±~18° (ближний бой)
       if (!chosenBankGuard || d < chosenBankGuard.d) {
         chosenBankGuard = { idx: _bankInt.npcs.indexOf(npc), npc, x: npc.c, y: npc.r, d };
       }
@@ -12585,6 +12604,21 @@ function fire(angle = null) {
   // (трассер летит вперёд + отдача + cd). Локально, серверу не шлём.
   const noTarget = !chosenConvoy && !chosenCop && !chosenCityCop && !chosenAggro && !chosenMg && !chosenBankGuard && !pvpTarget;
   lastShotClientT = now;
+  // ── Выстрел ВНУТРИ банка → мгновенная паника + тревога ──────────────
+  // Раньше паника/враждебность охраны включались только в фазе ограбления
+  // (cracking/vault_open). Если просто зайти с оружием и стрелять — ничего
+  // не происходило. Теперь ЛЮБОЙ выстрел в банке поднимает всех: клиенты
+  // в панику, охрана враждебна, тревога (полиция выезжает).
+  if (_bankInt && _bankInt.room !== 'vault') {
+    if (_bankInt.panicAt === null || _bankInt.panicAt === undefined) {
+      _bankInt.panicAt = now;
+    }
+    if (!_bankInt.alarmTriggered) {
+      _bankInt.alarmTriggered = true;
+      if (!_bankInt._crackStartedAt) _bankInt._crackStartedAt = now;  // запускает таймер полиции
+      showToast('🚨 Стрельба в банке! Тревога!', '🚨', 2200);
+    }
+  }
   // Копы в радиусе реагируют на выстрел
   _alertNearbyCops('shot');
   _fireBtn.classList.add('cd');
@@ -23977,6 +24011,18 @@ function render() {
     if (g.y < r0 || g.y >= r1 || g.x < c0 || g.x >= c1) continue;
     items.push({ depth: g.y + g.x + 0.0007, draw: () => drawMichaelGuard(g) });
   }
+  // ФОЛБЭК: сервер не прислал охрану (офлайн/превью/сбой) — рисуем
+  // декоративных стражей вокруг Майкла, чтобы порт не был пустым.
+  if (michaelGuards.size === 0 &&
+      MICHAEL_POS.r >= r0 && MICHAEL_POS.r < r1 &&
+      MICHAEL_POS.c >= c0 && MICHAEL_POS.c < c1) {
+    for (const g of _michaelDecor()) {
+      // Лёгкая «жизнь»: поворачиваются к игроку когда он близко
+      const dr = player.r - g.y, dc = player.c - g.x;
+      if (Math.hypot(dr, dc) < 12) g.ang = Math.atan2(dr, dc);
+      items.push({ depth: g.y + g.x + 0.0006, draw: () => drawMichaelGuard(g) });
+    }
+  }
   // Машины (движущиеся). Уничтоженные — рисуем обугленный остов с
   // пламенем (или дымом, если потушены пожарными).
   for (const car of CARS) {
@@ -24254,6 +24300,10 @@ function render() {
         ctx.fillStyle = 'rgba(255,255,255,.25)';
         ctx.fillRect(cc.x - 2.5, cc.y - canH, 1.5, canH);
       }
+      // Крыша навеса — ПОЛУПРОЗРАЧНАЯ, чтобы персонажа было видно под ней
+      // (заезжаешь/заходишь под навес — силуэт читается сквозь крышу).
+      ctx.save();
+      ctx.globalAlpha = 0.55;
       // Фасция (толщина плиты) на ближних гранях D→C и B→C
       const fasc = 7;
       ctx.fillStyle = '#b81818';
@@ -24280,6 +24330,7 @@ function render() {
       ctx.lineTo(cC.x, cC.y - canH); ctx.lineTo(cD.x, cD.y - canH); ctx.closePath(); ctx.fill();
       // Подсветка снизу плиты (неон по периметру) + блик
       ctx.strokeStyle = 'rgba(255,240,180,.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.restore();
 
       // Вывеска «ЗАПРАВКА» теперь рисуется ОТДЕЛЬНЫМ слоем поверх всех
       // зданий (см. _drawGasSigns после items.forEach) — иначе её
@@ -25481,48 +25532,52 @@ function drawBullets() {
                    b.c - b.vc * trailSec + 0.5);                   // tail
     const hx = ph.x,           hy = ph.y - dy;
     const tx = pt.x,           ty = pt.y - dy;
-    // Градиентный шлейф (linear gradient вдоль траектории)
-    const grad = ctx.createLinearGradient(tx, ty, hx, hy);
-    grad.addColorStop(0,   'rgba(255,255,255,0)');
-    grad.addColorStop(0.4, b.color + '');                          // средний — цвет оружия
-    grad.addColorStop(1,   '#ffffff');                             // голова — белая
-    ctx.strokeStyle = grad;
-    // Раньше: 5/3 + shadowBlur 14/9 — пули копов выглядели как огромные
-    // жёлтые «огненные шары» (жалоба юзера из IMG_5094). Уменьшил
-    // вдвое — пуля заметна как трассер, но без halo во весь экран.
-    ctx.lineWidth = b.thick ? 3.5 : 2;
     ctx.lineCap = 'round';
-    ctx.shadowBlur = 0;   // без shadow на шлейфе — дорого при 50 пулях
-    ctx.beginPath();
-    ctx.moveTo(tx, ty);
-    ctx.lineTo(hx, hy);
-    ctx.stroke();
-    // Ядро головы — минимальный glow только на самой точке
-    ctx.shadowBlur = b.thick ? 5 : 3;
-    ctx.shadowColor = b.color;
+    ctx.shadowBlur = 0;   // без shadowBlur на шлейфе — дорого при 50 пулях
+    // ── Многослойный трассер ─────────────────────────────────────
+    // 1) Внешний мягкий ореол (additive) — даёт энергию, не «огненный шар»
+    ctx.globalCompositeOperation = 'lighter';
+    const glow = ctx.createLinearGradient(tx, ty, hx, hy);
+    glow.addColorStop(0, 'rgba(255,180,90,0)');
+    glow.addColorStop(1, b.color);
+    ctx.strokeStyle = glow;
+    ctx.globalAlpha = 0.45;
+    ctx.lineWidth = b.thick ? 6 : 4;
+    ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+    // 2) Яркое ядро трассера (тонкое, бело→цветной градиент)
+    ctx.globalAlpha = 1;
+    const core = ctx.createLinearGradient(tx, ty, hx, hy);
+    core.addColorStop(0,   'rgba(255,255,255,0)');
+    core.addColorStop(0.5, b.color);
+    core.addColorStop(1,   '#ffffff');
+    ctx.strokeStyle = core;
+    ctx.lineWidth = b.thick ? 2.4 : 1.4;
+    ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+    // 3) Голова — горячее белое ядро + искра-крест
     ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(hx, hy, b.thick ? 2.2 : 1.5, 0, Math.PI * 2); ctx.fill();
+    const sl = b.thick ? 5 : 3.5;
+    ctx.strokeStyle = 'rgba(255,240,200,0.9)'; ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.arc(hx, hy, b.thick ? 2.0 : 1.3, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(hx - sl, hy); ctx.lineTo(hx + sl, hy);
+    ctx.moveTo(hx, hy - sl); ctx.lineTo(hx, hy + sl);
+    ctx.stroke();
+    ctx.globalCompositeOperation = 'source-over';
     if (b._finished) {
       if (b.hit) {
-        // Вспышка попадания — двойное яркое кольцо
-        ctx.shadowBlur = 16;
-        ctx.fillStyle = '#fff';
-        ctx.shadowColor = '#fff';
-        ctx.beginPath();
-        ctx.arc(hx, hy, 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 18;
-        ctx.fillStyle = '#ff7040';
-        ctx.shadowColor = '#ff5020';
-        ctx.beginPath();
-        ctx.arc(hx, hy, 8, 0, Math.PI * 2);
-        ctx.fill();
+        // Вспышка попадания — двойное яркое кольцо (additive)
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        ctx.beginPath(); ctx.arc(hx, hy, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,150,60,0.8)';
+        ctx.beginPath(); ctx.arc(hx, hy, 9, 0, Math.PI * 2); ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
       }
       bullets.splice(i, 1);
     }
   }
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
   ctx.shadowBlur = 0;
   ctx.restore();
 }
@@ -27562,6 +27617,15 @@ function exitBankInterior(withBag) {
     }
     _myBagWeight=int.myBag.value||1;
     showToast('💼 Несёшь мешок! Грузи в машину или неси в бизнес','⚠️',2500);
+  } else if (int.alarmTriggered && !_bankRob) {
+    // Стрелял/поднял тревогу, но вышел без мешка — полиция ВСЁ РАВНО едет.
+    // Создаём _bankRob в фазе побега → _updateBankRobbery тикает таймер
+    // полиции и вызывает _dispatchHeistPolice (осада снаружи).
+    _bankRob={bank:int.bank,phase:'escaping',bagsLoaded:0,bagsMax:int.bank.bags,
+      myBag:null,policeTimer:int.bank.police_delay,alarmTriggered:true,
+      _policeArrived:false,
+      startedAt:int.startedAt,crackProgress:1,crackTotal:20};
+    showToast('🚨 Ты поднял тревогу — полиция уже едет!','🚓',2600);
   }
   const hudEl=document.getElementById('bankRobHud');
   if (hudEl&&!_bankRob) hudEl.style.display='none';
@@ -27588,15 +27652,17 @@ function _isBlockedInterior(r,c) {
     const inArch=(c>=staffL&&c<staffR)||(c>=loungeL&&c<loungeR)||(c>=cenL&&c<cenR);
     if (!inArch) return true;
   }
-  // Перегородки внутри задней зоны — 1-тайловая зона с проходами у арок
-  // (граница совпадает с зоной арки выше, чтобы не было зазора на стыке)
-  if (r<archRow-0.5 && r>=0.5) {
+  // Перегородки внутри задней зоны. Раньше блок начинался с r>=0.5 — у
+  // северной стены (r<0.5) оставалась ЩЕЛЬ, через которую можно было
+  // проскользнуть сквозь нарисованную перегородку («через некоторые
+  // стены можно пройти»). Теперь блокируем от самого верха (r>=0).
+  if (r<archRow-0.5 && r>=0) {
     const pL=Math.floor(W*.38), pR=Math.floor(W*.62);
-    const staffArchR=Math.floor(W*.10)+3, loungeArchL=Math.floor(W*.65);
-    // Левая перегородка (персонал|хранилище): проход c < staffArchR
-    if (c>=pL-0.5&&c<pL+0.5 && c>=staffArchR) return true;
-    // Правая перегородка (хранилище|отдых): проход c >= loungeArchL
-    if (c>=pR-0.5&&c<pR+0.5 && c<loungeArchL) return true;
+    // Перегородки сплошные (обход — через арки на archRow). Раньше были
+    // условия c>=staffArchR / c<loungeArchL, но pL/pR всегда им
+    // удовлетворяют → по сути сплошная стена. Оставляем сплошными явно.
+    if (c>=pL-0.5 && c<pL+0.5) return true;   // персонал | хранилище
+    if (c>=pR-0.5 && c<pR+0.5) return true;   // хранилище | отдых
   }
   return false;
 }
