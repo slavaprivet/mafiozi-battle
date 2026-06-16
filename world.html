@@ -1693,7 +1693,13 @@ function buildMap() {
   // машины заезжать в зону. Центр (само здание) оставляем как building=1.
   for (let dr = -3; dr <= 3; dr++) for (let dc = -3; dc <= 3; dc++) {
     const r = JAIL_CENTER_R + dr, c = JAIL_CENTER_C + dc;
-    if (r < 1 || r >= MAP_ROWS - 1 || c < 1 || c >= MAP_COLS - 1) continue;
+    // ВАЖНО: было `>= MAP_COLS - 1` — это исключало САМУЮ ПОСЛЕДНЮЮ
+    // валидную колонку (c=79 при MAP_COLS=80), то есть восточную грань
+    // компаунда. Туда падают 3 из 10 JAIL_SPAWNS ((79,76),(79,74),(79,79)) —
+    // они оставались на building=1, и анти-застрял (_ensureSpawnSafe)
+    // каждый кадр телепортировал сидящего игрока на (-1,-1) → дёрганье
+    // вверх-вниз, «не могу ходить».
+    if (r < 1 || r >= MAP_ROWS || c < 1 || c >= MAP_COLS) continue;
     if (r === JAIL_CENTER_R && c === JAIL_CENTER_C) continue;  // здание участка
     if (MAP[r][c] === 0) continue;       // дороги не трогаем
     MAP[r][c] = 9;                       // двор-площадка
@@ -8173,7 +8179,6 @@ function tryMove(obj, dr, dc) {
   // он оказывался ВНЕ клетки («в тюрьме, но бегаю»), удержание отключалось.
   const jailed = isMe && myJailIn > 0;
   if (jailed) {
-    const R = JAIL_RADIUS_TILES - 0.3;
     // Игрок ДАЛЕКО вне клетки — мягко шагаем к центру (возврат в камеру),
     // пока не войдёт в кольцо. Покрывает кейс «сервер не телепортировал».
     if (curD > JAIL_RADIUS_TILES + 1.0) {
@@ -8183,18 +8188,25 @@ function tryMove(obj, dr, dc) {
       obj.c += Math.cos(ang0) * step;
       return;
     }
-    let nr = obj.r + dr, nc = obj.c + dc;
-    const d2r = nr - JAIL_CENTER_R, d2c = nc - JAIL_CENTER_C;
-    const d2  = Math.hypot(d2r, d2c);
-    if (d2 > R) {
-      // У решётки — скользим по касательной, не выпуская наружу
-      const ang = Math.atan2(d2r, d2c);
-      const targetD = Math.min(d2, R);
-      obj.r = JAIL_CENTER_R + Math.sin(ang) * targetD;
-      obj.c = JAIL_CENTER_C + Math.cos(ang) * targetD;
-      return;
+    // Клетка — расчищенный двор участка 7×7 (dr,dc∈[-3,3] от центра,
+    // см. buildMap: весь квадрат = 9/0/7, кроме центра (76,76)=1 здание).
+    // РАНЬШЕ здесь был круг радиуса R=6.7 со снапом по углу овершута —
+    // он выводил игрока ЗА пределы расчищенного двора (в decor соседних
+    // блоков, напр. (69,76)=3 ящик), и анти-застрял каждый кадр дёргал
+    // игрока обратно -> «дёргается верх-вниз, не могу ходить».
+    // Теперь — жёсткий клампинг к квадрату двора + обычное скольжение
+    // вдоль стены здания участка (как у всех остальных персонажей).
+    const BOUND = 3.0;
+    let nr = Math.max(JAIL_CENTER_R - BOUND, Math.min(JAIL_CENTER_R + BOUND, obj.r + dr));
+    let nc = Math.max(JAIL_CENTER_C - BOUND, Math.min(JAIL_CENTER_C + BOUND, obj.c + dc));
+    if (!isBlocked(nr - pad, obj.c) && !isBlocked(nr + pad, obj.c) &&
+        !isBlocked(nr, obj.c - pad) && !isBlocked(nr, obj.c + pad)) {
+      obj.r = nr;
     }
-    obj.r = nr; obj.c = nc;
+    if (!isBlocked(obj.r - pad, nc) && !isBlocked(obj.r + pad, nc) &&
+        !isBlocked(obj.r, nc - pad) && !isBlocked(obj.r, nc + pad)) {
+      obj.c = nc;
+    }
     return;
   }
   // ESCAPE MODE: если игрок ЗАЛИП в blocked-тайле — пропускаем коллизии,
@@ -8935,8 +8947,9 @@ function handleEventPacket(d) {
       showToast('Нет невыданной награды', 'ℹ️', 1600);
     }
   } else if (kind === 'citycop_arrest_reply') {
-    // NPC-патрульный схватил тебя на улице (wanted ≥ 1). Сервер посадил
-    // в тюрьму, обнулил звёзды. Локально — тост + showArrestOverlay.
+    // NPC-патрульный схватил тебя на улице (wanted ≥ 2 — серьёзный розыск,
+    // не просто предупреждение при 1★). Сервер посадил в тюрьму, обнулил
+    // звёзды. Локально — тост + showArrestOverlay.
     if (d.ok) {
       showEventBanner(
         '🚓 ЗАДЕРЖАН',
@@ -9932,10 +9945,10 @@ function updateZoneBtn() {
         delete _zoneEl.dataset.vaultBagId;
         label = null;
       }
-    } else if (int.myBag) {
-      label = '🚪 Выйти с мешком';
     } else {
-      label = '💰 Иди в хранилище';
+      // Несём мешок или просто гуляем по лобби после взлома — кнопки нет,
+      // выход всегда через EXIT-дверь (см. door-check в _updateBankInterior)
+      label = null;
     }
     if (!label) { _zoneEl.style.display = 'none'; return; }
     _zoneEl.textContent = label;
@@ -10066,8 +10079,9 @@ _zoneEl.addEventListener('click', () => {
         }
         return;
       }
-      if (int.myBag) { exitBankInterior(true); return; }
-      exitBankInterior(false); return;
+      // Кнопки больше нет ни для мешка, ни для пустых рук — выход всегда
+      // через EXIT-дверь (door-check в _updateBankInterior).
+      return;
     }
     // Машина с добычей полна — кнопка «Уехать с добычей!» завершает
     // ограбление (выплата + кулдаун), а не повторный вход в банк.
@@ -13067,19 +13081,17 @@ function punch(force) {
     hapticHit();
   }
 
-  // Если ударил мирного NPC — тоже незаконно
+  // Если ударил мирного NPC — окружающие жители паникуют/стучат.
+  // Репорт копам (open_fire+wanted) уже отправлен выше через
+  // _alertNearbyCops('fight') — отдельный второй open_fire отсюда
+  // дублировал бы его и давал +2 wanted за один удар (1★→2★ мгновенно,
+  // чего достаточно для citycop_arrest и моментальной посадки).
   if (kind === 'npc') {
-    const _copNear = _copInRadius(player.r, player.c, 10);
     triggerWitnessChain(player.r, player.c, 8, {
       snitchChance: 0.7,
       snitchCries: ['Хулиган!', 'Вызовите полицию!', 'Нападение!'],
       panicCries:  ['Ай!', 'Помогите!', 'Стой!'],
     });
-    try {
-      ws && ws.send(JSON.stringify({ t: 'open_fire',
-        d: { x: +player.c.toFixed(2), y: +player.r.toFixed(2),
-             weapon: 'fists', civilian: false, witness: _copNear } }));
-    } catch(e) {}
   }
 }
 
@@ -14218,22 +14230,23 @@ function update(dt) {
     updateZoneBtn();
     updatePvpUI();
     updateProjectiles(dt);
+    _updateTargetLock(dt);
     // Стрельба внутри банка. Блок стрельбы открытого мира стоит НИЖЕ
     // этого early-return и тут не выполняется — без этого кнопка огня
-    // и правый стик внутри банка не работали вообще.
+    // внутри банка не работала вообще. Как в городе: только лок-он,
+    // без free-aim правым стиком.
     if (myMode !== 'pve' && !myDead) {
-      if (joyR.active && joyR.hasAim) {
-        // Free-aim правым стиком (как на арене)
-        const d2 = joyR.dx, s2 = joyR.dy / ISO_Y;
-        fire(Math.atan2((s2 - d2) * 0.5, (s2 + d2) * 0.5));
-      } else if (_fireBtnDown) {
+      if (_fireBtnDown) {
         if (_isArmed()) {
-          // Кнопка огня: по залоченной цели, иначе по направлению взгляда
-          const active = getActiveTarget();
+          const active = lockedTargets.size ? getActiveTarget() : null;
           const pos = active && active.getPos();
-          const fang = pos ? Math.atan2(pos.r - player.r, pos.c - player.c) : player.ang;
-          player.ang = fang;
-          fire(fang);
+          if (pos) {
+            const ang = Math.atan2(pos.r - player.r, pos.c - player.c);
+            player.ang = ang;
+            fire(ang);
+          } else {
+            fire();
+          }
         } else {
           punch();
         }
@@ -20035,7 +20048,7 @@ function drawBusRider(rd) {
 
 function drawNpc(npc) {
   const p = w2s(npc.r, npc.c);
-  drawPerson(p.x, p.y, npc.ang, npc.look, npc.walkPhase, null, null, false, null, null,
+  drawPerson(p.x, p.y, npc.ang, npc.look, npc.walkPhase, null, null, false, npc.hp, npc.max_hp,
              !!npc.dead, npc.deadAt || 0);
   // Вооружённый NPC (контратака) — пистолет в руке + мигающий прицел
   if (npc._fighting && !npc.dead) {
@@ -22428,10 +22441,10 @@ function drawStationTurret(sR, sC, threat) {
     _lastTurretShotAt = now;
     const muzR = sR + Math.sin(ang) * 1.4;
     const muzC = sC + Math.cos(ang) * 1.4;
-    bullets.push({
-      sr: muzR, sc: muzC, er: threat.r, ec: threat.c,
-      t0: now, ttl: 160, hit: true, fromNpc: true, weapon: 'rifle',
-    });
+    // spawnBullet (не сырой push {sr,sc,er,ec,t0,ttl}) — иначе r/c становятся NaN
+    // и drawBullets() падает на createLinearGradient, обрывая render() навсегда.
+    spawnBullet(muzR, muzC, threat.r, threat.c, { hit: true, fromNpc: true, weapon: 'rifle' });
+    spawnMuzzle(muzR, muzC, ang, 'rifle', true);
     spawnShot(muzR, muzC, ang, 'rifle',
               String(threat.uid) === String(QP.uid));
     spawnImpact(threat.r, threat.c, 'rifle');
@@ -22466,18 +22479,18 @@ const HAIR_COLORS_M = ['#1a0e00','#3d2200','#8b6333','#b8860b','#888','#111'];
 const HAIR_COLORS_F = ['#1a0e00','#8b1a1a','#b8860b','#3d2200','#888','#c87050','#e0c080'];
 
 function drawChar(ctx, W, H, opts) {
-  const { gender, skin, body, face, hair, hat, skipArms } = opts;
+  const { gender, skin, body, face, hair, hat, skipArms, skipLegs } = opts;
   ctx.clearRect(0, 0, W, H);
   const cx = W / 2;
   const sc = Math.min(W, H) / 220;
   function px(x) { return cx + x * sc; }
   function py(y) { return H * 0.92 - y * sc; }
   const skinCol = SKINS[skin] || SKINS[0];
-  if (gender === 0) drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms);
-  else              drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms);
+  if (gender === 0) drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms, skipLegs);
+  else              drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms, skipLegs);
 }
 
-function drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms) {
+function drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms, skipLegs) {
   const bodyDefs = [
     { sw: 34, sh: 80, nw: 14, nh: 22, hw: 26 },
     { sw: 44, sh: 85, nw: 16, nh: 22, hw: 30 },
@@ -22487,12 +22500,14 @@ function drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms) {
   const bd = bodyDefs[body] || bodyDefs[1];
   const suitCol = ['#1a1a2e','#1a2e1a','#2e1a1a','#1a1e2e'][body % 4];
   const tieCol  = ['#c0392b','#e8c96e','#8e44ad','#2980b9'][face % 4];
-  ctx.fillStyle = suitCol;
-  const legW = bd.sw * 0.38; const legH = 55 * sc;
-  ctx.beginPath(); ctx.roundRect(px(-bd.sw*0.22), py(legH), legW*sc, legH, 4*sc); ctx.fill();
-  ctx.beginPath(); ctx.roundRect(px(bd.sw*0.22 - legW), py(legH), legW*sc, legH, 4*sc); ctx.fill();
-  ctx.fillStyle = '#111';
-  [-1,1].forEach(s => { ctx.beginPath(); ctx.ellipse(px(s*bd.sw*0.1), py(2), 10*sc, 5*sc, 0, 0, Math.PI*2); ctx.fill(); });
+  if (!skipLegs) {
+    ctx.fillStyle = suitCol;
+    const legW = bd.sw * 0.38; const legH = 55 * sc;
+    ctx.beginPath(); ctx.roundRect(px(-bd.sw*0.22), py(legH), legW*sc, legH, 4*sc); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(px(bd.sw*0.22 - legW), py(legH), legW*sc, legH, 4*sc); ctx.fill();
+    ctx.fillStyle = '#111';
+    [-1,1].forEach(s => { ctx.beginPath(); ctx.ellipse(px(s*bd.sw*0.1), py(2), 10*sc, 5*sc, 0, 0, Math.PI*2); ctx.fill(); });
+  }
   ctx.fillStyle = suitCol;
   ctx.beginPath(); ctx.roundRect(px(-bd.sw/2), py(bd.sh), bd.sw*sc, bd.sh*sc, [0,0,6*sc,6*sc]); ctx.fill();
   ctx.fillStyle = '#ddd';
@@ -22529,7 +22544,7 @@ function drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms) {
   if (hat > 0)  drawHat(ctx, hat, px, py, bd, headY, headH, sc);
 }
 
-function drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms) {
+function drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms, skipLegs) {
   const bodyDefs = [
     { sw: 30, sh: 78, nw: 12, nh: 20, hw: 24, hip: 32 },
     { sw: 36, sh: 80, nw: 13, nh: 20, hw: 27, hip: 40 },
@@ -22539,16 +22554,18 @@ function drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms) {
   const bd = bodyDefs[body] || bodyDefs[1];
   const dressCol = ['#3a1a3a','#1a2a3a','#3a1a1a','#1a3a2a'][body % 4];
   const accentCol = ['#e8c96e','#c0392b','#8e44ad','#2980b9'][face % 4];
-  ctx.fillStyle = dressCol;
-  ctx.beginPath();
-  ctx.moveTo(px(-bd.sw/2), py(bd.sh)); ctx.lineTo(px(-bd.hip/2), py(0));
-  ctx.lineTo(px(bd.hip/2), py(0)); ctx.lineTo(px(bd.sw/2), py(bd.sh));
-  ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#111';
-  [-1,1].forEach(s => {
-    ctx.beginPath(); ctx.ellipse(px(s*bd.hip*0.18), py(3), 8*sc, 4*sc, 0, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.roundRect(px(s*bd.hip*0.18+4*sc), py(0), 3*sc, 8*sc, 1*sc); ctx.fill();
-  });
+  if (!skipLegs) {
+    ctx.fillStyle = dressCol;
+    ctx.beginPath();
+    ctx.moveTo(px(-bd.sw/2), py(bd.sh)); ctx.lineTo(px(-bd.hip/2), py(0));
+    ctx.lineTo(px(bd.hip/2), py(0)); ctx.lineTo(px(bd.sw/2), py(bd.sh));
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#111';
+    [-1,1].forEach(s => {
+      ctx.beginPath(); ctx.ellipse(px(s*bd.hip*0.18), py(3), 8*sc, 4*sc, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(px(s*bd.hip*0.18+4*sc), py(0), 3*sc, 8*sc, 1*sc); ctx.fill();
+    });
+  }
   ctx.fillStyle = dressCol;
   ctx.beginPath();
   ctx.roundRect(px(-bd.sw/2), py(bd.sh), bd.sw*sc, bd.sh*sc, [0,0,6*sc,6*sc]); ctx.fill();
@@ -22848,12 +22865,12 @@ function drawHat(ctx, hatId, px, py, bd, headY, headH, sc) {
 // Кеш спрайтов — каждый уникальный look рендерится один раз в офскрин-canvas.
 const SPRITE_W = 110, SPRITE_H = 200;
 const _spriteCache = new Map();
-function getSprite(look, skipArms) {
-  const key = [look.gender|0, look.skin|0, look.body|0, look.face|0, look.hair|0, look.hat|0, skipArms?1:0].join('.');
+function getSprite(look, skipArms, skipLegs) {
+  const key = [look.gender|0, look.skin|0, look.body|0, look.face|0, look.hair|0, look.hat|0, skipArms?1:0, skipLegs?1:0].join('.');
   if (_spriteCache.has(key)) return _spriteCache.get(key);
   const off = document.createElement('canvas');
   off.width = SPRITE_W; off.height = SPRITE_H;
-  drawChar(off.getContext('2d'), SPRITE_W, SPRITE_H, Object.assign({}, look, { skipArms: !!skipArms }));
+  drawChar(off.getContext('2d'), SPRITE_W, SPRITE_H, Object.assign({}, look, { skipArms: !!skipArms, skipLegs: !!skipLegs }));
   _spriteCache.set(key, off);
   return off;
 }
@@ -23196,17 +23213,22 @@ function _drawPunchAnim(px, py) {
   if (_punchAnim.type === 'kick') { _drawKickAnim(px, py, elapsed); return; }
 
   const ang = _punchAnim.ang;
-  const bY  = Math.round(TS * 0.289);
-  const a   = handAnchor(px, py - bY, ang);
+  const a   = handAnchor(px, py, ang);
 
-  // Плечо — базовая точка (hx - sx*armLen)
+  // Плечо — базовая точка (hx - sx*armLen), считаем по НЕограниченным sx/sy
   const armLen   = TS * 0.36;
-  const sx = a.sx, sy = a.sy;
-  const shdX = a.hx - sx * armLen;
-  const shdY = a.hy - sy * armLen;
+  const shdX = a.hx - a.sx * armLen;
+  const shdY = a.hy - a.sy * armLen;
+  // Направление выброса кулака: sx как есть, sy ограничен (-0.18..0.3) —
+  // иначе при прицеле "от камеры" (a.sy → -1 в ISO-проекции handAnchor,
+  // sx=0) кулак с импакт-вспышкой улетал к подбородку/голове и казался
+  // растущим из головы. В сторону камеры (+sy, к зрителю) запас больше —
+  // там это просто удар в грудь/живот, головы не касается.
+  const sx = a.sx;
+  const sy = Math.max(-0.18, Math.min(0.3, a.sy));
 
   // k: [-1..1], отрицательный = замах назад, 1 = полный выброс кулака
-  const MAX_REACH = TS * 0.44;   // ~25 px — не слишком длинно
+  const MAX_REACH = TS * 0.22;   // ~12 px доп. выброс — короче, по-боксёрски
   let k;
   if (elapsed < 120) {
     // Замах — дуга назад
@@ -23222,9 +23244,9 @@ function _drawPunchAnim(px, py) {
     k = Math.cos(t * Math.PI * 0.5);
   }
 
-  // Позиция кулака
-  const fistX = a.hx + sx * MAX_REACH * k;
-  const fistY = a.hy + sy * MAX_REACH * k;
+  // Позиция кулака — от плеча, не от a.hx/a.hy (там "сырые" sx/sy)
+  const fistX = shdX + sx * (armLen + MAX_REACH * k);
+  const fistY = shdY + sy * (armLen + MAX_REACH * k);
 
   // Локоть — 52% между плечом и кулаком + перпендикулярный выпуклость
   const elbT  = 0.52;
@@ -23246,8 +23268,8 @@ function _drawPunchAnim(px, py) {
     for (let i = steps; i >= 1; i--) {
       const pastT  = Math.max(0, (elapsed - i * 16 - 120) / 80);
       const pastK  = Math.max(0, 1 - Math.pow(1 - pastT, 3));
-      const pfx    = a.hx + sx * MAX_REACH * pastK;
-      const pfy    = a.hy + sy * MAX_REACH * pastK;
+      const pfx    = shdX + sx * (armLen + MAX_REACH * pastK);
+      const pfy    = shdY + sy * (armLen + MAX_REACH * pastK);
       ctx.globalAlpha = 0.22 - i * 0.04;
       ctx.fillStyle = '#e08030';
       ctx.beginPath();
@@ -23700,7 +23722,7 @@ function drawWeaponInHands(x, y, ang, weapon, scale /*shotAtMs ignored: см. dr
   }
 }
 
-function drawPerson(x, y, ang, look, walkPhase, name, chat, isSelf, hp, maxHp, isDead, deadAt, skipArms) {
+function drawPerson(x, y, ang, look, walkPhase, name, chat, isSelf, hp, maxHp, isDead, deadAt, skipArms, skipLegs) {
   // Анимация падения: первые 400мс — поворот 0→90° и смещение вниз; дальше
   // — статично лежит с alpha 0.55. До этого было просто globalAlpha 0.35 без
   // движения — выглядело как «исчезает», не как «упал».
@@ -23716,7 +23738,7 @@ function drawPerson(x, y, ang, look, walkPhase, name, chat, isSelf, hp, maxHp, i
   ctx.ellipse(x, y + 3, 14, 5, 0, 0, Math.PI * 2);
   ctx.fill();
   // Спрайт из креатора. Лёгкая ходьба: вертикальный bob + сжатие.
-  const sprite = getSprite(look || {}, skipArms);
+  const sprite = getSprite(look || {}, skipArms, skipLegs);
   const sh = TS * 1.7;
   const sw = sh * 0.72;
   const ph = walkPhase || 0;
@@ -24592,7 +24614,7 @@ function render() {
     const myChat = (_localChat && performance.now() - _localChatT < chatDuration(_localChat)) ? _localChat : null;
     drawPerson(px, py, player.ang, QP.look,
                player.walking ? player.walkPhase : 0, QP.name, myChat, true,
-               myHp, PVP.max_hp, myDead, null, !!_punchAnim);
+               myHp, PVP.max_hp, myDead, null, !!_punchAnim, !!(_punchAnim && _punchAnim.type === 'kick'));
     if (myMode !== 'pve' && !myDead) {
       if (_isArmed()) drawWeaponInHands(px, py, player.ang, currentWeapon, 0.9, lastShotClientT);
       if (_punchAnim) _drawPunchAnim(px, py);
@@ -24988,6 +25010,36 @@ function tryTapLock(canvasX, canvasY) {
   // Не локаемся на арене (free-aim only) и когда я мёртв / в машине / PvE
   if (myDead || myMode === 'pve' || myDrivingCarId) return false;
   if (inArena(player.r, player.c)) return false;
+  // Внутри банка координаты всех «мировых» сущностей (NPCS/копы/др.игроки)
+  // не соответствуют локальным координатам интерьера — лочим только NPC
+  // банка (любой живой, не сбежавший).
+  if (_bankInt) {
+    let bBest = null, bBestD = _isArmed() ? 80 : 120;
+    for (const npc of (_bankInt.npcs || [])) {
+      if (npc.dead || npc.state === 'fled') continue;
+      const d = _screenDistToCell(npc.r, npc.c, canvasX, canvasY);
+      if (d < bBestD) {
+        bBestD = d;
+        const idx = _bankInt.npcs.indexOf(npc);
+        bBest = _lockTargetEntry('bank_guard', idx, () => {
+          const n2 = _bankInt && _bankInt.npcs && _bankInt.npcs[idx];
+          return (n2 && !n2.dead) ? { r: n2.r, c: n2.c } : null;
+        }, () => 'охранник');
+      }
+    }
+    if (bBest) {
+      const id = _lockId(bBest);
+      if (lockedTargets.has(id)) { lockedTargets.delete(id); return true; }
+      if (lockedTargets.size >= MAX_LOCKS) {
+        const oldestId = lockedTargets.keys().next().value;
+        lockedTargets.delete(oldestId);
+      }
+      lockedTargets.set(id, { entry: bBest, expireAt: performance.now() + TARGET_LOCK_TIMEOUT_MS });
+      return true;
+    }
+    if (lockedTargets.size) lockedTargets.clear();
+    return false;
+  }
   // В ближнем бою (без оружия) радиус тапа шире — мобилка, пальцы толще
   const MAX_PX = _isArmed() ? 80 : 120;
   let best = null, bestD = MAX_PX;
@@ -25110,21 +25162,6 @@ function tryTapLock(canvasX, canvasY) {
       }, () => o.name || '?');
     }
   }
-  // 5b) Враждебные охранники банка (внутри интерьера банка)
-  if (_bankInt && _bankInt.npcs) {
-    for (const npc of _bankInt.npcs) {
-      if (npc.type !== 'guard' || npc.state !== 'hostile' || npc.dead) continue;
-      const d = _screenDistToCell(npc.r, npc.c, canvasX, canvasY);
-      if (d < bestD) {
-        bestD = d;
-        const idx = _bankInt.npcs.indexOf(npc);
-        best = _lockTargetEntry('bank_guard', idx, () => {
-          const n2 = _bankInt && _bankInt.npcs && _bankInt.npcs[idx];
-          return (n2 && !n2.dead) ? { r: n2.r, c: n2.c } : null;
-        }, () => 'охранник');
-      }
-    }
-  }
   // 7) Гангстерские машины
   for (const car of CARS) {
     if (!car || !car.gang || car._wrecked) continue;
@@ -25228,6 +25265,19 @@ function _findLaserTarget(dirY, dirX) {
     if (perp > 0.9) return;
     if (along < bestAlong) { bestAlong = along; best = entry; }
   }
+  // Внутри банка координаты «мировых» сущностей не соответствуют локальным
+  // координатам интерьера — ищем только среди NPC банка.
+  if (_bankInt) {
+    for (const npc of (_bankInt.npcs || [])) {
+      if (npc.dead || npc.state === 'fled') continue;
+      const idx = _bankInt.npcs.indexOf(npc);
+      _check(npc.r, npc.c, _lockTargetEntry('bank_guard', idx, () => {
+        const n2 = _bankInt && _bankInt.npcs && _bankInt.npcs[idx];
+        return (n2 && !n2.dead) ? { r: n2.r, c: n2.c } : null;
+      }, () => 'охранник'));
+    }
+    return best;
+  }
   for (const n of NPCS) {
     if (n.dead) continue;
     _check(n.r, n.c, _lockTargetEntry('npc', NPCS.indexOf(n),
@@ -25298,17 +25348,6 @@ function _findLaserTarget(dirY, dirX) {
     _check(car.r, car.c, _lockTargetEntry('gang_car', 'c' + CARS.indexOf(car), () => {
       return cref._wrecked ? null : { r: cref.r, c: cref.c };
     }));
-  }
-  // Враждебные охранники банка (внутри интерьера банка)
-  if (_bankInt && _bankInt.npcs) {
-    for (const npc of _bankInt.npcs) {
-      if (npc.type !== 'guard' || npc.state !== 'hostile' || npc.dead) continue;
-      const idx = _bankInt.npcs.indexOf(npc);
-      _check(npc.r, npc.c, _lockTargetEntry('bank_guard', idx, () => {
-        const n2 = _bankInt && _bankInt.npcs && _bankInt.npcs[idx];
-        return (n2 && !n2.dead) ? { r: n2.r, c: n2.c } : null;
-      }, () => 'охранник'));
-    }
   }
   return best;
 }
@@ -26717,19 +26756,27 @@ function _carTypeName(type) {
 function loadBagIntoVan() {
   if (!_bankRob || !_bankRob.myBag) return;
 
-  // Найти ближайшую стоящую машину рядом с игроком (радиус 3 тайла)
-  let nearCar = null, nearDist = 3.0;
-  for (const car of CARS) {
-    if (!car) continue;
-    if (car.driverId) continue;  // кто-то едет — пропустить
-    const d = Math.hypot(player.r - car.r, player.c - car.c);
-    if (d < nearDist) { nearDist = d; nearCar = car; }
-  }
-  // Fallback: проверяем зону фургона у банка
-  if (!nearCar && _bankRob.bank) {
+  // Зона фургона у банка — основной транспорт для отгрузки добычи, вмещает
+  // ВЕСЬ улов банка (bagsMax), чтобы погрузка не упиралась в штатную вместимость
+  // обычной машины (sedan=2, van=6) посреди взлома medium/large банка (12/18 мешков)
+  // и игрок не застревал с мешком в руках без возможности его сгрузить.
+  let nearCar = null, maxBagsOverride = null;
+  if (_bankRob.bank) {
     const vz = _getBankVanZone(_bankRob.bank);
     if (Math.hypot(player.r - vz.r, player.c - vz.c) < 3.0) {
       nearCar = { type: 'van', id: 'bank_van', _isBankVan: true };
+      maxBagsOverride = _bankRob.bagsMax;
+    }
+  }
+
+  // Иначе — ближайшая стоящая машина рядом с игроком (радиус 3 тайла)
+  if (!nearCar) {
+    let nearDist = 3.0;
+    for (const car of CARS) {
+      if (!car) continue;
+      if (car.driverId) continue;  // кто-то едет — пропустить
+      const d = Math.hypot(player.r - car.r, player.c - car.c);
+      if (d < nearDist) { nearDist = d; nearCar = car; }
     }
   }
 
@@ -26740,7 +26787,8 @@ function loadBagIntoVan() {
 
   // Вместимость по типу машины
   const carType = (nearCar.model && nearCar.model.name) || nearCar.type || 'default';
-  const maxBags = BAG_CAPACITY[carType] !== undefined ? BAG_CAPACITY[carType] : BAG_CAPACITY['default'];
+  const maxBags = maxBagsOverride != null ? maxBagsOverride
+    : (BAG_CAPACITY[carType] !== undefined ? BAG_CAPACITY[carType] : BAG_CAPACITY['default']);
   if (maxBags === 0) {
     showToast('🚌 В эту машину мешки не влезут', '❌', 1800);
     return;
@@ -28642,10 +28690,8 @@ function _drawVaultRoom(int) {
   // Игрок
   items.push({d:player.r+player.c*0.01+0.5, fn:()=>{
     const p=w2s(player.r+.5, player.c+.5);
-    drawPerson(p.x,p.y,player.ang,
-      (window.QP||{}).look, player.walking?player.walkPhase:0,
-      (window.QP||{}).name, null, true, window.myHp||100, 100,
-      window.myDead||false, null, false);
+    drawPerson(p.x,p.y,player.ang,QP.look,player.walking?player.walkPhase:0,QP.name,null,true,myHp,PVP.max_hp||100,myDead,null,!!_punchAnim,!!(_punchAnim && _punchAnim.type === 'kick'));
+    if (!myDead) { if (_isArmed()) drawWeaponInHands(p.x,p.y,player.ang,currentWeapon,.9,lastShotClientT); if (_punchAnim) _drawPunchAnim(p.x,p.y); }
     if (int.myBag) _drawCarryingBag(p.x, p.y);
   }});
 
@@ -28666,6 +28712,8 @@ function _drawVaultRoom(int) {
 
   // Боевые эффекты — как в drawBankInteriorScene: render() сюда не доходит,
   // без этих вызовов выстрелы игрока в хранилище были бы невидимы.
+  drawAimLaser();
+  drawTargetLock();
   drawSmokePuffs();
   drawBullets();
   drawMuzzles();
@@ -29268,7 +29316,7 @@ function drawBankInteriorScene() {
   // Игрок
   items.push({d:player.r+player.c+.05,fn:()=>{
     const p=w2s(player.r+.5,player.c+.5);
-    drawPerson(p.x,p.y,player.ang,QP.look,player.walking?player.walkPhase:0,QP.name,null,true,myHp,PVP.max_hp||100,myDead,null,!!_punchAnim);
+    drawPerson(p.x,p.y,player.ang,QP.look,player.walking?player.walkPhase:0,QP.name,null,true,myHp,PVP.max_hp||100,myDead,null,!!_punchAnim,!!(_punchAnim && _punchAnim.type === 'kick'));
     if (!myDead) { if (_isArmed()) drawWeaponInHands(p.x,p.y,player.ang,currentWeapon,.9,lastShotClientT); if (_punchAnim) _drawPunchAnim(p.x,p.y); }
     if (myBag){ _drawCarryingBag(p.x, p.y); }
   }});
@@ -30075,6 +30123,8 @@ function drawBankInteriorScene() {
   // Боевые эффекты (трассеры/вспышки/импакты охраны) — снаружи банка их
   // рисует render(), но внутри банка render() сразу уходит в эту функцию
   // и до них не доходит. Без этого выстрелы охраны были невидимы.
+  drawAimLaser();
+  drawTargetLock();
   drawSmokePuffs();
   drawBullets();
   drawMuzzles();
