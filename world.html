@@ -9960,11 +9960,12 @@ function updateZoneBtn() {
       label = nearVault ? '🔓 Взломать хранилище' : null;
     } else if (int.phase==='cracking') {
       label = `🔒 Взлом ${(int.crackProg*100).toFixed(0)}%`;
-    } else if (int.room === 'vault' && !int.myBag) {
-      // В хранилище мешок берётся ТАПОМ по нему (tryTapLock → _takeVaultBagDirect).
-      // Кнопки нет — игрок просто тыкает в мешок.
+    } else if (int.room === 'vault') {
+      // В хранилище мешок берётся ТАПОМ (tryTapLock → _takeVaultBagDirect).
+      // Зональная кнопка = ВЫХОД обратно в лобби — раньше выход был только
+      // по доходу до южной кромки, игрок жаловался «нет двери выхода».
       delete _zoneEl.dataset.vaultBagId;
-      label = null;
+      label = '🚪 Выйти из хранилища';
     } else {
       // Несём мешок или просто гуляем по лобби после взлома — кнопки нет,
       // выход всегда через EXIT-дверь (см. door-check в _updateBankInterior)
@@ -10089,7 +10090,19 @@ _zoneEl.addEventListener('click', () => {
         return;
       }
       if (int.phase==='cracking') return; // взлом идёт — ничего
-      // Хранилище: подбор мешка по кнопке
+      // Хранилище: кнопка «Выйти из хранилища» → возврат в лобби.
+      // Дублирует выход по южной кромке, но гарантированно работает
+      // (была жалоба «нет двери выхода из хранилища»).
+      if (int.room === 'vault') {
+        int.room = 'lobby';
+        player.r = 2.5;
+        player.c = int.W / 2;
+        bullets.length = 0; muzzles.length = 0; impacts.length = 0;
+        showToast('🚪 Вышел в лобби', 'ℹ️', 1400);
+        if (typeof updateZoneBtn === 'function') updateZoneBtn();
+        return;
+      }
+      // Хранилище: подбор мешка по кнопке (легаси — мешок берётся тапом)
       if (int.room === 'vault' && !int.myBag && _zoneEl.dataset.vaultBagId) {
         const bag = int.bags.find(b => b.id === +_zoneEl.dataset.vaultBagId && !b.taken);
         if (bag) {
