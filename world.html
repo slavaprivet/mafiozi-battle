@@ -10098,7 +10098,7 @@ _zoneEl.addEventListener('click', () => {
         player.r = 2.5;
         player.c = int.W / 2;
         bullets.length = 0; muzzles.length = 0; impacts.length = 0;
-        showToast('🚪 Вышел в лобби', 'ℹ️', 1400);
+        showToast(int.myBag ? '🚪 Вернулся в банк с мешком' : '🚪 Вернулся в банк', '🏦', 1400);
         if (typeof updateZoneBtn === 'function') updateZoneBtn();
         return;
       }
@@ -28992,20 +28992,36 @@ function _drawVaultRoom(int) {
   drawImpacts();
   drawFloatTexts();
 
-  // Светящийся выход (южная стена, центр)
-  const exitP=w2s(H, W/2);
-  const exitPulse=0.6+0.4*Math.sin(now*0.003);
+  // Дверь выхода в банк (южная стена, центр) — как вход/EXIT в банк:
+  // зелёная рамка-проём + пульсирующее свечение + табличка. Раньше был
+  // лишь слабый синий блик «← Выход», игрок его не замечал.
+  const dDL=W/2-1, dDR=W/2+1;
+  const a=w2s(H,dDL), b=w2s(H,dDR);
+  const exitPulse=0.55+0.45*Math.sin(now*0.004);
   ctx.save();
-  const grad=ctx.createRadialGradient(exitP.x,exitP.y-wallH*0.5,5,exitP.x,exitP.y-wallH*0.5,hx*3);
-  grad.addColorStop(0,`rgba(60,120,255,${exitPulse})`);
-  grad.addColorStop(1,'rgba(60,120,255,0)');
+  // Свечение проёма
+  const cx=(a.x+b.x)/2, cy=(a.y+b.y)/2;
+  const grad=ctx.createRadialGradient(cx,cy-wallH*0.5,4,cx,cy-wallH*0.5,hx*4);
+  grad.addColorStop(0,`rgba(70,230,90,${0.45*exitPulse})`);
+  grad.addColorStop(1,'rgba(70,230,90,0)');
   ctx.fillStyle=grad;
-  ctx.fillRect(exitP.x-hx*3,exitP.y-wallH,hx*6,wallH*1.5);
+  ctx.fillRect(cx-hx*4,cy-wallH*1.3,hx*8,wallH*1.6);
+  // Тёмный проём двери
+  ctx.fillStyle='#0a140a';
+  ctx.beginPath();
+  ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
+  ctx.lineTo(b.x,b.y-wallH); ctx.lineTo(a.x,a.y-wallH);
+  ctx.closePath(); ctx.fill();
+  // Зелёные стойки + перемычка
+  ctx.strokeStyle=`rgba(80,240,100,${0.7+0.3*exitPulse})`; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(a.x,a.y-wallH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(b.x,b.y); ctx.lineTo(b.x,b.y-wallH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(a.x,a.y-wallH); ctx.lineTo(b.x,b.y-wallH); ctx.stroke();
   ctx.restore();
-  ctx.fillStyle='rgba(180,200,255,0.9)';
-  ctx.font='11px sans-serif'; ctx.textAlign='center';
-  ctx.fillText('← Выход',exitP.x,exitP.y-wallH*0.3);
-  ctx.textAlign='left';
+  ctx.fillStyle='#7bf08c';
+  ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('🚪 ВЫХОД В БАНК',cx,cy-wallH*0.55);
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
 
   // HUD — счётчик мешков
   const taken=(bags||[]).filter(b=>b.taken).length;
