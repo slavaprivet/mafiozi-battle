@@ -28992,35 +28992,67 @@ function _drawVaultRoom(int) {
   drawImpacts();
   drawFloatTexts();
 
-  // Дверь выхода в банк (южная стена, центр) — как вход/EXIT в банк:
-  // зелёная рамка-проём + пульсирующее свечение + табличка. Раньше был
-  // лишь слабый синий блик «← Выход», игрок его не замечал.
+  // ── Дверь выхода в банк (южная стена, центр) — полотно со скином ──
+  // Стальная дверь: рама, полотно с двумя филёнками, ручка, заклёпки,
+  // пульсирующая зелёная подсветка проёма + табличка «ВЫХОД В БАНК».
   const dDL=W/2-1, dDR=W/2+1;
-  const a=w2s(H,dDL), b=w2s(H,dDR);
+  const a=w2s(H,dDL), b=w2s(H,dDR);          // нижние углы проёма
+  const aT={x:a.x, y:a.y-wallH}, bT={x:b.x, y:b.y-wallH}; // верхние
+  const cx=(a.x+b.x)/2, cy=(a.y+b.y)/2;
   const exitPulse=0.55+0.45*Math.sin(now*0.004);
   ctx.save();
-  // Свечение проёма
-  const cx=(a.x+b.x)/2, cy=(a.y+b.y)/2;
-  const grad=ctx.createRadialGradient(cx,cy-wallH*0.5,4,cx,cy-wallH*0.5,hx*4);
-  grad.addColorStop(0,`rgba(70,230,90,${0.45*exitPulse})`);
-  grad.addColorStop(1,'rgba(70,230,90,0)');
-  ctx.fillStyle=grad;
-  ctx.fillRect(cx-hx*4,cy-wallH*1.3,hx*8,wallH*1.6);
-  // Тёмный проём двери
-  ctx.fillStyle='#0a140a';
+  // 1) Свечение-ореол вокруг двери
+  const halo=ctx.createRadialGradient(cx,cy-wallH*0.5,4,cx,cy-wallH*0.5,hx*4.5);
+  halo.addColorStop(0,`rgba(70,230,90,${0.40*exitPulse})`);
+  halo.addColorStop(1,'rgba(70,230,90,0)');
+  ctx.fillStyle=halo;
+  ctx.fillRect(cx-hx*4.5,cy-wallH*1.35,hx*9,wallH*1.7);
+  // 2) Косяк/рама (чуть шире проёма) — тёмный металл
+  const fr=0.14;
+  const fa={x:a.x-(b.x-a.x)*fr, y:a.y-(b.y-a.y)*fr};
+  const fb={x:b.x+(b.x-a.x)*fr, y:b.y+(b.y-a.y)*fr};
+  ctx.fillStyle='#23303f';
+  ctx.beginPath();
+  ctx.moveTo(fa.x,fa.y); ctx.lineTo(fb.x,fb.y);
+  ctx.lineTo(fb.x,fb.y-wallH*1.04); ctx.lineTo(fa.x,fa.y-wallH*1.04);
+  ctx.closePath(); ctx.fill();
+  // 3) Полотно двери — стальная плита с вертикальным градиентом
+  const leaf=ctx.createLinearGradient(0,cy-wallH,0,cy);
+  leaf.addColorStop(0,'#5a6678'); leaf.addColorStop(0.5,'#454f5e'); leaf.addColorStop(1,'#333b47');
+  ctx.fillStyle=leaf;
   ctx.beginPath();
   ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
-  ctx.lineTo(b.x,b.y-wallH); ctx.lineTo(a.x,a.y-wallH);
+  ctx.lineTo(bT.x,bT.y); ctx.lineTo(aT.x,aT.y);
   ctx.closePath(); ctx.fill();
-  // Зелёные стойки + перемычка
-  ctx.strokeStyle=`rgba(80,240,100,${0.7+0.3*exitPulse})`; ctx.lineWidth=3;
-  ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(a.x,a.y-wallH); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(b.x,b.y); ctx.lineTo(b.x,b.y-wallH); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(a.x,a.y-wallH); ctx.lineTo(b.x,b.y-wallH); ctx.stroke();
+  // 4) Две филёнки (утопленные панели)
+  const lerp=(p,q,t)=>({x:p.x+(q.x-p.x)*t, y:p.y+(q.y-p.y)*t});
+  for (const [t0,t1] of [[0.12,0.45],[0.55,0.88]]) {
+    const p0=lerp(a,b,0.18), p1=lerp(a,b,0.82);
+    const bl=lerp(p0, {x:p0.x,y:p0.y-wallH}, t0);
+    const br=lerp(p1, {x:p1.x,y:p1.y-wallH}, t0);
+    const tl=lerp(p0, {x:p0.x,y:p0.y-wallH}, t1);
+    const tr=lerp(p1, {x:p1.x,y:p1.y-wallH}, t1);
+    ctx.fillStyle='#3a434f';
+    ctx.beginPath(); ctx.moveTo(bl.x,bl.y); ctx.lineTo(br.x,br.y); ctx.lineTo(tr.x,tr.y); ctx.lineTo(tl.x,tl.y); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='rgba(20,26,34,0.8)'; ctx.lineWidth=1.2; ctx.stroke();
+    ctx.strokeStyle='rgba(150,165,185,0.25)'; ctx.lineWidth=0.6;
+    ctx.beginPath(); ctx.moveTo(tl.x,tl.y); ctx.lineTo(tr.x,tr.y); ctx.stroke();
+  }
+  // 5) Ручка двери (у правого края, на высоте ~40%)
+  const hp=lerp(lerp(a,b,0.72), {x:lerp(a,b,0.72).x,y:lerp(a,b,0.72).y-wallH}, 0.42);
+  ctx.fillStyle='#cdd6e2';
+  ctx.beginPath(); ctx.arc(hp.x,hp.y,2.4,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#8d97a6'; ctx.fillRect(hp.x-1, hp.y, 2, 6);
+  // 6) Зелёная контур-подсветка проёма (живая рамка выхода)
+  ctx.strokeStyle=`rgba(90,245,110,${0.65+0.35*exitPulse})`; ctx.lineWidth=2.4;
+  ctx.beginPath();
+  ctx.moveTo(a.x,a.y); ctx.lineTo(aT.x,aT.y); ctx.lineTo(bT.x,bT.y); ctx.lineTo(b.x,b.y);
+  ctx.stroke();
   ctx.restore();
+  // 7) Табличка над дверью
   ctx.fillStyle='#7bf08c';
   ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText('🚪 ВЫХОД В БАНК',cx,cy-wallH*0.55);
+  ctx.fillText('🚪 ВЫХОД В БАНК',cx,Math.min(aT.y,bT.y)-9);
   ctx.textAlign='left'; ctx.textBaseline='alphabetic';
 
   // HUD — счётчик мешков
