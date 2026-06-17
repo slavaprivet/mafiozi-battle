@@ -28281,12 +28281,13 @@ function _updateBankInterior(dt) {
   if (ph) ph.textContent=`🏦 ${int.bank.name}`;
   const isRobbing=int.phase==='cracking'||int.phase==='vault_open';
   if (bg){
-    if (!isRobbing){bg.style.display='none';bg.textContent='';}
-    else{
+    // Счётчик «Мешки X/Y» убран — в хранилище его не показываем.
+    // Оставляем только прогресс взлома хранилища.
+    if (int.phase==='cracking'){
       bg.style.display='block';
-      bg.textContent=int.phase==='cracking'
-        ?`🔒 Взлом: ${(int.crackProg*100).toFixed(0)}%`
-        :`💰 Мешки: ${int.bags.filter(b=>b.taken).length+int._bagsLoaded}/${int.bank.bags}${int.myBag?' 💼 несу':''}`;
+      bg.textContent=`🔒 Взлом: ${(int.crackProg*100).toFixed(0)}%`;
+    } else {
+      bg.style.display='none'; bg.textContent='';
     }
   }
   if (pb)pb.style.display=isRobbing?'block':'none';
