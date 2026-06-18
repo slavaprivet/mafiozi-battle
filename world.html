@@ -20592,11 +20592,16 @@ function drawAggroBot(bot) {
   const walkPhase = (isCityGang && act !== 'walk')
     ? 0
     : (performance.now() * 0.008) % (Math.PI * 2);
-  // Сиреневая «аура» под ногами — отличает банду от обычных NPC
+  // Сиреневая «аура» под ногами — отличает банду от обычных NPC.
+  // БЕЗ shadowBlur (дорого при десятках ботов в кадре → просадка FPS):
+  // имитируем свечение двумя эллипсами — бледный широкий ореол + плотное
+  // ядро. Визуально близко, для GPU в разы дешевле.
   ctx.save();
-  ctx.fillStyle = isBoss ? 'rgba(180, 80, 255, .55)' : 'rgba(140, 70, 200, .35)';
-  ctx.shadowColor = '#a050ff';
-  ctx.shadowBlur  = isBoss ? 16 : 10;
+  ctx.fillStyle = isBoss ? 'rgba(160, 80, 255, .20)' : 'rgba(140, 70, 200, .14)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y + 6, isBoss ? 30 : 22, isBoss ? 12 : 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = isBoss ? 'rgba(180, 80, 255, .55)' : 'rgba(140, 70, 200, .38)';
   ctx.beginPath();
   ctx.ellipse(p.x, p.y + 6, isBoss ? 22 : 16, isBoss ? 8 : 6, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -20657,9 +20662,7 @@ function drawAggroBot(bot) {
   ctx.font = '14px system-ui, "Segoe UI Emoji", sans-serif';
   ctx.textAlign = 'center';
   ctx.fillStyle = '#fff';
-  ctx.shadowColor = '#000'; ctx.shadowBlur = 4;
   ctx.fillText(isBoss ? '👹' : '🥷', p.x, p.y - (isBoss ? 56 : 44));
-  ctx.shadowBlur = 0;
   ctx.textAlign = 'left';
 }
 
@@ -20709,10 +20712,14 @@ function drawCopNpc(cop) {
     sirenCol  = sirenPhase ? 'rgba(60,120,255,.55)' : 'rgba(255,40,40,.55)';
     sirenGlow = sirenPhase ? '#3a78ff' : '#ff3030';
   }
+  // Мигалка-аура под копом — БЕЗ shadowBlur (дорого при облаве, копов много
+  // в кадре). Свечение имитируем бледным широким ореолом + плотным ядром.
   ctx.save();
+  ctx.fillStyle = sirenCol.replace(/[\d.]+\)$/, '.18)');
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y + 6, kind === 'swat' ? 30 : 28, 11, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.fillStyle = sirenCol;
-  ctx.shadowColor = sirenGlow;
-  ctx.shadowBlur = kind === 'swat' ? 18 : 14;
   ctx.beginPath();
   ctx.ellipse(p.x, p.y + 6, kind === 'swat' ? 22 : 20, 8, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -20742,10 +20749,8 @@ function drawCopNpc(cop) {
   ctx.font = '14px system-ui, "Segoe UI Emoji", sans-serif';
   ctx.textAlign = 'center';
   ctx.fillStyle = '#fff';
-  ctx.shadowColor = '#000'; ctx.shadowBlur = 4;
   ctx.fillText(icon, p.x, p.y - 44);
   // Маленький мигающий маркер на самом верху
-  ctx.shadowBlur = 0;
   ctx.fillStyle = sirenGlow;
   ctx.beginPath();
   ctx.arc(p.x, p.y - 52, 2.5, 0, Math.PI * 2);
