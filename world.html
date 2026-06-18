@@ -8966,6 +8966,8 @@ function handleEventPacket(d) {
     // не просто предупреждение при 1★). Сервер посадил в тюрьму, обнулил
     // звёзды. Локально — тост + showArrestOverlay.
     if (d.ok) {
+      // Копы забирают мешок при аресте — нельзя сидеть в тюрьме с добычей.
+      _confiscateBagOnArrest();
       showEventBanner(
         '🚓 ЗАДЕРЖАН',
         `Патруль схватил на месте. Срок: ${Math.round((d.jail_s || 60) / 60)} мин.`,
@@ -9853,7 +9855,11 @@ function wsConnect() {
         }
         // Внутри банка не применяем серверный jail_in — пока игрок в
         // интерьере его не должно сажать (он для сервера стоит у входа).
-        if (typeof d.me.jail_in === 'number' && !_bankShield()) myJailIn = d.me.jail_in;
+        if (typeof d.me.jail_in === 'number' && !_bankShield()) {
+          // Переход свобода→тюрьма: копы забирают несомый мешок при аресте.
+          if (myJailIn <= 0 && d.me.jail_in > 0) _confiscateBagOnArrest();
+          myJailIn = d.me.jail_in;
+        }
         if (typeof d.me.terr_cd === 'number') myTerrCd = d.me.terr_cd;
       }
       // ── Захват районов: владельцы + активный прогресс ────────────
@@ -10656,6 +10662,30 @@ function updateGtaInteractions() {
       return;
     }
   }
+  // Руки пусты, но в стоящей рядом машине лежат НАШИ мешки → достать обратно
+  // (можно передумать и понести мешок пешком / переложить). Радиус 3 тайла.
+  if (_bankRob && !_bankRob.myBag && (_bankRob.bagsLoaded > 0)) {
+    let nearCarUnload = null, ndU = 3.0;
+    for (const car of CARS) {
+      if (!car || !(car._bagsLoaded > 0)) continue;
+      const d = Math.hypot(player.r - car.r, player.c - car.c);
+      if (d < ndU) { ndU = d; nearCarUnload = car; }
+    }
+    // Банковский фургон у банка (виртуальный — мешки в _bankRob.bagsLoaded)
+    if (!nearCarUnload && _bankRob.bank) {
+      const vz = _getBankVanZone(_bankRob.bank);
+      if (Math.hypot(player.r - vz.r, player.c - vz.c) < 3.0) {
+        nearCarUnload = { _isBankVan: true, id: 'bank_van' };
+      }
+    }
+    if (nearCarUnload) {
+      _gtaActionKind = 'bag_unload';
+      _gtaActionCarId = nearCarUnload.id;
+      _gtaBtn.textContent = '💼 Достать мешок из машины';
+      _gtaBtn.style.display = 'block';
+      return;
+    }
+  }
   // Несём мешок снаружи банка → кнопка погрузки в любую стоящую машину
   if (_bankRob && _bankRob.myBag && (_bankRob.phase === 'loading' || _bankRob.phase === 'carrying')) {
     let nearCarForLoad = null, nearLoadDist = 3.0;
@@ -10810,6 +10840,8 @@ _gtaBtn.addEventListener('click', () => {
     pickupDroppedBag(_gtaActionCarId);
   } else if (_gtaActionKind === 'bag_load') {
     loadBagIntoVan();
+  } else if (_gtaActionKind === 'bag_unload') {
+    unloadBagFromCar(_gtaActionCarId);
   } else if (_gtaActionKind === 'biz_deliver') {
     deliverBagsToBusinesses();
   }
@@ -26945,6 +26977,41 @@ function loadBagIntoVan() {
   else if (typeof updateZoneBtn === 'function') updateZoneBtn();
 }
 
+// Достать мешок ОБРАТНО из машины — зеркало loadBagIntoVan. Берём один
+// мешок в руки (phase carrying), уменьшаем счётчик загруженных. Нужно чтобы
+// игрок не «терял» мешки безвозвратно, погрузив их в тачку.
+function unloadBagFromCar(carId) {
+  if (!_bankRob || _bankRob.myBag) return;
+  if ((_bankRob.bagsLoaded || 0) <= 0) {
+    showToast('🚗 В машине нет мешков', 'ℹ️', 1500);
+    return;
+  }
+  let car = null;
+  if (carId && carId !== 'bank_van') {
+    car = CARS.find(c => c && c.id === carId && (c._bagsLoaded > 0));
+  }
+  if (!car && carId !== 'bank_van') {
+    // запрошенной нет — ближайшая с грузом в радиусе 3
+    let nd = 3.0;
+    for (const c of CARS) {
+      if (!c || !(c._bagsLoaded > 0)) continue;
+      const d = Math.hypot(player.r - c.r, player.c - c.c);
+      if (d < nd) { nd = d; car = c; }
+    }
+  }
+  if (car) car._bagsLoaded = Math.max(0, (car._bagsLoaded || 0) - 1);
+  // Снимаем один мешок с общего счётчика, берём в руки
+  _bankRob.bagsLoaded = Math.max(0, (_bankRob.bagsLoaded || 0) - 1);
+  _bankRob.myBag = { value: (_bankRob.bank && _bankRob.bank.reward_per_bag) || 1200 };
+  _myBagWeight = 1;
+  _bankRob.phase = 'carrying';
+  showToast('💼 Достал мешок из машины', '🚗', 1600);
+  try { ws && ws.send(JSON.stringify({ t: 'bank_rob_bag_loaded', d: { bank_id: _bankRob.bank.id, bags: _bankRob.bagsLoaded } })); } catch(e) {}
+  if (typeof _updateBankZoneBtn === 'function') _updateBankZoneBtn();
+  else if (typeof updateZoneBtn === 'function') updateZoneBtn();
+  if (typeof _updateDropBagBtn === 'function') _updateDropBagBtn();
+}
+
 // Разгрузить мешки в бизнес и получить награду
 function deliverBagsToBusinesses() {
   if (!_bankRob) return;
@@ -26961,6 +27028,25 @@ function deliverBagsToBusinesses() {
   _myBagWeight = 0;
   if (typeof _updateBankZoneBtn === 'function') _updateBankZoneBtn();
   else if (typeof updateZoneBtn === 'function') updateZoneBtn();
+}
+
+// Копы забирают мешок при аресте — игрок не должен попадать в тюрьму с
+// добычей в руках. Изымаем ТОЛЬКО несомый мешок; мешки уже в машине
+// остаются (машина с добычей не конфискуется). Если несомый был последним —
+// ограбление закрывается.
+function _confiscateBagOnArrest() {
+  const carrying = !!((_bankRob && _bankRob.myBag) || (_bankInt && _bankInt.myBag) || _myBagWeight > 0);
+  if (!carrying) return;
+  if (_bankInt) _bankInt.myBag = null;
+  if (_bankRob) {
+    _bankRob.myBag = null;
+    if (_bankRob.bagsLoaded > 0) _bankRob.phase = 'escaping';
+    else _bankRob = null;
+  }
+  _myBagWeight = 0;
+  showToast('💼 Копы забрали мешок при аресте', '🚓', 2600);
+  if (typeof _updateDropBagBtn === 'function') _updateDropBagBtn();
+  if (typeof _updateBankZoneBtn === 'function') _updateBankZoneBtn();
 }
 
 // Отмена / провал ограбления банка
