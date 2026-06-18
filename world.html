@@ -8975,6 +8975,12 @@ function handleEventPacket(d) {
       try { showArrestOverlay && showArrestOverlay(); } catch(e) {}
     }
     // ok=false молча — это либо лагнувший пакет, либо сервер уже посадил
+  } else if (kind === 'bank_rob_announce') {
+    // Кто-то вскрыл хранилище банка — уведомление ВСЕМ игрокам мира.
+    if (d && d.msg) {
+      try { showEventBanner('🚨 ОГРАБЛЕНИЕ БАНКА', d.msg, 4500, 'lose'); }
+      catch(e) { try { showToast(d.msg, '🚨', 4000); } catch(_) {} }
+    }
   } else if (kind === 'bank_rob_started') {
     // Сервер подтвердил начало ограбления (опционально — для мультиплеера)
     if (d.bank_id && _bankRob && _bankRob.bank.id === d.bank_id) {
