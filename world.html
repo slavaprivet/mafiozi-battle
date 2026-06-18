@@ -1114,17 +1114,10 @@ body.in-pvp #robActionBtn { top: 152px; }
       <div class="rob-hint">Уйдёшь / умрёшь — отмена</div>
     </div>
   </div>
-  <!-- HUD ограбления банка -->
-  <div id="bankRobHud" style="display:none; position:fixed; top:165px; left:50%; transform:translateX(-50%);
-       background:linear-gradient(180deg,#1a0a08,#2a0e08); border:2px solid #ff4020; border-radius:14px;
-       padding:10px 16px; min-width:220px; z-index:9; color:#fff; font-family:inherit; text-align:center;">
-    <div id="bankRobPhaseText" style="font-size:13px; font-weight:800; color:#ff8060;">ОГРАБЛЕНИЕ</div>
-    <div id="bankRobBagCount" style="font-size:11px; color:#ffd76b; margin:2px 0;">Мешки: 0/0</div>
-    <div id="bankRobPoliceBar" style="height:6px; background:#333; border-radius:3px; overflow:hidden; margin-top:4px;">
-      <div id="bankRobPoliceFill" style="height:100%; background:#ff3030; width:100%; transition:width 0.1s;"></div>
-    </div>
-    <div id="bankRobPoliceText" style="display:none;"></div>
-  </div>
+  <!-- HUD ограбления банка убран по запросу: лишние таблички «ОГРАБЛЕНИЕ» и
+       таймер приезда копов не нужны. Весь div bankRobHud удалён; связанные
+       _updateBankRobHud() и интерьерная логика безопасно no-op (везде
+       getElementById + null-guard, элементов больше нет в DOM). -->
   <!-- HUD активного контракта (под верхней панелью) -->
   <div id="gtaQuestHud"></div>
   <!-- Модал-меню Майкла -->
@@ -9960,12 +9953,11 @@ function updateZoneBtn() {
       label = nearVault ? '🔓 Взломать хранилище' : null;
     } else if (int.phase==='cracking') {
       label = `🔒 Взлом ${(int.crackProg*100).toFixed(0)}%`;
-    } else if (int.room === 'vault') {
-      // В хранилище мешок берётся ТАПОМ (tryTapLock → _takeVaultBagDirect).
-      // Зональная кнопка = ВЫХОД обратно в лобби — раньше выход был только
-      // по доходу до южной кромки, игрок жаловался «нет двери выхода».
+    } else if (int.room === 'vault' && !int.myBag) {
+      // В хранилище мешок берётся ТАПОМ по нему (tryTapLock → _takeVaultBagDirect).
+      // Кнопки нет — игрок просто тыкает в мешок.
       delete _zoneEl.dataset.vaultBagId;
-      label = '🚪 Выйти из хранилища';
+      label = null;
     } else {
       // Несём мешок или просто гуляем по лобби после взлома — кнопки нет,
       // выход всегда через EXIT-дверь (см. door-check в _updateBankInterior)
@@ -10090,19 +10082,7 @@ _zoneEl.addEventListener('click', () => {
         return;
       }
       if (int.phase==='cracking') return; // взлом идёт — ничего
-      // Хранилище: кнопка «Выйти из хранилища» → возврат в лобби.
-      // Дублирует выход по южной кромке, но гарантированно работает
-      // (была жалоба «нет двери выхода из хранилища»).
-      if (int.room === 'vault') {
-        int.room = 'lobby';
-        player.r = 2.5;
-        player.c = int.W / 2;
-        bullets.length = 0; muzzles.length = 0; impacts.length = 0;
-        showToast(int.myBag ? '🚪 Вернулся в банк с мешком' : '🚪 Вернулся в банк', '🏦', 1400);
-        if (typeof updateZoneBtn === 'function') updateZoneBtn();
-        return;
-      }
-      // Хранилище: подбор мешка по кнопке (легаси — мешок берётся тапом)
+      // Хранилище: подбор мешка по кнопке
       if (int.room === 'vault' && !int.myBag && _zoneEl.dataset.vaultBagId) {
         const bag = int.bags.find(b => b.id === +_zoneEl.dataset.vaultBagId && !b.taken);
         if (bag) {
@@ -27893,11 +27873,6 @@ function enterBankInterior(bank) {
   cam.y=(player.c+player.r)*TS*0.5*ISO_Y;
   showToast(vaultOpen?`🏦 ${bank.name} — хранилище открыто!`:`🏦 ${bank.name}`,vaultOpen?'💰':'🏦',2000);
   try{hapticHit&&hapticHit();}catch(e){}
-  // Сообщаем серверу что игрок в интерьере → worldCop'ы его не трогают
-  // (сервер держит позицию у входа, иначе убивали «сквозь стены»).
-  if (ws&&ws.readyState===1){
-    try{ws.send(JSON.stringify({t:'bank_enter',d:{bank_id:bank.id}}));}catch(e){}
-  }
   // bank_rob_start шлём только когда реально начинаем взлом (не при входе)
   if (vaultOpen&&ws&&ws.readyState===1){
     try{ws.send(JSON.stringify({t:'bank_rob_start',d:{bank_id:bank.id}}));}catch(e){}
@@ -27908,10 +27883,6 @@ function enterBankInterior(bank) {
 function exitBankInterior(withBag) {
   if (!_bankInt) return;
   const int=_bankInt; _bankInt=null;
-  // Сообщаем серверу что вышли из интерьера → копы снова могут преследовать.
-  if (ws&&ws.readyState===1){
-    try{ws.send(JSON.stringify({t:'bank_exit',d:{bank_id:int.bank.id}}));}catch(e){}
-  }
   // Щит против серверного dead/jail ещё 6с после выхода: сервер мог
   // «убить» игрока worldCop'ами пока он был внутри, и снап с этим
   // прилетит в ближайшие кадры — иначе моментальная смерть/тюрьма.
@@ -28294,13 +28265,12 @@ function _updateBankInterior(dt) {
   if (ph) ph.textContent=`🏦 ${int.bank.name}`;
   const isRobbing=int.phase==='cracking'||int.phase==='vault_open';
   if (bg){
-    // Счётчик «Мешки X/Y» убран — в хранилище его не показываем.
-    // Оставляем только прогресс взлома хранилища.
-    if (int.phase==='cracking'){
+    if (!isRobbing){bg.style.display='none';bg.textContent='';}
+    else{
       bg.style.display='block';
-      bg.textContent=`🔒 Взлом: ${(int.crackProg*100).toFixed(0)}%`;
-    } else {
-      bg.style.display='none'; bg.textContent='';
+      bg.textContent=int.phase==='cracking'
+        ?`🔒 Взлом: ${(int.crackProg*100).toFixed(0)}%`
+        :`💰 Мешки: ${int.bags.filter(b=>b.taken).length+int._bagsLoaded}/${int.bank.bags}${int.myBag?' 💼 несу':''}`;
     }
   }
   if (pb)pb.style.display=isRobbing?'block':'none';
@@ -28992,68 +28962,20 @@ function _drawVaultRoom(int) {
   drawImpacts();
   drawFloatTexts();
 
-  // ── Дверь выхода в банк (южная стена, центр) — полотно со скином ──
-  // Стальная дверь: рама, полотно с двумя филёнками, ручка, заклёпки,
-  // пульсирующая зелёная подсветка проёма + табличка «ВЫХОД В БАНК».
-  const dDL=W/2-1, dDR=W/2+1;
-  const a=w2s(H,dDL), b=w2s(H,dDR);          // нижние углы проёма
-  const aT={x:a.x, y:a.y-wallH}, bT={x:b.x, y:b.y-wallH}; // верхние
-  const cx=(a.x+b.x)/2, cy=(a.y+b.y)/2;
-  const exitPulse=0.55+0.45*Math.sin(now*0.004);
+  // Светящийся выход (южная стена, центр)
+  const exitP=w2s(H, W/2);
+  const exitPulse=0.6+0.4*Math.sin(now*0.003);
   ctx.save();
-  // 1) Свечение-ореол вокруг двери
-  const halo=ctx.createRadialGradient(cx,cy-wallH*0.5,4,cx,cy-wallH*0.5,hx*4.5);
-  halo.addColorStop(0,`rgba(70,230,90,${0.40*exitPulse})`);
-  halo.addColorStop(1,'rgba(70,230,90,0)');
-  ctx.fillStyle=halo;
-  ctx.fillRect(cx-hx*4.5,cy-wallH*1.35,hx*9,wallH*1.7);
-  // 2) Косяк/рама (чуть шире проёма) — тёмный металл
-  const fr=0.14;
-  const fa={x:a.x-(b.x-a.x)*fr, y:a.y-(b.y-a.y)*fr};
-  const fb={x:b.x+(b.x-a.x)*fr, y:b.y+(b.y-a.y)*fr};
-  ctx.fillStyle='#23303f';
-  ctx.beginPath();
-  ctx.moveTo(fa.x,fa.y); ctx.lineTo(fb.x,fb.y);
-  ctx.lineTo(fb.x,fb.y-wallH*1.04); ctx.lineTo(fa.x,fa.y-wallH*1.04);
-  ctx.closePath(); ctx.fill();
-  // 3) Полотно двери — стальная плита с вертикальным градиентом
-  const leaf=ctx.createLinearGradient(0,cy-wallH,0,cy);
-  leaf.addColorStop(0,'#5a6678'); leaf.addColorStop(0.5,'#454f5e'); leaf.addColorStop(1,'#333b47');
-  ctx.fillStyle=leaf;
-  ctx.beginPath();
-  ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
-  ctx.lineTo(bT.x,bT.y); ctx.lineTo(aT.x,aT.y);
-  ctx.closePath(); ctx.fill();
-  // 4) Две филёнки (утопленные панели)
-  const lerp=(p,q,t)=>({x:p.x+(q.x-p.x)*t, y:p.y+(q.y-p.y)*t});
-  for (const [t0,t1] of [[0.12,0.45],[0.55,0.88]]) {
-    const p0=lerp(a,b,0.18), p1=lerp(a,b,0.82);
-    const bl=lerp(p0, {x:p0.x,y:p0.y-wallH}, t0);
-    const br=lerp(p1, {x:p1.x,y:p1.y-wallH}, t0);
-    const tl=lerp(p0, {x:p0.x,y:p0.y-wallH}, t1);
-    const tr=lerp(p1, {x:p1.x,y:p1.y-wallH}, t1);
-    ctx.fillStyle='#3a434f';
-    ctx.beginPath(); ctx.moveTo(bl.x,bl.y); ctx.lineTo(br.x,br.y); ctx.lineTo(tr.x,tr.y); ctx.lineTo(tl.x,tl.y); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle='rgba(20,26,34,0.8)'; ctx.lineWidth=1.2; ctx.stroke();
-    ctx.strokeStyle='rgba(150,165,185,0.25)'; ctx.lineWidth=0.6;
-    ctx.beginPath(); ctx.moveTo(tl.x,tl.y); ctx.lineTo(tr.x,tr.y); ctx.stroke();
-  }
-  // 5) Ручка двери (у правого края, на высоте ~40%)
-  const hp=lerp(lerp(a,b,0.72), {x:lerp(a,b,0.72).x,y:lerp(a,b,0.72).y-wallH}, 0.42);
-  ctx.fillStyle='#cdd6e2';
-  ctx.beginPath(); ctx.arc(hp.x,hp.y,2.4,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#8d97a6'; ctx.fillRect(hp.x-1, hp.y, 2, 6);
-  // 6) Зелёная контур-подсветка проёма (живая рамка выхода)
-  ctx.strokeStyle=`rgba(90,245,110,${0.65+0.35*exitPulse})`; ctx.lineWidth=2.4;
-  ctx.beginPath();
-  ctx.moveTo(a.x,a.y); ctx.lineTo(aT.x,aT.y); ctx.lineTo(bT.x,bT.y); ctx.lineTo(b.x,b.y);
-  ctx.stroke();
+  const grad=ctx.createRadialGradient(exitP.x,exitP.y-wallH*0.5,5,exitP.x,exitP.y-wallH*0.5,hx*3);
+  grad.addColorStop(0,`rgba(60,120,255,${exitPulse})`);
+  grad.addColorStop(1,'rgba(60,120,255,0)');
+  ctx.fillStyle=grad;
+  ctx.fillRect(exitP.x-hx*3,exitP.y-wallH,hx*6,wallH*1.5);
   ctx.restore();
-  // 7) Табличка над дверью
-  ctx.fillStyle='#7bf08c';
-  ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText('🚪 ВЫХОД В БАНК',cx,Math.min(aT.y,bT.y)-9);
-  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  ctx.fillStyle='rgba(180,200,255,0.9)';
+  ctx.font='11px sans-serif'; ctx.textAlign='center';
+  ctx.fillText('← Выход',exitP.x,exitP.y-wallH*0.3);
+  ctx.textAlign='left';
 
   // HUD — счётчик мешков
   const taken=(bags||[]).filter(b=>b.taken).length;
