@@ -4087,6 +4087,25 @@ function updateCityCops(dt) {
   // никакого преследования/ареста/реакции на игрока.
   const playerWanted = (typeof myWanted === 'number') && myWanted >= 1
     && !myDead && !(typeof myJailIn === 'number' && myJailIn > 0) && !_bankInt;
+  // ── #3: копы докапываются ТОЛЬКО когда видят игрока с НЕСОМЫМ мешком ──
+  // При грабеже мешает лишь охрана банка; копов на улице компромат интересует
+  // только если мешок в руках. Мешок в машине — не видно, игнорируют. Несём
+  // руками и рядом патрульный → шлём серверу запрос на +2★ (раз в 8с).
+  if (_bankRob && _bankRob.myBag && _myBagWeight > 0 && !_bankInt && !myDead
+      && !(typeof myJailIn === 'number' && myJailIn > 0)
+      && (typeof myWanted !== 'number' || myWanted < 2)) {
+    let copNear = false;
+    for (const cop of cityCops) {
+      if (!cop.alive) continue;
+      if (Math.hypot(cop.y - player.r, cop.x - player.c) < 6.5) { copNear = true; break; }
+    }
+    if (copNear && now > (_bagSpottedCdUntil || 0)) {
+      _bagSpottedCdUntil = now + 8000;
+      try { ws && ws.send(JSON.stringify({ t: 'cop_spotted_bag', d: {} })); } catch(e) {}
+      showToast('🚓 Коп заметил мешок! Розыск +2★', '🚨', 2600);
+      try { hapticHit && hapticHit(); } catch(e) {}
+    }
+  }
   for (let i = cityCops.length - 1; i >= 0; i--) {
     const cop = cityCops[i];
     if (!cop.alive) { cityCops.splice(i, 1); continue; }
@@ -6858,6 +6877,7 @@ const _bankCivSave = {};
 const _bankCooldowns = {};
 // Вес мешка: 0 = нет мешка, 1 = несу мешок (замедление)
 let _myBagWeight = 0;
+let _bagSpottedCdUntil = 0;   // антиспам запроса «коп заметил мешок» серверу
 
 // Конфигурация размеров комнат банка
 const BANK_INT_CFG = {
@@ -24721,14 +24741,10 @@ function render() {
     if (myWanted > 0) drawWantedStars(px, py, myWanted);
     if (myGangs  > 0) drawWantedGangs(px, py, myGangs);
     drawModeTag(px, py, myMode || 'pvp');
-    // Иконка мешка над игроком при ограблении банка
+    // Несём мешок по городу — ТА ЖЕ анимация что в банке (мешок на верёвке
+    // через плечо + покачивание при ходьбе), а не просто эмодзи над головой.
     if (_bankRob && _bankRob.myBag) {
-      ctx.save();
-      ctx.font = '18px "Segoe UI Emoji", system-ui';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('💰', px, py - 42);
-      ctx.restore();
+      _drawCarryingBag(px, py);
     }
     // Рендер упавших мешков на земле (мини 3D-мешок с пульсирующим свечением)
     const _nowBag = performance.now();
