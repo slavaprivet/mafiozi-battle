@@ -14068,11 +14068,11 @@ function update(dt) {
           qc.y = newY;
           curVx *= 0.35;
         } else {
-          // Прямой удар — полная остановка
-          curVx = 0; curVy = 0;
+          // Прямой удар о стену → ОТСКОК назад (инверсия скорости с гашением)
+          // вместо «прилипания»: машину отбрасывает от здания + урон по hp.
+          curVx = -curVx * 0.5; curVy = -curVy * 0.5;
           if (impact > 5.5) reportCarCrash(qc, impact, 'wall');
         }
-        if (impact > 5.5 && !slideX && !slideY) reportCarCrash(qc, impact, 'wall');
       }
       // Столкновение с NPC-трафиком (декоративный CARS). Включается только
       // если мы реально в неё «врезались на скорости» (curSpeed>4) и игрок
