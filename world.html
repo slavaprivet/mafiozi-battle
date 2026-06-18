@@ -6124,6 +6124,13 @@ function spawnParkedCar() {
 // Машины из этого кортежа имеют флаг model.gang=true.
 let _convoyNextAt = 0;
 function spawnGangConvoy() {
+  // Не плодим кортежи: если на карте уже есть живой конвой (3+ машины), новый
+  // не выпускаем. КОРЕНЬ старого бага: gang-машины исключены из обычного
+  // удаления трафика И из LOD-деспауна за картой — поэтому конвои копились
+  // бесконечно (3 шт каждые ~75с) → за пару часов сотни машин, пробка, fps в пол.
+  let _convoyAlive = 0;
+  for (const c of CARS) if (c && c._convoy && !c._wrecked) _convoyAlive++;
+  if (_convoyAlive >= 3) return false;
   // Берём случайную точку дороги и направление (как spawnCar)
   for (let tries = 0; tries < 60; tries++) {
     const r = 2 + Math.floor(Math.random() * (MAP_ROWS - 4));
@@ -6160,6 +6167,7 @@ function spawnGangConvoy() {
         dirDx, dirDy, model,
         braking: false, flash: 0,
         gang: true,                     // кортеж банды
+        _convoy: true,                  // именно конвой (для деспауна/лимита)
         gangHp: 70, gangHpMax: 70,
       });
     }
@@ -6799,6 +6807,17 @@ function _maintainTrafficDensity(now) {
       }
     }
   }
+  // Аварийный потолок CARS: если по любой причине машин накопилось слишком
+  // много (gang/convoy/спец/баг) — агрессивно чистим ДАЛЬНИЕ не-парковочные,
+  // пока не вернёмся к норме. Парковку и нашу машину с добычей не трогаем.
+  if (CARS.length > 110) {
+    for (let i = CARS.length - 1; i >= 0 && CARS.length > 90; i--) {
+      const c = CARS[i];
+      if (!c || c.parked) continue;
+      if (c.id && _bankRob && _bankRob._carId === c.id) continue;
+      if (Math.hypot(c.r - player.r, c.c - player.c) > 26) CARS.splice(i, 1);
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -6927,6 +6946,15 @@ function updateCars(dt) {
   }
   for (let _ci = CARS.length - 1; _ci >= 0; _ci--) {
     const car = CARS[_ci];
+    // Конвой банды УДАЛЯЕМ (не респауним) когда уехал за карту или слишком
+    // далеко — иначе gang-машины копятся (они вне обычного удаления трафика).
+    if (car._convoy) {
+      const _off = car.r < 1 || car.r > MAP_ROWS - 2 || car.c < 1 || car.c > MAP_COLS - 2;
+      if (_off || Math.hypot(car.r - player.r, car.c - player.c) > 55) {
+        CARS.splice(_ci, 1);
+        continue;
+      }
+    }
     // П8 LOD: машины дальше 32 тайлов — двигаем позицию, но пропускаем
     // физику застревания/столкновений. Экономит ~30% CPU на большой карте.
     const _lodDist = Math.hypot(car.r - player.r, car.c - player.c);
