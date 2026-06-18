@@ -9995,7 +9995,7 @@ function updateZoneBtn() {
       // «Уехать с добычей» только когда реально есть мешки. Если тревога
       // поднята, но хранилище не взломано (bagsLoaded=0) — даём вернуться
       // в банк, иначе игрок застревал с бесполезной кнопкой побега.
-      else if (_bankRob.phase === 'escaping') label = (_bankRob.bagsLoaded > 0) ? '🚗 Уехать с добычей!' : '🏦 Войти в банк';
+      else if (_bankRob.phase === 'escaping') label = (_bankRob.bagsLoaded > 0) ? '🚗 Вези куш к бизнесу' : '🏦 Войти в банк';
       else label = '🏦 Банк';
     } else {
       label = '🏦 Войти в банк';
@@ -10099,11 +10099,17 @@ _zoneEl.addEventListener('click', () => {
       // через EXIT-дверь (door-check в _updateBankInterior).
       return;
     }
-    // Кнопка «Уехать с добычей!» завершает ограбление (выплата + кулдаун).
-    // Но если добычи нет (тревога без взлома) — кнопка показывает «Войти
-    // в банк», поэтому завершаем только при bagsLoaded>0, иначе входим.
+    // Фаза escaping: мешки уже в машине. Обналичка ТОЛЬКО доставкой к своему
+    // бизнесу («Спрятать куш» — biz_deliver → сервер начисляет cash). Тут у
+    // банка НИЧЕГО не завершаем и денег не даём: раньше «Уехать с добычей!»
+    // слал bank_rob_escape, но сервер его не обрабатывает → деньги были
+    // фейковые (только toast). Если добычи нет (тревога без взлома) — пускаем
+    // обратно в банк взломать хранилище.
     if (_bankRob && _bankRob.bank.id === bank.id && _bankRob.phase === 'escaping') {
-      if (_bankRob.bagsLoaded > 0) { finishBankRobbery(); return; }
+      if (_bankRob.bagsLoaded > 0) {
+        showToast('🚗 Вези мешки к своему бизнесу и нажми «Спрятать куш»', 'ℹ️', 2600);
+        return;
+      }
       // Нет добычи — пускаем обратно в банк (взломать хранилище)
     }
     // Войти в банк
@@ -10624,7 +10630,7 @@ function updateGtaInteractions() {
       const bags = _bankRob.phase === 'carrying' ? 1 : (_bankRob.bagsLoaded || 0);
       const rewardPer = (_bankRob.bank && _bankRob.bank.reward_per_bag) || 1200;
       const total = bags * rewardPer;
-      _gtaBtn.textContent = `📦 Разгрузить ${bags} мешк${bags===1?'ок':'ов'} (+$${total.toLocaleString('ru')})`;
+      _gtaBtn.textContent = `🤫 Спрятать куш (+$${total.toLocaleString('ru')})`;
       _gtaBtn.style.display = 'block';
       return;
     }
@@ -26924,7 +26930,7 @@ function deliverBagsToBusinesses() {
   const rewardPer = (_bankRob.bank && _bankRob.bank.reward_per_bag) || 1200;
   const total = bags * rewardPer;
   try { ws && ws.send(JSON.stringify({ t: 'bank_rob_deliver', d: { bank_id: _bankRob.bank.id, biz_id: bizId, bags } })); } catch(e) {}
-  showToast(`💰 Разгружаем! +$${total.toLocaleString('ru')}`, '🏆', 3500);
+  showToast(`🤫 Прячем куш! +$${total.toLocaleString('ru')}`, '🏆', 3500);
   _bankRob = null;
   _myBagWeight = 0;
   if (typeof _updateBankZoneBtn === 'function') _updateBankZoneBtn();
@@ -26950,7 +26956,10 @@ function abortBankRobbery(reason) {
   _updateBankZoneBtn();
 }
 
-// Завершить ограбление (уехать с добычей)
+// [УСТАРЕЛО / НЕ ВЫЗЫВАЕТСЯ] Старый путь «Уехать с добычей!» у банка.
+// Показывал «+$» и слал bank_rob_escape, но сервер его не обрабатывает —
+// деньги были фейковые. Обналичка теперь только через deliverBagsToBusinesses()
+// («Спрятать куш» у своего бизнеса). Оставлено для истории, нигде не вызывается.
 function finishBankRobbery() {
   if (!_bankRob) return;
   const bank_id = _bankRob.bank.id;
