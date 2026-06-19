@@ -13171,6 +13171,10 @@ function punch(force) {
       triggerHitStop(25);
       addShake(1.5);
       hapticHit();
+      if (npc.type === 'guard' && !npc.dead) {
+        npc.state = 'hostile';
+        npc._aggroUntil = performance.now() + 12000;
+      }
     }
   } else if (kind === 'citycop') {
     // NPC-патрульный — локальная цель
@@ -20999,7 +21003,7 @@ function drawCar(r, c) {
 // Подсветка: золотой контур + 🎯 над крышей если это МОЙ контракт,
 // либо иконка модели + цвет владельца. Driver-uid отображается рядом.
 function drawQuestCar(qc) {
-  const m = QUEST_CAR_MODELS[qc.model];
+  const m = QUEST_CAR_MODELS[qc.model] || CAR_MODELS.find(cm => cm.name === qc.model);
   if (!m) return;
   // Непрерывный угол — плавный поворот без 4-snap
   const isMine    = String(qc.owner_uid) === String(QP.uid);
@@ -23230,8 +23234,8 @@ function reportCarCrash(qc, impact, kind) {
   // Метка тряски: drawQuestCar читает qc._shakeUntil для жесть-вибрации
   qc._shakeUntil = now + 280;
   qc._shakeMag   = Math.min(6, impact * 0.6);
-  // Глобальная экранная тряска — используем существующий camShake/addShake
-  addShake(Math.min(8, impact * 0.7));
+  // Глобальная экранная тряска — лёгкая, только корпус трясётся сильно
+  addShake(Math.min(3, impact * 0.25));
   // Шлём серверу — пусть уменьшит hp в авторитативном состоянии
   try {
     ws && ws.send(JSON.stringify({ t: 'gta_crash', d: {
@@ -28678,7 +28682,18 @@ function _drawCarryingBag(x, y) {
 }
 
 function _drawBankInteriorNpc(npc) {
-  if (npc.state==='fled') return;
+  if (npc.state==='fled' && !npc.dead) return;
+  if (npc.dead) {
+    const p=w2s(npc.r+.5,npc.c+.5);
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(npc.ang || 0.3);
+    ctx.scale(1, 0.45);
+    ctx.globalAlpha = 0.7;
+    drawPerson(0, 0, 0, npc.look, 0, null, null, false, 0, 60, true, 0);
+    ctx.restore();
+    return;
+  }
   const now=performance.now();
   const p=w2s(npc.r+.5,npc.c+.5);
   const moving=npc.state==='panic'||npc.state==='hostile'||
@@ -29138,6 +29153,8 @@ function _drawVaultRoom(int) {
   items.sort((a,b)=>a.d-b.d);
   for (const item of items) item.fn();
 
+  // Кровь на полу
+  drawBloodSplats();
   // Боевые эффекты — как в drawBankInteriorScene: render() сюда не доходит,
   // без этих вызовов выстрелы игрока в хранилище были бы невидимы.
   drawAimLaser();
@@ -30548,6 +30565,8 @@ function drawBankInteriorScene() {
    ctx.fillStyle='#60e060';ctx.font='bold 8px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
    ctx.fillText('🚪 ВЫХОД',(a.x+b.x)/2,a.y-dH*.5);ctx.textAlign='left';ctx.textBaseline='alphabetic';}
 
+  // Кровь на полу — без этого пятна крови от убитых охранников не видны
+  drawBloodSplats();
   // Боевые эффекты (трассеры/вспышки/импакты охраны) — снаружи банка их
   // рисует render(), но внутри банка render() сразу уходит в эту функцию
   // и до них не доходит. Без этого выстрелы охраны были невидимы.
