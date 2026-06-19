@@ -10725,13 +10725,6 @@ function updateGtaInteractions() {
       const d = Math.hypot(player.r - car.r, player.c - car.c);
       if (d < ndU) { ndU = d; nearCarUnload = car; }
     }
-    // Банковский фургон у банка (виртуальный — мешки в _bankRob.bagsLoaded)
-    if (!nearCarUnload && _bankRob.bank) {
-      const vz = _getBankVanZone(_bankRob.bank);
-      if (Math.hypot(player.r - vz.r, player.c - vz.c) < 3.0) {
-        nearCarUnload = { _isBankVan: true, id: 'bank_van' };
-      }
-    }
     if (nearCarUnload) {
       _gtaActionKind = 'bag_unload';
       _gtaActionCarId = nearCarUnload.id;
@@ -10748,11 +10741,6 @@ function updateGtaInteractions() {
       if (car.driverId) continue;
       const d = Math.hypot(player.r - car.r, player.c - car.c);
       if (d < nearLoadDist) { nearLoadDist = d; nearCarForLoad = car; }
-    }
-    // Также проверить зону фургона у банка
-    if (!nearCarForLoad && _bankRob.bank) {
-      const vz = _getBankVanZone(_bankRob.bank);
-      if (Math.hypot(player.r - vz.r, player.c - vz.c) < 3.0) nearCarForLoad = { type: 'van', model: { name: 'van' } };
     }
     if (nearCarForLoad) {
       const ct = (nearCarForLoad.model && nearCarForLoad.model.name) || nearCarForLoad.type || 'default';
@@ -24413,7 +24401,7 @@ function render() {
     items.push({ depth: bank.r + bank.c - 0.3, draw: () => drawBankBuilding(bank) });
     items.push({ depth: bank.r + bank.c - 0.5, draw: () => drawBankSign(bank) });
     items.push({ depth: bank.r + bank.c - 0.6, draw: () => drawBankPlayerBadge(bank) });
-    items.push({ depth: bank.r + bank.c + 0.1, draw: () => drawBankVanZone(bank) });
+    // Зона фургона убрана — мешок грузится в любую машину рядом
     items.push({ depth: bank.r + 3.5 + bank.c + 1.5, draw: () => drawBankEntrance(bank) });
   }
 
@@ -24905,8 +24893,8 @@ function render() {
   // Ночной тинт — поверх ВСЕХ объектов мира, но ПОД UI-слоем (стрелки,
   // мини-карта рисуются после, чтобы остаться читаемыми).
   drawNightTint();
-  // Стрелки-указатели на POI, которые сейчас за пределами видимости.
-  drawPOIArrows(r0, r1, c0, c1);
+  // POI-стрелки убраны — навигация через метки по клику (см. _waypoint*)
+  _drawWaypoint();
   // Стрелка-указатель на инкассатора если он за пределами экрана
   drawEventArrow(r0, r1, c0, c1);
   // 🎯 над активной хит-целью Бригадира — поверх всего
@@ -26217,6 +26205,116 @@ function drawImpacts() {
 // Раньше было «по 4 углам», но из-за DPR-clamp (resizeCanvas clamp'ит
 // devicePixelRatio до 2 на ретине) координаты сжимались к центру и
 // стрелки попадали почти на персонажа.
+// ── Система меток (waypoint) — заменяет автоматические POI-стрелки ───
+// Игрок тапает по зданию/месту → белая метка + компас-стрелка если за экраном.
+// Метка исчезает когда игрок подошёл к ней (< 3 тайла) или через 60 сек.
+let _waypoint = null; // {r, c, setAt, icon}
+
+function _setWaypoint(screenX, screenY) {
+  if (_bankInt) return;
+  const world = s2w(screenX, screenY);
+  if (!world || world.r < 0 || world.c < 0) return;
+  const ri = Math.floor(world.r), ci = Math.floor(world.c);
+  if (ri < 0 || ri >= MAP_ROWS || ci < 0 || ci >= MAP_COLS) return;
+  let icon = '📍';
+  const poiKey = ri + ',' + ci;
+  const poi = POI_BY_RC.get(poiKey);
+  if (poi && poi.icon) icon = poi.icon;
+  const biz = BUSINESS_BY_RC.get(poiKey);
+  if (biz && biz.emoji) icon = biz.emoji;
+  for (const bank of BANKS) {
+    if (Math.abs(ri - bank.r) < 3 && Math.abs(ci - bank.c) < 3) { icon = '🏦'; break; }
+  }
+  _waypoint = { r: world.r, c: world.c, setAt: performance.now(), icon };
+}
+
+function _drawWaypoint() {
+  if (!_waypoint) return;
+  const now = performance.now();
+  const age = now - _waypoint.setAt;
+  if (age > 60000) { _waypoint = null; return; }
+  const dist = Math.hypot(player.r - _waypoint.r, player.c - _waypoint.c);
+  if (dist < 3) { _waypoint = null; return; }
+  const p = w2s(_waypoint.r + 0.5, _waypoint.c + 0.5);
+  const W = window.innerWidth, H = window.innerHeight;
+  const onScreen = p.x > -20 && p.x < W + 20 && p.y > -20 && p.y < H + 20;
+  const pulse = 0.7 + 0.3 * Math.sin(now * 0.005);
+  if (onScreen) {
+    ctx.save();
+    ctx.globalAlpha = 0.85 * pulse;
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    const sz = 8;
+    ctx.strokeRect(p.x - sz, p.y - sz, sz * 2, sz * 2);
+    ctx.globalAlpha = 0.15 * pulse;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(p.x - sz, p.y - sz, sz * 2, sz * 2);
+    ctx.restore();
+  } else {
+    const cx = W / 2, cy = H / 2;
+    const dx = p.x - cx, dy = p.y - cy;
+    const len = Math.hypot(dx, dy) || 1;
+    const ndx = dx / len, ndy = dy / len;
+    const PAD = 35;
+    let t = Infinity;
+    if (dx > 0) t = Math.min(t, (W - PAD - cx) / dx);
+    if (dx < 0) t = Math.min(t, (PAD - cx) / dx);
+    if (dy > 0) t = Math.min(t, (H - PAD - cy) / dy);
+    if (dy < 0) t = Math.min(t, (PAD - cy) / dy);
+    const ax = cx + t * dx, ay = cy + t * dy;
+    ctx.save();
+    ctx.globalAlpha = 0.85;
+    ctx.translate(ax, ay);
+    ctx.rotate(Math.atan2(ndy, ndx));
+    ctx.fillStyle = 'rgba(255,255,255,.9)';
+    ctx.beginPath();
+    ctx.moveTo(12, 0); ctx.lineTo(-4, -7); ctx.lineTo(-4, 7); ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.font = '13px system-ui';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.globalAlpha = 0.9;
+    const toCx = cx - ax, toCy = cy - ay;
+    const tl = Math.hypot(toCx, toCy) || 1;
+    ctx.fillText(_waypoint.icon, ax + (toCx / tl) * 22, ay + (toCy / tl) * 22);
+    ctx.restore();
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  }
+  const distText = dist < 100 ? `${Math.round(dist)}m` : `${(dist / 100).toFixed(1)}km`;
+  const dp = onScreen ? p : { x: W / 2, y: 50 };
+  if (!onScreen) {
+    ctx.save();
+    ctx.font = 'bold 10px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(0,0,0,.6)';
+    ctx.fillText(_waypoint.icon + ' ' + distText, dp.x + 1, 47);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(_waypoint.icon + ' ' + distText, dp.x, 46);
+    ctx.restore();
+    ctx.textAlign = 'left';
+  }
+}
+
+// Обработчик тапа по canvas — ставит метку
+{
+  const _stage = document.getElementById('stage');
+  let _wpTouchStart = null;
+  _stage.addEventListener('pointerdown', (e) => {
+    _wpTouchStart = { x: e.clientX, y: e.clientY, t: performance.now() };
+  }, { passive: true });
+  _stage.addEventListener('pointerup', (e) => {
+    if (!_wpTouchStart) return;
+    const dx = e.clientX - _wpTouchStart.x, dy = e.clientY - _wpTouchStart.y;
+    const dt = performance.now() - _wpTouchStart.t;
+    _wpTouchStart = null;
+    if (Math.hypot(dx, dy) > 15 || dt > 400) return;
+    if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+    if (e.target.closest('.modal, #chatBox, #menuPanel, #weaponPick')) return;
+    _setWaypoint(e.clientX, e.clientY);
+  }, { passive: true });
+}
+
 function drawPOIArrows(r0, r1, c0, c1) {
   // ВАЖНО: используем CSS pixels (innerWidth/Height), а не canvas.width
   // делёный на window.devicePixelRatio — в resizeCanvas DPR заклеймён до 2,
@@ -26984,27 +27082,24 @@ function _carTypeName(type) {
 function loadBagIntoVan() {
   if (!_bankRob || !_bankRob.myBag) return;
 
-  // Зона фургона у банка — основной транспорт для отгрузки добычи, вмещает
-  // ВЕСЬ улов банка (bagsMax), чтобы погрузка не упиралась в штатную вместимость
-  // обычной машины (sedan=2, van=6) посреди взлома medium/large банка (12/18 мешков)
-  // и игрок не застревал с мешком в руках без возможности его сгрузить.
+  // Ближайшая стоящая машина рядом с игроком (радиус 3 тайла)
   let nearCar = null, maxBagsOverride = null;
-  if (_bankRob.bank) {
-    const vz = _getBankVanZone(_bankRob.bank);
-    if (Math.hypot(player.r - vz.r, player.c - vz.c) < 3.0) {
-      nearCar = { type: 'van', id: 'bank_van', _isBankVan: true };
-      maxBagsOverride = _bankRob.bagsMax;
-    }
-  }
-
-  // Иначе — ближайшая стоящая машина рядом с игроком (радиус 3 тайла)
-  if (!nearCar) {
+  {
     let nearDist = 3.0;
     for (const car of CARS) {
       if (!car) continue;
-      if (car.driverId) continue;  // кто-то едет — пропустить
+      if (car.driverId) continue;
       const d = Math.hypot(player.r - car.r, player.c - car.c);
       if (d < nearDist) { nearDist = d; nearCar = car; }
+    }
+  }
+  // Квестовые машины тоже подходят
+  if (!nearCar) {
+    let nearDist = 3.0;
+    for (const [, qc] of questCars) {
+      if (qc.driver_uid && qc.driver_uid !== String(QP.uid)) continue;
+      const d = Math.hypot(player.r - qc.y, player.c - qc.x);
+      if (d < nearDist) { nearDist = d; nearCar = { type: qc.model, id: qc.id, r: qc.y, c: qc.x }; }
     }
   }
 
