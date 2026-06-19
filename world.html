@@ -24857,7 +24857,15 @@ function render() {
   drawSkidMarks();
   drawExhaustPuffs();
   items.sort((a, b) => a.depth - b.depth);
-  items.forEach(i => i.draw());
+  for (const it of items) {
+    try { it.draw(); }
+    catch(e) {
+      if (!window._renderErrShown) {
+        window._renderErrShown = true;
+        console.error('[render item crash]', e, 'depth=', it.depth);
+      }
+    }
+  }
   // Вывески АЗС — ПОВЕРХ всех зданий (тотем на высоком столбе виден
   // даже когда сама заправка спрятана за домом). Рисуем после depth-sort.
   _drawGasSigns(r0, c0, r1, c1);
