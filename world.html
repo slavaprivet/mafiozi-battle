@@ -545,7 +545,7 @@ body.in-pvp #robActionBtn { top: 152px; }
    инкассатора. Теперь приклеен к HP-бару — место освобождено. */
 #moneyHud {
   position: absolute; left: 200px; top: 52px;
-  display: flex; gap: 6px; z-index: 9;
+  display: none; gap: 6px; z-index: 9;
   pointer-events: none; font-family: inherit;
 }
 #moneyHud .mh-pill {
@@ -741,24 +741,44 @@ body.in-pvp #robActionBtn { top: 152px; }
    «← Меню». Содержит HP-бар на всю ширину, цифры current/max, эмодзи
    времени суток и счётчик kills/deaths. */
 #hudPlayer {
-  position: absolute; left: 8px; top: calc(env(safe-area-inset-top, 6px) + 46px);
-  z-index: 5; display: none; flex-direction: column; gap: 4px;
-  background: linear-gradient(180deg, rgba(20,24,32,.92) 0%, rgba(10,12,18,.85) 100%);
-  border: 1px solid #3a4452; border-radius: 10px;
-  padding: 8px 10px; min-width: 200px; max-width: 60vw;
-  box-shadow: 0 4px 14px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.05);
+  position: absolute; left: 6px; top: calc(env(safe-area-inset-top, 4px) + 42px);
+  z-index: 5; display: none; flex-direction: row; align-items: center; gap: 6px;
+  background: linear-gradient(180deg, rgba(16,18,26,.94) 0%, rgba(8,10,16,.9) 100%);
+  border: 1px solid #2a3040; border-radius: 10px;
+  padding: 5px 8px 5px 5px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.04);
   font-family: inherit;
 }
 #hudPlayer.show { display: flex; }
+#hudAvatar {
+  width: 36px; height: 36px; border-radius: 8px;
+  border: 1.5px solid #4a5a6a; background: #0a0e14;
+  flex-shrink: 0; overflow: hidden;
+}
+#hudAvatar canvas { width: 100%; height: 100%; }
+#hudRight { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+#hudNameRow {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 800; color: #ffd76b;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#hudNameRow .lvl {
+  font-size: 9px; font-weight: 800; color: #0a0e14;
+  background: #ffd76b; border-radius: 4px; padding: 0 4px; line-height: 14px;
+}
 #hudPlayer .hp-row, #hudPlayer .kd-row {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 11px; color: #cfd6e6; white-space: nowrap;
+  display: flex; align-items: center; gap: 4px;
+  font-size: 10px; color: #cfd6e6; white-space: nowrap;
 }
 #hudPlayer .hp-row .label, #hudPlayer .kd-row .label {
-  color: #8a92a8; font-size: 10px; font-weight: 700;
+  color: #8a92a8; font-size: 9px; font-weight: 700;
 }
-#hudPlayer .hp-nums { display: inline-flex; align-items: baseline; gap: 1px; white-space: nowrap; }
+#hudPlayer .hp-nums { display: inline-flex; align-items: baseline; gap: 1px; white-space: nowrap; font-size: 10px; }
 #hudPlayer .hp-nums #hpMaxVal { color: #5a6478; }
+#hudMoneyRow {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 800; color: #5dd55d;
+}
 #hpBarBig {
   flex: 1; min-width: 80px; height: 12px;
   background: #1a1e26; border: 1px solid #3a4452; border-radius: 6px;
@@ -915,19 +935,19 @@ body.in-pvp #robActionBtn { top: 152px; }
    привлекает внимание всех онлайн-игроков, видно даже на маленьком
    экране. Появляется сверху, висит 3-6 сек, плавно уезжает. */
 #eventBanner {
-  position: absolute; top: 60px; left: 50%;
+  position: absolute; top: 50px; left: 50%;
   transform: translate(-50%, -100%);
-  width: min(380px, 92vw);
-  padding: 12px 16px;
+  width: min(260px, 80vw);
+  padding: 6px 10px;
   background: linear-gradient(135deg, #4a1212, #2a0808);
-  border: 2px solid #b8202a;
-  border-radius: 12px;
+  border: 1.5px solid #b8202a;
+  border-radius: 8px;
   color: #fff;
   z-index: 25;
-  box-shadow: 0 8px 32px rgba(184, 32, 42, .5);
+  box-shadow: 0 4px 16px rgba(184, 32, 42, .4);
   pointer-events: none;
   opacity: 0;
-  transition: transform .35s cubic-bezier(.16,1,.3,1), opacity .35s ease;
+  transition: transform .3s cubic-bezier(.16,1,.3,1), opacity .3s ease;
   text-align: center;
 }
 #eventBanner.show { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
@@ -935,8 +955,8 @@ body.in-pvp #robActionBtn { top: 152px; }
 #eventBanner.win     { border-color: #50d878; background: linear-gradient(135deg, #0a4020, #04201a); box-shadow: 0 8px 32px rgba(80,216,120,.5); }
 #eventBanner.lose    { border-color: #c850a8; background: linear-gradient(135deg, #3a0a3a, #1a041a); box-shadow: 0 8px 32px rgba(200,80,168,.45); }
 #eventBanner.neutral { border-color: #5a708a; background: linear-gradient(135deg, #1a2a3a, #0a141e); box-shadow: 0 8px 32px rgba(90,112,138,.4); }
-#eventBanner .et { font-size: 17px; font-weight: 800; letter-spacing: .3px; line-height: 1.15; padding-right: 22px; }
-#eventBanner .em { font-size: 12px; color: #d8d2c8; margin-top: 4px; line-height: 1.35; }
+#eventBanner .et { font-size: 13px; font-weight: 800; letter-spacing: .2px; line-height: 1.1; padding-right: 18px; }
+#eventBanner .em { font-size: 10px; color: #d8d2c8; margin-top: 2px; line-height: 1.2; }
 /* Крестик закрытия — справа сверху, круглая красная кнопка. Кликабельна
    только когда баннер показан (pointer-events: auto через .show). */
 #eventBanner .bx {
@@ -1081,9 +1101,10 @@ body.in-pvp #robActionBtn { top: 152px; }
 /* Toast — короткое всплывающее уведомление */
 #toast {
   position: absolute; left: 50%; transform: translateX(-50%);
-  bottom: 110px; background: rgba(20,24,32,.95);
-  border: 1px solid #5a2058; border-radius: 10px;
-  color: #ffd76b; padding: 10px 16px; font-size: 13px;
+  bottom: 110px; background: rgba(20,24,32,.92);
+  border: 1px solid #5a2058; border-radius: 8px;
+  color: #ffd76b; padding: 6px 12px; font-size: 11px;
+  max-width: min(260px, 80vw);
   z-index: 30; display: none; box-shadow: 0 4px 12px rgba(0,0,0,.6);
   font-family: inherit;
 }
@@ -1321,17 +1342,20 @@ body.in-pvp #robActionBtn { top: 152px; }
   <div id="toast"></div>
 
   <div id="hudPlayer">
-    <div class="hp-row">
-      <span class="label">HP</span>
-      <div id="hpBarBig"><div id="hpBarFill"></div></div>
-      <span class="hp-nums">
-        <span id="hpVal">100</span><span style="color:#5a6478">/</span><span id="hpMaxVal">100</span>
-      </span>
-    </div>
-    <div class="kd-row">
-      <span class="label" id="timeEmoji" title="Время в городе">☀️</span>
-      <span class="clock" id="gameClock">12:00</span>
-      <span class="kd"><span id="hudKills">0</span>💀 / <span id="hudDeaths">0</span>🪦</span>
+    <div id="hudAvatar"><canvas id="hudAvatarCv" width="72" height="72"></canvas></div>
+    <div id="hudRight">
+      <div id="hudNameRow"><span class="lvl" id="hudLvl">1</span><span id="hudName">Игрок</span></div>
+      <div class="hp-row">
+        <span class="label">HP</span>
+        <div id="hpBarBig"><div id="hpBarFill"></div></div>
+        <span class="hp-nums">
+          <span id="hpVal">100</span><span style="color:#5a6478">/</span><span id="hpMaxVal">100</span>
+        </span>
+      </div>
+      <div id="hudMoneyRow">
+        <span>💵</span><span id="hudMoney">0</span>
+        <span style="margin-left:4px" id="timeEmoji">☀️</span><span class="clock" id="gameClock">12:00</span>
+      </div>
     </div>
   </div>
   <button id="fireBtn">🔫</button>
@@ -10719,7 +10743,7 @@ function updateGtaInteractions() {
   // Руки пусты, но в стоящей рядом машине лежат НАШИ мешки → достать обратно
   // (можно передумать и понести мешок пешком / переложить). Радиус 3 тайла.
   if (_bankRob && !_bankRob.myBag && (_bankRob.bagsLoaded > 0)) {
-    let nearCarUnload = null, ndU = 3.0;
+    let nearCarUnload = null, ndU = 6.0;
     for (const car of CARS) {
       if (!car || !(car._bagsLoaded > 0)) continue;
       const d = Math.hypot(player.r - car.r, player.c - car.c);
@@ -10735,7 +10759,7 @@ function updateGtaInteractions() {
   }
   // Несём мешок снаружи банка → кнопка погрузки в любую стоящую машину
   if (_bankRob && _bankRob.myBag && (_bankRob.phase === 'loading' || _bankRob.phase === 'carrying')) {
-    let nearCarForLoad = null, nearLoadDist = 3.0;
+    let nearCarForLoad = null, nearLoadDist = 6.0;
     for (const car of CARS) {
       if (!car) continue;
       if (car.driverId) continue;
@@ -12427,7 +12451,8 @@ function closeEventBanner() {
   _evBanner.classList.remove('show');
   if (_evBannerT_id) { clearTimeout(_evBannerT_id); _evBannerT_id = null; }
 }
-function showEventBanner(title, msg, ms = 4000, style = 'spawn') {
+function showEventBanner(title, msg, ms = 2500, style = 'spawn') {
+  ms = Math.min(ms, 3000);
   if (!_evBanner) return;
   // Anti-spam: тот же баннер в окне 1200мс игнорируем
   const key = (title || '') + '|' + (msg || '');
@@ -13344,6 +13369,7 @@ function updatePvpUI() {
   // PvE-режиме (мирный наблюдатель) — скрываем. В обычном городе с
   // настоящим аккаунтом HUD виден постоянно.
   _hudPlayer.classList.toggle('show', !isPve);
+  _updateHudBar();
   // Кнопка огня видна только когда можно стрелять и есть смысл (open world
   // с хотя бы одной меткой ИЛИ PvP-арена с free-aim). Иначе скрыта.
   // В банке — как в городе: кнопка только при наличии замка (lockedTargets).
@@ -13454,6 +13480,30 @@ function formatMoney(n) {
 function updateMoneyHud() {
   if (_moneyCashEl) _moneyCashEl.textContent = formatMoney(myCash);
   if (_moneyDiaEl)  _moneyDiaEl.textContent  = formatMoney(myDiamonds);
+  const _hm = document.getElementById('hudMoney');
+  if (_hm) _hm.textContent = formatMoney(myCash);
+}
+let _hudAvatarDrawn = false;
+function _renderHudAvatar() {
+  const cv = document.getElementById('hudAvatarCv');
+  if (!cv || !QP.look) return;
+  const c2 = cv.getContext('2d');
+  c2.clearRect(0, 0, 72, 72);
+  const savedCtx = ctx;
+  ctx = c2;
+  ctx.save();
+  ctx.translate(36, 52);
+  ctx.scale(1.6, 1.6);
+  try { drawPerson(0, 0, 0, QP.look, 0, null, null, false, null, null, false, 0); } catch(e) {}
+  ctx.restore();
+  ctx = savedCtx;
+  _hudAvatarDrawn = true;
+}
+function _updateHudBar() {
+  const ne = document.getElementById('hudName');
+  if (ne) ne.textContent = QP.name || 'Игрок';
+  const le = document.getElementById('hudLvl');
+  if (le) le.textContent = (myGtaStatus && myGtaStatus.sc_lvl) ? myGtaStatus.sc_lvl : Math.max(1, Math.floor((myKills + myDeaths) / 3) + 1);
 }
 function showCashDelta(amount, kind) {
   if (!amount) return;
@@ -24040,11 +24090,7 @@ function roundRect(x, y, w, h, r) {
 }
 
 function render() {
-  // СБРОС трансформы к базовой (dpr) КАЖДЫЙ кадр. Без этого любой
-  // разбаланс ctx.save()/restore() (напр. при стрельбе по копам-машинам,
-  // взрывах) НАКАПЛИВАЛСЯ между кадрами → картинку «уносило в бесконечный
-  // туннель» (камера будто отдаляется навсегда). Теперь каждый кадр
-  // стартуем с чистой трансформы — глитч не накапливается.
+  if (!_hudAvatarDrawn && QP.look) _renderHudAvatar();
   const _dpr = Math.min(2, window.devicePixelRatio || 1);
   ctx.setTransform(_dpr, 0, 0, _dpr, 0, 0);
   // Если игрок внутри банка — рисуем только интерьер
@@ -27097,10 +27143,10 @@ function _carTypeName(type) {
 function loadBagIntoVan() {
   if (!_bankRob || !_bankRob.myBag) return;
 
-  // Ближайшая стоящая машина рядом с игроком (радиус 3 тайла)
+  // Ближайшая стоящая машина рядом с игроком (радиус 6 тайлов)
   let nearCar = null, maxBagsOverride = null;
   {
-    let nearDist = 3.0;
+    let nearDist = 6.0;
     for (const car of CARS) {
       if (!car) continue;
       if (car.driverId) continue;
@@ -27110,7 +27156,7 @@ function loadBagIntoVan() {
   }
   // Квестовые машины тоже подходят
   if (!nearCar) {
-    let nearDist = 3.0;
+    let nearDist = 6.0;
     for (const [, qc] of questCars) {
       if (qc.driver_uid && qc.driver_uid !== String(QP.uid)) continue;
       const d = Math.hypot(player.r - qc.y, player.c - qc.x);
