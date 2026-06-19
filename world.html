@@ -9014,8 +9014,8 @@ function handleEventPacket(d) {
     // не просто предупреждение при 1★). Сервер посадил в тюрьму, обнулил
     // звёзды. Локально — тост + showArrestOverlay.
     if (d.ok) {
-      // Копы забирают мешок при аресте — нельзя сидеть в тюрьме с добычей.
       _confiscateBagOnArrest();
+      spawnArrestAnim(String(QP.uid), player.r, player.c);
       showEventBanner(
         '🚓 ЗАДЕРЖАН',
         `Патруль схватил на месте. Срок: ${Math.round((d.jail_s || 60) / 60)} мин.`,
@@ -13040,6 +13040,21 @@ function _findNearestMeleeTarget() {
         const cc = cityCops.find(x => x.id === cid);
         return (cc && cc.alive) ? { r: cc.y, c: cc.x } : null;
       } };
+    }
+  }
+  // Другие игроки (PvP / тюрьма)
+  if (typeof others !== 'undefined') {
+    for (const [uid, o] of others) {
+      if (o.dead || String(uid) === String(QP.uid)) continue;
+      const d = Math.hypot(o.y - player.r, o.x - player.c);
+      if (d < bestD) {
+        bestD = d;
+        const _uid = uid;
+        best = { kind:'player', id:String(_uid), getPos:()=>{
+          const p = others.get(_uid);
+          return (p && !p.dead) ? { r: p.y, c: p.x } : null;
+        }};
+      }
     }
   }
   // Жители-декор (пассажиры автобуса / ожидающие / хозяева парковок)
