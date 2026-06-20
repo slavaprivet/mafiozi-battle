@@ -10923,12 +10923,16 @@ const _dropBagBtn = document.getElementById('dropBagBtn');
 if (_dropBagBtn) {
   _dropBagBtn.addEventListener('click', () => {
     if (_bankInt && _bankInt.myBag) {
-      // В хранилище — кладём мешок обратно на пол (можно снова взять)
+      // Бросаем мешок на пол в текущей позиции (можно снова подобрать тапом)
       const b = _bankInt.myBag;
       const orig = (_bankInt.bags || []).find(x => x.id === b.id);
-      if (orig) orig.taken = false;
+      if (orig) {
+        orig.taken = false;
+        orig.r = player.r;
+        orig.c = player.c;
+      }
       _bankInt.myBag = null; _myBagWeight = 0;
-      showToast('💼 Мешок отложен', 'ℹ️', 1400);
+      showToast('💼 Мешок брошен', 'ℹ️', 1400);
       if (typeof updateZoneBtn === 'function') updateZoneBtn();
     } else if (_bankRob && _bankRob.myBag) {
       dropVaultBag();
