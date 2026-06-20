@@ -6827,7 +6827,7 @@ function _maintainTrafficDensity(now) {
       if (c.parked || c.gang || c._policeEscort || c._policeChase) continue;
       if (c.model && (c.model.paddyvan || c.model.cruiser ||
                       c.model.ambulance || c.model.firetruck)) continue;
-      if (Math.hypot(c.r - player.r, c.c - player.c) > 25) {
+      if (Math.hypot(c.r - player.r, c.c - player.c) > 40) {
         CARS.splice(i, 1); removed++;
       }
     }
@@ -6840,7 +6840,7 @@ function _maintainTrafficDensity(now) {
       const c = CARS[i];
       if (!c || c.parked) continue;
       if (c.id && _bankRob && _bankRob._carId === c.id) continue;
-      if (Math.hypot(c.r - player.r, c.c - player.c) > 26) CARS.splice(i, 1);
+      if (Math.hypot(c.r - player.r, c.c - player.c) > 40) CARS.splice(i, 1);
     }
   }
 }
@@ -23297,8 +23297,9 @@ let _gtaLastWarnAt = 0;
 // kind: 'wall' / 'car' / 'other'. impact — скорость в момент удара (тайл/с).
 let _lastCrashAt = 0;
 function reportCarCrash(qc, impact, kind) {
+  if (impact < 1.5) return;
   const now = performance.now();
-  if (now - _lastCrashAt < 600) return;   // антиспам столкновений
+  if (now - _lastCrashAt < 800) return;
   _lastCrashAt = now;
   const dmg = Math.min(80, Math.round(impact * impact * 1.4));
   if (dmg <= 0) return;
@@ -24908,8 +24909,11 @@ function render() {
   // Другие
   for (const [, o] of others) {
     items.push({ depth: o.y + o.x + 0.001, draw: () => {
-      // Игрок сейчас «в автозаке» (LOADING/DRIVING) — не рисуем его
       if (_arrestHidden.has(String(o.uid))) return;
+      if (o.dead) {
+        if (!o._deadSince) o._deadSince = performance.now();
+        if (performance.now() - o._deadSince > 3000) return;
+      } else { o._deadSince = 0; }
       const p = w2s(o.y + 0.5, o.x + 0.5);
       const phase = (o.w ? (o._walkPhase || 0) : 0);
       const chat = (o.chat && performance.now() - o.chatT < chatDuration(o.chat)) ? o.chat : null;
