@@ -14066,10 +14066,10 @@ function update(dt) {
         const slideY = !isBlocked(newY, qc.x);
         if (slideX) {
           qc.x = newX;
-          curVy = 0;
+          curVy = 0; curVx *= 0.7;   // слегка тормозим вдоль стены — меньше зигзаг
         } else if (slideY) {
           qc.y = newY;
-          curVx = 0;
+          curVx = 0; curVy *= 0.7;
         } else {
           curVx = 0; curVy = 0;
           if (impact > 5.5) reportCarCrash(qc, impact, 'wall');
@@ -14220,27 +14220,33 @@ function update(dt) {
         try { ws && ws.send(JSON.stringify({ t: 'gta_exit', d: { car_id: cid } })); }
         catch(e){}
       }
-      // Камера look-ahead — на скорости сдвигаем target по вектору
-      // движения, игрок видит дорогу впереди. Лерп помедленнее (×5
-      // вместо ×8), чтобы съезд камеры был плавным а не дёрганым.
+      // Камера: следим за СГЛАЖЕННЫМ якорём машины, а не за сырой позицией.
+      // Сырая qc.x/qc.y при скольжении вдоль стены зигзагует (slideX/slideY
+      // чередуются кадр-в-кадр) → раньше камера копировала зигзаг = тряска.
+      // Якорь экспоненциально догоняет машину с ПОСТОЯННЫМ темпом, поэтому
+      // высокочастотный джиттер физики не доходит до камеры.
+      if (qc._camAncR === undefined) { qc._camAncR = qc.y; qc._camAncC = qc.x; }
+      const _ancLerp = Math.min(1, dt * 6);
+      qc._camAncR += (qc.y - qc._camAncR) * _ancLerp;
+      qc._camAncC += (qc.x - qc._camAncC) * _ancLerp;
+      // Look-ahead по вектору скорости — на ОСНОВЕ якорной скорости, плавный.
       let lookR = 0, lookC = 0;
       const camSpeed = Math.hypot(curVx, curVy);
-      if (camSpeed > 0.5 && !_wallTouch) {
-        const k = Math.min(1, camSpeed / CAR_MAX_SPEED) * 2.6;
+      if (camSpeed > 1.5) {
+        const k = Math.min(1, camSpeed / CAR_MAX_SPEED) * 2.4;
         lookR = (curVy / camSpeed) * k;
         lookC = (curVx / camSpeed) * k;
       }
-      if (!qc._smoothLookR) { qc._smoothLookR = lookR; qc._smoothLookC = lookC; }
-      const _lookLerp = Math.min(1, dt * 1.8);
+      if (qc._smoothLookR === undefined) { qc._smoothLookR = lookR; qc._smoothLookC = lookC; }
+      const _lookLerp = Math.min(1, dt * 1.5);
       qc._smoothLookR += (lookR - qc._smoothLookR) * _lookLerp;
       qc._smoothLookC += (lookC - qc._smoothLookC) * _lookLerp;
-      const aimC = player.c + qc._smoothLookC;
-      const aimR = player.r + qc._smoothLookR;
+      const aimC = qc._camAncC + qc._smoothLookC;
+      const aimR = qc._camAncR + qc._smoothLookR;
       const targetCamX = (aimC - aimR) * TS * 0.5;
       const targetCamY = (aimC + aimR) * TS * 0.5 * ISO_Y;
-      const _camLerp = _wallTouch ? 2.5 : 5;
-      cam.x += (targetCamX - cam.x) * Math.min(1, dt * _camLerp);
-      cam.y += (targetCamY - cam.y) * Math.min(1, dt * _camLerp);
+      cam.x += (targetCamX - cam.x) * Math.min(1, dt * 5);
+      cam.y += (targetCamY - cam.y) * Math.min(1, dt * 5);
       // Зум от скорости: стоим=1.0, макс. скорость=0.80 (видно больше дороги)
       {
         const tzoom = (player.r >= 140) ? 1.18 : 1.0;
