@@ -8719,7 +8719,6 @@ function handleEventPacket(d) {
       spawnArrestAnim(d.target_uid, d.ty, d.tx);
       if (String(d.target_uid) === String(QP.uid)) {
         showArrestOverlay();
-        addShake(7);
       }
     }
   } else if (kind === 'cop_shot_bot') {
@@ -9808,14 +9807,16 @@ function wsConnect() {
           // Мешок падает на землю при смерти
           if (_myBagWeight > 0 && _bankRob && _bankRob.myBag) { dropVaultBag(); }
         } else if (wasDead && !myDead) {
-          // Респаун — сбрасываем причину смерти. Принудительно
-          // телепортируемся в серверную spawn-точку.
+          // Респаун — сбрасываем ВСЕ блокирующие флаги.
           myDeathBy = '';
-          if (_bankInt) exitBankInterior(false);  // выходим из банка при смерти
+          if (_bankInt) exitBankInterior(false);
+          _bankShieldUntil = 0;
+          myDrivingCarId = null;
+          myIsPassenger = false;
+          _exitRequested = false;
+          camShake = 0;
           player.r = d.me.y;
           player.c = d.me.x;
-          // Сброс камеры на новую позицию, чтобы не «летела» туда
-          // через лерп — иначе экран дёргается на полсекунды.
           cam.x = (player.c - player.r) * TS * 0.5;
           cam.y = (player.c + player.r) * TS * 0.5 * ISO_Y;
         }
@@ -14338,6 +14339,14 @@ function update(dt) {
       myDeathBy = '';
       myHp = PVP.max_hp || 100;
       if (_bankInt) exitBankInterior(false);
+      // Сброс всех блокирующих флагов при респавне — иначе прицел/стрельба
+      // могут не работать (bankShield блокирует серверный статус, lockedTargets
+      // пуст, myDrivingCarId завис).
+      _bankShieldUntil = 0;
+      myDrivingCarId = null;
+      myIsPassenger = false;
+      _exitRequested = false;
+      camShake = 0;
       const _rp = _hospitalDoor();
       player.r = _rp.r; player.c = _rp.c;
       cam.x = (player.c - player.r) * TS * 0.5;
@@ -24443,10 +24452,10 @@ function render() {
   // БАНКИ — объёмные здания + вывески + зона фургона
   for (const bank of BANKS) {
     if (bank.r + 4 < r0 - 2 || bank.r >= r1 + 2 || bank.c + 5 < c0 - 2 || bank.c >= c1 + 2) continue;
-    items.push({ depth: bank.r + bank.c - 0.3, draw: () => drawBankBuilding(bank) });
-    items.push({ depth: bank.r + bank.c - 0.5, draw: () => drawBankSign(bank) });
-    items.push({ depth: bank.r + bank.c - 0.6, draw: () => drawBankPlayerBadge(bank) });
-    items.push({ depth: bank.r + bank.c + 0.1, draw: () => drawBankVanZone(bank) });
+    items.push({ depth: bank.r + bank.c - 3, draw: () => drawBankBuilding(bank) });
+    items.push({ depth: bank.r + bank.c - 3.2, draw: () => drawBankSign(bank) });
+    items.push({ depth: bank.r + bank.c - 3.3, draw: () => drawBankPlayerBadge(bank) });
+    items.push({ depth: bank.r + bank.c - 2.5, draw: () => drawBankVanZone(bank) });
     items.push({ depth: bank.r + 3.5 + bank.c + 1.5, draw: () => drawBankEntrance(bank) });
   }
 
