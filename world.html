@@ -7776,9 +7776,9 @@ const bloodSplats = [];   // {r,c,radius,life,max,rot}
 // + копы шлют десятки 'aggro_shot'/'cop_shot' пакетов в секунду) без
 // капов impacts/bloodSplats/bullets разрастаются до тысяч и фризят
 // рендер. Спавнеры дропают самое старое если упёрлись в лимит.
-const _MAX_BULLETS = 35, _MAX_IMPACTS = 10, _MAX_BLOOD = 25,
-      _MAX_MUZZLES = 10, _MAX_SHOCKW = 10, _MAX_SMOKE = 20,
-      _MAX_SHELLS = 20;
+const _MAX_BULLETS = 50, _MAX_IMPACTS = 16, _MAX_BLOOD = 40,
+      _MAX_MUZZLES = 16, _MAX_SHOCKW = 18, _MAX_SMOKE = 30,
+      _MAX_SHELLS = 30;
 function _capArr(arr, cap) { if (arr.length >= cap) arr.shift(); }
 // Тормозные следы — два чёрных штриха от задних колёс при резком повороте
 // или жёстком тормозе на скорости. Затухают за 6 секунд.
@@ -8243,13 +8243,13 @@ function tryMove(obj, dr, dc) {
   // он оказывался ВНЕ клетки («в тюрьме, но бегаю»), удержание отключалось.
   const jailed = isMe && myJailIn > 0;
   if (jailed) {
-    // Игрок ДАЛЕКО вне клетки — мягко шагаем к центру (возврат в камеру),
-    // пока не войдёт в кольцо. Покрывает кейс «сервер не телепортировал».
+    // Игрок далеко от тюрьмы — ТЕЛЕПОРТ в центр двора (не пошаговое
+    // хождение через карту, которое упиралось в здания и лагало).
     if (curD > JAIL_RADIUS_TILES + 1.0) {
-      const ang0 = Math.atan2(JAIL_CENTER_R - obj.r, JAIL_CENTER_C - obj.c);
-      const step = Math.max(Math.hypot(dr, dc), 0.12);
-      obj.r += Math.sin(ang0) * step;
-      obj.c += Math.cos(ang0) * step;
+      obj.r = JAIL_CENTER_R + 1;
+      obj.c = JAIL_CENTER_C + 1;
+      cam.x = (obj.c - obj.r) * TS * 0.5;
+      cam.y = (obj.c + obj.r) * TS * 0.5 * ISO_Y;
       return;
     }
     // Клетка — расчищенный двор участка 7×7 (dr,dc∈[-3,3] от центра,
@@ -23200,7 +23200,7 @@ function spawnShot(wr, wc, ang, weapon, isMyShot) {
 function spawnImpact(wr, wc, weapon, npcShot) {
   const fx = weaponFx(weapon);
   const parts = [];
-  const N = npcShot ? (fx.thick ? 8 : 5) : (fx.thick ? 16 : 10);
+  const N = npcShot ? (fx.thick ? 12 : 8) : (fx.thick ? 22 : 16);
   for (let i = 0; i < N; i++) {
     const a = Math.random() * Math.PI * 2;
     const sp = 0.8 + Math.random() * 1.8 * (fx.thick ? 1.5 : 1.0);
