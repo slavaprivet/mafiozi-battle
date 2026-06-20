@@ -4087,7 +4087,7 @@ function initCityCops() {
 let _cityCopsLastSpawnAt = 0;
 // Радиус, в котором NPC-патрульный «замечает» игрока с wanted и переключается
 // в pursue. 16 тайлов ≈ полтора квартала — реалистично: патруль увидел и побежал.
-const CITYCOP_PURSUE_R = 16;
+const CITYCOP_PURSUE_R = 10;
 // Дистанция захвата (на которой триггерится citycop_arrest на сервере).
 const CITYCOP_ARREST_R = 1.5;
 // Кулдаун на повторную отправку citycop_arrest (чтобы не флудить, если сервер
@@ -4240,7 +4240,8 @@ function updateCityCops(dt) {
     // П6: скрытие в потоке — радиус обнаружения сокращается на 40%
     const _effectivePursueR = (_trafficHideActive && myDrivingCarId)
       ? CITYCOP_PURSUE_R * 0.6 : CITYCOP_PURSUE_R;
-    if (playerWanted && distToPlayer <= _effectivePursueR) {
+    if (playerWanted && distToPlayer <= _effectivePursueR &&
+        (distToPlayer < 4 || !_world_is_wall(Math.floor((cop.y + player.r) / 2), Math.floor((cop.x + player.c) / 2)))) {
       cop._pursuing = true;
       // Игрок в машине — бежим к точке за машиной, но не лезем под колёса.
       // Если игрок прямо тут и НЕ в машине — пробуем арестовать.
@@ -8688,7 +8689,7 @@ function handleEventPacket(d) {
       const g = michaelGuards.get(d.guard_id);
       if (g) g.lastShotAt = performance.now();
     }
-    if (!d.miss && String(d.target_uid) === String(QP.uid)) {
+    if (!d.miss && String(d.target_uid) === String(QP.uid) && !(myJailIn > 0)) {
       flashHitOverlay();
       addShake(3);
       _autoLockThreat('mg', d.guard_id);
@@ -8729,7 +8730,7 @@ function handleEventPacket(d) {
     // Внутри банка серверные копы по игроку «попадать» не должны — он для
     // сервера стоит у входа (savedR/savedC), но физически в интерьере и не
     // может уклоняться. Игнорируем эффекты выстрела/ареста пока _bankInt.
-    if (!d.miss && String(d.target_uid) === String(QP.uid) && !_bankShield()) {
+    if (!d.miss && String(d.target_uid) === String(QP.uid) && !_bankShield() && !(myJailIn > 0)) {
       flashHitOverlay();
       addShake(3);
       _autoLockThreat('cop', d.cop_id);
@@ -21089,7 +21090,9 @@ function drawCar(r, c) {
 // Подсветка: золотой контур + 🎯 над крышей если это МОЙ контракт,
 // либо иконка модели + цвет владельца. Driver-uid отображается рядом.
 function drawQuestCar(qc) {
-  const m = QUEST_CAR_MODELS[qc.model] || CAR_MODELS.find(cm => cm.name === qc.model);
+  const _mn = (typeof qc.model === 'object' && qc.model) ? qc.model.name || qc.model.id : qc.model;
+  const m = QUEST_CAR_MODELS[_mn] || CAR_MODELS.find(cm => cm.name === _mn)
+    || (typeof qc.model === 'object' ? qc.model : null);
   if (!m) return;
   // Непрерывный угол — плавный поворот без 4-snap
   const isMine    = String(qc.owner_uid) === String(QP.uid);
