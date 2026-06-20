@@ -26842,6 +26842,16 @@ function drawMinimap() {
       ctx2.fill(); ctx2.stroke();
     }
   }
+  // Метка waypoint — белый квадрат с пульсацией
+  if (_waypoint) {
+    const wx = (_waypoint.c + 0.5) * sx, wy = (_waypoint.r + 0.5) * sy;
+    const wp2 = 0.6 + 0.4 * Math.abs(Math.sin(performance.now() * 0.005));
+    ctx2.fillStyle = `rgba(255,255,255,${0.3 * wp2})`;
+    ctx2.beginPath(); ctx2.arc(wx, wy, 8, 0, Math.PI * 2); ctx2.fill();
+    ctx2.strokeStyle = `rgba(255,255,255,${0.9 * wp2})`;
+    ctx2.lineWidth = 1.5;
+    ctx2.strokeRect(wx - 4, wy - 4, 8, 8);
+  }
   // Игрок — ЯРКАЯ ЖЁЛТАЯ СТРЕЛКА в направлении взгляда. Под ней —
   // пульсирующее свечение чтобы было хорошо видно среди прочих точек.
   const px = (player.c + 0.5) * sx;
@@ -27347,6 +27357,27 @@ function _updateBankRobbery(dt) {
       }
     }
   }
+
+  // NPC вокруг банка паникуют при тревоге (раз в 3 сек обновляем)
+  if (rob.alarmTriggered && !rob._panicDone) {
+    const now = performance.now();
+    if (!rob._lastPanicAt || now - rob._lastPanicAt > 3000) {
+      rob._lastPanicAt = now;
+      const br = rob.bank.r + 1.5, bc = rob.bank.c + 1.5;
+      for (const n of NPCS) {
+        if (n.dead || (n.panicUntil && n.panicUntil > now)) continue;
+        const d = Math.hypot(n.r - br, n.c - bc);
+        if (d < 12) {
+          n.panicUntil = now + 6000 + Math.random() * 4000;
+          n.panicSrcR = br; n.panicSrcC = bc;
+          n.cryUntil = now + 2000;
+          n.cryText = ['ОГРАБЛЕНИЕ!','ПОЛИЦИЯ!','БЕЖИМ!','ОЙ МАМОЧКИ!'][Math.floor(Math.random()*4)];
+          n.idleUntil = 0;
+        }
+      }
+    }
+  }
+  if (!rob.alarmTriggered) rob._panicDone = false;
 
   // Таймер полиции
   if (rob.alarmTriggered && rob.policeTimer > 0) {
