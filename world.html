@@ -13435,7 +13435,7 @@ function updatePvpUI() {
   }
   // PvP-зона badge
   if (_pvpZoneEl) {
-    _pvpZoneEl.style.display = (pvpActive && !myDead) ? 'block' : 'none';
+    _pvpZoneEl.style.display = 'none';
     document.body.classList.toggle('in-pvp', !!pvpActive);
   }
   // Wanted HUD — звёзды копов и кулачки банд слева сверху.
