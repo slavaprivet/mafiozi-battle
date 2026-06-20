@@ -545,7 +545,7 @@ body.in-pvp #robActionBtn { top: 152px; }
    инкассатора. Теперь приклеен к HP-бару — место освобождено. */
 #moneyHud {
   position: absolute; left: 200px; top: 52px;
-  display: none; gap: 6px; z-index: 9;
+  display: flex; gap: 6px; z-index: 9;
   pointer-events: none; font-family: inherit;
 }
 #moneyHud .mh-pill {
@@ -741,45 +741,24 @@ body.in-pvp #robActionBtn { top: 152px; }
    «← Меню». Содержит HP-бар на всю ширину, цифры current/max, эмодзи
    времени суток и счётчик kills/deaths. */
 #hudPlayer {
-  position: absolute; left: 6px; top: calc(env(safe-area-inset-top, 4px) + 42px);
-  z-index: 5; display: none; flex-direction: row; align-items: center; gap: 6px;
-  background: linear-gradient(180deg, rgba(16,18,26,.94) 0%, rgba(8,10,16,.9) 100%);
-  border: 1px solid #2a3040; border-radius: 10px;
-  padding: 5px 8px 5px 5px;
-  box-shadow: 0 4px 16px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.04);
+  position: absolute; left: 8px; top: calc(env(safe-area-inset-top, 6px) + 46px);
+  z-index: 5; display: none; flex-direction: column; gap: 4px;
+  background: linear-gradient(180deg, rgba(20,24,32,.92) 0%, rgba(10,12,18,.85) 100%);
+  border: 1px solid #3a4452; border-radius: 10px;
+  padding: 8px 10px; min-width: 200px; max-width: 60vw;
+  box-shadow: 0 4px 14px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.05);
   font-family: inherit;
 }
 #hudPlayer.show { display: flex; }
-#hudAvatar {
-  width: 36px; height: 36px; border-radius: 8px;
-  border: 1.5px solid #4a5a6a; background: #0a0e14;
-  flex-shrink: 0; overflow: hidden;
-}
-#hudAvatar canvas { width: 100%; height: 100%; }
-#hudRight { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-#hudNameRow {
-  display: flex; align-items: center; gap: 4px;
-  font-size: 11px; font-weight: 800; color: #ffd76b;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-#hudNameRow .lvl {
-  font-size: 9px; font-weight: 800; color: #0a0e14;
-  background: #ffd76b; border-radius: 4px; padding: 0 4px; line-height: 14px;
-}
 #hudPlayer .hp-row, #hudPlayer .kd-row {
-  display: flex; align-items: center; gap: 4px;
-  font-size: 10px; color: #cfd6e6; white-space: nowrap;
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: #cfd6e6; white-space: nowrap;
 }
 #hudPlayer .hp-row .label, #hudPlayer .kd-row .label {
-  color: #8a92a8; font-size: 9px; font-weight: 700;
+  color: #8a92a8; font-size: 10px; font-weight: 700;
 }
-#hudPlayer .hp-nums { display: inline-flex; align-items: baseline; gap: 1px; white-space: nowrap; font-size: 10px; }
+#hudPlayer .hp-nums { display: inline-flex; align-items: baseline; gap: 1px; white-space: nowrap; }
 #hudPlayer .hp-nums #hpMaxVal { color: #5a6478; }
-#hudMoneyRow {
-  display: flex; align-items: center; gap: 5px;
-  font-size: 12px; font-weight: 800; color: #5dd55d;
-}
-#hudMoneyRow span:first-child { font-size: 14px; }
 #hpBarBig {
   flex: 1; min-width: 80px; height: 12px;
   background: #1a1e26; border: 1px solid #3a4452; border-radius: 6px;
@@ -936,19 +915,19 @@ body.in-pvp #robActionBtn { top: 152px; }
    привлекает внимание всех онлайн-игроков, видно даже на маленьком
    экране. Появляется сверху, висит 3-6 сек, плавно уезжает. */
 #eventBanner {
-  position: absolute; top: 50px; left: 50%;
+  position: absolute; top: 60px; left: 50%;
   transform: translate(-50%, -100%);
-  width: min(260px, 80vw);
-  padding: 6px 10px;
+  width: min(380px, 92vw);
+  padding: 12px 16px;
   background: linear-gradient(135deg, #4a1212, #2a0808);
-  border: 1.5px solid #b8202a;
-  border-radius: 8px;
+  border: 2px solid #b8202a;
+  border-radius: 12px;
   color: #fff;
   z-index: 25;
-  box-shadow: 0 4px 16px rgba(184, 32, 42, .4);
+  box-shadow: 0 8px 32px rgba(184, 32, 42, .5);
   pointer-events: none;
   opacity: 0;
-  transition: transform .3s cubic-bezier(.16,1,.3,1), opacity .3s ease;
+  transition: transform .35s cubic-bezier(.16,1,.3,1), opacity .35s ease;
   text-align: center;
 }
 #eventBanner.show { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
@@ -956,8 +935,8 @@ body.in-pvp #robActionBtn { top: 152px; }
 #eventBanner.win     { border-color: #50d878; background: linear-gradient(135deg, #0a4020, #04201a); box-shadow: 0 8px 32px rgba(80,216,120,.5); }
 #eventBanner.lose    { border-color: #c850a8; background: linear-gradient(135deg, #3a0a3a, #1a041a); box-shadow: 0 8px 32px rgba(200,80,168,.45); }
 #eventBanner.neutral { border-color: #5a708a; background: linear-gradient(135deg, #1a2a3a, #0a141e); box-shadow: 0 8px 32px rgba(90,112,138,.4); }
-#eventBanner .et { font-size: 13px; font-weight: 800; letter-spacing: .2px; line-height: 1.1; padding-right: 18px; }
-#eventBanner .em { font-size: 10px; color: #d8d2c8; margin-top: 2px; line-height: 1.2; }
+#eventBanner .et { font-size: 17px; font-weight: 800; letter-spacing: .3px; line-height: 1.15; padding-right: 22px; }
+#eventBanner .em { font-size: 12px; color: #d8d2c8; margin-top: 4px; line-height: 1.35; }
 /* Крестик закрытия — справа сверху, круглая красная кнопка. Кликабельна
    только когда баннер показан (pointer-events: auto через .show). */
 #eventBanner .bx {
@@ -1102,10 +1081,9 @@ body.in-pvp #robActionBtn { top: 152px; }
 /* Toast — короткое всплывающее уведомление */
 #toast {
   position: absolute; left: 50%; transform: translateX(-50%);
-  bottom: 110px; background: rgba(20,24,32,.92);
-  border: 1px solid #5a2058; border-radius: 8px;
-  color: #ffd76b; padding: 6px 12px; font-size: 11px;
-  max-width: min(260px, 80vw);
+  bottom: 110px; background: rgba(20,24,32,.95);
+  border: 1px solid #5a2058; border-radius: 10px;
+  color: #ffd76b; padding: 10px 16px; font-size: 13px;
   z-index: 30; display: none; box-shadow: 0 4px 12px rgba(0,0,0,.6);
   font-family: inherit;
 }
@@ -1343,20 +1321,17 @@ body.in-pvp #robActionBtn { top: 152px; }
   <div id="toast"></div>
 
   <div id="hudPlayer">
-    <div id="hudAvatar"><canvas id="hudAvatarCv" width="72" height="72"></canvas></div>
-    <div id="hudRight">
-      <div id="hudNameRow"><span class="lvl" id="hudLvl">1</span><span id="hudName">Игрок</span></div>
-      <div class="hp-row">
-        <span class="label">HP</span>
-        <div id="hpBarBig"><div id="hpBarFill"></div></div>
-        <span class="hp-nums">
-          <span id="hpVal">100</span><span style="color:#5a6478">/</span><span id="hpMaxVal">100</span>
-        </span>
-      </div>
-      <div id="hudMoneyRow">
-        <span>💵</span><span id="hudMoney">0</span>
-        <span style="margin-left:4px" id="timeEmoji">☀️</span><span class="clock" id="gameClock">12:00</span>
-      </div>
+    <div class="hp-row">
+      <span class="label">HP</span>
+      <div id="hpBarBig"><div id="hpBarFill"></div></div>
+      <span class="hp-nums">
+        <span id="hpVal">100</span><span style="color:#5a6478">/</span><span id="hpMaxVal">100</span>
+      </span>
+    </div>
+    <div class="kd-row">
+      <span class="label" id="timeEmoji" title="Время в городе">☀️</span>
+      <span class="clock" id="gameClock">12:00</span>
+      <span class="kd"><span id="hudKills">0</span>💀 / <span id="hudDeaths">0</span>🪦</span>
     </div>
   </div>
   <button id="fireBtn">🔫</button>
@@ -4034,25 +4009,6 @@ function _alertNearbyCops(reason) {
   }
 }
 
-function _alertCopsToGunfire(shotR, shotC) {
-  const now = performance.now();
-  for (const cop of cityCops) {
-    if (!cop.alive) continue;
-    if (inLair(cop.y, cop.x)) continue;
-    const d = Math.hypot(cop.y - shotR, cop.x - shotC);
-    if (d > 14) continue;
-    if (inLair(shotR, shotC)) continue;
-    cop._reactUntil = now + 5000;
-    cop._reactR = shotR;
-    cop._reactC = shotC;
-    const cries = ['СТРЕЛЬБА!','ВСЕМ СТОЯТЬ!','ПОЛИЦИЯ! НА ЗЕМЛЮ!'];
-    const existing = _copChats.get(cop.id);
-    if (!existing || existing.untilMs < now + 500) {
-      _copChats.set(cop.id, { text: cries[Math.floor(Math.random() * cries.length)], untilMs: now + 2500 });
-    }
-  }
-}
-
 function spawnCityCop() {
   for (let tries = 0; tries < 60; tries++) {
     const r = 4 + Math.floor(Math.random() * 72);
@@ -4106,7 +4062,7 @@ function initCityCops() {
 let _cityCopsLastSpawnAt = 0;
 // Радиус, в котором NPC-патрульный «замечает» игрока с wanted и переключается
 // в pursue. 16 тайлов ≈ полтора квартала — реалистично: патруль увидел и побежал.
-const CITYCOP_PURSUE_R = 10;
+const CITYCOP_PURSUE_R = 16;
 // Дистанция захвата (на которой триггерится citycop_arrest на сервере).
 const CITYCOP_ARREST_R = 1.5;
 // Кулдаун на повторную отправку citycop_arrest (чтобы не флудить, если сервер
@@ -4259,8 +4215,7 @@ function updateCityCops(dt) {
     // П6: скрытие в потоке — радиус обнаружения сокращается на 40%
     const _effectivePursueR = (_trafficHideActive && myDrivingCarId)
       ? CITYCOP_PURSUE_R * 0.6 : CITYCOP_PURSUE_R;
-    if (playerWanted && distToPlayer <= _effectivePursueR &&
-        (distToPlayer < 4 || !_world_is_wall(Math.floor((cop.y + player.r) / 2), Math.floor((cop.x + player.c) / 2)))) {
+    if (playerWanted && distToPlayer <= _effectivePursueR) {
       cop._pursuing = true;
       // Игрок в машине — бежим к точке за машиной, но не лезем под колёса.
       // Если игрок прямо тут и НЕ в машине — пробуем арестовать.
@@ -4313,8 +4268,7 @@ function updateCityCops(dt) {
     // ── РЕАКЦИЯ НА ИНЦИДЕНТ (стрельба/драка рядом) ─────────────────
     // Пока игрок в банке — не реагируем (player.r/c в координатах интерьера).
     if (cop._reactUntil && now < cop._reactUntil && !_bankInt) {
-      const _rr = cop._reactR || player.r, _rc = cop._reactC || player.c;
-      const dpr2 = _rr - cop.y, dpc2 = _rc - cop.x;
+      const dpr2 = player.r - cop.y, dpc2 = player.c - cop.x;
       const distP2 = Math.hypot(dpr2, dpc2);
       cop.ang = Math.atan2(dpr2, dpc2);
       // Идёт к игроку, но медленнее чем pursue
@@ -6848,7 +6802,7 @@ function _maintainTrafficDensity(now) {
       if (c.parked || c.gang || c._policeEscort || c._policeChase) continue;
       if (c.model && (c.model.paddyvan || c.model.cruiser ||
                       c.model.ambulance || c.model.firetruck)) continue;
-      if (Math.hypot(c.r - player.r, c.c - player.c) > 40) {
+      if (Math.hypot(c.r - player.r, c.c - player.c) > 25) {
         CARS.splice(i, 1); removed++;
       }
     }
@@ -6861,7 +6815,7 @@ function _maintainTrafficDensity(now) {
       const c = CARS[i];
       if (!c || c.parked) continue;
       if (c.id && _bankRob && _bankRob._carId === c.id) continue;
-      if (Math.hypot(c.r - player.r, c.c - player.c) > 40) CARS.splice(i, 1);
+      if (Math.hypot(c.r - player.r, c.c - player.c) > 26) CARS.splice(i, 1);
     }
   }
 }
@@ -8709,7 +8663,7 @@ function handleEventPacket(d) {
       const g = michaelGuards.get(d.guard_id);
       if (g) g.lastShotAt = performance.now();
     }
-    if (!d.miss && String(d.target_uid) === String(QP.uid) && !(myJailIn > 0)) {
+    if (!d.miss && String(d.target_uid) === String(QP.uid)) {
       flashHitOverlay();
       addShake(3);
       _autoLockThreat('mg', d.guard_id);
@@ -8750,7 +8704,7 @@ function handleEventPacket(d) {
     // Внутри банка серверные копы по игроку «попадать» не должны — он для
     // сервера стоит у входа (savedR/savedC), но физически в интерьере и не
     // может уклоняться. Игнорируем эффекты выстрела/ареста пока _bankInt.
-    if (!d.miss && String(d.target_uid) === String(QP.uid) && !_bankShield() && !(myJailIn > 0)) {
+    if (!d.miss && String(d.target_uid) === String(QP.uid) && !_bankShield()) {
       flashHitOverlay();
       addShake(3);
       _autoLockThreat('cop', d.cop_id);
@@ -9060,8 +9014,8 @@ function handleEventPacket(d) {
     // не просто предупреждение при 1★). Сервер посадил в тюрьму, обнулил
     // звёзды. Локально — тост + showArrestOverlay.
     if (d.ok) {
+      // Копы забирают мешок при аресте — нельзя сидеть в тюрьме с добычей.
       _confiscateBagOnArrest();
-      spawnArrestAnim(String(QP.uid), player.r, player.c);
       showEventBanner(
         '🚓 ЗАДЕРЖАН',
         `Патруль схватил на месте. Срок: ${Math.round((d.jail_s || 60) / 60)} мин.`,
@@ -9382,10 +9336,6 @@ function handleEventPacket(d) {
     // сразу, не дожидаясь aggro_apply (даст время отреагировать пока пуля летит).
     if (kind === 'aggro_shot' && String(d.target_uid) === String(QP.uid)) {
       _autoLockThreat('aggro_bot', d.bot_id);
-    }
-    // Копы слышат стрельбу банд — бегут к месту и «вступают в бой»
-    if (kind === 'aggro_shot' && d.sy && d.sx) {
-      _alertCopsToGunfire(d.sy, d.sx);
     }
   } else if (kind === 'aggro_apply') {
     // Серверный отложенный hit-check: пуля долетела, проверка попадания.
@@ -9882,7 +9832,6 @@ function wsConnect() {
               _spriteCache.clear();
               QP.look = merged;
               getSprite(QP.look);
-              _hudAvatarDrawn = false;
             }
             QP.has_look = 1;
           }
@@ -10276,7 +10225,6 @@ const BRIGADIR_AI = {
 };
 const BRIGADIR_PAYOUT_PREVIEW = 400;
 let _myHitTargetBotId = null;   // id бандита-цели из aggroZones (string)
-let _myHitTargetLostAt = 0;
 let _myHitContractActive = false;
 // Защита от race: когда я завалил цель, между aggro_killed (мы шлём
 // brigadir_kill) и brigadir_kill_reply сервер успевает прислать snap
@@ -10771,11 +10719,18 @@ function updateGtaInteractions() {
   // Руки пусты, но в стоящей рядом машине лежат НАШИ мешки → достать обратно
   // (можно передумать и понести мешок пешком / переложить). Радиус 3 тайла.
   if (_bankRob && !_bankRob.myBag && (_bankRob.bagsLoaded > 0)) {
-    let nearCarUnload = null, ndU = 6.0;
+    let nearCarUnload = null, ndU = 3.0;
     for (const car of CARS) {
       if (!car || !(car._bagsLoaded > 0)) continue;
       const d = Math.hypot(player.r - car.r, player.c - car.c);
       if (d < ndU) { ndU = d; nearCarUnload = car; }
+    }
+    // Банковский фургон у банка (виртуальный — мешки в _bankRob.bagsLoaded)
+    if (!nearCarUnload && _bankRob.bank) {
+      const vz = _getBankVanZone(_bankRob.bank);
+      if (Math.hypot(player.r - vz.r, player.c - vz.c) < 3.0) {
+        nearCarUnload = { _isBankVan: true, id: 'bank_van' };
+      }
     }
     if (nearCarUnload) {
       _gtaActionKind = 'bag_unload';
@@ -10787,17 +10742,17 @@ function updateGtaInteractions() {
   }
   // Несём мешок снаружи банка → кнопка погрузки в любую стоящую машину
   if (_bankRob && _bankRob.myBag && (_bankRob.phase === 'loading' || _bankRob.phase === 'carrying')) {
-    let nearCarForLoad = null, nearLoadDist = 6.0;
+    let nearCarForLoad = null, nearLoadDist = 3.0;
     for (const car of CARS) {
       if (!car) continue;
       if (car.driverId) continue;
       const d = Math.hypot(player.r - car.r, player.c - car.c);
       if (d < nearLoadDist) { nearLoadDist = d; nearCarForLoad = car; }
     }
-    for (const [, qc] of questCars) {
-      if (qc.wrecked) continue;
-      const d = Math.hypot(player.r - qc.y, player.c - qc.x);
-      if (d < nearLoadDist) { nearLoadDist = d; nearCarForLoad = { model: { name: qc.model }, r: qc.y, c: qc.x, _bagsLoaded: 0 }; }
+    // Также проверить зону фургона у банка
+    if (!nearCarForLoad && _bankRob.bank) {
+      const vz = _getBankVanZone(_bankRob.bank);
+      if (Math.hypot(player.r - vz.r, player.c - vz.c) < 3.0) nearCarForLoad = { type: 'van', model: { name: 'van' } };
     }
     if (nearCarForLoad) {
       const ct = (nearCarForLoad.model && nearCarForLoad.model.name) || nearCarForLoad.type || 'default';
@@ -10954,16 +10909,12 @@ const _dropBagBtn = document.getElementById('dropBagBtn');
 if (_dropBagBtn) {
   _dropBagBtn.addEventListener('click', () => {
     if (_bankInt && _bankInt.myBag) {
-      // Бросаем мешок на пол в текущей позиции (можно снова подобрать тапом)
+      // В хранилище — кладём мешок обратно на пол (можно снова взять)
       const b = _bankInt.myBag;
       const orig = (_bankInt.bags || []).find(x => x.id === b.id);
-      if (orig) {
-        orig.taken = false;
-        orig.r = player.r;
-        orig.c = player.c;
-      }
+      if (orig) orig.taken = false;
       _bankInt.myBag = null; _myBagWeight = 0;
-      showToast('💼 Мешок брошен', 'ℹ️', 1400);
+      showToast('💼 Мешок отложен', 'ℹ️', 1400);
       if (typeof updateZoneBtn === 'function') updateZoneBtn();
     } else if (_bankRob && _bankRob.myBag) {
       dropVaultBag();
@@ -12488,8 +12439,7 @@ function closeEventBanner() {
   _evBanner.classList.remove('show');
   if (_evBannerT_id) { clearTimeout(_evBannerT_id); _evBannerT_id = null; }
 }
-function showEventBanner(title, msg, ms = 2500, style = 'spawn') {
-  ms = Math.min(ms, 3000);
+function showEventBanner(title, msg, ms = 4000, style = 'spawn') {
   if (!_evBanner) return;
   // Anti-spam: тот же баннер в окне 1200мс игнорируем
   const key = (title || '') + '|' + (msg || '');
@@ -13104,21 +13054,6 @@ function _findNearestMeleeTarget() {
       } };
     }
   }
-  // Другие игроки (PvP / тюрьма)
-  if (typeof others !== 'undefined') {
-    for (const [uid, o] of others) {
-      if (o.dead || String(uid) === String(QP.uid)) continue;
-      const d = Math.hypot(o.y - player.r, o.x - player.c);
-      if (d < bestD) {
-        bestD = d;
-        const _uid = uid;
-        best = { kind:'player', id:String(_uid), getPos:()=>{
-          const p = others.get(_uid);
-          return (p && !p.dead) ? { r: p.y, c: p.x } : null;
-        }};
-      }
-    }
-  }
   // Жители-декор (пассажиры автобуса / ожидающие / хозяева парковок)
   for (const arr of [_busRiders, _busWaiters, _parkingNpcs]) {
     if (!Array.isArray(arr)) continue;
@@ -13236,10 +13171,6 @@ function punch(force) {
       triggerHitStop(25);
       addShake(1.5);
       hapticHit();
-      if (npc.type === 'guard' && !npc.dead) {
-        npc.state = 'hostile';
-        npc._aggroUntil = performance.now() + 12000;
-      }
     }
   } else if (kind === 'citycop') {
     // NPC-патрульный — локальная цель
@@ -13406,7 +13337,6 @@ function updatePvpUI() {
   // PvE-режиме (мирный наблюдатель) — скрываем. В обычном городе с
   // настоящим аккаунтом HUD виден постоянно.
   _hudPlayer.classList.toggle('show', !isPve);
-  _updateHudBar();
   // Кнопка огня видна только когда можно стрелять и есть смысл (open world
   // с хотя бы одной меткой ИЛИ PvP-арена с free-aim). Иначе скрыта.
   // В банке — как в городе: кнопка только при наличии замка (lockedTargets).
@@ -13434,8 +13364,8 @@ function updatePvpUI() {
   _hpBarFill.classList.toggle('crit', pct <= 25);
   _hpVal.textContent     = Math.max(0, Math.round(myHp));
   _hpMaxVal.textContent  = maxHp;
-  if (_hudKills)  _hudKills.textContent  = myKills;
-  if (_hudDeaths) _hudDeaths.textContent = myDeaths;
+  _hudKills.textContent  = myKills;
+  _hudDeaths.textContent = myDeaths;
   // deathOverlay скрываем когда в тюрьме — иначе АРЕСТ + В ТЮРЬМЕ
   // накладываются друг на друга и юзер думает что игра зависла
   // (из дебаг-скрина: fps=60, ws=OPEN, но видно сразу два затемнения).
@@ -13470,7 +13400,7 @@ function updatePvpUI() {
   }
   // PvP-зона badge
   if (_pvpZoneEl) {
-    _pvpZoneEl.style.display = 'none';
+    _pvpZoneEl.style.display = (pvpActive && !myDead) ? 'block' : 'none';
     document.body.classList.toggle('in-pvp', !!pvpActive);
   }
   // Wanted HUD — звёзды копов и кулачки банд слева сверху.
@@ -13517,52 +13447,6 @@ function formatMoney(n) {
 function updateMoneyHud() {
   if (_moneyCashEl) _moneyCashEl.textContent = formatMoney(myCash);
   if (_moneyDiaEl)  _moneyDiaEl.textContent  = formatMoney(myDiamonds);
-  const _hm = document.getElementById('hudMoney');
-  if (_hm) _hm.textContent = formatMoney(myCash);
-}
-let _hudAvatarDrawn = false;
-function _renderHudAvatar() {
-  const cv = document.getElementById('hudAvatarCv');
-  if (!cv || !QP.look) return;
-  const c = cv.getContext('2d');
-  c.clearRect(0, 0, 72, 72);
-  const look = QP.look;
-  const SKINS_A = ['#FDDBB4','#D4A574','#8D5524','#3B2219','#F5D0A9'];
-  const skin = SKINS_A[(look.skin || 0) % SKINS_A.length];
-  const HAIR_C = ['#1a1a1a','#6a3818','#d4a520','#c83a18','#e8e0d0'];
-  const hair = HAIR_C[(look.hair || 0) % HAIR_C.length];
-  const BODY_C = ['#3a5a8a','#5a3a2a','#2a2a2a'];
-  const body = BODY_C[(look.body || 0) % BODY_C.length];
-  c.save();
-  c.translate(36, 36);
-  c.fillStyle = 'rgba(0,0,0,.15)';
-  c.beginPath(); c.ellipse(0, 18, 14, 5, 0, 0, Math.PI * 2); c.fill();
-  c.fillStyle = body;
-  c.beginPath(); c.moveTo(-10, 6); c.lineTo(10, 6); c.lineTo(8, 22); c.lineTo(-8, 22); c.closePath(); c.fill();
-  c.strokeStyle = 'rgba(0,0,0,.3)'; c.lineWidth = 0.8; c.stroke();
-  c.fillStyle = skin;
-  c.beginPath(); c.arc(0, -2, 11, 0, Math.PI * 2); c.fill();
-  c.strokeStyle = 'rgba(0,0,0,.2)'; c.lineWidth = 0.6; c.stroke();
-  c.fillStyle = '#1a1a1a';
-  c.beginPath(); c.arc(-4, -3, 1.5, 0, Math.PI * 2); c.fill();
-  c.beginPath(); c.arc(4, -3, 1.5, 0, Math.PI * 2); c.fill();
-  c.fillStyle = hair;
-  c.beginPath();
-  c.ellipse(0, -9, 11, 6, 0, Math.PI, Math.PI * 2); c.fill();
-  if ((look.hat || 0) > 0) {
-    const HAT_C = ['','#1a1a1a','#3a3a5a','#5a2828','#2a5a2a'];
-    c.fillStyle = HAT_C[(look.hat || 0) % HAT_C.length] || '#1a1a1a';
-    c.beginPath(); c.ellipse(0, -11, 14, 5, 0, Math.PI, Math.PI * 2); c.fill();
-    c.fillRect(-14, -11, 28, 3);
-  }
-  c.restore();
-  _hudAvatarDrawn = true;
-}
-function _updateHudBar() {
-  const ne = document.getElementById('hudName');
-  if (ne) ne.textContent = QP.name || 'Игрок';
-  const le = document.getElementById('hudLvl');
-  if (le) le.textContent = (myGtaStatus && myGtaStatus.sc_lvl) ? myGtaStatus.sc_lvl : Math.max(1, Math.floor((myKills + myDeaths) / 3) + 1);
 }
 function showCashDelta(amount, kind) {
   if (!amount) return;
@@ -13985,7 +13869,11 @@ function update(dt) {
         while (adf < -Math.PI) adf += Math.PI * 2;
         if (Math.abs(adf) > Math.PI * 0.65) inReverse = true;
       }
-      if (!wantingExit && (Math.abs(inDx) > 0.08 || Math.abs(inDy) > 0.08)) {
+      // После удара о стену — короткий кулдаун на газ, чтобы машина не
+      // пинг-понгила обратно в здание каждый кадр (причина бага тряски).
+      const _wallCd = qc._wallHitUntil && performance.now() < qc._wallHitUntil;
+      if (_wallCd) { throttle = 0; }
+      if (!_wallCd && !wantingExit && (Math.abs(inDx) > 0.08 || Math.abs(inDy) > 0.08)) {
         // Стик → желаемое направление движения в WORLD-координатах (тайлы)
         const d = inDx, s = inDy / ISO_Y;
         const targetAng = Math.atan2((s - d) * 0.5, (s + d) * 0.5);
@@ -14184,9 +14072,15 @@ function update(dt) {
           qc.y = newY;
           curVx *= 0.35;
         } else {
-          // Прямой удар о стену → ОТСКОК назад (инверсия скорости с гашением)
-          // вместо «прилипания»: машину отбрасывает от здания + урон по hp.
-          curVx = -curVx * 0.5; curVy = -curVy * 0.5;
+          // Прямой удар о стену → гасим скорость до нуля + лёгкий толчок назад.
+          // Раньше инвертировали velocity (-0.5x), но это вызывало пинг-понг:
+          // отскок → стик разгоняет обратно → снова удар → камера трясётся.
+          // Теперь просто тормозим и немного откатываем позицию от стены.
+          const pushAng = Math.atan2(curVy, curVx);
+          curVx = 0; curVy = 0;
+          qc.x -= Math.cos(pushAng) * 0.08;
+          qc.y -= Math.sin(pushAng) * 0.08;
+          qc._wallHitUntil = performance.now() + 200;
           if (impact > 5.5) reportCarCrash(qc, impact, 'wall');
         }
       }
@@ -14333,13 +14227,18 @@ function update(dt) {
       let lookR = 0, lookC = 0;
       const camSpeed = Math.hypot(curVx, curVy);
       if (camSpeed > 0.5) {
-        // Максимум 2.6 тайла предугадывания на max-скорости.
         const k = Math.min(1, camSpeed / CAR_MAX_SPEED) * 2.6;
         lookR = (curVy / camSpeed) * k;
         lookC = (curVx / camSpeed) * k;
       }
-      const aimC = player.c + lookC;
-      const aimR = player.r + lookR;
+      // Сглаживаем look-ahead через лерп — при резком развороте вектора
+      // (отскок/столкновение) камера не прыгает мгновенно в обратную сторону.
+      if (!qc._smoothLookR) { qc._smoothLookR = lookR; qc._smoothLookC = lookC; }
+      const _lookLerp = Math.min(1, dt * 3);
+      qc._smoothLookR += (lookR - qc._smoothLookR) * _lookLerp;
+      qc._smoothLookC += (lookC - qc._smoothLookC) * _lookLerp;
+      const aimC = player.c + qc._smoothLookC;
+      const aimR = player.r + qc._smoothLookR;
       const targetCamX = (aimC - aimR) * TS * 0.5;
       const targetCamY = (aimC + aimR) * TS * 0.5 * ISO_Y;
       cam.x += (targetCamX - cam.x) * Math.min(1, dt * 5);
@@ -14568,14 +14467,10 @@ function update(dt) {
   if (_myHitContractActive && _myHitTargetBotId && !_myBrigadirKillSent) {
     const tgt = _findHitTargetBotById(_myHitTargetBotId);
     if (!tgt || !tgt.alive) {
-      if (!_myHitTargetLostAt) _myHitTargetLostAt = performance.now();
-      if (performance.now() - _myHitTargetLostAt > 4000) {
-        _myHitContractActive = false;
-        _myHitTargetBotId = null;
-        _myHitTargetLostAt = 0;
-        showToast('🎯 Цель погибла без тебя — контракт сорван', 'ℹ️', 2400);
-      }
-    } else { _myHitTargetLostAt = 0; }
+      _myHitContractActive = false;
+      _myHitTargetBotId = null;
+      showToast('🎯 Цель погибла без тебя — контракт сорван', 'ℹ️', 2400);
+    }
   }
   updateExtinguishBtn();
   _updateDropBagBtn();
@@ -21119,9 +21014,7 @@ function drawCar(r, c) {
 // Подсветка: золотой контур + 🎯 над крышей если это МОЙ контракт,
 // либо иконка модели + цвет владельца. Driver-uid отображается рядом.
 function drawQuestCar(qc) {
-  const _mn = (typeof qc.model === 'object' && qc.model) ? qc.model.name || qc.model.id : qc.model;
-  const m = QUEST_CAR_MODELS[_mn] || CAR_MODELS.find(cm => cm.name === _mn)
-    || (typeof qc.model === 'object' ? qc.model : null);
+  const m = QUEST_CAR_MODELS[qc.model];
   if (!m) return;
   // Непрерывный угол — плавный поворот без 4-snap
   const isMine    = String(qc.owner_uid) === String(QP.uid);
@@ -22156,10 +22049,8 @@ function drawPOI(r, c, poi) {
   ctx.beginPath();
   ctx.arc(p.x, topY - 6, haloR, 0, Math.PI * 2);
   ctx.fill();
-  // Подложка-щит (ширина по тексту)
-  ctx.font = 'bold 11px system-ui, sans-serif';
-  const nameW = ctx.measureText(poi.name).width;
-  const labelW = Math.max(80, 36 + nameW + 10), labelH = 38;
+  // Подложка-щит
+  const labelW = 92, labelH = 38;
   const lx = p.x - labelW / 2, ly = topY - labelH;
   ctx.fillStyle = 'rgba(20,18,12,.92)';
   ctx.strokeStyle = accent;
@@ -22171,6 +22062,7 @@ function drawPOI(r, c, poi) {
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = accent;
+  // Если заблокирован — рисуем замок поверх иконки
   ctx.fillText(locked ? '🔒' : poi.icon, lx + 6, ly + labelH / 2);
   ctx.font = 'bold 11px system-ui, sans-serif';
   ctx.fillStyle = locked ? '#d8a8a8' : '#ffe9aa';
@@ -23329,10 +23221,10 @@ let _gtaLastWarnAt = 0;
 // kind: 'wall' / 'car' / 'other'. impact — скорость в момент удара (тайл/с).
 let _lastCrashAt = 0;
 function reportCarCrash(qc, impact, kind) {
-  if (impact < 1.5) return;
   const now = performance.now();
-  if (now - _lastCrashAt < 800) return;
+  if (now - _lastCrashAt < 250) return;   // антиспам столкновений
   _lastCrashAt = now;
+  // Урон: квадратично от скорости (импульс ~ v²). max клам ~80 за столкновение.
   const dmg = Math.min(80, Math.round(impact * impact * 1.4));
   if (dmg <= 0) return;
   // Локальные эффекты — искры из точки удара + дым
@@ -23351,10 +23243,11 @@ function reportCarCrash(qc, impact, kind) {
   _capArr(impacts, _MAX_IMPACTS);
   impacts.push({ r: qc.y, c: qc.x, parts });
   // Метка тряски: drawQuestCar читает qc._shakeUntil для жесть-вибрации
-  qc._shakeUntil = now + 200;
-  qc._shakeMag   = Math.min(4, impact * 0.4);
-  // Глобальная тряска камеры только при сильном ударе (impact > 4)
-  if (impact > 4) addShake(Math.min(2, impact * 0.15));
+  qc._shakeUntil = now + 280;
+  qc._shakeMag   = Math.min(6, impact * 0.6);
+  // Глобальная экранная тряска — мягче чем раньше (impact*0.7 → *0.35),
+  // иначе при серии ударов камера ходит ходуном.
+  addShake(Math.min(5, impact * 0.35));
   // Шлём серверу — пусть уменьшит hp в авторитативном состоянии
   try {
     ws && ws.send(JSON.stringify({ t: 'gta_crash', d: {
@@ -24156,7 +24049,11 @@ function roundRect(x, y, w, h, r) {
 }
 
 function render() {
-  if (!_hudAvatarDrawn && QP.look) _renderHudAvatar();
+  // СБРОС трансформы к базовой (dpr) КАЖДЫЙ кадр. Без этого любой
+  // разбаланс ctx.save()/restore() (напр. при стрельбе по копам-машинам,
+  // взрывах) НАКАПЛИВАЛСЯ между кадрами → картинку «уносило в бесконечный
+  // туннель» (камера будто отдаляется навсегда). Теперь каждый кадр
+  // стартуем с чистой трансформы — глитч не накапливается.
   const _dpr = Math.min(2, window.devicePixelRatio || 1);
   ctx.setTransform(_dpr, 0, 0, _dpr, 0, 0);
   // Если игрок внутри банка — рисуем только интерьер
@@ -24249,7 +24146,7 @@ function render() {
           else if (poi && poi.special === 'shop') drawBlackmarket(r, c);
           else if (_bankTileSet.has(r + ',' + c)) { /* bank tile — drawn by drawBankBuilding */ }
           else                                    drawBuilding(r, c);
-          // POI-табличка рисуется отдельным проходом ПОСЛЕ items (overlay)
+          if (poi) drawPOI(r, c, poi);
           // Билборд над крышей — если на этом тайле есть запись
           const bb = BILLBOARD_BY_RC.get(r + ',' + c);
           if (bb) drawBillboard(bb);
@@ -24299,7 +24196,7 @@ function render() {
     if (MAP[b.r] && MAP[b.r][b.c] !== 1) {
       items.push({ depth: b.r + b.c, draw: () => drawBusinessBuilding(b.r, b.c, b) });
     }
-    items.push({ depth: b.r + b.c + 0.5, draw: () => drawBusinessPoi(b) });
+    items.push({ depth: b.r + b.c - 0.4, draw: () => drawBusinessPoi(b) });
   }
   // Декор пляжа (турники, лежаки, замки, рампы и т.д.)
   for (const d of BEACH_DECOR) {
@@ -24528,14 +24425,14 @@ function render() {
     items.push({ depth: bank.r + bank.c - 0.3, draw: () => drawBankBuilding(bank) });
     items.push({ depth: bank.r + bank.c - 0.5, draw: () => drawBankSign(bank) });
     items.push({ depth: bank.r + bank.c - 0.6, draw: () => drawBankPlayerBadge(bank) });
-    // Зона фургона убрана — мешок грузится в любую машину рядом
+    items.push({ depth: bank.r + bank.c + 0.1, draw: () => drawBankVanZone(bank) });
     items.push({ depth: bank.r + 3.5 + bank.c + 1.5, draw: () => drawBankEntrance(bank) });
   }
 
   // АЗС — знак с колонкой и зоной взаимодействия
   for (const gs of GAS_STATIONS) {
     if (gs.r < r0 - 2 || gs.r >= r1 + 2 || gs.c < c0 - 2 || gs.c >= c1 + 2) continue;
-    items.push({ depth: gs.r + gs.c + 3.5, draw: () => {
+    items.push({ depth: gs.r + gs.c - 0.1, draw: () => {
       const p = w2s(gs.r + 0.5, gs.c + 0.5);
       const t = performance.now();
       ctx.save();
@@ -24941,11 +24838,8 @@ function render() {
   // Другие
   for (const [, o] of others) {
     items.push({ depth: o.y + o.x + 0.001, draw: () => {
+      // Игрок сейчас «в автозаке» (LOADING/DRIVING) — не рисуем его
       if (_arrestHidden.has(String(o.uid))) return;
-      if (o.dead) {
-        if (!o._deadSince) o._deadSince = performance.now();
-        if (performance.now() - o._deadSince > 3000) return;
-      } else { o._deadSince = 0; }
       const p = w2s(o.y + 0.5, o.x + 0.5);
       const phase = (o.w ? (o._walkPhase || 0) : 0);
       const chat = (o.chat && performance.now() - o.chatT < chatDuration(o.chat)) ? o.chat : null;
@@ -24979,23 +24873,9 @@ function render() {
   drawSkidMarks();
   drawExhaustPuffs();
   items.sort((a, b) => a.depth - b.depth);
-  for (const it of items) {
-    try { it.draw(); }
-    catch(e) {
-      if (!window._renderErrShown) {
-        window._renderErrShown = true;
-        console.error('[render item crash]', e, 'depth=', it.depth);
-      }
-    }
-  }
-  // POI-таблички и бизнес-вывески — ПОВЕРХ зданий чтобы не скрывались
-  for (let r = r0; r < r1; r++) {
-    for (let c = c0; c < c1; c++) {
-      const poi = POI_BY_RC.get(r + ',' + c);
-      if (poi) drawPOI(r, c, poi);
-    }
-  }
-  // Вывески АЗС — ПОВЕРХ всех зданий
+  items.forEach(i => i.draw());
+  // Вывески АЗС — ПОВЕРХ всех зданий (тотем на высоком столбе виден
+  // даже когда сама заправка спрятана за домом). Рисуем после depth-sort.
   _drawGasSigns(r0, c0, r1, c1);
   // Коробка над игроком/машиной если несу груз Майкла
   drawCarriedBox();
@@ -25029,8 +24909,8 @@ function render() {
   // Ночной тинт — поверх ВСЕХ объектов мира, но ПОД UI-слоем (стрелки,
   // мини-карта рисуются после, чтобы остаться читаемыми).
   drawNightTint();
-  // POI-стрелки убраны — навигация через метки по клику (см. _waypoint*)
-  _drawWaypoint();
+  // Стрелки-указатели на POI, которые сейчас за пределами видимости.
+  drawPOIArrows(r0, r1, c0, c1);
   // Стрелка-указатель на инкассатора если он за пределами экрана
   drawEventArrow(r0, r1, c0, c1);
   // 🎯 над активной хит-целью Бригадира — поверх всего
@@ -26341,150 +26221,6 @@ function drawImpacts() {
 // Раньше было «по 4 углам», но из-за DPR-clamp (resizeCanvas clamp'ит
 // devicePixelRatio до 2 на ретине) координаты сжимались к центру и
 // стрелки попадали почти на персонажа.
-// ── Система меток (waypoint) — заменяет автоматические POI-стрелки ───
-// Игрок тапает по зданию/месту → белая метка + компас-стрелка если за экраном.
-// Метка исчезает когда игрок подошёл к ней (< 3 тайла) или через 60 сек.
-let _waypoint = null; // {r, c, setAt, icon}
-
-function _setWaypoint(screenX, screenY) {
-  if (_bankInt) return;
-  const world = s2w(screenX, screenY);
-  if (!world || world.r < 0 || world.c < 0) return;
-  const ri = Math.floor(world.r), ci = Math.floor(world.c);
-  if (ri < 0 || ri >= MAP_ROWS || ci < 0 || ci >= MAP_COLS) return;
-  if (_waypoint && Math.hypot(world.r - _waypoint.r, world.c - _waypoint.c) < 3) {
-    _waypoint = null; return;
-  }
-  let icon = '📍';
-  const poiKey = ri + ',' + ci;
-  const poi = POI_BY_RC.get(poiKey);
-  if (poi && poi.icon) icon = poi.icon;
-  const biz = BUSINESS_BY_RC.get(poiKey);
-  if (biz && biz.emoji) icon = biz.emoji;
-  for (const bank of BANKS) {
-    if (Math.abs(ri - bank.r) < 3 && Math.abs(ci - bank.c) < 3) { icon = '🏦'; break; }
-  }
-  _waypoint = { r: world.r, c: world.c, setAt: performance.now(), icon };
-}
-
-function _drawWaypoint() {
-  if (!_waypoint) return;
-  const now = performance.now();
-  const age = now - _waypoint.setAt;
-  if (age > 60000) { _waypoint = null; return; }
-  const dist = Math.hypot(player.r - _waypoint.r, player.c - _waypoint.c);
-  if (dist < 3) { _waypoint = null; return; }
-  const p = w2s(_waypoint.r + 0.5, _waypoint.c + 0.5);
-  const W = window.innerWidth, H = window.innerHeight;
-  const onScreen = p.x > -20 && p.x < W + 20 && p.y > -20 && p.y < H + 20;
-  const pulse = 0.7 + 0.3 * Math.sin(now * 0.005);
-  if (onScreen) {
-    ctx.save();
-    const bob = Math.sin(now * 0.004) * 4;
-    const py2 = p.y - 28 + bob;
-    // Пульсирующее кольцо на земле (изометрический овал)
-    ctx.globalAlpha = 0.3 * pulse;
-    ctx.strokeStyle = '#60d8ff';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.ellipse(p.x, p.y, 14, 7, 0, 0, Math.PI * 2); ctx.stroke();
-    ctx.globalAlpha = 0.15 * pulse;
-    ctx.beginPath(); ctx.ellipse(p.x, p.y, 20 + pulse * 4, 10 + pulse * 2, 0, 0, Math.PI * 2); ctx.stroke();
-    // Луч от земли к маркеру
-    ctx.globalAlpha = 0.35 * pulse;
-    ctx.strokeStyle = '#60d8ff';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([3, 3]);
-    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x, py2 + 10); ctx.stroke();
-    ctx.setLineDash([]);
-    // Ромб-маркер
-    const sz = 12;
-    const grad = ctx.createLinearGradient(p.x, py2 - sz, p.x, py2 + sz);
-    grad.addColorStop(0, 'rgba(96,216,255,.95)');
-    grad.addColorStop(1, 'rgba(40,120,200,.85)');
-    ctx.globalAlpha = 0.9;
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.moveTo(p.x, py2 - sz); ctx.lineTo(p.x + sz * 0.7, py2);
-    ctx.lineTo(p.x, py2 + sz); ctx.lineTo(p.x - sz * 0.7, py2);
-    ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
-    // Иконка внутри ромба
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(_waypoint.icon, p.x, py2);
-    // Расстояние под маркером
-    ctx.globalAlpha = 0.8;
-    ctx.font = 'bold 9px system-ui';
-    ctx.fillStyle = '#000';
-    ctx.fillText(Math.round(dist) + 'm', p.x + 1, py2 + sz + 10);
-    ctx.fillStyle = '#60d8ff';
-    ctx.fillText(Math.round(dist) + 'm', p.x, py2 + sz + 9);
-    ctx.restore();
-  } else {
-    const cx = W / 2, cy = H / 2;
-    const dx = p.x - cx, dy = p.y - cy;
-    const len = Math.hypot(dx, dy) || 1;
-    const ndx = dx / len, ndy = dy / len;
-    const PAD = 35;
-    let t = Infinity;
-    if (dx > 0) t = Math.min(t, (W - PAD - cx) / dx);
-    if (dx < 0) t = Math.min(t, (PAD - cx) / dx);
-    if (dy > 0) t = Math.min(t, (H - PAD - cy) / dy);
-    if (dy < 0) t = Math.min(t, (PAD - cy) / dy);
-    const ax = cx + t * dx, ay = cy + t * dy;
-    ctx.save();
-    ctx.globalAlpha = 0.85;
-    ctx.translate(ax, ay);
-    ctx.rotate(Math.atan2(ndy, ndx));
-    ctx.fillStyle = 'rgba(255,255,255,.9)';
-    ctx.beginPath();
-    ctx.moveTo(12, 0); ctx.lineTo(-4, -7); ctx.lineTo(-4, 7); ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-    ctx.save();
-    ctx.font = '13px system-ui';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.globalAlpha = 0.9;
-    const toCx = cx - ax, toCy = cy - ay;
-    const tl = Math.hypot(toCx, toCy) || 1;
-    ctx.fillText(_waypoint.icon, ax + (toCx / tl) * 22, ay + (toCy / tl) * 22);
-    ctx.restore();
-    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-  }
-  const distText = dist < 100 ? `${Math.round(dist)}m` : `${(dist / 100).toFixed(1)}km`;
-  ctx.save();
-  ctx.font = 'bold 10px system-ui';
-  ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(0,0,0,.6)';
-  ctx.fillText(_waypoint.icon + ' ' + distText, W / 2 + 1, 47);
-  ctx.fillStyle = '#fff';
-  ctx.fillText(_waypoint.icon + ' ' + distText, W / 2, 46);
-  ctx.restore();
-  ctx.textAlign = 'left';
-}
-
-// Обработчик тапа по canvas — ставит метку
-{
-  const _stage = document.getElementById('stage');
-  let _wpTouchStart = null;
-  _stage.addEventListener('pointerdown', (e) => {
-    _wpTouchStart = { x: e.clientX, y: e.clientY, t: performance.now() };
-  }, { passive: true });
-  _stage.addEventListener('pointerup', (e) => {
-    if (!_wpTouchStart) return;
-    const dx = e.clientX - _wpTouchStart.x, dy = e.clientY - _wpTouchStart.y;
-    const dt = performance.now() - _wpTouchStart.t;
-    _wpTouchStart = null;
-    if (Math.hypot(dx, dy) > 15 || dt > 400) return;
-    if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
-    if (e.target.closest('.modal, #chatBox, #menuPanel, #weaponPick')) return;
-    const _sw = window.innerWidth, _sh = window.innerHeight;
-    if (e.clientX < _sw * 0.3 && e.clientY > _sh * 0.5) return;
-    if (e.clientX > _sw * 0.7 && e.clientY > _sh * 0.5) return;
-    _setWaypoint(e.clientX, e.clientY);
-  }, { passive: true });
-}
-
 function drawPOIArrows(r0, r1, c0, c1) {
   // ВАЖНО: используем CSS pixels (innerWidth/Height), а не canvas.width
   // делёный на window.devicePixelRatio — в resizeCanvas DPR заклеймён до 2,
@@ -26950,16 +26686,6 @@ function drawMinimap() {
       ctx2.fill(); ctx2.stroke();
     }
   }
-  // Метка waypoint — белый квадрат с пульсацией
-  if (_waypoint) {
-    const wx = (_waypoint.c + 0.5) * sx, wy = (_waypoint.r + 0.5) * sy;
-    const wp2 = 0.6 + 0.4 * Math.abs(Math.sin(performance.now() * 0.005));
-    ctx2.fillStyle = `rgba(255,255,255,${0.3 * wp2})`;
-    ctx2.beginPath(); ctx2.arc(wx, wy, 8, 0, Math.PI * 2); ctx2.fill();
-    ctx2.strokeStyle = `rgba(255,255,255,${0.9 * wp2})`;
-    ctx2.lineWidth = 1.5;
-    ctx2.strokeRect(wx - 4, wy - 4, 8, 8);
-  }
   // Игрок — ЯРКАЯ ЖЁЛТАЯ СТРЕЛКА в направлении взгляда. Под ней —
   // пульсирующее свечение чтобы было хорошо видно среди прочих точек.
   const px = (player.c + 0.5) * sx;
@@ -27262,24 +26988,27 @@ function _carTypeName(type) {
 function loadBagIntoVan() {
   if (!_bankRob || !_bankRob.myBag) return;
 
-  // Ближайшая стоящая машина рядом с игроком (радиус 6 тайлов)
+  // Зона фургона у банка — основной транспорт для отгрузки добычи, вмещает
+  // ВЕСЬ улов банка (bagsMax), чтобы погрузка не упиралась в штатную вместимость
+  // обычной машины (sedan=2, van=6) посреди взлома medium/large банка (12/18 мешков)
+  // и игрок не застревал с мешком в руках без возможности его сгрузить.
   let nearCar = null, maxBagsOverride = null;
-  {
-    let nearDist = 6.0;
-    for (const car of CARS) {
-      if (!car) continue;
-      if (car.driverId) continue;
-      const d = Math.hypot(player.r - car.r, player.c - car.c);
-      if (d < nearDist) { nearDist = d; nearCar = car; }
+  if (_bankRob.bank) {
+    const vz = _getBankVanZone(_bankRob.bank);
+    if (Math.hypot(player.r - vz.r, player.c - vz.c) < 3.0) {
+      nearCar = { type: 'van', id: 'bank_van', _isBankVan: true };
+      maxBagsOverride = _bankRob.bagsMax;
     }
   }
-  // Квестовые машины тоже подходят
+
+  // Иначе — ближайшая стоящая машина рядом с игроком (радиус 3 тайла)
   if (!nearCar) {
-    let nearDist = 6.0;
-    for (const [, qc] of questCars) {
-      if (qc.driver_uid && qc.driver_uid !== String(QP.uid)) continue;
-      const d = Math.hypot(player.r - qc.y, player.c - qc.x);
-      if (d < nearDist) { nearDist = d; nearCar = { type: qc.model, id: qc.id, r: qc.y, c: qc.x }; }
+    let nearDist = 3.0;
+    for (const car of CARS) {
+      if (!car) continue;
+      if (car.driverId) continue;  // кто-то едет — пропустить
+      const d = Math.hypot(player.r - car.r, player.c - car.c);
+      if (d < nearDist) { nearDist = d; nearCar = car; }
     }
   }
 
@@ -27465,27 +27194,6 @@ function _updateBankRobbery(dt) {
       }
     }
   }
-
-  // NPC вокруг банка паникуют при тревоге (раз в 3 сек обновляем)
-  if (rob.alarmTriggered && !rob._panicDone) {
-    const now = performance.now();
-    if (!rob._lastPanicAt || now - rob._lastPanicAt > 3000) {
-      rob._lastPanicAt = now;
-      const br = rob.bank.r + 1.5, bc = rob.bank.c + 1.5;
-      for (const n of NPCS) {
-        if (n.dead || (n.panicUntil && n.panicUntil > now)) continue;
-        const d = Math.hypot(n.r - br, n.c - bc);
-        if (d < 12) {
-          n.panicUntil = now + 6000 + Math.random() * 4000;
-          n.panicSrcR = br; n.panicSrcC = bc;
-          n.cryUntil = now + 2000;
-          n.cryText = ['ОГРАБЛЕНИЕ!','ПОЛИЦИЯ!','БЕЖИМ!','ОЙ МАМОЧКИ!'][Math.floor(Math.random()*4)];
-          n.idleUntil = 0;
-        }
-      }
-    }
-  }
-  if (!rob.alarmTriggered) rob._panicDone = false;
 
   // Таймер полиции
   if (rob.alarmTriggered && rob.policeTimer > 0) {
@@ -28978,18 +28686,7 @@ function _drawCarryingBag(x, y) {
 }
 
 function _drawBankInteriorNpc(npc) {
-  if (npc.state==='fled' && !npc.dead) return;
-  if (npc.dead) {
-    const p=w2s(npc.r+.5,npc.c+.5);
-    ctx.save();
-    ctx.translate(p.x, p.y);
-    ctx.rotate(npc.ang || 0.3);
-    ctx.scale(1, 0.45);
-    ctx.globalAlpha = 0.7;
-    drawPerson(0, 0, 0, npc.look, 0, null, null, false, 0, 60, true, 0);
-    ctx.restore();
-    return;
-  }
+  if (npc.state==='fled') return;
   const now=performance.now();
   const p=w2s(npc.r+.5,npc.c+.5);
   const moving=npc.state==='panic'||npc.state==='hostile'||
@@ -29449,8 +29146,6 @@ function _drawVaultRoom(int) {
   items.sort((a,b)=>a.d-b.d);
   for (const item of items) item.fn();
 
-  // Кровь на полу
-  drawBloodSplats();
   // Боевые эффекты — как в drawBankInteriorScene: render() сюда не доходит,
   // без этих вызовов выстрелы игрока в хранилище были бы невидимы.
   drawAimLaser();
@@ -30861,8 +30556,6 @@ function drawBankInteriorScene() {
    ctx.fillStyle='#60e060';ctx.font='bold 8px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
    ctx.fillText('🚪 ВЫХОД',(a.x+b.x)/2,a.y-dH*.5);ctx.textAlign='left';ctx.textBaseline='alphabetic';}
 
-  // Кровь на полу — без этого пятна крови от убитых охранников не видны
-  drawBloodSplats();
   // Боевые эффекты (трассеры/вспышки/импакты охраны) — снаружи банка их
   // рисует render(), но внутри банка render() сразу уходит в эту функцию
   // и до них не доходит. Без этого выстрелы охраны были невидимы.
