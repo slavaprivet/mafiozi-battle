@@ -24487,10 +24487,10 @@ function render() {
   // БАНКИ — объёмные здания + вывески + зона фургона
   for (const bank of BANKS) {
     if (bank.r + 4 < r0 - 2 || bank.r >= r1 + 2 || bank.c + 5 < c0 - 2 || bank.c >= c1 + 2) continue;
-    items.push({ depth: bank.r + bank.c - 3, draw: () => drawBankBuilding(bank) });
-    items.push({ depth: bank.r + bank.c - 3.2, draw: () => drawBankSign(bank) });
-    items.push({ depth: bank.r + bank.c - 3.3, draw: () => drawBankPlayerBadge(bank) });
-    items.push({ depth: bank.r + bank.c - 2.5, draw: () => drawBankVanZone(bank) });
+    items.push({ depth: bank.r + bank.c - 0.3, draw: () => drawBankBuilding(bank) });
+    items.push({ depth: bank.r + bank.c - 0.5, draw: () => drawBankSign(bank) });
+    items.push({ depth: bank.r + bank.c - 0.6, draw: () => drawBankPlayerBadge(bank) });
+    items.push({ depth: bank.r + bank.c + 0.1, draw: () => drawBankVanZone(bank) });
     items.push({ depth: bank.r + 3.5 + bank.c + 1.5, draw: () => drawBankEntrance(bank) });
   }
 
