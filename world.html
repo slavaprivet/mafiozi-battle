@@ -22115,8 +22115,10 @@ function drawPOI(r, c, poi) {
   ctx.beginPath();
   ctx.arc(p.x, topY - 6, haloR, 0, Math.PI * 2);
   ctx.fill();
-  // Подложка-щит
-  const labelW = 92, labelH = 38;
+  // Подложка-щит (ширина по тексту)
+  ctx.font = 'bold 11px system-ui, sans-serif';
+  const nameW = ctx.measureText(poi.name).width;
+  const labelW = Math.max(80, 36 + nameW + 10), labelH = 38;
   const lx = p.x - labelW / 2, ly = topY - labelH;
   ctx.fillStyle = 'rgba(20,18,12,.92)';
   ctx.strokeStyle = accent;
@@ -22128,7 +22130,6 @@ function drawPOI(r, c, poi) {
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = accent;
-  // Если заблокирован — рисуем замок поверх иконки
   ctx.fillText(locked ? '🔒' : poi.icon, lx + 6, ly + labelH / 2);
   ctx.font = 'bold 11px system-ui, sans-serif';
   ctx.fillStyle = locked ? '#d8a8a8' : '#ffe9aa';
@@ -24207,7 +24208,7 @@ function render() {
           else if (poi && poi.special === 'shop') drawBlackmarket(r, c);
           else if (_bankTileSet.has(r + ',' + c)) { /* bank tile — drawn by drawBankBuilding */ }
           else                                    drawBuilding(r, c);
-          if (poi) drawPOI(r, c, poi);
+          // POI-табличка рисуется отдельным проходом ПОСЛЕ items (overlay)
           // Билборд над крышей — если на этом тайле есть запись
           const bb = BILLBOARD_BY_RC.get(r + ',' + c);
           if (bb) drawBillboard(bb);
@@ -24257,7 +24258,7 @@ function render() {
     if (MAP[b.r] && MAP[b.r][b.c] !== 1) {
       items.push({ depth: b.r + b.c, draw: () => drawBusinessBuilding(b.r, b.c, b) });
     }
-    items.push({ depth: b.r + b.c - 0.4, draw: () => drawBusinessPoi(b) });
+    items.push({ depth: b.r + b.c + 0.5, draw: () => drawBusinessPoi(b) });
   }
   // Декор пляжа (турники, лежаки, замки, рампы и т.д.)
   for (const d of BEACH_DECOR) {
@@ -24493,7 +24494,7 @@ function render() {
   // АЗС — знак с колонкой и зоной взаимодействия
   for (const gs of GAS_STATIONS) {
     if (gs.r < r0 - 2 || gs.r >= r1 + 2 || gs.c < c0 - 2 || gs.c >= c1 + 2) continue;
-    items.push({ depth: gs.r + gs.c - 0.1, draw: () => {
+    items.push({ depth: gs.r + gs.c + 3.5, draw: () => {
       const p = w2s(gs.r + 0.5, gs.c + 0.5);
       const t = performance.now();
       ctx.save();
@@ -24943,8 +24944,14 @@ function render() {
       }
     }
   }
-  // Вывески АЗС — ПОВЕРХ всех зданий (тотем на высоком столбе виден
-  // даже когда сама заправка спрятана за домом). Рисуем после depth-sort.
+  // POI-таблички и бизнес-вывески — ПОВЕРХ зданий чтобы не скрывались
+  for (let r = r0; r < r1; r++) {
+    for (let c = c0; c < c1; c++) {
+      const poi = POI_BY_RC.get(r + ',' + c);
+      if (poi) drawPOI(r, c, poi);
+    }
+  }
+  // Вывески АЗС — ПОВЕРХ всех зданий
   _drawGasSigns(r0, c0, r1, c1);
   // Коробка над игроком/машиной если несу груз Майкла
   drawCarriedBox();
