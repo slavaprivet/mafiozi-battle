@@ -2193,7 +2193,8 @@ function applyQuestCarsSnapshot(arr) {
       prev.passenger_uids = c.passenger_uids || [];
       prev.state      = c.state;
       prev.owner_uid  = c.owner_uid;
-      prev.model      = c.model;
+      // _lockedModel = угнанная civ-машина: держим её скин, не даём серверу подменить
+      prev.model      = prev._lockedModel || c.model;
       prev.reward     = c.reward;
       prev.hp         = c.hp;
       prev.max_hp     = c.max_hp;
@@ -5965,6 +5966,23 @@ const QUEST_CAR_MODELS = {
   harley_chopper: { id: 'harley_chopper', label: 'Harley Chopper',  L: 1.85, W: 0.55, palette: ['#3a3a48','#15151c'], roof: '#0a0a10', wheelR: 0.24, height: 0.50, reward: 1200, is_bike: true },
   ducati_750:     { id: 'ducati_750',     label: 'Ducati 750',      L: 1.70, W: 0.52, palette: ['#e62018','#7a0c0c'], roof: '#1a0a0a', wheelR: 0.22, height: 0.48, reward: 1400, is_bike: true, fast: true },
 };
+// Универсальный резолвер модели машины по id/имени. Угнанная civ-машина
+// приходит с сервера с моделью из CAR_MODELS (sedan/taxi/...), которой НЕТ
+// в QUEST_CAR_MODELS → раньше drawQuestCar делал return и машина пропадала.
+// Ищем в QUEST → CAR → GANG → POLICE, фолбэк — sedan. Карта строится лениво.
+let _CAR_MODEL_BY_NAME = null;
+function resolveCarModel(modelId) {
+  if (!modelId) return QUEST_CAR_MODELS.cadillac_eldo;
+  if (typeof modelId === 'object') return modelId;   // уже объект-модель
+  if (QUEST_CAR_MODELS[modelId]) return QUEST_CAR_MODELS[modelId];
+  if (!_CAR_MODEL_BY_NAME) {
+    _CAR_MODEL_BY_NAME = {};
+    for (const m of CAR_MODELS)      _CAR_MODEL_BY_NAME[m.name] = m;
+    for (const m of GANG_CAR_MODELS) _CAR_MODEL_BY_NAME[m.name] = m;
+    for (const k in POLICE_MODELS)   _CAR_MODEL_BY_NAME[POLICE_MODELS[k].name || k] = POLICE_MODELS[k];
+  }
+  return _CAR_MODEL_BY_NAME[modelId] || _CAR_MODEL_BY_NAME['sedan'] || QUEST_CAR_MODELS.cadillac_eldo;
+}
 // Полицейские модели — отдельный pool, используется ТОЛЬКО для патрулей
 // и спецсобытий (не спавнятся как обычные машины). Эти модели имеют
 // мигалки, надписи POLICE, цветную палитру (бело-чёрная или чёрная для
@@ -8878,9 +8896,11 @@ function handleEventPacket(d) {
       // Сервер создал нам quest-car-civilian. Сразу садимся за руль —
       // сервер уже поставил driver_uid. Локальный snapshot questCars
       // догонит через 1 кадр, поэтому пока создаём болванку.
+      // Скин — в какую сел, в той и едешь: предпочитаем локальную модель.
+      const _useModel = _pendingHijackModel || d.model;
       if (!questCars.has(d.car_id)) {
         questCars.set(d.car_id, {
-          id: d.car_id, model: d.model,
+          id: d.car_id, model: _useModel, _lockedModel: _useModel,
           owner_uid: null, driver_uid: String(QP.uid),
           passenger_uids: [],
           x: d.x, y: d.y, ang: player.ang || 0,
@@ -8889,7 +8909,11 @@ function handleEventPacket(d) {
           state: 'driven', wrecked: false,
           civilian: true, lock_lvl: 0, reward: 0,
         });
+      } else {
+        const _ex = questCars.get(d.car_id);
+        _ex.model = _useModel; _ex._lockedModel = _useModel;
       }
+      _pendingHijackModel = null;
       myDrivingCarId = d.car_id;
       myIsPassenger  = false;
       _exitRequested = false;
@@ -9737,8 +9761,13 @@ function wsConnect() {
       // Если игрок реально жульничает (тп) — at 15 тайл snap всё равно
       // вернёт его. Если просто инет лагает — игрок не чувствует rubber.
       if (d.me) {
-        // Внутри банка координаты — комнатные, не мировые → snap игнорируем
-        if (!_bankInt) {
+        // Внутри банка координаты — комнатные, не мировые → snap игнорируем.
+        // ЗА РУЛЁМ машина клиент-авторитетна (позиция шлётся через gta_drive,
+        // серверный d.me — устаревшее эхо). Если применять коррекцию — снапшот
+        // дёргает player назад, update() возвращает вперёд → камера трясётся
+        // каждый снап. Поэтому при вождении позиционную коррекцию пропускаем.
+        const _driving = !!myDrivingCarId && !myIsPassenger;
+        if (!_bankInt && !_driving) {
         const dist = Math.hypot(player.r - d.me.y, player.c - d.me.x);
         if (_firstSnap || dist > 15.0) {
           player.r = d.me.y; player.c = d.me.x;
@@ -9752,7 +9781,7 @@ function wsConnect() {
           player.r += (d.me.y - player.r) * k;
           player.c += (d.me.x - player.c) * k;
         }
-        } // end if (!_bankInt)
+        } // end if (!_bankInt && !_driving)
         // PVP: HP, dead-state, счёт
         // Если игрока недавно ранил ЛОКАЛЬНЫЙ NPC (охрана банка/копы, о ком
         // сервер не знает), снапшот НЕ поднимает HP обратно — иначе урон
@@ -11446,6 +11475,8 @@ _lpModal.addEventListener('click', (e) => {
 function _completeHijack(car) {
   // Сохраняем уровень топлива угоняемой машины
   _myCarFuelPct = (car._fuel !== undefined) ? car._fuel : (55 + Math.random() * 45);
+  // Запоминаем модель — чтобы серверный civilian_hijack_reply не подменил скин
+  _pendingHijackModel = (car.model && car.model.name) || null;
   // НЕ удаляем машину из CARS сразу: между splice и приходом серверного
   // civilian_hijack_reply (~100мс RTT) клиент видел «дырку» — машина
   // пропадала с экрана пока серверный quest_car не появится. Теперь
@@ -11989,6 +12020,9 @@ function refreshMichaelMenu() {
 // и мы сбросим myDrivingCarId.
 let _exitRequested   = false;   // нажали «Выйти» на ходу — тормозим, потом выходим
 let _handbrakeActive = false;   // ручной тормоз — удерживается кнопкой ⛓
+// Модель угоняемой civ-машины — чтобы скин в какую сел, в той и едешь
+// (сервер может прислать другую модель; мы её игнорируем для своей civ-тачки).
+let _pendingHijackModel = null;
 function enterCar(carId, asKind) {
   const qc = questCars.get(carId);
   if (!qc) return;
@@ -21043,7 +21077,9 @@ function drawCar(r, c) {
 // Подсветка: золотой контур + 🎯 над крышей если это МОЙ контракт,
 // либо иконка модели + цвет владельца. Driver-uid отображается рядом.
 function drawQuestCar(qc) {
-  const m = QUEST_CAR_MODELS[qc.model];
+  // Резолвер: угнанная civ-машина имеет модель из CAR_MODELS (sedan/taxi),
+  // которой нет в QUEST_CAR_MODELS. Раньше тут был return → машина пропадала.
+  const m = resolveCarModel(qc.model);
   if (!m) return;
   // Непрерывный угол — плавный поворот без 4-snap
   const isMine    = String(qc.owner_uid) === String(QP.uid);
