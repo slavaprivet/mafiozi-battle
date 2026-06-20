@@ -26326,14 +26326,45 @@ function _drawWaypoint() {
   const pulse = 0.7 + 0.3 * Math.sin(now * 0.005);
   if (onScreen) {
     ctx.save();
-    ctx.globalAlpha = 0.85 * pulse;
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 2;
-    const sz = 8;
-    ctx.strokeRect(p.x - sz, p.y - sz, sz * 2, sz * 2);
+    const bob = Math.sin(now * 0.004) * 4;
+    const py2 = p.y - 28 + bob;
+    // Пульсирующее кольцо на земле (изометрический овал)
+    ctx.globalAlpha = 0.3 * pulse;
+    ctx.strokeStyle = '#60d8ff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, 14, 7, 0, 0, Math.PI * 2); ctx.stroke();
     ctx.globalAlpha = 0.15 * pulse;
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, 20 + pulse * 4, 10 + pulse * 2, 0, 0, Math.PI * 2); ctx.stroke();
+    // Луч от земли к маркеру
+    ctx.globalAlpha = 0.35 * pulse;
+    ctx.strokeStyle = '#60d8ff';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x, py2 + 10); ctx.stroke();
+    ctx.setLineDash([]);
+    // Ромб-маркер
+    const sz = 12;
+    const grad = ctx.createLinearGradient(p.x, py2 - sz, p.x, py2 + sz);
+    grad.addColorStop(0, 'rgba(96,216,255,.95)');
+    grad.addColorStop(1, 'rgba(40,120,200,.85)');
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(p.x, py2 - sz); ctx.lineTo(p.x + sz * 0.7, py2);
+    ctx.lineTo(p.x, py2 + sz); ctx.lineTo(p.x - sz * 0.7, py2);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+    // Иконка внутри ромба
     ctx.fillStyle = '#fff';
-    ctx.fillRect(p.x - sz, p.y - sz, sz * 2, sz * 2);
+    ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(_waypoint.icon, p.x, py2);
+    // Расстояние под маркером
+    ctx.globalAlpha = 0.8;
+    ctx.font = 'bold 9px system-ui';
+    ctx.fillStyle = '#000';
+    ctx.fillText(Math.round(dist) + 'm', p.x + 1, py2 + sz + 10);
+    ctx.fillStyle = '#60d8ff';
+    ctx.fillText(Math.round(dist) + 'm', p.x, py2 + sz + 9);
     ctx.restore();
   } else {
     const cx = W / 2, cy = H / 2;
