@@ -23298,9 +23298,8 @@ let _gtaLastWarnAt = 0;
 let _lastCrashAt = 0;
 function reportCarCrash(qc, impact, kind) {
   const now = performance.now();
-  if (now - _lastCrashAt < 250) return;   // антиспам столкновений
+  if (now - _lastCrashAt < 600) return;   // антиспам столкновений
   _lastCrashAt = now;
-  // Урон: квадратично от скорости (импульс ~ v²). max клам ~80 за столкновение.
   const dmg = Math.min(80, Math.round(impact * impact * 1.4));
   if (dmg <= 0) return;
   // Локальные эффекты — искры из точки удара + дым
@@ -23319,10 +23318,10 @@ function reportCarCrash(qc, impact, kind) {
   _capArr(impacts, _MAX_IMPACTS);
   impacts.push({ r: qc.y, c: qc.x, parts });
   // Метка тряски: drawQuestCar читает qc._shakeUntil для жесть-вибрации
-  qc._shakeUntil = now + 280;
-  qc._shakeMag   = Math.min(6, impact * 0.6);
-  // Глобальная экранная тряска — лёгкая, только корпус трясётся сильно
-  addShake(Math.min(3, impact * 0.25));
+  qc._shakeUntil = now + 200;
+  qc._shakeMag   = Math.min(4, impact * 0.4);
+  // Глобальная тряска камеры только при сильном ударе (impact > 4)
+  if (impact > 4) addShake(Math.min(2, impact * 0.15));
   // Шлём серверу — пусть уменьшит hp в авторитативном состоянии
   try {
     ws && ws.send(JSON.stringify({ t: 'gta_crash', d: {
@@ -26443,6 +26442,9 @@ function _drawWaypoint() {
     if (Math.hypot(dx, dy) > 15 || dt > 400) return;
     if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
     if (e.target.closest('.modal, #chatBox, #menuPanel, #weaponPick')) return;
+    const _sw = window.innerWidth, _sh = window.innerHeight;
+    if (e.clientX < _sw * 0.3 && e.clientY > _sh * 0.5) return;
+    if (e.clientX > _sw * 0.7 && e.clientY > _sh * 0.5) return;
     _setWaypoint(e.clientX, e.clientY);
   }, { passive: true });
 }
