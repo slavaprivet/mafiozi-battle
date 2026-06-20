@@ -4034,6 +4034,25 @@ function _alertNearbyCops(reason) {
   }
 }
 
+function _alertCopsToGunfire(shotR, shotC) {
+  const now = performance.now();
+  for (const cop of cityCops) {
+    if (!cop.alive) continue;
+    if (inLair(cop.y, cop.x)) continue;
+    const d = Math.hypot(cop.y - shotR, cop.x - shotC);
+    if (d > 14) continue;
+    if (inLair(shotR, shotC)) continue;
+    cop._reactUntil = now + 5000;
+    cop._reactR = shotR;
+    cop._reactC = shotC;
+    const cries = ['СТРЕЛЬБА!','ВСЕМ СТОЯТЬ!','ПОЛИЦИЯ! НА ЗЕМЛЮ!'];
+    const existing = _copChats.get(cop.id);
+    if (!existing || existing.untilMs < now + 500) {
+      _copChats.set(cop.id, { text: cries[Math.floor(Math.random() * cries.length)], untilMs: now + 2500 });
+    }
+  }
+}
+
 function spawnCityCop() {
   for (let tries = 0; tries < 60; tries++) {
     const r = 4 + Math.floor(Math.random() * 72);
@@ -4294,7 +4313,8 @@ function updateCityCops(dt) {
     // ── РЕАКЦИЯ НА ИНЦИДЕНТ (стрельба/драка рядом) ─────────────────
     // Пока игрок в банке — не реагируем (player.r/c в координатах интерьера).
     if (cop._reactUntil && now < cop._reactUntil && !_bankInt) {
-      const dpr2 = player.r - cop.y, dpc2 = player.c - cop.x;
+      const _rr = cop._reactR || player.r, _rc = cop._reactC || player.c;
+      const dpr2 = _rr - cop.y, dpc2 = _rc - cop.x;
       const distP2 = Math.hypot(dpr2, dpc2);
       cop.ang = Math.atan2(dpr2, dpc2);
       // Идёт к игроку, но медленнее чем pursue
@@ -9363,6 +9383,10 @@ function handleEventPacket(d) {
     if (kind === 'aggro_shot' && String(d.target_uid) === String(QP.uid)) {
       _autoLockThreat('aggro_bot', d.bot_id);
     }
+    // Копы слышат стрельбу банд — бегут к месту и «вступают в бой»
+    if (kind === 'aggro_shot' && d.sy && d.sx) {
+      _alertCopsToGunfire(d.sy, d.sx);
+    }
   } else if (kind === 'aggro_apply') {
     // Серверный отложенный hit-check: пуля долетела, проверка попадания.
     // d.miss=true → игрок успел увернуться, никакого урона. Иначе hit-flash.
@@ -10252,6 +10276,7 @@ const BRIGADIR_AI = {
 };
 const BRIGADIR_PAYOUT_PREVIEW = 400;
 let _myHitTargetBotId = null;   // id бандита-цели из aggroZones (string)
+let _myHitTargetLostAt = 0;
 let _myHitContractActive = false;
 // Защита от race: когда я завалил цель, между aggro_killed (мы шлём
 // brigadir_kill) и brigadir_kill_reply сервер успевает прислать snap
@@ -14543,10 +14568,14 @@ function update(dt) {
   if (_myHitContractActive && _myHitTargetBotId && !_myBrigadirKillSent) {
     const tgt = _findHitTargetBotById(_myHitTargetBotId);
     if (!tgt || !tgt.alive) {
-      _myHitContractActive = false;
-      _myHitTargetBotId = null;
-      showToast('🎯 Цель погибла без тебя — контракт сорван', 'ℹ️', 2400);
-    }
+      if (!_myHitTargetLostAt) _myHitTargetLostAt = performance.now();
+      if (performance.now() - _myHitTargetLostAt > 4000) {
+        _myHitContractActive = false;
+        _myHitTargetBotId = null;
+        _myHitTargetLostAt = 0;
+        showToast('🎯 Цель погибла без тебя — контракт сорван', 'ℹ️', 2400);
+      }
+    } else { _myHitTargetLostAt = 0; }
   }
   updateExtinguishBtn();
   _updateDropBagBtn();
