@@ -9857,6 +9857,7 @@ function wsConnect() {
               _spriteCache.clear();
               QP.look = merged;
               getSprite(QP.look);
+              _hudAvatarDrawn = false;
             }
             QP.has_look = 1;
           }
@@ -13491,13 +13492,18 @@ function _renderHudAvatar() {
   const c2 = cv.getContext('2d');
   c2.clearRect(0, 0, 72, 72);
   const savedCtx = ctx;
-  ctx = c2;
-  ctx.save();
-  ctx.translate(36, 52);
-  ctx.scale(1.6, 1.6);
-  try { drawPerson(0, 0, 0, QP.look, 0, null, null, false, null, null, false, 0); } catch(e) {}
-  ctx.restore();
-  ctx = savedCtx;
+  try {
+    ctx = c2;
+    c2.save();
+    c2.translate(36, 52);
+    c2.scale(1.6, 1.6);
+    drawPerson(0, 0, 0, QP.look, 0, null, null, false, null, null, false, 0);
+    c2.restore();
+  } catch(e) {
+    try { c2.restore(); } catch(_) {}
+  } finally {
+    ctx = savedCtx;
+  }
   _hudAvatarDrawn = true;
 }
 function _updateHudBar() {
