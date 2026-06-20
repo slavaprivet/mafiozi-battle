@@ -13489,21 +13489,38 @@ let _hudAvatarDrawn = false;
 function _renderHudAvatar() {
   const cv = document.getElementById('hudAvatarCv');
   if (!cv || !QP.look) return;
-  const c2 = cv.getContext('2d');
-  c2.clearRect(0, 0, 72, 72);
-  const savedCtx = ctx;
-  try {
-    ctx = c2;
-    c2.save();
-    c2.translate(36, 52);
-    c2.scale(1.6, 1.6);
-    drawPerson(0, 0, 0, QP.look, 0, null, null, false, null, null, false, 0);
-    c2.restore();
-  } catch(e) {
-    try { c2.restore(); } catch(_) {}
-  } finally {
-    ctx = savedCtx;
+  const c = cv.getContext('2d');
+  c.clearRect(0, 0, 72, 72);
+  const look = QP.look;
+  const SKINS_A = ['#FDDBB4','#D4A574','#8D5524','#3B2219','#F5D0A9'];
+  const skin = SKINS_A[(look.skin || 0) % SKINS_A.length];
+  const HAIR_C = ['#1a1a1a','#6a3818','#d4a520','#c83a18','#e8e0d0'];
+  const hair = HAIR_C[(look.hair || 0) % HAIR_C.length];
+  const BODY_C = ['#3a5a8a','#5a3a2a','#2a2a2a'];
+  const body = BODY_C[(look.body || 0) % BODY_C.length];
+  c.save();
+  c.translate(36, 36);
+  c.fillStyle = 'rgba(0,0,0,.15)';
+  c.beginPath(); c.ellipse(0, 18, 14, 5, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = body;
+  c.beginPath(); c.moveTo(-10, 6); c.lineTo(10, 6); c.lineTo(8, 22); c.lineTo(-8, 22); c.closePath(); c.fill();
+  c.strokeStyle = 'rgba(0,0,0,.3)'; c.lineWidth = 0.8; c.stroke();
+  c.fillStyle = skin;
+  c.beginPath(); c.arc(0, -2, 11, 0, Math.PI * 2); c.fill();
+  c.strokeStyle = 'rgba(0,0,0,.2)'; c.lineWidth = 0.6; c.stroke();
+  c.fillStyle = '#1a1a1a';
+  c.beginPath(); c.arc(-4, -3, 1.5, 0, Math.PI * 2); c.fill();
+  c.beginPath(); c.arc(4, -3, 1.5, 0, Math.PI * 2); c.fill();
+  c.fillStyle = hair;
+  c.beginPath();
+  c.ellipse(0, -9, 11, 6, 0, Math.PI, Math.PI * 2); c.fill();
+  if ((look.hat || 0) > 0) {
+    const HAT_C = ['','#1a1a1a','#3a3a5a','#5a2828','#2a5a2a'];
+    c.fillStyle = HAT_C[(look.hat || 0) % HAT_C.length] || '#1a1a1a';
+    c.beginPath(); c.ellipse(0, -11, 14, 5, 0, Math.PI, Math.PI * 2); c.fill();
+    c.fillRect(-14, -11, 28, 3);
   }
+  c.restore();
   _hudAvatarDrawn = true;
 }
 function _updateHudBar() {
