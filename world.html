@@ -13871,11 +13871,7 @@ function update(dt) {
         while (adf < -Math.PI) adf += Math.PI * 2;
         if (Math.abs(adf) > Math.PI * 0.65) inReverse = true;
       }
-      // После удара о стену — короткий кулдаун на газ, чтобы машина не
-      // пинг-понгила обратно в здание каждый кадр (причина бага тряски).
-      const _wallCd = qc._wallHitUntil && performance.now() < qc._wallHitUntil;
-      if (_wallCd) { throttle = 0; }
-      if (!_wallCd && !wantingExit && (Math.abs(inDx) > 0.08 || Math.abs(inDy) > 0.08)) {
+      if (!wantingExit && (Math.abs(inDx) > 0.08 || Math.abs(inDy) > 0.08)) {
         // Стик → желаемое направление движения в WORLD-координатах (тайлы)
         const d = inDx, s = inDy / ISO_Y;
         const targetAng = Math.atan2((s - d) * 0.5, (s + d) * 0.5);
@@ -14060,11 +14056,12 @@ function update(dt) {
       // Угнанная машина блокируется любым непроходимым тайлом — стены домов
       // (1), вода (16), припаркованные машины (2), декор. Используем общий
       // isBlocked, чтобы не въехать в море с пирса.
+      let _wallTouch = false;
       if (!isBlocked(newY, newX)) {
         qc.x = newX; qc.y = newY;
       } else {
+        _wallTouch = true;
         const impact = curSpeed;
-        // Скольжение вдоль стены: пробуем двигаться только по X или только по Y
         const slideX = !isBlocked(qc.y, newX);
         const slideY = !isBlocked(newY, qc.x);
         if (slideX) {
@@ -14074,15 +14071,7 @@ function update(dt) {
           qc.y = newY;
           curVx = 0;
         } else {
-          // Прямой удар о стену → гасим скорость до нуля + лёгкий толчок назад.
-          // Раньше инвертировали velocity (-0.5x), но это вызывало пинг-понг:
-          // отскок → стик разгоняет обратно → снова удар → камера трясётся.
-          // Теперь просто тормозим и немного откатываем позицию от стены.
-          const pushAng = Math.atan2(curVy, curVx);
           curVx = 0; curVy = 0;
-          qc.x -= Math.cos(pushAng) * 0.08;
-          qc.y -= Math.sin(pushAng) * 0.08;
-          qc._wallHitUntil = performance.now() + 200;
           if (impact > 5.5) reportCarCrash(qc, impact, 'wall');
         }
       }
@@ -14220,6 +14209,14 @@ function update(dt) {
         const cid = myDrivingCarId;
         myDrivingCarId = null;
         _exitRequested = false;
+        _myCarFuelPct  = null;
+        // Высадка на безопасный тайл рядом с машиной
+        const _exitSafe = _findExitSpot(qc.y, qc.x);
+        if (_exitSafe) { player.r = _exitSafe.r; player.c = _exitSafe.c; }
+        if (qc.driver_uid === String(QP.uid)) {
+          qc.driver_uid = null; qc.state = 'idle';
+          qc.vx = 0; qc.vy = 0;
+        }
         try { ws && ws.send(JSON.stringify({ t: 'gta_exit', d: { car_id: cid } })); }
         catch(e){}
       }
@@ -14228,9 +14225,7 @@ function update(dt) {
       // вместо ×8), чтобы съезд камеры был плавным а не дёрганым.
       let lookR = 0, lookC = 0;
       const camSpeed = Math.hypot(curVx, curVy);
-      // При wallHit-кулдауне — не сдвигаем look-ahead вообще (камера стоит),
-      // чтобы не было дёрганья при скольжении вдоль стены.
-      if (camSpeed > 0.5 && !_wallCd) {
+      if (camSpeed > 0.5 && !_wallTouch) {
         const k = Math.min(1, camSpeed / CAR_MAX_SPEED) * 2.6;
         lookR = (curVy / camSpeed) * k;
         lookC = (curVx / camSpeed) * k;
