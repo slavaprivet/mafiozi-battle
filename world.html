@@ -26827,6 +26827,12 @@ window.addEventListener('pointerdown', () => {
 // строки останутся, юзер делает скриншот и шлёт.
 const _hbHistory = [];
 const _hbEl = (typeof document !== 'undefined') ? document.getElementById('debugHud') : null;
+const _dbgErrors = [];
+window.onerror = (msg, src, line) => {
+  const short = String(msg).slice(0, 60) + ' L' + line;
+  _dbgErrors.push(short);
+  if (_dbgErrors.length > 5) _dbgErrors.shift();
+};
 function _heartbeat() {
   const now = performance.now();
   const dt = (now - _hbLastT) / 1000;
@@ -26872,9 +26878,17 @@ function _heartbeat() {
     const _pc = player ? player.c.toFixed(1) : '?';
     const _qc = (questCars && questCars.size) || 0;
     const _carN = (typeof CARS !== 'undefined' && CARS) ? CARS.length : 0;
+    const _shk = (typeof camShake === 'number') ? camShake.toFixed(1) : '0';
+    const _drvId = myDrivingCarId ? myDrivingCarId.slice(0, 6) : '-';
+    const _bank = _bankInt ? 'IN' : (_bankShieldUntil > performance.now() ? 'SH' : '-');
+    const _wnt = (typeof myWanted === 'number') ? myWanted : 0;
+    const _hp = (typeof myHp === 'number') ? myHp : '?';
+    const _fuel = (_myCarFuelPct !== null) ? Math.round(_myCarFuelPct) + '%' : '-';
+    const _errs = _dbgErrors.length ? '\n🔴 ' + _dbgErrors.slice(-2).join('\n🔴 ') : '';
     _dbg = `\nz${_zoom} dpr${_dpr} cv${canvas.width}x${canvas.height}\n` +
       `win${window.innerWidth}x${window.innerHeight} cam${_camx},${_camy}\n` +
-      `pl${_pr},${_pc} qc${_qc} car${_carN}`;
+      `pl${_pr},${_pc} qc${_qc} car${_carN}\n` +
+      `shk${_shk} drv:${_drvId} bnk:${_bank} w★${_wnt} hp${_hp} ⛽${_fuel}` + _errs;
   } catch (e) { _dbg = '\ndbg-err'; }
   const compact = `${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
     `npc${NPCS && NPCS.length || 0} cop${cops} agg${aggro} oth${others && others.size || 0}\n` +
