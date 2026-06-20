@@ -10768,6 +10768,11 @@ function updateGtaInteractions() {
       const d = Math.hypot(player.r - car.r, player.c - car.c);
       if (d < nearLoadDist) { nearLoadDist = d; nearCarForLoad = car; }
     }
+    for (const [, qc] of questCars) {
+      if (qc.wrecked) continue;
+      const d = Math.hypot(player.r - qc.y, player.c - qc.x);
+      if (d < nearLoadDist) { nearLoadDist = d; nearCarForLoad = { model: { name: qc.model }, r: qc.y, c: qc.x, _bagsLoaded: 0 }; }
+    }
     if (nearCarForLoad) {
       const ct = (nearCarForLoad.model && nearCarForLoad.model.name) || nearCarForLoad.type || 'default';
       const max = BAG_CAPACITY[ct] !== undefined ? BAG_CAPACITY[ct] : BAG_CAPACITY['default'];
