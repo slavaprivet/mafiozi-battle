@@ -24940,6 +24940,36 @@ function render() {
   drawExhaustPuffs();
   items.sort((a, b) => a.depth - b.depth);
   items.forEach(i => i.draw());
+  // ── РЕНТГЕН игрока за зданием ──────────────────────────────────────
+  // В изометрии здание на тайле ближе к камере (r+c больше) рисуется
+  // ПОВЕРХ игрока и полностью его закрывает — игрок «пропадает». Проверяем
+  // тайлы спереди-к-камере; если там стена/банк — дорисовываем игрока
+  // (или его машину) полупрозрачным поверх, чтобы он не исчезал.
+  if (!_bankInt) {
+    const _pri = Math.floor(player.r), _pci = Math.floor(player.c);
+    let _occluded = false;
+    const _frontTiles = [[1,0],[0,1],[1,1],[2,0],[0,2],[2,1],[1,2],[2,2]];
+    for (const [dr, dc] of _frontTiles) {
+      const rr = _pri + dr, cc = _pci + dc;
+      if (!MAP[rr]) continue;
+      const tt = MAP[rr][cc];
+      if (tt === 1 || _bankTileSet.has(rr + ',' + cc)) { _occluded = true; break; }
+    }
+    if (_occluded) {
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      if (myDrivingCarId && !myIsPassenger) {
+        const _qc = questCars.get(myDrivingCarId);
+        if (_qc) { try { drawQuestCar(_qc); } catch(e){} }
+      } else if (!myDrivingCarId && !_inBus) {
+        const _gp = w2s(player.r + 0.5, player.c + 0.5);
+        drawPerson(_gp.x, _gp.y, player.ang, QP.look,
+                   player.walking ? player.walkPhase : 0, null, null, true,
+                   myHp, PVP.max_hp, myDead, null, false, false);
+      }
+      ctx.restore();
+    }
+  }
   // Вывески АЗС — ПОВЕРХ всех зданий (тотем на высоком столбе виден
   // даже когда сама заправка спрятана за домом). Рисуем после depth-sort.
   _drawGasSigns(r0, c0, r1, c1);
