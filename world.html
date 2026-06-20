@@ -14068,10 +14068,10 @@ function update(dt) {
         const slideY = !isBlocked(newY, qc.x);
         if (slideX) {
           qc.x = newX;
-          curVy *= 0.35;   // гасим перпендикулярную составляющую
+          curVy = 0;
         } else if (slideY) {
           qc.y = newY;
-          curVx *= 0.35;
+          curVx = 0;
         } else {
           // Прямой удар о стену → гасим скорость до нуля + лёгкий толчок назад.
           // Раньше инвертировали velocity (-0.5x), но это вызывало пинг-понг:
@@ -14227,15 +14227,15 @@ function update(dt) {
       // вместо ×8), чтобы съезд камеры был плавным а не дёрганым.
       let lookR = 0, lookC = 0;
       const camSpeed = Math.hypot(curVx, curVy);
-      if (camSpeed > 0.5) {
+      // При wallHit-кулдауне — не сдвигаем look-ahead вообще (камера стоит),
+      // чтобы не было дёрганья при скольжении вдоль стены.
+      if (camSpeed > 0.5 && !_wallCd) {
         const k = Math.min(1, camSpeed / CAR_MAX_SPEED) * 2.6;
         lookR = (curVy / camSpeed) * k;
         lookC = (curVx / camSpeed) * k;
       }
-      // Сглаживаем look-ahead через лерп — при резком развороте вектора
-      // (отскок/столкновение) камера не прыгает мгновенно в обратную сторону.
       if (!qc._smoothLookR) { qc._smoothLookR = lookR; qc._smoothLookC = lookC; }
-      const _lookLerp = Math.min(1, dt * 3);
+      const _lookLerp = Math.min(1, dt * 1.8);
       qc._smoothLookR += (lookR - qc._smoothLookR) * _lookLerp;
       qc._smoothLookC += (lookC - qc._smoothLookC) * _lookLerp;
       const aimC = player.c + qc._smoothLookC;
@@ -21200,9 +21200,9 @@ function drawQuestCar(qc) {
   const hpR   = hp / maxHp;
   if (hpR > 0 && hpR < 0.50) {
     const t = performance.now() * 0.004;
-    // Точка «капота» — впереди по направлению машины (dirDx/dirDy уже выше)
-    const hoodOff = 0.45; // тайла впереди от центра
-    const hoodWorld = w2s(qc.y + dirDy * hoodOff, qc.x + dirDx * hoodOff);
+    const _qdx = Math.cos(qc.ang), _qdy = Math.sin(qc.ang);
+    const hoodOff = 0.45;
+    const hoodWorld = w2s(qc.y + _qdy * hoodOff, qc.x + _qdx * hoodOff);
     ctx.save();
     // Дым — всегда когда hpR<0.5, чем ниже hp тем гуще
     const smokeCount = hpR < 0.25 ? 4 : 2;
@@ -23261,12 +23261,14 @@ function reportCarCrash(qc, impact, kind) {
   }
   _capArr(impacts, _MAX_IMPACTS);
   impacts.push({ r: qc.y, c: qc.x, parts });
-  // Метка тряски: drawQuestCar читает qc._shakeUntil для жесть-вибрации
-  qc._shakeUntil = now + 280;
-  qc._shakeMag   = Math.min(6, impact * 0.6);
-  // Глобальная экранная тряска — мягче чем раньше (impact*0.7 → *0.35),
-  // иначе при серии ударов камера ходит ходуном.
-  addShake(Math.min(5, impact * 0.35));
+  // Тряска камеры и спрайта — ТОЛЬКО для столкновений с машинами/NPC,
+  // НЕ для стен. При ударе в стену машина просто останавливается (без
+  // визуальной тряски), иначе камера ходит ходуном при скольжении вдоль стены.
+  if (kind !== 'wall') {
+    qc._shakeUntil = now + 280;
+    qc._shakeMag   = Math.min(6, impact * 0.6);
+    addShake(Math.min(5, impact * 0.35));
+  }
   // Шлём серверу — пусть уменьшит hp в авторитативном состоянии
   try {
     ws && ws.send(JSON.stringify({ t: 'gta_crash', d: {
