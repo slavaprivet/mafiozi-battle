@@ -14238,13 +14238,14 @@ function update(dt) {
       const aimR = player.r + qc._smoothLookR;
       const targetCamX = (aimC - aimR) * TS * 0.5;
       const targetCamY = (aimC + aimR) * TS * 0.5 * ISO_Y;
-      cam.x += (targetCamX - cam.x) * Math.min(1, dt * 5);
-      cam.y += (targetCamY - cam.y) * Math.min(1, dt * 5);
+      const _camLerp = _wallTouch ? 2.5 : 5;
+      cam.x += (targetCamX - cam.x) * Math.min(1, dt * _camLerp);
+      cam.y += (targetCamY - cam.y) * Math.min(1, dt * _camLerp);
       // Зум от скорости: стоим=1.0, макс. скорость=0.80 (видно больше дороги)
-      {
+      if (!_wallTouch) {
         const sp = Math.hypot(curVx, curVy) / CAR_MAX_SPEED;
         const tzoom = (player.r >= 140) ? 1.18 : (1.0 - Math.min(1, sp) * 0.20);
-        viewZoom += (tzoom - viewZoom) * Math.min(1, dt * 2.5);
+        viewZoom += (tzoom - viewZoom) * Math.min(1, dt * 0.8);
       }
       // Крен/клевок кузова (для рендера)
       qc._bodyPitch = (qc._bodyPitch || 0);
