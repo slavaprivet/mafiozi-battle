@@ -544,8 +544,10 @@ body.in-pvp #robActionBtn { top: 152px; }
    Раньше висел сверху и перекрывался плашкой «В тюрьме» / таймером
    инкассатора. Теперь приклеен к HP-бару — место освобождено. */
 #moneyHud {
+  /* Деньги переехали в верхний HUD-бар (#hudPlayer). Старый блок скрыт. */
+  display: none;
   position: absolute; left: 200px; top: 52px;
-  display: flex; gap: 6px; z-index: 9;
+  gap: 6px; z-index: 9;
   pointer-events: none; font-family: inherit;
 }
 #moneyHud .mh-pill {
@@ -742,25 +744,45 @@ body.in-pvp #robActionBtn { top: 152px; }
    времени суток и счётчик kills/deaths. */
 #hudPlayer {
   position: absolute; left: 8px; top: calc(env(safe-area-inset-top, 6px) + 46px);
-  z-index: 5; display: none; flex-direction: column; gap: 4px;
+  z-index: 5; display: none; flex-direction: row; align-items: center; gap: 8px;
   background: linear-gradient(180deg, rgba(20,24,32,.92) 0%, rgba(10,12,18,.85) 100%);
   border: 1px solid #3a4452; border-radius: 10px;
-  padding: 8px 10px; min-width: 200px; max-width: 60vw;
+  padding: 6px 10px 6px 6px; min-width: 200px; max-width: 72vw;
   box-shadow: 0 4px 14px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.05);
   font-family: inherit;
 }
 #hudPlayer.show { display: flex; }
-#hudPlayer .hp-row, #hudPlayer .kd-row {
+/* Аватар персонажа + бейдж уровня */
+#hudPlayer .hud-ava { position: relative; flex: 0 0 auto; width: 44px; height: 44px; }
+#hudPlayer #hudAvatar {
+  width: 44px; height: 44px; border-radius: 8px; display: block;
+  background: radial-gradient(circle at 50% 38%, #2b3144 0%, #11141c 100%);
+  border: 1px solid #3a4452;
+}
+#hudPlayer .hud-lvl {
+  position: absolute; left: -5px; top: -5px;
+  min-width: 17px; height: 17px; padding: 0 3px; box-sizing: border-box;
+  background: linear-gradient(180deg,#ffc24a,#e0891a); color: #1a1206;
+  border: 1px solid rgba(0,0,0,.45); border-radius: 9px;
+  font-size: 10px; font-weight: 900; line-height: 15px; text-align: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,.5);
+}
+#hudPlayer .hud-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+#hudPlayer .hud-name {
+  font-size: 12px; font-weight: 800; color: #eaeefb; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; max-width: 52vw; line-height: 1.1;
+}
+#hudPlayer .hp-row, #hudPlayer .stat-row {
   display: flex; align-items: center; gap: 6px;
   font-size: 11px; color: #cfd6e6; white-space: nowrap;
 }
-#hudPlayer .hp-row .label, #hudPlayer .kd-row .label {
+#hudPlayer .hp-row .label {
   color: #8a92a8; font-size: 10px; font-weight: 700;
 }
-#hudPlayer .hp-nums { display: inline-flex; align-items: baseline; gap: 1px; white-space: nowrap; }
+#hudPlayer .hp-nums { display: inline-flex; align-items: baseline; gap: 1px; white-space: nowrap; font-size: 10px; }
 #hudPlayer .hp-nums #hpMaxVal { color: #5a6478; }
 #hpBarBig {
-  flex: 1; min-width: 80px; height: 12px;
+  flex: 1; min-width: 72px; height: 11px;
   background: #1a1e26; border: 1px solid #3a4452; border-radius: 6px;
   overflow: hidden; position: relative;
   box-shadow: inset 0 1px 3px rgba(0,0,0,.6);
@@ -773,10 +795,9 @@ body.in-pvp #robActionBtn { top: 152px; }
 }
 #hpBarFill.low  { background: linear-gradient(90deg,#ffd24a,#cf8a20); }
 #hpBarFill.crit { background: linear-gradient(90deg,#ff5050,#a02020); }
-#hudPlayer .kd-row { justify-content: space-between; }
-#hudPlayer .kd-row .clock { color: #ffd76b; font-weight: 700; font-size: 11px; }
-#hudPlayer .kd-row .kd { color: #ffd76b; font-size: 11px; font-weight: 700; }
-#hudPlayer .kd-row .kd .neg { color: #ff8888; }
+#hudPlayer .stat-money { color: #5dd55d; font-weight: 800; display: inline-flex; align-items: center; gap: 3px; }
+#hudPlayer .stat-time  { color: #ffd76b; font-weight: 700; display: inline-flex; align-items: center; gap: 3px; }
+#hudPlayer .stat-time .clock { color: #ffd76b; font-weight: 700; }
 
 /* Экран смерти */
 #deathOverlay {
@@ -1322,17 +1343,24 @@ body.in-pvp #robActionBtn { top: 152px; }
   <div id="toast"></div>
 
   <div id="hudPlayer">
-    <div class="hp-row">
-      <span class="label">HP</span>
-      <div id="hpBarBig"><div id="hpBarFill"></div></div>
-      <span class="hp-nums">
-        <span id="hpVal">100</span><span style="color:#5a6478">/</span><span id="hpMaxVal">100</span>
-      </span>
+    <div class="hud-ava">
+      <canvas id="hudAvatar" width="44" height="44"></canvas>
+      <span class="hud-lvl" id="hudLvl">1</span>
     </div>
-    <div class="kd-row">
-      <span class="label" id="timeEmoji" title="Время в городе">☀️</span>
-      <span class="clock" id="gameClock">12:00</span>
-      <span class="kd"><span id="hudKills">0</span>💀 / <span id="hudDeaths">0</span>🪦</span>
+    <div class="hud-info">
+      <div class="hud-name" id="hudName">Игрок</div>
+      <div class="hp-row">
+        <span class="label">HP</span>
+        <div id="hpBarBig"><div id="hpBarFill"></div></div>
+        <span class="hp-nums">
+          <span id="hpVal">100</span><span style="color:#5a6478">/</span><span id="hpMaxVal">100</span>
+        </span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-money">💰<span id="hudMoneyVal">0</span></span>
+        <span class="stat-time"><span id="timeEmoji" title="Время в городе">☀️</span><span class="clock" id="gameClock">12:00</span></span>
+        <span style="display:none"><span id="hudKills">0</span><span id="hudDeaths">0</span></span>
+      </div>
     </div>
   </div>
   <button id="fireBtn">🔫</button>
@@ -9923,6 +9951,7 @@ function wsConnect() {
               _spriteCache.clear();
               QP.look = merged;
               getSprite(QP.look);
+              try { renderHudAvatar(); } catch (e) {}
             }
             QP.has_look = 1;
           }
@@ -13542,6 +13571,9 @@ function formatMoney(n) {
 function updateMoneyHud() {
   if (_moneyCashEl) _moneyCashEl.textContent = formatMoney(myCash);
   if (_moneyDiaEl)  _moneyDiaEl.textContent  = formatMoney(myDiamonds);
+  // Деньги в верхнем HUD-баре (аватар+lvl+имя+HP+деньги+время).
+  const _hm = document.getElementById('hudMoneyVal');
+  if (_hm) _hm.textContent = formatMoney(myCash);
 }
 function showCashDelta(amount, kind) {
   if (!amount) return;
@@ -23162,6 +23194,33 @@ function getSprite(look, skipArms, skipLegs) {
   _spriteCache.set(key, off);
   return off;
 }
+
+// ── Аватар игрока в верхнем HUD-баре ───────────────────────────────
+// Берём верхнюю часть (голова+плечи) спрайта из look и вписываем в
+// квадратный canvas. Кешируется внутри getSprite, перерисовываем при
+// смене внешности (creator) и на старте.
+function renderHudAvatar() {
+  const cv = document.getElementById('hudAvatar');
+  if (!cv) return;
+  const g = cv.getContext('2d');
+  g.clearRect(0, 0, cv.width, cv.height);
+  try {
+    const sp = getSprite(QP.look || {});
+    // Перс рисуется в НИЖНЕЙ части спрайта (bbox по y≈86..197, x≈37..73).
+    // Берём голову+плечи квадратной областью и вписываем в квадратный аватар.
+    const sx = 30, sy = 86, sw = 50, sh = 52;
+    g.imageSmoothingEnabled = false;
+    g.drawImage(sp, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
+  } catch (e) {}
+}
+function initHudIdentity() {
+  const nm = document.getElementById('hudName');
+  if (nm) nm.textContent = QP.name || 'Игрок';
+  const lv = document.getElementById('hudLvl');
+  if (lv) lv.textContent = String(QP.lvl || 1);
+  renderHudAvatar();
+}
+try { initHudIdentity(); } catch (e) {}
 
 // Отрисовка персонажа в мире: тень + спрайт из creator-кеша + имя/чат/HP.
 // Размер фигуры подобран под TS=56: высота спрайта ~ 1.7×TS, чтобы перс
