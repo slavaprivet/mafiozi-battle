@@ -21618,6 +21618,15 @@ function drawHitTargetMarker() {
   if (_myBrigadirReward) {
     _drawEdgeArrowToWorld(BRIGADIR_POS.r, BRIGADIR_POS.c, '🏆', '#ffd76b');
   }
+  // Несём мешок из банка → стрелки-указатели на свои купленные здания
+  // (куда сдать куш). Показываем только пока мешок реально в руках.
+  if (_bankRob && _bankRob.myBag && _myBagWeight > 0 &&
+      Array.isArray(myOwnedBiz) && myOwnedBiz.length) {
+    for (const b of BUSINESS_POIS) {
+      if (!myOwnedBiz.includes(b.id)) continue;
+      _drawEdgeArrowToWorld(b.r, b.c, b.emoji || '🏠', '#5dd55d');
+    }
+  }
 }
 
 // ── Зона сдачи угнанных машин ────────────────────────────────────
