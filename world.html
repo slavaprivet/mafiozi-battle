@@ -1873,10 +1873,10 @@ function generateBeachDecor() {
   //    границы города (r=150) вглубь пляжа к воде (r≈165). По 1 тайлу
   //    шириной, 3-4 дорожки распределены по c. Это не блокирует игрока,
   //    просто декор поверх песка.
+  // PATH_COLS оставлены как «свободные коридоры» для расстановки прочего
+  // декора (пальмы/зонты не лезут в эти полосы), но сами деревянные
+  // дорожки (plank_path) убраны по просьбе — выглядели «досками в кучу».
   const PATH_COLS = [18, 30, 52, 66];
-  for (const pc of PATH_COLS) {
-    _beachDecor.push({ kind: 'plank_path', r0: 150, r1: 165, c: pc });
-  }
   // 2) Пальмы — Poisson-like grid placement. Делим пляж на «соты» 4×4 тайла,
   //    в каждой соте максимум 1 пальма со случайным сдвигом. Плюс глобальная
   //    мин-дистанция 4.0 — гарантия что соседние клетки не дают пары впритык.
@@ -27128,7 +27128,7 @@ function _heartbeat() {
       `pl${_pr},${_pc} qc${_qc} car${_carN}\n` +
       `shk${_shk} drv:${_drvId} bnk:${_bank} w★${_wnt} hp${_hp} ⛽${_fuel}` + _errs;
   } catch (e) { _dbg = '\ndbg-err'; }
-  const compact = `BUILD v2330🚗 ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
+  const compact = `BUILD v0045🏖️ ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
     `npc${NPCS && NPCS.length || 0} cop${cops} agg${aggro} oth${others && others.size || 0}\n` +
     `bul${bullets.length} muz${muzzles.length} ft${floatTexts.length} lk${lockedTargets && lockedTargets.size || 0}\n` +
     `st:${flagStr} tch${_touchCount}/3s ago${touchAgo}s` + _dbg;
