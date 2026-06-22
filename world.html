@@ -1552,10 +1552,8 @@ document.body.addEventListener('touchstart', (e) => {
 // На всякий случай — глушим touchmove на body (но не на canvas/joystick,
 // они и так останавливают через preventDefault выше).
 document.addEventListener('touchmove', (e) => {
-  // Если событие началось НЕ из интерактивного контрола — гасим (для iOS
-  // часто свайп-вниз снизу закрывает webapp).
-  if (e.touches.length > 1) return;  // не мешаем pinch
-  if (e.cancelable) e.preventDefault();
+  if (e.touches.length > 1) return;
+  try { e.preventDefault(); } catch(_) {}
 }, { passive: false });
 
 // ── Canvas ──────────────────────────────────────────────────────
@@ -8165,6 +8163,7 @@ window.addEventListener('touchmove', (e) => {
   for (const t of e.changedTouches) {
     if (t.identifier === joyL._touchId) { joyLMove(t.clientX, t.clientY); break; }
   }
+  try { e.preventDefault(); } catch(_) {}
 }, { passive: false });
 window.addEventListener('touchend', (e) => {
   if (!joyL.active || joyL._touchId == null) return;
@@ -8239,6 +8238,7 @@ window.addEventListener('touchmove', (e) => {
   for (const t of e.changedTouches) {
     if (t.identifier === joyR._touchId) { joyRMove(t.clientX, t.clientY); break; }
   }
+  try { e.preventDefault(); } catch(_) {}
 }, { passive: false });
 window.addEventListener('touchend', (e) => {
   if (!joyR.active || joyR._touchId == null) return;
