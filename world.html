@@ -1965,10 +1965,18 @@ function generateBeachDecor() {
     { r: 158, c: 19, col: '#e74c3c' },
     { r: 161, c: 46, col: '#9b59b6' },
     { r: 158, c: 67, col: '#1abc9c' },
+    { r: 154, c: 32, col: '#3498db' },
+    { r: 160, c: 55, col: '#f39c12' },
+    { r: 162, c: 10, col: '#e91e63' },
   ]) _beachDecor.push({ kind: 'towel', r: tw.r, c: tw.c, col: tw.col });
   // 10) Песочные замки (детский антураж)
   _beachDecor.push({ kind: 'sandcastle', r: 160, c: 16 });
   _beachDecor.push({ kind: 'sandcastle', r: 163, c: 70 });
+  // 10b) Волейбольная сетка
+  _beachDecor.push({ kind: 'volleyball', r: 155, c: 38 });
+  // 10c) Тележки мороженого
+  _beachDecor.push({ kind: 'icecream_cart', r: 152, c: 20 });
+  _beachDecor.push({ kind: 'icecream_cart', r: 153, c: 64 });
   // 11) Морские звёзды и крабы у самой воды
   for (let r = BEACH_R1 - 2; r < BEACH_R1; r++) {
     for (let c = 4; c < MAP_COLS - 4; c++) {
@@ -14745,21 +14753,20 @@ function drawSouthTile(r, c, t, p, wx, wy) {
     const cityTransK = (r < 150)
       ? Math.max(0, (150 - r) / 10)             // 0..1, 1 у города
       : 0;
-    if      (h1 < 18) color = '#e6c890';   // светлый тёплый
-    else if (h1 < 42) color = '#d8b478';
-    else if (h1 < 66) color = '#caa468';
-    else if (h1 < 86) color = '#b8945c';
-    else if (h1 < 95) color = '#a8844c';   // тёмные крупицы
-    else              color = '#f2dca5';   // блик дюны (солнце)
+    if      (h1 < 20) color = '#e8d0a0';
+    else if (h1 < 45) color = '#e0c490';
+    else if (h1 < 70) color = '#d8b880';
+    else if (h1 < 90) color = '#d0ac74';
+    else if (h1 < 96) color = '#c8a46c';
+    else              color = '#ecd8a8';
     // В буферной зоне у города — часть тайлов становятся «бетонными»
     // (как будто остатки разрушенного асфальта на песке). Чем ближе
     // к r=140, тем больше доля серых тайлов.
     if (cityTransK > 0 && h2 < cityTransK * 60) {
       color = (h1 < 50) ? '#4a4a4a' : '#5a5a58';
     }
-    // Сухой песок чуть светлее, мокрый — заметно темнее и с зеленцой
-    if (dryK > 0) color = _shade(color, 0.04 * dryK);
-    if (wetK > 0) color = _shade(color, -0.22 * wetK);
+    if (dryK > 0) color = _shade(color, 0.03 * dryK);
+    if (wetK > 0) color = _shade(color, -0.10 * wetK);
   } else if (isRoadTile) {
     // Асфальтовая дорога к Майклу. Чем ближе к пирсу — тем больше
     // песка занесло на асфальт (по краям дороги).
@@ -14772,7 +14779,7 @@ function drawSouthTile(r, c, t, p, wx, wy) {
     const edgeK = (c === 40 || c === 43) ? 1 : (c === 41 || c === 42 ? 0.35 : 0);
     const sandMix = sandIngress * edgeK;
     if (sandMix > 0 && h2 < sandMix * 70) {
-      color = (h1 < 50) ? '#b8945c' : '#caa468';
+      color = (h1 < 50) ? '#d0ac74' : '#d8b880';
     }
   } else if (t === 15) {
     // Деревянный причал — доски с тёмными швами вдоль рядов (по r).
@@ -15953,6 +15960,77 @@ function drawSandcastle(r, c) {
   ctx.lineTo(p.x + 6 + wave, p.y - 20);
   ctx.lineTo(p.x, p.y - 18);
   ctx.closePath(); ctx.fill();
+}
+
+function drawVolleyNet(r, c) {
+  const p = w2s(r, c);
+  ctx.fillStyle = 'rgba(0,0,0,.3)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y + 4, 30, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  const hw = 28;
+  ctx.strokeStyle = '#6a4a2a';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(p.x - hw, p.y + 4); ctx.lineTo(p.x - hw, p.y - 22);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(p.x + hw, p.y + 4); ctx.lineTo(p.x + hw, p.y - 22);
+  ctx.stroke();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(p.x - hw, p.y - 20); ctx.lineTo(p.x + hw, p.y - 20);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(p.x - hw, p.y - 14); ctx.lineTo(p.x + hw, p.y - 14);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,.5)';
+  ctx.lineWidth = 0.7;
+  for (let i = -hw + 4; i < hw; i += 5) {
+    ctx.beginPath();
+    ctx.moveTo(p.x + i, p.y - 20); ctx.lineTo(p.x + i, p.y - 14);
+    ctx.stroke();
+  }
+}
+
+function drawIceCreamCart(r, c) {
+  const p = w2s(r, c);
+  ctx.fillStyle = 'rgba(0,0,0,.4)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y + 6, 16, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(p.x - 12, p.y - 10, 24, 16);
+  ctx.strokeStyle = '#bbb';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(p.x - 12, p.y - 10, 24, 16);
+  ctx.fillStyle = '#e74c3c';
+  ctx.fillRect(p.x - 12, p.y - 10, 24, 4);
+  ctx.fillStyle = '#c89858';
+  ctx.fillRect(p.x - 8, p.y - 4, 3, 6);
+  ctx.fillStyle = '#f8c0d0';
+  ctx.beginPath(); ctx.arc(p.x - 6.5, p.y - 5.5, 2.5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#c89858';
+  ctx.fillRect(p.x + 2, p.y - 4, 3, 6);
+  ctx.fillStyle = '#c0e8b0';
+  ctx.beginPath(); ctx.arc(p.x + 3.5, p.y - 5.5, 2.5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#666';
+  ctx.beginPath(); ctx.arc(p.x - 8, p.y + 8, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(p.x + 8, p.y + 8, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#888';
+  ctx.fillRect(p.x - 0.5, p.y - 10, 1, -14);
+  ctx.fillStyle = '#f1c40f';
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y - 24);
+  ctx.lineTo(p.x + 14, p.y - 18);
+  ctx.lineTo(p.x + 14, p.y - 12);
+  ctx.lineTo(p.x, p.y - 18);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#1a1410';
+  ctx.font = 'bold 5px system-ui';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('ICE', p.x + 7, p.y - 16);
 }
 
 function drawStarfish(r, c, col) {
@@ -24881,6 +24959,10 @@ function render() {
       items.push({ depth: d.r + d.c - 0.1, draw: () => drawBeachTowel(d.r, d.c, d.col) });
     else if (d.kind === 'sandcastle')
       items.push({ depth: d.r + d.c, draw: () => drawSandcastle(d.r, d.c) });
+    else if (d.kind === 'volleyball')
+      items.push({ depth: d.r + d.c, draw: () => drawVolleyNet(d.r, d.c) });
+    else if (d.kind === 'icecream_cart')
+      items.push({ depth: d.r + d.c, draw: () => drawIceCreamCart(d.r, d.c) });
     else if (d.kind === 'starfish')
       items.push({ depth: d.r + d.c - 0.1, draw: () => drawStarfish(d.r, d.c, d.col) });
     else if (d.kind === 'crab')
