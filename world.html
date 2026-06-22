@@ -2251,9 +2251,15 @@ function applyQuestCarsSnapshot(arr) {
       });
     }
   }
-  // Убираем машины которые больше не приходят (доставлены / сервер их выкинул)
+  // Убираем машины которые больше не приходят (доставлены / сервер их выкинул).
+  // НО НИКОГДА не удаляем машину, которой я сейчас рулю/еду пассажиром: на
+  // пляже/песке сервер временно перестаёт слать civ-машину (считает её «вне
+  // дороги»), а клиент её удалял → «тачка пропала, выезжаешь с песка —
+  // появляется», и камера машины ломалась (questCars.get(myDrivingCarId)
+  // = undefined → весь вид «съезжал»). Моя машина клиент-авторитетна —
+  // держим её локально, даже если сервер на пару тиков замолчал.
   for (const id of Array.from(questCars.keys())) {
-    if (!fresh.has(id)) questCars.delete(id);
+    if (!fresh.has(id) && id !== myDrivingCarId) questCars.delete(id);
   }
 }
 // Когда я сел в машину — её id; null если иду пешком.
@@ -27122,7 +27128,7 @@ function _heartbeat() {
       `pl${_pr},${_pc} qc${_qc} car${_carN}\n` +
       `shk${_shk} drv:${_drvId} bnk:${_bank} w★${_wnt} hp${_hp} ⛽${_fuel}` + _errs;
   } catch (e) { _dbg = '\ndbg-err'; }
-  const compact = `BUILD v2310💼 ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
+  const compact = `BUILD v2330🚗 ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
     `npc${NPCS && NPCS.length || 0} cop${cops} agg${aggro} oth${others && others.size || 0}\n` +
     `bul${bullets.length} muz${muzzles.length} ft${floatTexts.length} lk${lockedTargets && lockedTargets.size || 0}\n` +
     `st:${flagStr} tch${_touchCount}/3s ago${touchAgo}s` + _dbg;
