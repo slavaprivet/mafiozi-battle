@@ -20495,158 +20495,66 @@ function drawNpc(npc) {
 const _BEACH_SKIN = ['#f0c89c', '#d8a07c', '#a87454', '#6c4a30'];
 function drawBeachgoer(b) {
   const p = w2s(b.y, b.x);
-  const skin = _BEACH_SKIN[b.skin % _BEACH_SKIN.length];
-  const hairCols = ['#3a2418', '#7a4a26', '#d4a44c', '#262626'];
-  const hairCol  = hairCols[b.hair % hairCols.length];
-  const act      = b.act || 'idle';
-  // Тень под NPC
-  ctx.fillStyle = 'rgba(0,0,0,.35)';
-  ctx.beginPath();
-  ctx.ellipse(p.x, p.y + 3, 7, 2.5, 0, 0, Math.PI * 2);
-  ctx.fill();
+  const act = b.act || 'idle';
+  // Голый «купальный» look — полноразмерный спрайт как у обычного перса
+  // (раньше были мелкие палочки). swim:true → drawChar рисует голое тело
+  // + плавки/купальник цвета b.outfit.
+  const look = {
+    gender: b.gender | 0,
+    skin:   (b.skin | 0) % 4,
+    body:   b.gender ? (b.hair % 4) : ((b.skin + b.hair) % 4),
+    face:   1,                       // лёгкая улыбка
+    hair:   ((b.hair | 0) % 4) + 1,  // 1..4 (0 = лысый — пропускаем)
+    hat:    0,
+    swim:   true,
+    swimCol: b.outfit || '#e74c3c',
+  };
   if (act === 'sunbathe') {
-    // Лежит на полотенце — горизонтальная поза
-    // Полотенце
-    ctx.fillStyle = b.outfit;
-    ctx.fillRect(p.x - 12, p.y - 1, 24, 8);
-    // Тело-овал
+    // Лежит на полотенце (drawPerson не умеет лежачую позу) — компактно
+    const skin = SKINS[look.skin] || SKINS[0];
+    ctx.fillStyle = 'rgba(0,0,0,.3)';
+    ctx.beginPath(); ctx.ellipse(p.x, p.y + 3, 16, 5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = b.outfit; ctx.fillRect(p.x - 18, p.y - 2, 36, 12);        // полотенце
     ctx.fillStyle = skin;
-    ctx.beginPath();
-    ctx.ellipse(p.x, p.y + 2, 10, 3.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // Голова
-    ctx.fillStyle = skin;
-    ctx.beginPath();
-    ctx.arc(p.x - 10, p.y + 2, 3, 0, Math.PI * 2);
-    ctx.fill();
-    // Волосы
-    ctx.fillStyle = hairCol;
-    ctx.beginPath();
-    ctx.arc(p.x - 11, p.y + 1, 2.5, 0, Math.PI * 2);
-    ctx.fill();
-    // Купальник — пятно посередине
-    ctx.fillStyle = b.outfit;
-    ctx.fillRect(p.x - 2, p.y + 1, 6, 3);
+    ctx.beginPath(); ctx.ellipse(p.x, p.y + 3, 15, 5, 0, 0, Math.PI * 2); ctx.fill(); // тело
+    ctx.beginPath(); ctx.arc(p.x - 15, p.y + 3, 4.5, 0, Math.PI * 2); ctx.fill();      // голова
+    const hairCols = ['#3a2418', '#7a4a26', '#d4a44c', '#262626'];
+    ctx.fillStyle = hairCols[b.hair % 4];
+    ctx.beginPath(); ctx.arc(p.x - 16, p.y + 1, 4, Math.PI, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = b.outfit; ctx.fillRect(p.x - 4, p.y + 1, 9, 5);            // купальник
     return;
   }
-  // Стоящие позы. Высота фигурки ~ 28 px.
-  // Покачивание ног при ходьбе/беге
-  let legSwing = 0;
-  if (act === 'walk' || act === 'flee') {
-    legSwing = Math.sin(b.walkPhase) * (act === 'flee' ? 4 : 2.5);
+  const walking = (act === 'walk' || act === 'flee');
+  const ph = walking ? (b.walkPhase || 0) : 0;
+  drawPerson(p.x, p.y, b.ang || 0, look, ph, null, null, false, null, null, false, 0);
+  // Предмет в руке: сок / мороженое (поверх спрайта, у плеча)
+  if (act === 'drink' || act === 'icecream') {
+    const hx = p.x + 13, hy = p.y - 46;
+    if (act === 'drink') {
+      ctx.fillStyle = '#fff8c8'; ctx.fillRect(hx, hy, 5, 7);
+      ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(hx + 3, hy); ctx.lineTo(hx + 5, hy - 5); ctx.stroke();
+    } else {
+      ctx.fillStyle = '#c89858';
+      ctx.beginPath();
+      ctx.moveTo(hx, hy); ctx.lineTo(hx + 6, hy); ctx.lineTo(hx + 3, hy + 6); ctx.closePath(); ctx.fill();
+      const ICE = ['#f8e8c0', '#f0a8b0', '#c0e8b0', '#b0d8f0'];
+      ctx.fillStyle = ICE[(b.hair || 0) % 4];
+      ctx.beginPath(); ctx.arc(hx + 3, hy - 1, 3.4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.55)';
+      ctx.beginPath(); ctx.arc(hx + 2, hy - 2, 1, 0, Math.PI * 2); ctx.fill();
+    }
   }
-  // Ноги (2 палки)
-  ctx.strokeStyle = skin;
-  ctx.lineWidth = 2;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(p.x - 2, p.y - 2);
-  ctx.lineTo(p.x - 2 + legSwing * 0.5, p.y + 4);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(p.x + 2, p.y - 2);
-  ctx.lineTo(p.x + 2 - legSwing * 0.5, p.y + 4);
-  ctx.stroke();
-  // Купальник/плавки (нижняя часть туловища)
-  ctx.fillStyle = b.outfit;
-  ctx.fillRect(p.x - 4, p.y - 6, 8, 5);
-  // Туловище (открытое — кожа)
-  ctx.fillStyle = skin;
-  ctx.fillRect(p.x - 4, p.y - 13, 8, 7);
-  if (b.gender === 1) {
-    // Верх купальника — две полоски
-    ctx.fillStyle = b.outfit;
-    ctx.fillRect(p.x - 4, p.y - 12, 8, 2);
-  }
-  // Руки
-  ctx.strokeStyle = skin;
-  ctx.lineWidth = 2;
-  let armSwing = 0;
-  if (act === 'walk' || act === 'flee') {
-    armSwing = -Math.sin(b.walkPhase) * (act === 'flee' ? 4 : 2);
-  }
-  // Левая рука
-  ctx.beginPath();
-  ctx.moveTo(p.x - 4, p.y - 11);
-  ctx.lineTo(p.x - 7 + armSwing * 0.5, p.y - 5 + armSwing * 0.3);
-  ctx.stroke();
-  // Правая рука — если drink/icecream, согнута со «вкусняшкой»
-  if (act === 'drink') {
-    ctx.beginPath();
-    ctx.moveTo(p.x + 4, p.y - 11);
-    ctx.lineTo(p.x + 6, p.y - 14);
-    ctx.stroke();
-    // Стакан с соком
-    ctx.fillStyle = '#fff8c8';
-    ctx.fillRect(p.x + 5, p.y - 17, 3.5, 4);
-    ctx.strokeStyle = '#aa8030';
-    ctx.lineWidth = 0.6;
-    ctx.strokeRect(p.x + 5, p.y - 17, 3.5, 4);
-    // Соломинка
-    ctx.strokeStyle = '#e74c3c';
-    ctx.lineWidth = 0.8;
-    ctx.beginPath();
-    ctx.moveTo(p.x + 6.5, p.y - 17);
-    ctx.lineTo(p.x + 7.5, p.y - 20);
-    ctx.stroke();
-  } else if (act === 'icecream') {
-    // Рука к рожку
-    ctx.beginPath();
-    ctx.moveTo(p.x + 4, p.y - 11);
-    ctx.lineTo(p.x + 6, p.y - 14);
-    ctx.stroke();
-    // Рожок (треугольник, светло-коричневый)
-    ctx.fillStyle = '#c89858';
-    ctx.beginPath();
-    ctx.moveTo(p.x + 5.2, p.y - 15.5);
-    ctx.lineTo(p.x + 8.0, p.y - 15.5);
-    ctx.lineTo(p.x + 6.6, p.y - 19);
-    ctx.closePath();
-    ctx.fill();
-    // Сеточка на рожке
-    ctx.strokeStyle = '#8a6028';
-    ctx.lineWidth = 0.4;
-    ctx.beginPath();
-    ctx.moveTo(p.x + 5.5, p.y - 16.5); ctx.lineTo(p.x + 7.7, p.y - 16.5);
-    ctx.moveTo(p.x + 5.9, p.y - 17.5); ctx.lineTo(p.x + 7.3, p.y - 17.5);
-    ctx.stroke();
-    // Шарик мороженого (цветной по skin index — каждый разное)
-    const ICE_COLORS = ['#f8e8c0', '#f0a8b0', '#c0e8b0', '#b0d8f0'];
-    ctx.fillStyle = ICE_COLORS[(b.hair || 0) % ICE_COLORS.length];
-    ctx.beginPath();
-    ctx.arc(p.x + 6.6, p.y - 17.5, 2.0, 0, Math.PI * 2);
-    ctx.fill();
-    // Маленький блик
-    ctx.fillStyle = 'rgba(255,255,255,.55)';
-    ctx.beginPath();
-    ctx.arc(p.x + 6.0, p.y - 18.0, 0.7, 0, Math.PI * 2);
-    ctx.fill();
-  } else {
-    ctx.beginPath();
-    ctx.moveTo(p.x + 4, p.y - 11);
-    ctx.lineTo(p.x + 7 - armSwing * 0.5, p.y - 5 - armSwing * 0.3);
-    ctx.stroke();
-  }
-  // Голова
-  ctx.fillStyle = skin;
-  ctx.beginPath();
-  ctx.arc(p.x, p.y - 16, 3.5, 0, Math.PI * 2);
-  ctx.fill();
-  // Волосы (шапочка сверху)
-  ctx.fillStyle = hairCol;
-  ctx.beginPath();
-  ctx.arc(p.x, p.y - 17, 3.5, Math.PI, 0);
-  ctx.fill();
-  // Восклицательный знак при flee — над головой
+  // Восклицательный знак при панике — над головой полноразмерного спрайта
   if (act === 'flee') {
     ctx.fillStyle = 'rgba(220,40,40,.95)';
-    ctx.font = 'bold 12px system-ui, sans-serif';
+    ctx.font = 'bold 15px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
-    const bob = Math.sin(performance.now() * 0.02) * 1.5;
-    ctx.fillText('!', p.x, p.y - 22 + bob);
+    const bob = Math.sin(performance.now() * 0.02) * 2;
+    ctx.fillText('!', p.x, p.y - 96 + bob);
+    ctx.textAlign = 'left';
   }
-  ctx.lineCap = 'butt';
 }
 
 // Охранник Майкла — головорез в чёрной рубашке с пистолетом. Стоит
@@ -22896,11 +22804,12 @@ function drawChar(ctx, W, H, opts) {
   function px(x) { return cx + x * sc; }
   function py(y) { return H * 0.92 - y * sc; }
   const skinCol = SKINS[skin] || SKINS[0];
-  if (gender === 0) drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms, skipLegs);
-  else              drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms, skipLegs);
+  const swim = opts.swim ? (opts.swimCol || '#e74c3c') : null;
+  if (gender === 0) drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms, skipLegs, swim);
+  else              drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms, skipLegs, swim);
 }
 
-function drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms, skipLegs) {
+function drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms, skipLegs, swim) {
   const bodyDefs = [
     { sw: 34, sh: 80, nw: 14, nh: 22, hw: 26 },
     { sw: 44, sh: 85, nw: 16, nh: 22, hw: 30 },
@@ -22908,18 +22817,27 @@ function drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms, ski
     { sw: 52, sh: 92, nw: 16, nh: 24, hw: 32 },
   ];
   const bd = bodyDefs[body] || bodyDefs[1];
-  const suitCol = ['#1a1a2e','#1a2e1a','#2e1a1a','#1a1e2e'][body % 4];
+  // Пляжник (swim): «костюм» = кожа (голое тело), сверху только плавки.
+  const suitCol = swim ? skinCol : ['#1a1a2e','#1a2e1a','#2e1a1a','#1a1e2e'][body % 4];
   const tieCol  = ['#c0392b','#e8c96e','#8e44ad','#2980b9'][face % 4];
   if (!skipLegs) {
     ctx.fillStyle = suitCol;
     const legW = bd.sw * 0.38; const legH = 55 * sc;
     ctx.beginPath(); ctx.roundRect(px(-bd.sw*0.22), py(legH), legW*sc, legH, 4*sc); ctx.fill();
     ctx.beginPath(); ctx.roundRect(px(bd.sw*0.22 - legW), py(legH), legW*sc, legH, 4*sc); ctx.fill();
-    ctx.fillStyle = '#111';
+    ctx.fillStyle = swim ? '#5a4a3a' : '#111';   // босиком/сланцы — тёмная стопа
     [-1,1].forEach(s => { ctx.beginPath(); ctx.ellipse(px(s*bd.sw*0.1), py(2), 10*sc, 5*sc, 0, 0, Math.PI*2); ctx.fill(); });
   }
   ctx.fillStyle = suitCol;
   ctx.beginPath(); ctx.roundRect(px(-bd.sw/2), py(bd.sh), bd.sw*sc, bd.sh*sc, [0,0,6*sc,6*sc]); ctx.fill();
+  if (swim) {
+    // Плавки — цветная полоса на бёдрах (накрывает стык торса и ног)
+    ctx.fillStyle = swim;
+    ctx.beginPath(); ctx.roundRect(px(-bd.sw*0.34), py(0)-3*sc, bd.sw*0.68*sc, 15*sc, 3*sc); ctx.fill();
+    // Поясок плавок чуть темнее
+    ctx.fillStyle = 'rgba(0,0,0,.18)';
+    ctx.beginPath(); ctx.roundRect(px(-bd.sw*0.34), py(0)-3*sc, bd.sw*0.68*sc, 3*sc, 2*sc); ctx.fill();
+  } else {
   ctx.fillStyle = '#ddd';
   ctx.beginPath(); ctx.roundRect(px(-7), py(bd.sh), 14*sc, bd.sh*0.7*sc, 2*sc); ctx.fill();
   ctx.fillStyle = tieCol;
@@ -22927,6 +22845,7 @@ function drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms, ski
   ctx.moveTo(px(-5), py(bd.sh-4)); ctx.lineTo(px(5), py(bd.sh-4));
   ctx.lineTo(px(3), py(bd.sh*0.32)); ctx.lineTo(px(0), py(bd.sh*0.25));
   ctx.lineTo(px(-3), py(bd.sh*0.32)); ctx.closePath(); ctx.fill();
+  }
   ctx.fillStyle = suitCol;
   ctx.beginPath(); ctx.moveTo(px(0), py(bd.sh-2)); ctx.lineTo(px(-bd.sw/2), py(bd.sh)); ctx.lineTo(px(-bd.sw/2), py(bd.sh-20)); ctx.closePath(); ctx.fill();
   ctx.beginPath(); ctx.moveTo(px(0), py(bd.sh-2)); ctx.lineTo(px(bd.sw/2), py(bd.sh)); ctx.lineTo(px(bd.sw/2), py(bd.sh-20)); ctx.closePath(); ctx.fill();
@@ -22954,7 +22873,7 @@ function drawMale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms, ski
   if (hat > 0)  drawHat(ctx, hat, px, py, bd, headY, headH, sc);
 }
 
-function drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms, skipLegs) {
+function drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms, skipLegs, swim) {
   const bodyDefs = [
     { sw: 30, sh: 78, nw: 12, nh: 20, hw: 24, hip: 32 },
     { sw: 36, sh: 80, nw: 13, nh: 20, hw: 27, hip: 40 },
@@ -22962,7 +22881,8 @@ function drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms, s
     { sw: 34, sh: 85, nw: 13, nh: 22, hw: 26, hip: 38 },
   ];
   const bd = bodyDefs[body] || bodyDefs[1];
-  const dressCol = ['#3a1a3a','#1a2a3a','#3a1a1a','#1a3a2a'][body % 4];
+  // Пляжница (swim): «платье» = кожа (голое тело), сверху раздельный купальник.
+  const dressCol = swim ? skinCol : ['#3a1a3a','#1a2a3a','#3a1a1a','#1a3a2a'][body % 4];
   const accentCol = ['#e8c96e','#c0392b','#8e44ad','#2980b9'][face % 4];
   if (!skipLegs) {
     ctx.fillStyle = dressCol;
@@ -22970,15 +22890,24 @@ function drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms, s
     ctx.moveTo(px(-bd.sw/2), py(bd.sh)); ctx.lineTo(px(-bd.hip/2), py(0));
     ctx.lineTo(px(bd.hip/2), py(0)); ctx.lineTo(px(bd.sw/2), py(bd.sh));
     ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#111';
+    ctx.fillStyle = swim ? '#5a4a3a' : '#111';
     [-1,1].forEach(s => {
       ctx.beginPath(); ctx.ellipse(px(s*bd.hip*0.18), py(3), 8*sc, 4*sc, 0, 0, Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.roundRect(px(s*bd.hip*0.18+4*sc), py(0), 3*sc, 8*sc, 1*sc); ctx.fill();
+      if (!swim) { ctx.beginPath(); ctx.roundRect(px(s*bd.hip*0.18+4*sc), py(0), 3*sc, 8*sc, 1*sc); ctx.fill(); }
     });
+    if (swim) {  // низ купальника
+      ctx.fillStyle = swim;
+      ctx.beginPath(); ctx.roundRect(px(-bd.hip*0.40), py(0)-1*sc, bd.hip*0.80*sc, 13*sc, 3*sc); ctx.fill();
+    }
   }
   ctx.fillStyle = dressCol;
   ctx.beginPath();
   ctx.roundRect(px(-bd.sw/2), py(bd.sh), bd.sw*sc, bd.sh*sc, [0,0,6*sc,6*sc]); ctx.fill();
+  if (swim) {
+    // Лиф купальника — полоса на груди
+    ctx.fillStyle = swim;
+    ctx.beginPath(); ctx.roundRect(px(-bd.sw*0.5), py(bd.sh*0.72), bd.sw*sc, 11*sc, 3*sc); ctx.fill();
+  } else {
   ctx.fillStyle = '#f0e8e0';
   ctx.beginPath(); ctx.roundRect(px(-6), py(bd.sh), 12*sc, bd.sh*0.65*sc, 2*sc); ctx.fill();
   ctx.fillStyle = dressCol;
@@ -22986,6 +22915,7 @@ function drawFemale(ctx, px, py, sc, skinCol, body, face, hair, hat, skipArms, s
   ctx.beginPath(); ctx.moveTo(px(0), py(bd.sh-4)); ctx.lineTo(px(bd.sw/2), py(bd.sh)); ctx.lineTo(px(bd.sw/2), py(bd.sh-18)); ctx.closePath(); ctx.fill();
   ctx.fillStyle = accentCol;
   ctx.beginPath(); ctx.arc(px(-8), py(bd.sh-10), 4*sc, 0, Math.PI*2); ctx.fill();
+  }
   const armLen = 58, armW = 8;
   if (!skipArms) {
     ctx.fillStyle = dressCol;
@@ -23276,7 +23206,7 @@ function drawHat(ctx, hatId, px, py, bd, headY, headH, sc) {
 const SPRITE_W = 110, SPRITE_H = 200;
 const _spriteCache = new Map();
 function getSprite(look, skipArms, skipLegs) {
-  const key = [look.gender|0, look.skin|0, look.body|0, look.face|0, look.hair|0, look.hat|0, skipArms?1:0, skipLegs?1:0].join('.');
+  const key = [look.gender|0, look.skin|0, look.body|0, look.face|0, look.hair|0, look.hat|0, skipArms?1:0, skipLegs?1:0, look.swim?('s'+(look.swimCol||'')):''].join('.');
   if (_spriteCache.has(key)) return _spriteCache.get(key);
   const off = document.createElement('canvas');
   off.width = SPRITE_W; off.height = SPRITE_H;
