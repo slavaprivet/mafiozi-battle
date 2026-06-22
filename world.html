@@ -3234,7 +3234,9 @@ function spawnNpc(seed) {
     const c = 2 + Math.floor(Math.random() * (MAP_COLS - 4));
     if (inArena(r, c)) continue;
     if (inLair(r, c)) continue;   // мирные NPC не заходят в логово
-    if (MAP[r][c] === 9 || MAP[r][c] === 8) {
+    const _spt = MAP[r][c];
+    const _isBeach = (_spt === 14);
+    if (_spt === 9 || _spt === 8 || _spt === 14) {
       const arcKey = _pickArchetype();
       const arc    = NPC_ARCHETYPES[arcKey];
       const [spMin, spMax] = arc.speedRange;
@@ -3247,6 +3249,13 @@ function spawnNpc(seed) {
         hat:    Math.floor(Math.random() * 4),
       };
       for (const k of Object.keys(arc.look || {})) baseLook[k] = arc.look[k];
+      // Пляжный NPC — голый купальный вид (тот же drawChar swim-путь, что
+      // и у бывших beachgoers). Обычный городской — как был.
+      if (_isBeach) {
+        baseLook.swim = true;
+        baseLook.swimCol = ['#e74c3c','#f1c40f','#3498db','#2ecc71','#9b59b6','#e67e22','#1abc9c','#ff7eb6'][Math.floor(Math.random()*8)];
+        baseLook.hat = 0;
+      }
       const n = {
         r: r + 0.5, c: c + 0.5,
         tr: r + 0.5, tc: c + 0.5,
@@ -3549,7 +3558,12 @@ function npcPassable(r, c) {
   if (inArena(ri, ci)) return false;
   if (inLair(ri, ci)) return false;   // обычные NPC не ходят в логово
   const t = MAP[ri][ci];
-  return (t === 9 || t === 8);
+  // 8/9 — тротуар/газон (город). 14 — песок (пляж): пускаем NPC и туда,
+  // чтобы пляжные жители были обычными NPC (ходят, стреляемы), а не
+  // отдельной системой. Песок есть только в южной зоне → city-NPC сами
+  // на пляж не уйдут (waypoint ±4 тайла), туда попадают лишь спавнящиеся
+  // на пляже. Вода(16)/пирс(15)/палуба(17) остаются непроходимыми.
+  return (t === 9 || t === 8 || t === 14);
 }
 // Расширенная проходимость для NPC-снитча (бежит к копам через всю карту).
 // Разрешает дорогу (0) дополнительно к тротуару/газону. Не позволяет
@@ -27128,7 +27142,7 @@ function _heartbeat() {
       `pl${_pr},${_pc} qc${_qc} car${_carN}\n` +
       `shk${_shk} drv:${_drvId} bnk:${_bank} w★${_wnt} hp${_hp} ⛽${_fuel}` + _errs;
   } catch (e) { _dbg = '\ndbg-err'; }
-  const compact = `BUILD v0045🏖️ ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
+  const compact = `BUILD v0110🏖️ ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
     `npc${NPCS && NPCS.length || 0} cop${cops} agg${aggro} oth${others && others.size || 0}\n` +
     `bul${bullets.length} muz${muzzles.length} ft${floatTexts.length} lk${lockedTargets && lockedTargets.size || 0}\n` +
     `st:${flagStr} tch${_touchCount}/3s ago${touchAgo}s` + _dbg;
