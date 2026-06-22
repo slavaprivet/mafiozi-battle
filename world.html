@@ -3268,6 +3268,11 @@ function spawnNpc(seed) {
         _arcKey: arcKey,
         _arc: arc,
         _relation: 0,   // neutral
+        // Зона обитания: пляжный NPC ходит ТОЛЬКО по песку (в город не идёт);
+        // городской — по тротуару/газону, и лишь РЕДКО (4%) разрешена вылазка
+        // на пляж (придёт одетым — обычный отдыхающий-зевака).
+        _beach: _isBeach,
+        _allowBeach: (!_isBeach && Math.random() < 0.04),
       };
       _initNpcEmotions(n);
       return n;
@@ -3575,6 +3580,21 @@ function npcPassableForSnitch(r, c) {
   const t = MAP[ri][ci];
   return (t === 0 || t === 9 || t === 8);
 }
+// Зональная проходимость для ВЫБОРА маршрута NPC. Базовый npcPassable
+// пускает на песок всех (стены/вода блокируются им же), а здесь держим
+// каждого в своей зоне: пляжный — только песок (14) в полосе пляжа, чтобы
+// в город не уходил; городской — тротуар/газон (8/9), а на песок только
+// если ему выпала редкая «вылазка» (_allowBeach).
+function npcWaypointOk(npc, r, c) {
+  const ri = Math.floor(r), ci = Math.floor(c);
+  if (ri < 1 || ri >= MAP_ROWS - 1 || ci < 1 || ci >= MAP_COLS - 1) return false;
+  if (inArena(ri, ci)) return false;
+  if (inLair(ri, ci)) return false;
+  const t = MAP[ri][ci];
+  if (npc._beach) return (t === 14 && ri >= 138 && ri <= 168);  // пляжный — только пляж
+  if (t === 14) return !!npc._allowBeach;                        // городской на песок — редко
+  return (t === 9 || t === 8);
+}
 function pickNpcWaypoint(npc) {
   // Близкий waypoint в радиусе 4 — чтобы прямой путь почти всегда
   // не пересекал здания. Дополнительная проверка: путь должен идти
@@ -3583,15 +3603,15 @@ function pickNpcWaypoint(npc) {
     const dr = (Math.random() * 8) - 4;
     const dc = (Math.random() * 8) - 4;
     const nr = npc.r + dr, nc = npc.c + dc;
-    if (!npcPassable(nr, nc)) continue;
-    // Проверяем что прямой путь не пересекает стены
+    if (!npcWaypointOk(npc, nr, nc)) continue;
+    // Проверяем что прямой путь не пересекает стены/чужую зону
     const steps = Math.max(2, Math.ceil(Math.hypot(dr, dc) * 2));
     let blocked = false;
     for (let s = 1; s <= steps; s++) {
       const k = s / steps;
       const pr = npc.r + dr * k;
       const pc = npc.c + dc * k;
-      if (!npcPassable(pr, pc)) { blocked = true; break; }
+      if (!npcWaypointOk(npc, pr, pc)) { blocked = true; break; }
     }
     if (blocked) continue;
     npc.tr = nr; npc.tc = nc;
@@ -27142,7 +27162,7 @@ function _heartbeat() {
       `pl${_pr},${_pc} qc${_qc} car${_carN}\n` +
       `shk${_shk} drv:${_drvId} bnk:${_bank} w★${_wnt} hp${_hp} ⛽${_fuel}` + _errs;
   } catch (e) { _dbg = '\ndbg-err'; }
-  const compact = `BUILD v0110🏖️ ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
+  const compact = `BUILD v0120🏖️ ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
     `npc${NPCS && NPCS.length || 0} cop${cops} agg${aggro} oth${others && others.size || 0}\n` +
     `bul${bullets.length} muz${muzzles.length} ft${floatTexts.length} lk${lockedTargets && lockedTargets.size || 0}\n` +
     `st:${flagStr} tch${_touchCount}/3s ago${touchAgo}s` + _dbg;
