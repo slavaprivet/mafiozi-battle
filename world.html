@@ -3237,6 +3237,12 @@ function spawnNpc(seed) {
     const _spt = MAP[r][c];
     const _isBeach = (_spt === 14);
     if (_spt === 9 || _spt === 8 || _spt === 14) {
+      // Песок плотный → рандом-спавн валит на пляж непропорционально много.
+      // Держим квоту пляжных ~18 (как было beachgoers), остальные — в город.
+      if (_isBeach) {
+        let _bc = 0; for (const _x of NPCS) if (_x._beach) _bc++;
+        if (_bc >= 18) continue;
+      }
       const arcKey = _pickArchetype();
       const arc    = NPC_ARCHETYPES[arcKey];
       const [spMin, spMax] = arc.speedRange;
@@ -27162,7 +27168,7 @@ function _heartbeat() {
       `pl${_pr},${_pc} qc${_qc} car${_carN}\n` +
       `shk${_shk} drv:${_drvId} bnk:${_bank} w★${_wnt} hp${_hp} ⛽${_fuel}` + _errs;
   } catch (e) { _dbg = '\ndbg-err'; }
-  const compact = `BUILD v0120🏖️ ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
+  const compact = `BUILD v0125🏖️ ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
     `npc${NPCS && NPCS.length || 0} cop${cops} agg${aggro} oth${others && others.size || 0}\n` +
     `bul${bullets.length} muz${muzzles.length} ft${floatTexts.length} lk${lockedTargets && lockedTargets.size || 0}\n` +
     `st:${flagStr} tch${_touchCount}/3s ago${touchAgo}s` + _dbg;
