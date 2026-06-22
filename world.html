@@ -24365,8 +24365,7 @@ function render() {
     ctx.scale(viewZoom, viewZoom);
     ctx.translate(-_pp.x, -_pp.y);
   }
-  // Viewport culling (под более крупный TS уменьшаем радиус)
-  const VIS_R = 12;
+  const VIS_R = 18;
   const r0 = Math.max(0, Math.floor(player.r - VIS_R));
   const r1 = Math.min(MAP_ROWS, Math.ceil(player.r + VIS_R));
   const c0 = Math.max(0, Math.floor(player.c - VIS_R));
