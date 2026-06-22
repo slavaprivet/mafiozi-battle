@@ -11037,12 +11037,17 @@ const _dropBagBtn = document.getElementById('dropBagBtn');
 if (_dropBagBtn) {
   _dropBagBtn.addEventListener('click', () => {
     if (_bankInt && _bankInt.myBag) {
-      // В хранилище — кладём мешок обратно на пол (можно снова взять)
+      // Кладём мешок НА ПОЛ К НОГАМ игрока (а не на исходную позицию в
+      // хранилище — раньше orig.taken=false возвращал мешок в дальний угол
+      // хранилища, выглядело как «исчез/телепортировался»). Координаты —
+      // интерьерные (room coords), как у player.r/c; рендерится в
+      // drawBankInteriorScene из _bankInt.bags.
       const b = _bankInt.myBag;
       const orig = (_bankInt.bags || []).find(x => x.id === b.id);
-      if (orig) orig.taken = false;
+      if (orig) { orig.taken = false; orig.r = player.r; orig.c = player.c; }
+      else if (_bankInt.bags) { _bankInt.bags.push({ id: b.id, taken: false, r: player.r, c: player.c }); }
       _bankInt.myBag = null; _myBagWeight = 0;
-      showToast('💼 Мешок отложен', 'ℹ️', 1400);
+      showToast('💼 Мешок брошен', '⚠️', 1400);
       if (typeof updateZoneBtn === 'function') updateZoneBtn();
     } else if (_bankRob && _bankRob.myBag) {
       dropVaultBag();
@@ -27117,7 +27122,7 @@ function _heartbeat() {
       `pl${_pr},${_pc} qc${_qc} car${_carN}\n` +
       `shk${_shk} drv:${_drvId} bnk:${_bank} w★${_wnt} hp${_hp} ⛽${_fuel}` + _errs;
   } catch (e) { _dbg = '\ndbg-err'; }
-  const compact = `BUILD v2245🏖️ ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
+  const compact = `BUILD v2310💼 ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
     `npc${NPCS && NPCS.length || 0} cop${cops} agg${aggro} oth${others && others.size || 0}\n` +
     `bul${bullets.length} muz${muzzles.length} ft${floatTexts.length} lk${lockedTargets && lockedTargets.size || 0}\n` +
     `st:${flagStr} tch${_touchCount}/3s ago${touchAgo}s` + _dbg;
