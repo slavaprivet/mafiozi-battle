@@ -1540,6 +1540,10 @@ try {
   if (tg && typeof tg.onEvent === 'function') {
     tg.onEvent('viewportChanged', () => {
       try { if (tg && !tg.isExpanded) tg.expand(); } catch(_) {}
+      // Viewport Telegram изменился (хедер/клавиатура/safe-area) — пересчитываем
+      // canvas+stage, чтобы центр камеры остался синхронным с холстом и карту
+      // не «уводило». На iOS window 'resize' при этом не всегда стреляет.
+      try { if (typeof resizeCanvas === 'function') resizeCanvas(); } catch(_) {}
     });
   }
 } catch(e) {}
@@ -1567,6 +1571,15 @@ function resizeCanvas() {
   canvas.style.width  = W + 'px';
   canvas.style.height = H + 'px';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // КРИТИЧНО (iOS/Telegram): #stage (position:fixed; inset:0) меряется по
+  // LAYOUT-viewport, а canvas — по window.innerHeight (VISUAL-viewport). На
+  // айфоне они РАЗНЫЕ (хедер Telegram/safe-area) → w2s центрировал камеру по
+  // stage, а рисовал по canvas → игрок не по центру и «вся карта съезжает»
+  // при любом изменении viewport. На десктопе они равны (поэтому в превью
+  // всё идеально). Принудительно равняем #stage к окну — все w2s/s2w/мини-
+  // карта (читают stage.client*) теперь совпадают с canvas.
+  const _stg = document.getElementById('stage');
+  if (_stg) { _stg.style.width = W + 'px'; _stg.style.height = H + 'px'; }
 }
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
@@ -27168,7 +27181,7 @@ function _heartbeat() {
       `pl${_pr},${_pc} qc${_qc} car${_carN}\n` +
       `shk${_shk} drv:${_drvId} bnk:${_bank} w★${_wnt} hp${_hp} ⛽${_fuel}` + _errs;
   } catch (e) { _dbg = '\ndbg-err'; }
-  const compact = `BUILD v0125🏖️ ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
+  const compact = `BUILD v0150📐 ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
     `npc${NPCS && NPCS.length || 0} cop${cops} agg${aggro} oth${others && others.size || 0}\n` +
     `bul${bullets.length} muz${muzzles.length} ft${floatTexts.length} lk${lockedTargets && lockedTargets.size || 0}\n` +
     `st:${flagStr} tch${_touchCount}/3s ago${touchAgo}s` + _dbg;
