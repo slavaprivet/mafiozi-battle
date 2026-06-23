@@ -495,6 +495,7 @@ body.in-pvp #robActionBtn { top: 152px; }
   z-index: 99; pointer-events: none; max-width: 230px;
   line-height: 1.3; white-space: pre;
   border: 1px solid rgba(143,255,143,.3);
+  display: none;   /* дебаг-плашка скрыта — мешала тесту. Вернуть: ?dbg=1 */
 }
 #debugHud.warn { color: #ffd76b; border-color: rgba(255,215,107,.5); }
 #debugHud.err  { color: #ff7878; border-color: rgba(255,120,120,.7); }
@@ -9680,14 +9681,14 @@ function handleEventPacket(d) {
     const tickMin = Math.round(((d.income_tick_s|0) || 120) / 60);
     if (me) {
       showEventBanner(`${d.icon} ${d.name} — твой район!`,
-        `Доход $${inc} каждые ${tickMin} мин в копилку банды.`, 5000, 'win');
+        `Доход $${inc} каждые ${tickMin} мин прямо на счёт.`, 5000, 'win');
     } else {
       showEventBanner(`${d.icon} @${d.by_name} захватил район ${d.name}`,
-        'Доход с района идёт в его банду.', 4000, 'neutral');
+        'Доход с района идёт ему.', 4000, 'neutral');
     }
   } else if (kind === 'district_income') {
     if (String(d.owner_uid) === String(QP.uid)) {
-      showToast(`💰 +$${d.amount} с района «${d.name}» → копилка банды`, 3000);
+      showToast(`💰 +$${d.amount} с района «${d.name}»`, 3000);
     }
   } else if (kind === 'open_fire') {
     // Игрок открыл огонь в городе вне PvP-зоны. Баннер всем (кроме стрелка)
@@ -27470,6 +27471,8 @@ window.addEventListener('pointerdown', () => {
 // строки останутся, юзер делает скриншот и шлёт.
 const _hbHistory = [];
 const _hbEl = (typeof document !== 'undefined') ? document.getElementById('debugHud') : null;
+// Дебаг-плашка скрыта по умолчанию (мешала тесту). Вернуть: ?dbg=1 в URL.
+try { if (_hbEl && /[?&]dbg=1/.test(location.search)) _hbEl.style.display = 'block'; } catch(e) {}
 const _dbgErrors = [];
 window.onerror = (msg, src, line) => {
   const short = String(msg).slice(0, 60) + ' L' + line;
@@ -27533,7 +27536,7 @@ function _heartbeat() {
       `pl${_pr},${_pc} qc${_qc} car${_carN}\n` +
       `shk${_shk} drv:${_drvId} bnk:${_bank} w★${_wnt} hp${_hp} ⛽${_fuel}` + _errs;
   } catch (e) { _dbg = '\ndbg-err'; }
-  const compact = `BUILD v0310🏴 ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
+  const compact = `BUILD v0320🏴 ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
     `npc${NPCS && NPCS.length || 0} cop${cops} agg${aggro} oth${others && others.size || 0}\n` +
     `bul${bullets.length} muz${muzzles.length} ft${floatTexts.length} lk${lockedTargets && lockedTargets.size || 0}\n` +
     `st:${flagStr} tch${_touchCount}/3s ago${touchAgo}s` + _dbg;
