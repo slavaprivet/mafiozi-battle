@@ -2177,6 +2177,41 @@ function inAggroZone(r, c) {
   return null;
 }
 
+// ── РАЙОНЫ (districts) ─────────────────────────────────────────────
+// Весь мир поделён на крупные районы-зоны (в отличие от точечных
+// TERRITORIES вокруг POI). Логово — отдельная бандитская зона (не
+// захватывается). В будущем игроки захватывают целые районы онлайн и
+// получают с них бонусы (поле bonus — задел под механику). Разбивка
+// покрывает карту 80×200 целиком, зоны не пересекаются:
+//   город r0..99 (4 квадранта по c=40 и r=40) + Логово r100..149 + берег r150..199.
+const DISTRICTS = [
+  { id:'northside',  name:'Норт-Сайд',  icon:'🏪', color:'#4aa3df',
+    r0:0,   r1:39,  c0:0,  c1:39, capturable:true,  bonus:'+25% доход с рынка' },
+  { id:'downtown',   name:'Даунтаун',   icon:'🏙', color:'#e0b94a',
+    r0:0,   r1:39,  c0:40, c1:79, capturable:true,  bonus:'Ускоренное лечение' },
+  { id:'southside',  name:'Саутсайд',   icon:'🎰', color:'#9b59b6',
+    r0:40,  r1:99,  c0:0,  c1:39, capturable:true,  bonus:'+10% наличных' },
+  { id:'industrial', name:'Промзона',   icon:'🏭', color:'#d2691e',
+    r0:40,  r1:99,  c0:40, c1:79, capturable:true,  bonus:'Скидка на оружие' },
+  { id:'lair',       name:'Логово',     icon:'☠️', color:'#c0392b',
+    r0:100, r1:149, c0:0,  c1:79, capturable:false, bonus:'Территория банды' },
+  { id:'coast',      name:'Побережье',  icon:'⚓', color:'#2ecc71',
+    r0:150, r1:199, c0:0,  c1:79, capturable:true,  bonus:'+20% с контрактов' },
+];
+const DISTRICT_BY_ID = new Map(DISTRICTS.map(d => [d.id, d]));
+function districtAt(r, c) {
+  for (const d of DISTRICTS) {
+    if (r >= d.r0 && r <= d.r1 && c >= d.c0 && c <= d.c1) return d;
+  }
+  return null;
+}
+// Владельцы районов (придёт с сервера; пока локально пусто).
+// { [districtId]: { ownerId, ownerName, gangTag, color, capturedAt } } — null = ничейный
+const districtOwners = Object.create(null);
+// Текущий район игрока + состояние GTA-баннера «въезд в район».
+let _curDistrictId = null;
+let _districtBanner = null;   // { d, t } — район и момент показа
+
 // State владельцев (приходит с сервера; пока локально пусто).
 // { [tid]: { ownerId, ownerName, gangTag, color, capturedAt } } — null = ничейная
 const territoryOwners = Object.create(null);
@@ -24388,6 +24423,8 @@ function render() {
   drawArenaPerimeter();
   // 1.55) Граница логова — красный пунктир (только если рядом)
   if (player.r > 90) drawLairPerimeter();
+  // 1.55b) Границы РАЙОНОВ (districts) — крупная сетка зон поверх пола
+  drawDistrictBorders(r0, r1, c0, c1);
   // 1.6) Периметры захватываемых районов — цвет владельца / пунктир если ничейная
   drawTerritoryPerimeters();
   // 1.7) Бандитские гнёзда — пульсирующая красная подсветка вокруг здания
@@ -25230,6 +25267,9 @@ function render() {
   drawEventArrow(r0, r1, c0, c1);
   // 🎯 над активной хит-целью Бригадира — поверх всего
   drawHitTargetMarker();
+  // Баннер «въезд в район» (GTA-стиль) — обновляем текущий район и рисуем
+  _updateDistrictBanner();
+  drawDistrictBanner();
   // Лента глобальных событий (справа над миникартой)
   drawFeedEvents();
   // Мини-карта
@@ -26724,6 +26764,82 @@ const _miniCanvas = document.getElementById('mapCanvas');
 const _miniCtx = _miniCanvas.getContext('2d');
 const MINI_W = _miniCanvas.width;
 const MINI_H = _miniCanvas.height;
+// hex → rgba с альфой (для районных оверлеев)
+function _districtRgba(hex, a) {
+  const h = String(hex).replace('#', '');
+  const s = h.length === 3 ? h.split('').map(x => x + x).join('') : h;
+  const n = parseInt(s, 16) || 0;
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+// Границы районов на земле — крупная зональная сетка поверх пола. Рисуем
+// контур района (изо-четырёхугольник) цветом района/владельца, пунктиром;
+// у захваченного — лёгкая заливка цветом владельца.
+function drawDistrictBorders(r0, r1, c0, c1) {
+  ctx.save();
+  ctx.lineWidth = 2;
+  ctx.setLineDash([10, 9]);
+  for (const d of DISTRICTS) {
+    if (d.r1 < r0 || d.r0 > r1 || d.c1 < c0 || d.c0 > c1) continue;  // вне вьюпорта
+    const owner = districtOwners[d.id];
+    const col = (owner && owner.color) ? owner.color : d.color;
+    const A = w2s(d.r0,     d.c0);
+    const B = w2s(d.r0,     d.c1 + 1);
+    const C = w2s(d.r1 + 1, d.c1 + 1);
+    const E = w2s(d.r1 + 1, d.c0);
+    ctx.beginPath();
+    ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y);
+    ctx.lineTo(C.x, C.y); ctx.lineTo(E.x, E.y); ctx.closePath();
+    if (owner) { ctx.fillStyle = _districtRgba(col, 0.08); ctx.fill(); }
+    ctx.strokeStyle = _districtRgba(col, 0.55);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+// Следим за текущим районом игрока; при въезде в новый — взводим баннер.
+function _updateDistrictBanner() {
+  const d = districtAt(player.r, player.c);
+  const id = d ? d.id : null;
+  if (id !== _curDistrictId) {
+    _curDistrictId = id;
+    if (d) _districtBanner = { d, t: performance.now() };
+  }
+}
+// GTA-стиль баннер «въезд в район»: название крупно + статус/бонус мелко,
+// выезжает слева, держится, затухает. ~3.5с.
+function drawDistrictBanner() {
+  if (!_districtBanner) return;
+  const age = performance.now() - _districtBanner.t;
+  const DUR = 3500;
+  if (age > DUR) { _districtBanner = null; return; }
+  const d = _districtBanner.d;
+  let alpha = 1, slide = 0;
+  if (age < 300)      { alpha = age / 300; slide = (1 - age / 300) * 36; }
+  else if (age > 3000) { alpha = 1 - (age - 3000) / 500; }
+  const W = window.innerWidth, H = window.innerHeight;
+  const cx = W / 2, y = Math.round(H * 0.15);
+  const owner = districtOwners[d.id];
+  const col = (owner && owner.color) ? owner.color : d.color;
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  // Название района
+  ctx.font = '700 23px system-ui, sans-serif';
+  ctx.fillStyle = 'rgba(0,0,0,.85)'; ctx.fillText(d.icon + ' ' + d.name, cx + 1 - slide, y + 1);
+  ctx.fillStyle = col;               ctx.fillText(d.icon + ' ' + d.name, cx - slide, y);
+  // Подпись: владелец / статус
+  ctx.font = '600 12px system-ui, sans-serif';
+  const sub = owner ? ('Контролирует: ' + (owner.ownerName || owner.gangTag || 'банда'))
+                    : (d.capturable ? 'Ничейный район · ' + d.bonus : 'Опасная зона');
+  ctx.fillStyle = 'rgba(0,0,0,.8)'; ctx.fillText(sub, cx + 1 - slide, y + 19);
+  ctx.fillStyle = '#dfe4ea';        ctx.fillText(sub, cx - slide, y + 18);
+  // Подчёркивание цветом района
+  ctx.strokeStyle = col; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(cx - 78 - slide, y + 6); ctx.lineTo(cx + 78 - slide, y + 6); ctx.stroke();
+  ctx.restore();
+  ctx.textAlign = 'left';
+}
 function drawMinimap() {
   const ctx2 = _miniCtx;
   ctx2.clearRect(0, 0, MINI_W, MINI_H);
@@ -26732,6 +26848,16 @@ function drawMinimap() {
   if ((_miniTick++ & 3) === 0) _miniBakedDirty = true;
   if (_miniBakedDirty) { bakeMini(); _miniBakedDirty = false; }
   ctx2.drawImage(_miniBaked, 0, 0);
+  // Районы — лёгкая заливка цветом района (владелец перекрашивает ярче)
+  for (const d of DISTRICTS) {
+    const owner = districtOwners[d.id];
+    const col = (owner && owner.color) ? owner.color : d.color;
+    ctx2.fillStyle = _districtRgba(col, owner ? 0.22 : 0.09);
+    ctx2.fillRect(d.c0 * sx, d.r0 * sy, (d.c1 - d.c0 + 1) * sx, (d.r1 - d.r0 + 1) * sy);
+    ctx2.strokeStyle = _districtRgba(col, 0.45);
+    ctx2.lineWidth = 0.8;
+    ctx2.strokeRect(d.c0 * sx + 0.5, d.r0 * sy + 0.5, (d.c1 - d.c0 + 1) * sx - 1, (d.r1 - d.r0 + 1) * sy - 1);
+  }
   // PVP-арена — пульсирующая красная зона
   const arenaPulse = 0.20 + Math.abs(Math.sin(performance.now() * 0.003)) * 0.18;
   ctx2.fillStyle = `rgba(255,40,40,${arenaPulse})`;
@@ -27181,7 +27307,7 @@ function _heartbeat() {
       `pl${_pr},${_pc} qc${_qc} car${_carN}\n` +
       `shk${_shk} drv:${_drvId} bnk:${_bank} w★${_wnt} hp${_hp} ⛽${_fuel}` + _errs;
   } catch (e) { _dbg = '\ndbg-err'; }
-  const compact = `BUILD v0150📐 ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
+  const compact = `BUILD v0200🗺️ ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
     `npc${NPCS && NPCS.length || 0} cop${cops} agg${aggro} oth${others && others.size || 0}\n` +
     `bul${bullets.length} muz${muzzles.length} ft${floatTexts.length} lk${lockedTargets && lockedTargets.size || 0}\n` +
     `st:${flagStr} tch${_touchCount}/3s ago${touchAgo}s` + _dbg;
