@@ -925,13 +925,31 @@ body.in-pvp #robActionBtn { top: 152px; }
               inset 0 1px 0 rgba(255,255,255,.05),
               inset 0 0 0 1px rgba(0,0,0,.45);
   padding: 4px;
-  pointer-events: none;
+  pointer-events: auto;          /* тап по миникарте сворачивает её */
+  cursor: pointer;
 }
+#mapHud.collapsed { display: none; }
 #mapHud canvas {
   display: block; width: 100%; height: 100%; border-radius: 8px;
   background: #0a0d14;
   box-shadow: inset 0 0 8px rgba(0,0,0,.7);
+  pointer-events: none;
 }
+/* Кнопка-иконка карты: видна когда миникарта свёрнута (тап — развернуть).
+   Долгое нажатие — показать/скрыть дебаг-плашку (ловить «уезжает»). */
+#mapToggle {
+  position: absolute; right: 14px; top: 56px; z-index: 5;
+  width: 42px; height: 42px; border-radius: 11px;
+  display: none;                 /* по умолчанию миникарта открыта */
+  align-items: center; justify-content: center;
+  font-size: 22px; line-height: 1;
+  background: linear-gradient(180deg, rgba(20,24,32,.94), rgba(10,12,18,.92));
+  border: 1px solid #4a5468; color: #cdd6e4;
+  box-shadow: 0 4px 14px rgba(0,0,0,.6);
+  -webkit-tap-highlight-color: transparent;
+}
+#mapToggle.show { display: flex; }
+#mapToggle:active { transform: scale(.92); }
 
 /* Большой баннер событий (инкассатор выехал / X забрал куш) —
    привлекает внимание всех онлайн-игроков, видно даже на маленьком
@@ -1241,6 +1259,7 @@ body.in-pvp #robActionBtn { top: 152px; }
   <div id="boxCopWarn">⚠️ КОПЫ РЯДОМ — УХОДИ!</div>
 
   <div id="mapHud"><canvas id="mapCanvas" width="304" height="304"></canvas></div>
+  <button id="mapToggle" type="button" aria-label="карта">🗺</button>
 
   <div id="joyL"><div class="knob"></div></div>
   <!-- Правый стик: прицел+огонь (Brawl-Stars style) -->
@@ -27471,8 +27490,40 @@ window.addEventListener('pointerdown', () => {
 // строки останутся, юзер делает скриншот и шлёт.
 const _hbHistory = [];
 const _hbEl = (typeof document !== 'undefined') ? document.getElementById('debugHud') : null;
-// Дебаг-плашка скрыта по умолчанию (мешала тесту). Вернуть: ?dbg=1 в URL.
+// Дебаг-плашка скрыта по умолчанию (мешала тесту). Вернуть: ?dbg=1 в URL,
+// ИЛИ долгим нажатием на иконку карты 🗺 (см. ниже).
 try { if (_hbEl && /[?&]dbg=1/.test(location.search)) _hbEl.style.display = 'block'; } catch(e) {}
+// ── Тоггл миникарты: тап по карте сворачивает её в иконку 🗺; тап по
+//    иконке разворачивает. Долгое нажатие (≥500мс) на иконку — показать/
+//    скрыть дебаг-плашку (для ловли «карта уезжает»).
+try {
+  const _mapHud = document.getElementById('mapHud');
+  const _mapTgl = document.getElementById('mapToggle');
+  if (_mapHud && _mapTgl) {
+    const _setMap = (open) => {
+      _mapHud.classList.toggle('collapsed', !open);
+      _mapTgl.classList.toggle('show', !open);
+    };
+    _mapHud.addEventListener('click', () => _setMap(false));   // тап по карте — свернуть
+    let _lpTimer = null, _lpFired = false;
+    const _lpStart = () => {
+      _lpFired = false;
+      _lpTimer = setTimeout(() => {
+        _lpFired = true;
+        if (_hbEl) _hbEl.style.display = (_hbEl.style.display === 'block') ? 'none' : 'block';
+        try { if (navigator.vibrate) navigator.vibrate(20); } catch(e) {}
+      }, 500);
+    };
+    const _lpEnd = () => { if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; } };
+    _mapTgl.addEventListener('pointerdown', _lpStart);
+    _mapTgl.addEventListener('pointerup',   _lpEnd);
+    _mapTgl.addEventListener('pointerleave', _lpEnd);
+    _mapTgl.addEventListener('click', (e) => {
+      if (_lpFired) { e.preventDefault(); return; }   // это был long-press — не разворачиваем
+      _setMap(true);                                   // короткий тап — развернуть карту
+    });
+  }
+} catch(e) {}
 const _dbgErrors = [];
 window.onerror = (msg, src, line) => {
   const short = String(msg).slice(0, 60) + ' L' + line;
@@ -27552,7 +27603,7 @@ function _heartbeat() {
       `pl${_pr},${_pc} qc${_qc} car${_carN}\n` +
       `shk${_shk} drv:${_drvId} bnk:${_bank} w★${_wnt} hp${_hp} ⛽${_fuel}` + _errs;
   } catch (e) { _dbg = '\ndbg-err'; }
-  const compact = `BUILD v0330🏴 ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
+  const compact = `BUILD v0340🗺 ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
     `npc${NPCS && NPCS.length || 0} cop${cops} agg${aggro} oth${others && others.size || 0}\n` +
     `bul${bullets.length} muz${muzzles.length} ft${floatTexts.length} lk${lockedTargets && lockedTargets.size || 0}\n` +
     `st:${flagStr} tch${_touchCount}/3s ago${touchAgo}s` + _dbg;
