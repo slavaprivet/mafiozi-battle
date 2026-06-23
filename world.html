@@ -10053,8 +10053,12 @@ function wsConnect() {
           cam.x = (player.c - player.r) * TS * 0.5;
           cam.y = (player.c + player.r) * TS * 0.5 * ISO_Y;
           _firstSnap = false;
-        } else if (dist > 5.0) {
-          const k = 0.10;
+        } else if (dist > 10.0) {
+          // Порог 5→10: на LTE задержка ~150мс → клиент уходит вперёд на
+          // 1-2 тайла, при пороге 5 сервер ПОСТОЯННО дёргал позицию назад
+          // (rubber-band) → камера тряслась/«уезжала» при ходьбе по пляжу.
+          // Теперь корректируем только реальный десинк (10-15 тайл). Мягко.
+          const k = 0.08;
           player.r += (d.me.y - player.r) * k;
           player.c += (d.me.x - player.c) * k;
         }
@@ -14864,11 +14868,11 @@ function update(dt) {
   // (то самое что прибавляется в w2s до вычитания cam). Плавно.
   const targetCamX = (player.c - player.r) * TS * 0.5;
   const targetCamY = (player.c + player.r) * TS * 0.5 * ISO_Y;
-  // dt*14 (было *8): отставание камеры при ходьбе ~0.35 тайла вместо 0.6 —
-  // на открытом пляже постоянное отставание было заметно («едет»), теперь
-  // игрок держится у центра. На стабильной связи джиттера снапшота нет.
-  cam.x += (targetCamX - cam.x) * Math.min(1, dt * 14);
-  cam.y += (targetCamY - cam.y) * Math.min(1, dt * 14);
+  // dt*22 (было *8→*14): почти мгновенное следование — отставание ~0.2 тайла,
+  // игрок практически строго по центру при ходьбе. Вместе с порогом
+  // коррекции 10 (выше) убирает «уезжает» на пляже/LTE.
+  cam.x += (targetCamX - cam.x) * Math.min(1, dt * 22);
+  cam.y += (targetCamY - cam.y) * Math.min(1, dt * 22);
   // Зум: на пляже немного приближаем (1.18) — там нет высоких зданий,
   // и игрок без зума выглядит слишком мелким. Лерпим плавно, дёрганья
   // больше нет благодаря медленному коэффициенту.
@@ -27659,8 +27663,8 @@ function _heartbeat() {
       _vv  = vv ? (Math.round(vv.width) + 'x' + Math.round(vv.height) + '@' + Math.round(vv.offsetTop)) : 'none';
       const st = document.getElementById('stage');
       _stg = st ? (st.clientWidth + 'x' + st.clientHeight) : '?';
-      // АВТО-ПОКАЗ дебаг-плашки когда «карта уезжает» (DRIFT>25px).
-      if (_hbEl && typeof _drift === 'number' && _drift > 25) _hbEl.style.display = 'block';
+      // АВТО-ПОКАЗ дебаг-плашки когда «карта уезжает» (DRIFT>15px).
+      if (_hbEl && typeof _drift === 'number' && _drift > 15) _hbEl.style.display = 'block';
     } catch (e) {}
     const _errs = _dbgErrors.length ? '\n🔴 ' + _dbgErrors.slice(-2).join('\n🔴 ') : '';
     _dbg = `\nz${_zoom} dpr${_dpr} cv${canvas.width}x${canvas.height}\n` +
@@ -27669,7 +27673,7 @@ function _heartbeat() {
       `cam${_camx},${_camy} pl${_pr},${_pc}\n` +
       `shk${_shk} drv:${_drvId} bnk:${_bank} w★${_wnt} hp${_hp} ⛽${_fuel}` + _errs;
   } catch (e) { _dbg = '\ndbg-err'; }
-  const compact = `BUILD v0370🏖 ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
+  const compact = `BUILD v0380🎥 ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
     `npc${NPCS && NPCS.length || 0} cop${cops} agg${aggro} oth${others && others.size || 0}\n` +
     `bul${bullets.length} muz${muzzles.length} ft${floatTexts.length} lk${lockedTargets && lockedTargets.size || 0}\n` +
     `st:${flagStr} tch${_touchCount}/3s ago${touchAgo}s` + _dbg;
