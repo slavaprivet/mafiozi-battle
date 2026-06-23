@@ -2184,20 +2184,32 @@ function inAggroZone(r, c) {
 // получают с них бонусы (поле bonus — задел под механику). Разбивка
 // покрывает карту 80×200 целиком, зоны не пересекаются:
 //   город r0..99 (4 квадранта по c=40 и r=40) + Логово r100..149 + берег r150..199.
+// hq — штаб района (точка захвата, совпадает с DISTRICTS_DEF на сервере).
+// income — пассивный доход банде-владельцу за тик. capturable:false у Логова.
 const DISTRICTS = [
   { id:'northside',  name:'Норт-Сайд',  icon:'🏪', color:'#4aa3df',
-    r0:0,   r1:39,  c0:0,  c1:39, capturable:true,  bonus:'+25% доход с рынка' },
+    r0:0,   r1:39,  c0:0,  c1:39, capturable:true,  bonus:'+25% доход с рынка',
+    hq:{r:20,c:20},  income:400 },
   { id:'downtown',   name:'Даунтаун',   icon:'🏙', color:'#e0b94a',
-    r0:0,   r1:39,  c0:40, c1:79, capturable:true,  bonus:'Ускоренное лечение' },
+    r0:0,   r1:39,  c0:40, c1:79, capturable:true,  bonus:'Ускоренное лечение',
+    hq:{r:20,c:60},  income:600 },
   { id:'southside',  name:'Саутсайд',   icon:'🎰', color:'#9b59b6',
-    r0:40,  r1:99,  c0:0,  c1:39, capturable:true,  bonus:'+10% наличных' },
+    r0:40,  r1:99,  c0:0,  c1:39, capturable:true,  bonus:'+10% наличных',
+    hq:{r:70,c:20},  income:500 },
   { id:'industrial', name:'Промзона',   icon:'🏭', color:'#d2691e',
-    r0:40,  r1:99,  c0:40, c1:79, capturable:true,  bonus:'Скидка на оружие' },
+    r0:40,  r1:99,  c0:40, c1:79, capturable:true,  bonus:'Скидка на оружие',
+    hq:{r:70,c:60},  income:550 },
   { id:'lair',       name:'Логово',     icon:'☠️', color:'#c0392b',
     r0:100, r1:149, c0:0,  c1:79, capturable:false, bonus:'Территория банды' },
   { id:'coast',      name:'Побережье',  icon:'⚓', color:'#2ecc71',
-    r0:150, r1:199, c0:0,  c1:79, capturable:true,  bonus:'+20% с контрактов' },
+    r0:150, r1:199, c0:0,  c1:79, capturable:true,  bonus:'+20% с контрактов',
+    hq:{r:156,c:40}, income:450 },
 ];
+const DIST_HQ_RAD = 6;             // радиус штаба (совпадает с сервером)
+const DIST_CAPTURE_TIME_S = 25;    // время удержания штаба (совпадает с сервером)
+const districtCaptures = new Map();   // did → { byId, byName, color, startedAt, duration }
+let _myInsideDistHq = null;        // did штаба под игроком (для UI)
+let _lastDistCaptureTryAt = 0;
 const DISTRICT_BY_ID = new Map(DISTRICTS.map(d => [d.id, d]));
 function districtAt(r, c) {
   for (const d of DISTRICTS) {
@@ -9642,6 +9654,41 @@ function handleEventPacket(d) {
     if (String(d.owner_uid) === String(QP.uid)) {
       showToast(`💰 +$${d.amount} с района «${d.name}» → копилка банды`, 3000);
     }
+  } else if (kind === 'district_capture_started') {
+    if (String(d.by_uid) === String(QP.uid)) {
+      showToast(`${d.icon||'🏴'} Захват района «${d.name}» — держись у штаба ${d.duration_s||25}с`, 3500);
+    }
+  } else if (kind === 'district_capture_denied') {
+    if (String(d.by_uid) === String(QP.uid)) {
+      if (d.reason === 'cooldown') {
+        const m = Math.ceil((d.wait_s || 0) / 60);
+        showToast(`⏳ Этот район ты недавно брал. Жди ещё ~${m} мин.`, 3500);
+      } else if (d.reason === 'must_reenter') {
+        showToast('🚶 Отойди от штаба и вернись, чтобы снова брать район.', 3500);
+      }
+    }
+  } else if (kind === 'district_capture_cancelled') {
+    if (String(d.by_uid) === String(QP.uid)) {
+      const reasons = { left_hq:'Ты ушёл от штаба.', killed:'Тебя убили.',
+        jailed:'Тебя приняли копы.', disconnected:'Разрыв связи.',
+        mode_changed:'Сменил режим.', cancelled:'Захват отменён.' };
+      showEventBanner('⚠️ Захват района сорван', reasons[d.reason] || 'Прогресс сброшен.', 2500, 'lose');
+    }
+  } else if (kind === 'district_captured') {
+    const me = (String(d.by_uid) === String(QP.uid));
+    const inc = d.income || 400;
+    const tickMin = Math.round(((d.income_tick_s|0) || 120) / 60);
+    if (me) {
+      showEventBanner(`${d.icon} ${d.name} — твой район!`,
+        `Доход $${inc} каждые ${tickMin} мин в копилку банды.`, 5000, 'win');
+    } else {
+      showEventBanner(`${d.icon} @${d.by_name} захватил район ${d.name}`,
+        'Доход с района идёт в его банду.', 4000, 'neutral');
+    }
+  } else if (kind === 'district_income') {
+    if (String(d.owner_uid) === String(QP.uid)) {
+      showToast(`💰 +$${d.amount} с района «${d.name}» → копилка банды`, 3000);
+    }
   } else if (kind === 'open_fire') {
     // Игрок открыл огонь в городе вне PvP-зоны. Баннер всем (кроме стрелка)
     // с указанием тяжести: обычно / расстрел гражданских / штурм участка.
@@ -10190,6 +10237,34 @@ function wsConnect() {
             byName:    ac.by_name,
             color:     ac.color,
             startedAt,
+          });
+        }
+      }
+      if (d.districts !== undefined) {
+        // РАЙОНЫ — владельцы + активные захваты штабов. Сервер — источник истины.
+        const dOwn = (d.districts && d.districts.owners) || {};
+        for (const k of Object.keys(districtOwners)) delete districtOwners[k];
+        for (const did of Object.keys(dOwn)) {
+          const o = dOwn[did];
+          districtOwners[did] = {
+            ownerId: o.owner_uid, owner_uid: o.owner_uid, ownerName: o.owner_name,
+            gangTag: o.gang_tag, gang_name: o.gang_name, flag: o.flag,
+            color: o.color, capturedAt: o.captured_at, income: o.income,
+          };
+        }
+        const dCap = (d.districts && d.districts.captures) || {};
+        const dFresh = new Set(Object.keys(dCap));
+        for (const did of Array.from(districtCaptures.keys())) {
+          if (!dFresh.has(did)) districtCaptures.delete(did);
+        }
+        for (const did of dFresh) {
+          const ac = dCap[did];
+          const prev = districtCaptures.get(did);
+          const startedAt = prev ? prev.startedAt
+            : (Date.now() - Math.round((ac.elapsed || 0) * 1000));
+          districtCaptures.set(did, {
+            byId: ac.by_uid, byName: ac.by_name, color: ac.color,
+            startedAt, duration: ac.duration_s || DIST_CAPTURE_TIME_S,
           });
         }
       }
@@ -14024,6 +14099,33 @@ function updateTerritoryCapture() {
   sendCaptureTry();
 }
 
+// Авто-захват РАЙОНА: если игрок стоит у штаба района (радиус DIST_HQ_RAD),
+// район захватываемый и не его — шлём district_capture_try. Сервер проверит
+// правила (PvE/кулдаун/re-enter). Выход из радиуса штаба → сервер сорвёт.
+function sendDistrictCaptureTry() {
+  if (!ws || ws.readyState !== 1) return;
+  try { ws.send(JSON.stringify({ t: 'district_capture_try', d: {} })); } catch(e) {}
+}
+function updateDistrictCapture() {
+  _myInsideDistHq = null;
+  if (myDead || myMode === 'pve') return;
+  let curHq = null;
+  for (const d of DISTRICTS) {
+    if (!d.capturable || !d.hq) continue;
+    const dr = player.r - d.hq.r, dc = player.c - d.hq.c;
+    if (dr * dr + dc * dc <= DIST_HQ_RAD * DIST_HQ_RAD) { curHq = d.id; break; }
+  }
+  _myInsideDistHq = curHq;
+  if (!curHq) return;
+  if (districtCaptures.has(curHq)) return;               // захват уже идёт
+  const own = districtOwners[curHq];
+  if (own && String(own.ownerId || own.owner_uid) === String(QP.uid)) return;  // уже мой
+  const now = performance.now();
+  if (now - _lastDistCaptureTryAt < 2000) return;
+  _lastDistCaptureTryAt = now;
+  sendDistrictCaptureTry();
+}
+
 // ── Update / Render ────────────────────────────────────────────
 let prevT = performance.now();
 function update(dt) {
@@ -14697,6 +14799,7 @@ function update(dt) {
   updateZoneBtn();
   updatePvpUI();
   updateTerritoryCapture();
+  updateDistrictCapture();
   updateAggroEntryHint();
   updateCaptureBanner();
   updateGtaInteractions();
@@ -24425,6 +24528,8 @@ function render() {
   if (player.r > 90) drawLairPerimeter();
   // 1.55b) Границы РАЙОНОВ (districts) — крупная сетка зон поверх пола
   drawDistrictBorders(r0, r1, c0, c1);
+  // 1.55c) Штабы районов — точки захвата (флаг + зона + прогресс)
+  drawDistrictHQs(r0, r1, c0, c1);
   // 1.6) Периметры захватываемых районов — цвет владельца / пунктир если ничейная
   drawTerritoryPerimeters();
   // 1.7) Бандитские гнёзда — пульсирующая красная подсветка вокруг здания
@@ -26796,6 +26901,61 @@ function drawDistrictBorders(r0, r1, c0, c1) {
   ctx.setLineDash([]);
   ctx.restore();
 }
+// Штабы районов: зона захвата + флагшток (цвет владельца/нейтральный) +
+// дуга прогресса при активном захвате. Точка захвата района.
+function drawDistrictHQs(r0, r1, c0, c1) {
+  for (const d of DISTRICTS) {
+    if (!d.hq) continue;  // Логово — без штаба
+    const hr = d.hq.r, hc = d.hq.c;
+    if (hr < r0 - 3 || hr > r1 + 3 || hc < c0 - 3 || hc > c1 + 3) continue;
+    const p = w2s(hr + 0.5, hc + 0.5);
+    const owner = districtOwners[d.id];
+    const cap = districtCaptures.get(d.id);
+    const col = (owner && owner.color) ? owner.color : d.color;
+    ctx.save();
+    // Зона штаба — изо-эллипс радиуса DIST_HQ_RAD
+    const edge = w2s(hr + 0.5 + DIST_HQ_RAD, hc + 0.5);
+    const rad = Math.max(10, Math.abs(edge.y - p.y));
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, rad, rad * 0.5, 0, 0, Math.PI * 2);
+    ctx.fillStyle = _districtRgba(col, owner ? 0.12 : 0.07);
+    ctx.fill();
+    ctx.strokeStyle = _districtRgba(col, 0.55);
+    ctx.lineWidth = 1.5; ctx.setLineDash([6, 5]); ctx.stroke(); ctx.setLineDash([]);
+    // Флагшток
+    const poleH = 34;
+    ctx.strokeStyle = '#2e2e2e'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x, p.y - poleH); ctx.stroke();
+    // Флаг (цвет владельца или серый-нейтральный)
+    const wave = Math.sin(performance.now() * 0.005) * 2;
+    ctx.fillStyle = owner ? col : '#8a8a8a';
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y - poleH);
+    ctx.lineTo(p.x + 18 + wave, p.y - poleH + 5);
+    ctx.lineTo(p.x, p.y - poleH + 10);
+    ctx.closePath(); ctx.fill();
+    // Иконка района над флагом
+    ctx.font = '13px "Segoe UI Emoji", system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillText(d.icon, p.x, p.y - poleH - 4);
+    // Прогресс захвата — дуга + процент
+    if (cap) {
+      const elapsed = (Date.now() - cap.startedAt) / 1000;
+      const prog = Math.max(0, Math.min(1, elapsed / (cap.duration || DIST_CAPTURE_TIME_S)));
+      ctx.beginPath();
+      ctx.arc(p.x, p.y - poleH / 2, 17, -Math.PI / 2, -Math.PI / 2 + prog * Math.PI * 2);
+      ctx.strokeStyle = cap.color || col; ctx.lineWidth = 3.5; ctx.stroke();
+      ctx.font = 'bold 11px system-ui, sans-serif'; ctx.fillStyle = '#fff';
+      ctx.fillText(Math.round(prog * 100) + '%', p.x, p.y - poleH / 2 + 4);
+    } else if (owner) {
+      // Захвачен — мини-метка владельца (флаг банды/имя) под флагом
+      ctx.font = 'bold 9px system-ui, sans-serif'; ctx.fillStyle = col;
+      ctx.fillText('контроль', p.x, p.y + 12);
+    }
+    ctx.restore();
+    ctx.textAlign = 'left';
+  }
+}
 // Следим за текущим районом игрока; при въезде в новый — взводим баннер.
 function _updateDistrictBanner() {
   const d = districtAt(player.r, player.c);
@@ -27307,7 +27467,7 @@ function _heartbeat() {
       `pl${_pr},${_pc} qc${_qc} car${_carN}\n` +
       `shk${_shk} drv:${_drvId} bnk:${_bank} w★${_wnt} hp${_hp} ⛽${_fuel}` + _errs;
   } catch (e) { _dbg = '\ndbg-err'; }
-  const compact = `BUILD v0200🗺️ ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
+  const compact = `BUILD v0300🏴 ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
     `npc${NPCS && NPCS.length || 0} cop${cops} agg${aggro} oth${others && others.size || 0}\n` +
     `bul${bullets.length} muz${muzzles.length} ft${floatTexts.length} lk${lockedTargets && lockedTargets.size || 0}\n` +
     `st:${flagStr} tch${_touchCount}/3s ago${touchAgo}s` + _dbg;
