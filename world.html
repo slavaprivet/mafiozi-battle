@@ -27530,13 +27530,25 @@ function _heartbeat() {
     const _wnt = (typeof myWanted === 'number') ? myWanted : 0;
     const _hp = (typeof myHp === 'number') ? myHp : '?';
     const _fuel = (_myCarFuelPct !== null) ? Math.round(_myCarFuelPct) + '%' : '-';
+    // DRIFT — смещение игрока от ЦЕНТРА экрана в пикселях. Если «карта
+    // уезжает» = это число большое; если камера в норме = ~0. Плюс stage/win
+    // расхождение (источник iOS-бага) — должны совпадать.
+    let _drift = '?', _stg = '?';
+    try {
+      const ps = w2s(player.r, player.c);
+      const cx0 = window.innerWidth / 2, cy0 = window.innerHeight / 2;
+      _drift = Math.round(Math.hypot(ps.x - cx0, ps.y - cy0));
+      const st = document.getElementById('stage');
+      _stg = st ? (st.clientWidth + 'x' + st.clientHeight) : '?';
+    } catch (e) {}
     const _errs = _dbgErrors.length ? '\n🔴 ' + _dbgErrors.slice(-2).join('\n🔴 ') : '';
     _dbg = `\nz${_zoom} dpr${_dpr} cv${canvas.width}x${canvas.height}\n` +
-      `win${window.innerWidth}x${window.innerHeight} cam${_camx},${_camy}\n` +
+      `win${window.innerWidth}x${window.innerHeight} stg${_stg}\n` +
+      `cam${_camx},${_camy} DRIFT:${_drift}px\n` +
       `pl${_pr},${_pc} qc${_qc} car${_carN}\n` +
       `shk${_shk} drv:${_drvId} bnk:${_bank} w★${_wnt} hp${_hp} ⛽${_fuel}` + _errs;
   } catch (e) { _dbg = '\ndbg-err'; }
-  const compact = `BUILD v0320🏴 ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
+  const compact = `BUILD v0330🏴 ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
     `npc${NPCS && NPCS.length || 0} cop${cops} agg${aggro} oth${others && others.size || 0}\n` +
     `bul${bullets.length} muz${muzzles.length} ft${floatTexts.length} lk${lockedTargets && lockedTargets.size || 0}\n` +
     `st:${flagStr} tch${_touchCount}/3s ago${touchAgo}s` + _dbg;
