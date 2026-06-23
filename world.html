@@ -25375,6 +25375,8 @@ function render() {
   // Баннер «въезд в район» (GTA-стиль) — обновляем текущий район и рисуем
   _updateDistrictBanner();
   drawDistrictBanner();
+  // Полоса захвата района у штаба (прогресс/подсказка)
+  drawDistrictCaptureHud();
   // Лента глобальных событий (справа над миникартой)
   drawFeedEvents();
   // Мини-карта
@@ -26977,26 +26979,72 @@ function drawDistrictBanner() {
   if (age < 300)      { alpha = age / 300; slide = (1 - age / 300) * 36; }
   else if (age > 3000) { alpha = 1 - (age - 3000) / 500; }
   const W = window.innerWidth, H = window.innerHeight;
-  const cx = W / 2, y = Math.round(H * 0.15);
+  // НИЖЕ HUD-бара (он занимает верх слева+справа) — иначе название района
+  // не прочесть под аватаром/«онлайн». ~30% высоты экрана.
+  const cx = W / 2 - slide, y = Math.round(H * 0.30);
   const owner = districtOwners[d.id];
   const col = (owner && owner.color) ? owner.color : d.color;
+  const sub = owner ? ('Контролирует: ' + (owner.ownerName || owner.gangTag || 'банда'))
+                    : (d.capturable ? 'Ничейный · подойди к 🏴 штабу' : 'Опасная зона');
   ctx.save();
   ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
+  // Тёмная подложка-панель (читаемость над городом)
+  ctx.font = '700 23px system-ui, sans-serif';
+  const tW = ctx.measureText(d.icon + ' ' + d.name).width;
+  ctx.font = '600 12px system-ui, sans-serif';
+  const sW = ctx.measureText(sub).width;
+  const panelW = Math.max(tW, sW) + 40, panelH = 52;
+  ctx.fillStyle = 'rgba(10,12,18,.78)';
+  ctx.beginPath(); ctx.roundRect(cx - panelW / 2, y - 26, panelW, panelH, 10); ctx.fill();
+  ctx.strokeStyle = col; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.roundRect(cx - panelW / 2, y - 26, panelW, panelH, 10); ctx.stroke();
   // Название района
   ctx.font = '700 23px system-ui, sans-serif';
-  ctx.fillStyle = 'rgba(0,0,0,.85)'; ctx.fillText(d.icon + ' ' + d.name, cx + 1 - slide, y + 1);
-  ctx.fillStyle = col;               ctx.fillText(d.icon + ' ' + d.name, cx - slide, y);
-  // Подпись: владелец / статус
+  ctx.fillStyle = col; ctx.fillText(d.icon + ' ' + d.name, cx, y - 1);
+  // Подпись
   ctx.font = '600 12px system-ui, sans-serif';
-  const sub = owner ? ('Контролирует: ' + (owner.ownerName || owner.gangTag || 'банда'))
-                    : (d.capturable ? 'Ничейный район · ' + d.bonus : 'Опасная зона');
-  ctx.fillStyle = 'rgba(0,0,0,.8)'; ctx.fillText(sub, cx + 1 - slide, y + 19);
-  ctx.fillStyle = '#dfe4ea';        ctx.fillText(sub, cx - slide, y + 18);
-  // Подчёркивание цветом района
-  ctx.strokeStyle = col; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(cx - 78 - slide, y + 6); ctx.lineTo(cx + 78 - slide, y + 6); ctx.stroke();
+  ctx.fillStyle = '#dfe4ea'; ctx.fillText(sub, cx, y + 17);
+  ctx.restore();
+  ctx.textAlign = 'left';
+}
+// Явная полоса захвата внизу экрана — когда игрок у штаба района. Показывает
+// прогресс (свой/чужой) или подсказку «стой здесь».
+function drawDistrictCaptureHud() {
+  const did = _myInsideDistHq;
+  if (!did) return;
+  const d = DISTRICT_BY_ID.get(did);
+  if (!d) return;
+  const owner = districtOwners[did];
+  if (owner && String(owner.ownerId || owner.owner_uid) === String(QP.uid)) return;  // уже мой
+  const cap = districtCaptures.get(did);
+  const W = window.innerWidth, H = window.innerHeight;
+  const cx = W / 2, y = Math.round(H * 0.70);
+  let prog = 0, mine = false;
+  if (cap) {
+    prog = Math.max(0, Math.min(1, (Date.now() - cap.startedAt) / 1000 / (cap.duration || DIST_CAPTURE_TIME_S)));
+    mine = String(cap.byId) === String(QP.uid);
+  }
+  const barW = Math.min(260, W * 0.7), barH = 14;
+  ctx.save();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = 'rgba(10,12,18,.82)';
+  ctx.beginPath(); ctx.roundRect(cx - barW / 2 - 10, y - 32, barW + 20, 54, 11); ctx.fill();
+  ctx.strokeStyle = d.color; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.roundRect(cx - barW / 2 - 10, y - 32, barW + 20, 54, 11); ctx.stroke();
+  ctx.font = '700 14px system-ui, sans-serif'; ctx.fillStyle = d.color;
+  const title = cap ? (mine ? `🏴 Захватываешь: ${d.name}` : `⚔️ ${cap.byName} берёт ${d.name}`)
+                    : `🏴 ${d.icon} ${d.name} — штаб района`;
+  ctx.fillText(title, cx, y - 14);
+  ctx.fillStyle = 'rgba(255,255,255,.16)';
+  ctx.beginPath(); ctx.roundRect(cx - barW / 2, y - 4, barW, barH, 5); ctx.fill();
+  if (cap) {
+    ctx.fillStyle = mine ? d.color : '#e74c3c';
+    ctx.beginPath(); ctx.roundRect(cx - barW / 2, y - 4, barW * prog, barH, 5); ctx.fill();
+  }
+  ctx.font = 'bold 11px system-ui, sans-serif'; ctx.fillStyle = '#fff';
+  ctx.fillText(cap ? (Math.round(prog * 100) + '%') : 'Стой здесь — захват начнётся', cx, y + 7);
   ctx.restore();
   ctx.textAlign = 'left';
 }
@@ -27017,6 +27065,24 @@ function drawMinimap() {
     ctx2.strokeStyle = _districtRgba(col, 0.45);
     ctx2.lineWidth = 0.8;
     ctx2.strokeRect(d.c0 * sx + 0.5, d.r0 * sy + 0.5, (d.c1 - d.c0 + 1) * sx - 1, (d.r1 - d.r0 + 1) * sy - 1);
+  }
+  // Штабы районов — флажок на миникарте (куда идти захватывать). Пульсирует
+  // у ничейных/чужих, чтобы игрок видел цель захвата.
+  const _hqPulse = 0.55 + 0.45 * Math.abs(Math.sin(performance.now() * 0.004));
+  for (const d of DISTRICTS) {
+    if (!d.hq) continue;
+    const owner = districtOwners[d.id];
+    const mine = owner && String(owner.ownerId || owner.owner_uid) === String(QP.uid);
+    const col = (owner && owner.color) ? owner.color : '#ffd76b';
+    const hx = (d.hq.c + 0.5) * sx, hy = (d.hq.r + 0.5) * sy;
+    ctx2.globalAlpha = mine ? 1 : _hqPulse;
+    ctx2.fillStyle = col;
+    // мини-флажок: шток + треугольник
+    ctx2.fillRect(hx - 0.5, hy - 6, 1.2, 8);
+    ctx2.beginPath();
+    ctx2.moveTo(hx + 0.6, hy - 6); ctx2.lineTo(hx + 6, hy - 4); ctx2.lineTo(hx + 0.6, hy - 2);
+    ctx2.closePath(); ctx2.fill();
+    ctx2.globalAlpha = 1;
   }
   // PVP-арена — пульсирующая красная зона
   const arenaPulse = 0.20 + Math.abs(Math.sin(performance.now() * 0.003)) * 0.18;
@@ -27467,7 +27533,7 @@ function _heartbeat() {
       `pl${_pr},${_pc} qc${_qc} car${_carN}\n` +
       `shk${_shk} drv:${_drvId} bnk:${_bank} w★${_wnt} hp${_hp} ⛽${_fuel}` + _errs;
   } catch (e) { _dbg = '\ndbg-err'; }
-  const compact = `BUILD v0300🏴 ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
+  const compact = `BUILD v0310🏴 ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
     `npc${NPCS && NPCS.length || 0} cop${cops} agg${aggro} oth${others && others.size || 0}\n` +
     `bul${bullets.length} muz${muzzles.length} ft${floatTexts.length} lk${lockedTargets && lockedTargets.size || 0}\n` +
     `st:${flagStr} tch${_touchCount}/3s ago${touchAgo}s` + _dbg;
