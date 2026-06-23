@@ -1583,26 +1583,40 @@ document.addEventListener('touchmove', (e) => {
 // ── Canvas ──────────────────────────────────────────────────────
 const canvas = document.getElementById('gc');
 const ctx = canvas.getContext('2d');
+// Истинная ВИДИМАЯ область. На iOS/Telegram window.innerWidth/Height могут
+// НЕ совпадать с тем что реально видно (хедер/safe-area/динамическая панель)
+// → игрок рисовался не по центру, «карта уезжает». visualViewport даёт точную
+// видимую зону. Берём его если есть, иначе фолбэк на window.
+function _viewSize() {
+  const vv = window.visualViewport;
+  return {
+    W: Math.round((vv && vv.width)  || window.innerWidth),
+    H: Math.round((vv && vv.height) || window.innerHeight),
+  };
+}
 function resizeCanvas() {
   const dpr = Math.min(2, window.devicePixelRatio || 1);
-  const W = window.innerWidth, H = window.innerHeight;
+  const { W, H } = _viewSize();
   canvas.width  = Math.floor(W * dpr);
   canvas.height = Math.floor(H * dpr);
   canvas.style.width  = W + 'px';
   canvas.style.height = H + 'px';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  // КРИТИЧНО (iOS/Telegram): #stage (position:fixed; inset:0) меряется по
-  // LAYOUT-viewport, а canvas — по window.innerHeight (VISUAL-viewport). На
-  // айфоне они РАЗНЫЕ (хедер Telegram/safe-area) → w2s центрировал камеру по
-  // stage, а рисовал по canvas → игрок не по центру и «вся карта съезжает»
-  // при любом изменении viewport. На десктопе они равны (поэтому в превью
-  // всё идеально). Принудительно равняем #stage к окну — все w2s/s2w/мини-
-  // карта (читают stage.client*) теперь совпадают с canvas.
+  // Равняем #stage (его clientWidth/Height читают w2s/s2w/миникарта) к той же
+  // видимой области — центр камеры строго совпадает с центром холста.
   const _stg = document.getElementById('stage');
   if (_stg) { _stg.style.width = W + 'px'; _stg.style.height = H + 'px'; }
 }
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
+// iOS: window 'resize' часто молчит при смене visible-области — слушаем
+// visualViewport напрямую (resize + scroll меняют видимую зону).
+try {
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', resizeCanvas);
+    window.visualViewport.addEventListener('scroll', resizeCanvas);
+  }
+} catch(e) {}
 
 // ── Карта (статичная) ──────────────────────────────────────────
 // Размер задаст сервер в hello-кадре, но дублируем дефолты на случай оффлайна.
@@ -27522,6 +27536,8 @@ try {
       if (_lpFired) { e.preventDefault(); return; }   // это был long-press — не разворачиваем
       _setMap(true);                                   // короткий тап — развернуть карту
     });
+    // Миникарта СКРЫТА по умолчанию (кто хочет — открывает тапом по 🗺).
+    _setMap(false);
   }
 } catch(e) {}
 const _dbgErrors = [];
@@ -27584,26 +27600,29 @@ function _heartbeat() {
     // DRIFT — смещение игрока от ЦЕНТРА экрана в пикселях. Если «карта
     // уезжает» = это число большое; если камера в норме = ~0. Плюс stage/win
     // расхождение (источник iOS-бага) — должны совпадать.
-    let _drift = '?', _stg = '?';
+    let _drift = '?', _stg = '?', _ps = '?', _ctr = '?', _vv = '?';
     try {
       const ps = w2s(player.r, player.c);
-      const cx0 = window.innerWidth / 2, cy0 = window.innerHeight / 2;
+      const vv = window.visualViewport;
+      const cx0 = (vv ? vv.width : window.innerWidth) / 2;
+      const cy0 = (vv ? vv.height : window.innerHeight) / 2;
       _drift = Math.round(Math.hypot(ps.x - cx0, ps.y - cy0));
+      _ps  = Math.round(ps.x) + ',' + Math.round(ps.y);
+      _ctr = Math.round(cx0) + ',' + Math.round(cy0);
+      _vv  = vv ? (Math.round(vv.width) + 'x' + Math.round(vv.height) + '@' + Math.round(vv.offsetTop)) : 'none';
       const st = document.getElementById('stage');
       _stg = st ? (st.clientWidth + 'x' + st.clientHeight) : '?';
-      // АВТО-ПОКАЗ дебаг-плашки когда «карта уезжает»: если игрок далеко от
-      // центра экрана (DRIFT>40px) — показываем панель, чтобы юзер заснял
-      // числа в момент бага. В норме плашка скрыта (мешала тесту).
-      if (_hbEl && typeof _drift === 'number' && _drift > 40) _hbEl.style.display = 'block';
+      // АВТО-ПОКАЗ дебаг-плашки когда «карта уезжает» (DRIFT>25px).
+      if (_hbEl && typeof _drift === 'number' && _drift > 25) _hbEl.style.display = 'block';
     } catch (e) {}
     const _errs = _dbgErrors.length ? '\n🔴 ' + _dbgErrors.slice(-2).join('\n🔴 ') : '';
     _dbg = `\nz${_zoom} dpr${_dpr} cv${canvas.width}x${canvas.height}\n` +
-      `win${window.innerWidth}x${window.innerHeight} stg${_stg}\n` +
-      `cam${_camx},${_camy} DRIFT:${_drift}px\n` +
-      `pl${_pr},${_pc} qc${_qc} car${_carN}\n` +
+      `win${window.innerWidth}x${window.innerHeight} stg${_stg} vv${_vv}\n` +
+      `DRIFT:${_drift}px  ps[${_ps}] ctr[${_ctr}]\n` +
+      `cam${_camx},${_camy} pl${_pr},${_pc}\n` +
       `shk${_shk} drv:${_drvId} bnk:${_bank} w★${_wnt} hp${_hp} ⛽${_fuel}` + _errs;
   } catch (e) { _dbg = '\ndbg-err'; }
-  const compact = `BUILD v0340🗺 ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
+  const compact = `BUILD v0350🗺 ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
     `npc${NPCS && NPCS.length || 0} cop${cops} agg${aggro} oth${others && others.size || 0}\n` +
     `bul${bullets.length} muz${muzzles.length} ft${floatTexts.length} lk${lockedTargets && lockedTargets.size || 0}\n` +
     `st:${flagStr} tch${_touchCount}/3s ago${touchAgo}s` + _dbg;
