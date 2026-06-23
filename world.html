@@ -8422,11 +8422,17 @@ function isBlocked(r, c) {
 // Коллизия для МАШИНЫ: в отличие от пешехода, машина НЕ заезжает на песок
 // пляжа (тайл 14), кроме асфальтовой дороги к Майклу (c=40..43). Песок для
 // пешехода остаётся проходимым через обычный isBlocked.
+// Песок (14) ТЕПЕРЬ ПРОХОДИМ для машин — можно ездить по пляжу (медленно,
+// колёса зарываются, см. sand-эффект ниже в физике). Блокируем только то же,
+// что и пешеходу (здания/вода/границы) через isBlocked. Раньше тут стоял
+// доп. блок песка — машина «врезалась в пляж».
 function isBlockedCar(r, c) {
-  if (isBlocked(r, c)) return true;
+  return isBlocked(r, c);
+}
+// Машина стоит на песке? (для замедления + анимации зарывания колёс)
+function _carOnSand(r, c) {
   const ri = Math.floor(r), ci = Math.floor(c);
-  if (MAP[ri] && MAP[ri][ci] === 14 && !(ci >= 40 && ci <= 43)) return true;
-  return false;
+  return !!(MAP[ri] && MAP[ri][ci] === 14);
 }
 function tryMove(obj, dr, dc) {
   const pad = 0.3;
@@ -14340,6 +14346,16 @@ function update(dt) {
           curVx *= k; curVy *= k;
         }
       }
+      // ── ПЕСОК: машина вязнет ───────────────────────────────────────
+      // По пляжу ездить можно, но медленно и с трением (колёса зарываются).
+      const _onSand = _carOnSand(qc.y, qc.x);
+      if (_onSand) {
+        const sandMax = CAR_MAX_SPEED * 0.42;       // ~42% от макс. на песке
+        const sp = Math.hypot(curVx, curVy);
+        if (sp > sandMax) { const kk = sandMax / sp; curVx *= kk; curVy *= kk; }
+        const fr = 1 - Math.min(0.6, dt * 1.4);     // доп. вязкое трение
+        curVx *= fr; curVy *= fr;
+      }
       // Флаг для рендера стоп-сигналов: жмём тормоз или просто очень медленно
       // едем (заходим на парковку).
       qc.braking = activeBrake || (Math.hypot(curVx, curVy) < 0.6 && throttle < 0.05);
@@ -14375,6 +14391,30 @@ function update(dt) {
             color: 'rgba(200,200,200,',
           });
           if (skidMarks.length > 500) skidMarks.splice(0, 80);
+        }
+      }
+
+      // ── ПЕСОК: колёса зарываются — фонтанчики песка из-под колёс ───
+      if (_onSand && curSpeed > 1.0) {
+        const nowMsS = performance.now();
+        if (nowMsS - (qc._lastSandAt || 0) > 45) {
+          qc._lastSandAt = nowMsS;
+          const mmS  = _qcMdl || { L: 1.7, W: 0.85 };
+          const wOffS = (mmS.W || 0.85) * 0.42;
+          const bOffS = (mmS.L || 1.6) * 0.40;
+          const bAngS = qc.ang + Math.PI;            // зад машины
+          const pAS   = qc.ang + Math.PI / 2;
+          const pxS = Math.cos(pAS), pyS = Math.sin(pAS);
+          const bxS  = qc.x + Math.cos(bAngS) * bOffS;
+          const byS  = qc.y + Math.sin(bAngS) * bOffS;
+          for (const s of [1, -1]) {
+            exhaustPuffs.push({
+              r: byS + pyS * wOffS * s, c: bxS + pxS * wOffS * s,
+              vr: -0.25 - Math.random() * 0.25, vc: (Math.random() - 0.5) * 0.4,
+              rad: 3 + Math.random() * 3, life: 360, max: 360,
+              color: 'rgba(216,186,124,',          // песочный цвет
+            });
+          }
         }
       }
 
@@ -14824,8 +14864,11 @@ function update(dt) {
   // (то самое что прибавляется в w2s до вычитания cam). Плавно.
   const targetCamX = (player.c - player.r) * TS * 0.5;
   const targetCamY = (player.c + player.r) * TS * 0.5 * ISO_Y;
-  cam.x += (targetCamX - cam.x) * Math.min(1, dt * 8);
-  cam.y += (targetCamY - cam.y) * Math.min(1, dt * 8);
+  // dt*14 (было *8): отставание камеры при ходьбе ~0.35 тайла вместо 0.6 —
+  // на открытом пляже постоянное отставание было заметно («едет»), теперь
+  // игрок держится у центра. На стабильной связи джиттера снапшота нет.
+  cam.x += (targetCamX - cam.x) * Math.min(1, dt * 14);
+  cam.y += (targetCamY - cam.y) * Math.min(1, dt * 14);
   // Зум: на пляже немного приближаем (1.18) — там нет высоких зданий,
   // и игрок без зума выглядит слишком мелким. Лерпим плавно, дёрганья
   // больше нет благодаря медленному коэффициенту.
@@ -27626,7 +27669,7 @@ function _heartbeat() {
       `cam${_camx},${_camy} pl${_pr},${_pc}\n` +
       `shk${_shk} drv:${_drvId} bnk:${_bank} w★${_wnt} hp${_hp} ⛽${_fuel}` + _errs;
   } catch (e) { _dbg = '\ndbg-err'; }
-  const compact = `BUILD v0360🚗 ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
+  const compact = `BUILD v0370🏖 ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
     `npc${NPCS && NPCS.length || 0} cop${cops} agg${aggro} oth${others && others.size || 0}\n` +
     `bul${bullets.length} muz${muzzles.length} ft${floatTexts.length} lk${lockedTargets && lockedTargets.size || 0}\n` +
     `st:${flagStr} tch${_touchCount}/3s ago${touchAgo}s` + _dbg;
