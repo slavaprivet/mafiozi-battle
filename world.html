@@ -27540,6 +27540,10 @@ function _heartbeat() {
       _drift = Math.round(Math.hypot(ps.x - cx0, ps.y - cy0));
       const st = document.getElementById('stage');
       _stg = st ? (st.clientWidth + 'x' + st.clientHeight) : '?';
+      // АВТО-ПОКАЗ дебаг-плашки когда «карта уезжает»: если игрок далеко от
+      // центра экрана (DRIFT>40px) — показываем панель, чтобы юзер заснял
+      // числа в момент бага. В норме плашка скрыта (мешала тесту).
+      if (_hbEl && typeof _drift === 'number' && _drift > 40) _hbEl.style.display = 'block';
     } catch (e) {}
     const _errs = _dbgErrors.length ? '\n🔴 ' + _dbgErrors.slice(-2).join('\n🔴 ') : '';
     _dbg = `\nz${_zoom} dpr${_dpr} cv${canvas.width}x${canvas.height}\n` +
