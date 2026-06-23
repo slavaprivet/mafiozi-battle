@@ -14597,11 +14597,15 @@ function update(dt) {
       const _ancLerp = Math.min(1, dt * 6);
       qc._camAncR += (qc.y - qc._camAncR) * _ancLerp;
       qc._camAncC += (qc.x - qc._camAncC) * _ancLerp;
-      // Look-ahead по вектору скорости — на ОСНОВЕ якорной скорости, плавный.
+      // Look-ahead по вектору скорости. РАНЬШЕ был 2.4 тайла — на пляже (простор,
+      // высокая скорость) камера уезжала вперёд на ~54px, юзер 3 сессии называл
+      // это «пляж съезжает». Это НЕ пляж и НЕ вьюпорт (vv==win, центр верный) —
+      // именно лидирование камеры машины. Снижено до 0.6 тайла: машина держится
+      // у центра, лёгкий намёк «куда едешь» остаётся.
       let lookR = 0, lookC = 0;
       const camSpeed = Math.hypot(curVx, curVy);
       if (camSpeed > 1.5) {
-        const k = Math.min(1, camSpeed / CAR_MAX_SPEED) * 2.4;
+        const k = Math.min(1, camSpeed / CAR_MAX_SPEED) * 0.6;
         lookR = (curVy / camSpeed) * k;
         lookC = (curVx / camSpeed) * k;
       }
@@ -27012,14 +27016,14 @@ function drawDistrictBanner() {
   let alpha = 1, slide = 0;
   if (age < 300)      { alpha = age / 300; slide = (1 - age / 300) * 36; }
   else if (age > 3000) { alpha = 1 - (age - 3000) / 500; }
-  const W = window.innerWidth, H = window.innerHeight;
-  // НИЖЕ HUD-бара (он занимает верх слева+справа) — иначе название района
-  // не прочесть под аватаром/«онлайн». ~30% высоты экрана.
-  const cx = W / 2 - slide, y = Math.round(H * 0.30);
+  const { W, H } = _viewSize();
+  // Ниже HUD-бара, но повыше прежнего (~24% высоты) — как просил юзер.
+  const cx = W / 2 - slide, y = Math.round(H * 0.24);
   const owner = districtOwners[d.id];
   const col = (owner && owner.color) ? owner.color : d.color;
-  const sub = owner ? ('Контролирует: ' + (owner.ownerName || owner.gangTag || 'банда'))
-                    : (d.capturable ? 'Ничейный · подойди к 🏴 штабу' : 'Опасная зона');
+  // Захвачен → ник владельца; ничейный → «не захвачен»; Логово → «опасная зона».
+  const sub = owner ? ('👑 ' + (owner.ownerName || owner.gangTag || 'игрок'))
+                    : (d.capturable ? '🏴 не захвачен' : '☠️ опасная зона');
   ctx.save();
   ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
   ctx.textAlign = 'center';
@@ -27053,7 +27057,7 @@ function drawDistrictCaptureHud() {
   const owner = districtOwners[did];
   if (owner && String(owner.ownerId || owner.owner_uid) === String(QP.uid)) return;  // уже мой
   const cap = districtCaptures.get(did);
-  const W = window.innerWidth, H = window.innerHeight;
+  const { W, H } = _viewSize();
   const cx = W / 2, y = Math.round(H * 0.70);
   let prog = 0, mine = false;
   if (cap) {
@@ -27622,7 +27626,7 @@ function _heartbeat() {
       `cam${_camx},${_camy} pl${_pr},${_pc}\n` +
       `shk${_shk} drv:${_drvId} bnk:${_bank} w★${_wnt} hp${_hp} ⛽${_fuel}` + _errs;
   } catch (e) { _dbg = '\ndbg-err'; }
-  const compact = `BUILD v0350🗺 ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
+  const compact = `BUILD v0360🚗 ${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
     `npc${NPCS && NPCS.length || 0} cop${cops} agg${aggro} oth${others && others.size || 0}\n` +
     `bul${bullets.length} muz${muzzles.length} ft${floatTexts.length} lk${lockedTargets && lockedTargets.size || 0}\n` +
     `st:${flagStr} tch${_touchCount}/3s ago${touchAgo}s` + _dbg;
