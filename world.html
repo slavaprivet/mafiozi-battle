@@ -24778,6 +24778,19 @@ function render() {
     drawPerson(px, py, player.ang, QP.look,
                player.walking ? player.walkPhase : 0, QP.name, myChat, true,
                myHp, PVP.max_hp, myDead, null, !!_punchAnim, !!(_punchAnim && _punchAnim.type === 'kick'));
+    // 🎯 ДИАГНОСТИКА: метка ТОЧКИ НОГ аватара — рисуется ВНУТРИ зум-трансформа,
+    // ровно там же, где сам аватар. Сравни с циан-кружком (он рисуется ПОСЛЕ
+    // снятия зума). Если красная метка и циан-кружок СОВПАЛИ — аватар там же,
+    // где его считает w2s (баг починен, фигура в стороне — это NPC-пляжник).
+    // Если разъехались — есть трансформ-баг зума. Тумблер: _diagAim.
+    if (_diagAim) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,40,40,0.95)'; ctx.fillStyle = 'rgba(255,40,40,0.95)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(px, py, 9, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(px, py, 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
     if (myMode !== 'pve' && !myDead) {
       if (_isArmed()) drawWeaponInHands(px, py, player.ang, currentWeapon, 0.9, lastShotClientT);
       if (_punchAnim) _drawPunchAnim(px, py);
