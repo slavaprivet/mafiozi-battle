@@ -7264,6 +7264,9 @@ const cam = {
 // игрок становится мелким. Компенсируем масштабом 1.18, плавно лерпим
 // при переходе. Управляется в update(dt) → применяется в render().
 let viewZoom = 1.0;
+// Маркер сборки — виден в дебаг-HUD. Бампим при каждом деплое, чтобы юзер
+// точно знал, что загружена свежая версия (Telegram любит кэшировать).
+const BUILD_TAG = 'B-2058';
 
 // Преобразование тайл→экран и обратно
 function w2s(r, c) {
@@ -26930,7 +26933,7 @@ function _heartbeat() {
       `win${window.innerWidth}x${window.innerHeight} cam${_camx},${_camy}\n` +
       `pl${_pr},${_pc} qc${_qc} car${_carN}`;
   } catch (e) { _dbg = '\ndbg-err'; }
-  const compact = `${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s\n` +
+  const compact = `${timeMark} fps${fps} ${wsReady.slice(0,4)} snap${snapAgo}s ${BUILD_TAG}\n` +
     `npc${NPCS && NPCS.length || 0} cop${cops} agg${aggro} oth${others && others.size || 0}\n` +
     `bul${bullets.length} muz${muzzles.length} ft${floatTexts.length} lk${lockedTargets && lockedTargets.size || 0}\n` +
     `st:${flagStr} tch${_touchCount}/3s ago${touchAgo}s` + _dbg;
