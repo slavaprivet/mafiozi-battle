@@ -14228,10 +14228,13 @@ function update(dt) {
       const targetCamY = (aimC + aimR) * TS * 0.5 * ISO_Y;
       cam.x += (targetCamX - cam.x) * Math.min(1, dt * 5);
       cam.y += (targetCamY - cam.y) * Math.min(1, dt * 5);
-      // Зум от скорости: стоим=1.0, макс. скорость=0.80 (видно больше дороги)
+      // Зум от скорости: стоим=1.0, макс. скорость=0.80 (видно больше дороги).
+      // Пляжный зум-IN (1.18) УБРАН и здесь (2026-06-24) — он был причиной
+      // «съезжания/плывёт декор» на пляже за рулём. Оставлен только speed-
+      // zoom-OUT — это полезная фишка вождения, не она была проблемой.
       {
         const sp = Math.hypot(curVx, curVy) / CAR_MAX_SPEED;
-        const tzoom = (player.r >= 140) ? 1.18 : (1.0 - Math.min(1, sp) * 0.20);
+        const tzoom = 1.0 - Math.min(1, sp) * 0.20;
         viewZoom += (tzoom - viewZoom) * Math.min(1, dt * 2.5);
       }
       // Крен/клевок кузова (для рендера)
