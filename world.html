@@ -14356,7 +14356,7 @@ function update(dt) {
       player.walkPhase+=dt*10*mv;
     }
     const targetCamX=(player.c-player.r)*TS*0.5;
-    const targetCamY=(player.c+player.r)*TS*0.5*ISO_Y;
+    const targetCamY=(player.c+player.r+1)*TS*0.5*ISO_Y;  // центр клетки (см. walk-path)
     cam.x+=(targetCamX-cam.x)*Math.min(1,dt*8);
     cam.y+=(targetCamY-cam.y)*Math.min(1,dt*8);
     _updateBankInterior(dt);
@@ -14420,13 +14420,21 @@ function update(dt) {
     player.walking = mv > 0.15;
     player.walkPhase += dt * 10 * mv;
   }
-  // Камера следит за игроком — держим его ровно по центру экрана.
-  // Целевое смещение камеры = изометрические координаты игрока
-  // (то самое что прибавляется в w2s до вычитания cam). Плавно.
+  // Камера следит за игроком — держим его РОВНО по центру экрана.
+  // ВАЖНО: w2s рисует игрока в ЦЕНТРЕ клетки (player.r+0.5, player.c+0.5),
+  // а раньше камера целилась в УГОЛ клетки (player.r, player.c). В X эти
+  // +0.5 сокращаются, но в Y — складываются → игрок постоянно висел на
+  // пол-тайла (TS·ISO_Y/2) НИЖЕ центра (диагностика это и показала: кружок
+  // под крестиком даже в покое). Целимся в центр клетки → +1 в Y.
   const targetCamX = (player.c - player.r) * TS * 0.5;
-  const targetCamY = (player.c + player.r) * TS * 0.5 * ISO_Y;
-  cam.x += (targetCamX - cam.x) * Math.min(1, dt * 8);
-  cam.y += (targetCamY - cam.y) * Math.min(1, dt * 8);
+  const targetCamY = (player.c + player.r + 1) * TS * 0.5 * ISO_Y;
+  // Лерп масштабируем на viewZoom: на пляже (zoom 1.18) мировое отставание
+  // камеры умножается зумом в 1.18× на экране — игрок «съезжал» к краю.
+  // Делая лерп пропорционально быстрее, держим ЭКРАННОЕ отставание тем же,
+  // что и в городе (zoom 1.0). Принципиально, без магических чисел.
+  const _camLerp = Math.min(1, dt * 8 * viewZoom);
+  cam.x += (targetCamX - cam.x) * _camLerp;
+  cam.y += (targetCamY - cam.y) * _camLerp;
   // Зум: на пляже немного приближаем (1.18) — там нет высоких зданий,
   // и игрок без зума выглядит слишком мелким. Лерпим плавно, дёрганья
   // больше нет благодаря медленному коэффициенту.
