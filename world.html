@@ -9799,9 +9799,22 @@ function wsConnect() {
           myDeathLeft = d.me.respawn_in || 0;
         }
         if (!wasDead && myDead) {
-          // Только что умер — принудительно выходим из машины, сбрасываем зум
+          // Только что умер — МГНОВЕННЫЙ жёсткий выход из машины. НЕ через
+          // exitCar(): тот при движущейся машине только ставит _exitRequested
+          // и выходит, НЕ очищая myDrivingCarId → после респавна игрок
+          // «застревал» в режиме машины (qc1, пеший апдейт не работает, не
+          // ходит). Мёртвый не тормозит — рвём состояние машины здесь и сразу.
           if (myDrivingCarId) {
-            exitCar('death');
+            const _cid = myDrivingCarId;
+            try { ws && ws.send(JSON.stringify({ t: 'gta_exit', d: { car_id: _cid } })); } catch(e){}
+            const _qc = questCars.get(_cid);
+            if (_qc && _qc.driver_uid === String(QP.uid)) {
+              _qc.driver_uid = null; _qc.state = 'idle'; _qc.vx = 0; _qc.vy = 0;
+            }
+            myDrivingCarId = null;
+            myIsPassenger  = false;
+            _exitRequested = false;
+            _myCarFuelPct  = null;
             viewZoom = 1.0;
           }
           // Мешок падает на землю при смерти
@@ -9811,6 +9824,16 @@ function wsConnect() {
           // телепортируемся в серверную spawn-точку.
           myDeathBy = '';
           if (_bankInt) exitBankInterior(false);  // выходим из банка при смерти
+          // Страховка: если по какой-то причине состояние машины не сбросилось
+          // на смерти — рвём его здесь, иначе пеший апдейт не запустится и
+          // игрок «застрянет» после респавна.
+          if (myDrivingCarId || myIsPassenger) {
+            myDrivingCarId = null;
+            myIsPassenger  = false;
+            _exitRequested = false;
+            _myCarFuelPct  = null;
+            viewZoom = 1.0;
+          }
           player.r = d.me.y;
           player.c = d.me.x;
           // Сброс камеры на новую позицию, чтобы не «летела» туда
