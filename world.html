@@ -29156,6 +29156,33 @@ function _updateBankInterior(dt) {
     }
     int.panicAt=null;
   }
+  // ── Комната охраны: спавн 3 охранников каждые 30 сек, макс 9 ────────
+  if (!int._secSpawnAt) int._secSpawnAt = now + 30000;
+  if (now >= int._secSpawnAt) {
+    const liveGuards = int.npcs.filter(n => n.type === 'guard' && !n.dead && n.state !== 'fled');
+    if (liveGuards.length < 9) {
+      const toSpawn = Math.min(3, 9 - liveGuards.length);
+      const secDoorR = counterRow + 2, secDoorC = 2;
+      for (let si = 0; si < toSpawn; si++) {
+        const gi = int.npcs.filter(n => n.type === 'guard').length;
+        int.npcs.push({
+          type: 'guard', _guardIdx: 100 + gi,
+          r: secDoorR + Math.random() * 0.5, c: secDoorC + Math.random() * 0.5,
+          state: isRobbery ? 'hostile' : 'normal',
+          look: _BANK_NPC_LOOKS.guard,
+          walkPhase: Math.random() * 6.28, ang: Math.PI * 0.5,
+          wanderTimer: 2 + Math.random() * 2, wanderVr: 0, wanderVc: 0,
+          _alertAt: 0, hp: 100, max_hp: 100,
+          cryText: isRobbery ? 'Подкрепление!' : null,
+          cryUntil: isRobbery ? now + 2000 : 0,
+        });
+      }
+      if (toSpawn > 0 && isRobbery) {
+        showToast(`🚨 Подкрепление! +${toSpawn} охранников!`, '🛡️', 1800);
+      }
+    }
+    int._secSpawnAt = now + 30000;
+  }
   // Живые фразы NPC (только в нормальном состоянии, не при ограблении)
   if (!int.panicAt && int.phase === 'lobby') {
     const _bankPhrases = {
@@ -30754,6 +30781,48 @@ function drawBankInteriorScene() {
   };
   drawArch(archRow, staffArchC,  '🖥️ Персонал', 'rgba(80,140,220,0.8)');
   drawArch(archRow, loungeArchC, '☕ Отдых',     'rgba(180,80,180,0.8)');
+
+  // ── Комната охраны — дверь сбоку от лобби (западная стена) ─────────
+  { const secR = counterRow + 1.5, secC = 0;
+    items.push({d: secR + secC + .2, fn: () => {
+      const a = w2s(secR, secC), b = w2s(secR + 2.5, secC);
+      const dH = wallH * .7;
+      // Дверной проём (тёмный)
+      ctx.fillStyle = 'rgba(10,8,18,.9)';
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+      ctx.lineTo(b.x, b.y - dH); ctx.lineTo(a.x, a.y - dH); ctx.closePath(); ctx.fill();
+      // Стальная рамка
+      ctx.strokeStyle = '#4a5268'; ctx.lineWidth = 2;
+      ctx.strokeRect(Math.min(a.x, b.x), Math.min(a.y, b.y) - dH, Math.abs(b.x - a.x) || 14, dH + Math.abs(b.y - a.y));
+      // Табличка SECURITY
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2 - dH - 8;
+      const blink = 0.5 + 0.5 * Math.sin(now * 0.004);
+      // Фон таблички
+      ctx.fillStyle = '#1a1020'; ctx.strokeStyle = '#3a2848'; ctx.lineWidth = 1;
+      const tw = 52, th = 14;
+      ctx.fillRect(mx - tw / 2, my - th / 2, tw, th);
+      ctx.strokeRect(mx - tw / 2, my - th / 2, tw, th);
+      // Текст
+      ctx.save();
+      ctx.font = 'bold 8px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = `rgba(255,60,60,${0.6 + 0.4 * blink})`;
+      ctx.shadowColor = '#ff2020'; ctx.shadowBlur = 6 + 4 * blink;
+      ctx.fillText('🛡️ SECURITY', mx, my);
+      ctx.shadowBlur = 0; ctx.restore();
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      // Мигающая лампа над дверью
+      ctx.fillStyle = `rgba(255,${40 + Math.floor(blink * 80)},40,${0.5 + 0.5 * blink})`;
+      ctx.beginPath(); ctx.arc(mx, my - th / 2 - 6, 3 + blink, 0, Math.PI * 2); ctx.fill();
+      // Свечение лампы
+      ctx.save();
+      const glow = ctx.createRadialGradient(mx, my - th / 2 - 6, 1, mx, my - th / 2 - 6, 14);
+      glow.addColorStop(0, `rgba(255,60,40,${0.15 * blink})`);
+      glow.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath(); ctx.arc(mx, my - th / 2 - 6, 14, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }});
+  }
 
   // ── СТЕНЫ — добавляем в depth-sort, иначе всегда поверх игрока ───
   // items.sort() будет вызван ПОСЛЕ добавления стен (ниже)
