@@ -32983,7 +32983,9 @@ function frame() {
   // ошибку и продолжает loop — игрок видит, что мир «дёрнулся» (один
   // потерянный кадр), но игра не умирает.
   try {
-    if (t < hitStopUntil) {
+    if (_battleOpen) {
+      // Битва в iframe — пропускаем тяжёлый рендер/update мира
+    } else if (t < hitStopUntil) {
       render();
     } else {
       update(dt);
