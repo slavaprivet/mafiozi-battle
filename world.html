@@ -1766,16 +1766,18 @@ function _viewSize() {
     H: Math.round((vv && vv.height) || window.innerHeight),
   };
 }
+let _lastCanvasW = 0, _lastCanvasH = 0;
 function resizeCanvas() {
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const { W, H } = _viewSize();
-  canvas.width  = Math.floor(W * dpr);
-  canvas.height = Math.floor(H * dpr);
+  const tw = Math.floor(W * dpr), th = Math.floor(H * dpr);
+  if (canvas.width === tw && canvas.height === th) return;
+  _lastCanvasW = tw; _lastCanvasH = th;
+  canvas.width  = tw;
+  canvas.height = th;
   canvas.style.width  = W + 'px';
   canvas.style.height = H + 'px';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  // Равняем #stage (его clientWidth/Height читают w2s/s2w/миникарта) к той же
-  // видимой области — центр камеры строго совпадает с центром холста.
   const _stg = document.getElementById('stage');
   if (_stg) { _stg.style.width = W + 'px'; _stg.style.height = H + 'px'; }
 }
@@ -5969,6 +5971,36 @@ function updateNpcs(dt) {
   for (const n of NPCS) {
     if (n.dead) continue;
 
+    // ── Охранник бизнеса — бежит к игроку и бьёт дубинкой ────────────
+    if (n._hostile && now < n._hostileUntil && !myDead) {
+      const dx = player.c - n.c, dy = player.r - n.r;
+      const dist = Math.hypot(dy, dx);
+      if (dist > 20) { n._hostile = false; continue; }
+      n.ang = Math.atan2(dy, dx);
+      if (dist > 1.2) {
+        const spd = n.speed || 2.5;
+        n.r += (dy / dist) * spd * dt;
+        n.c += (dx / dist) * spd * dt;
+        n.walkPhase = (n.walkPhase || 0) + dt * 10;
+      }
+      if (dist < 1.5 && now > (n._attackCd || 0)) {
+        n._attackCd = now + 1200;
+        const dmg = n._meleeDmg || 8;
+        addShake(2);
+        flashHitOverlay();
+        _hurtLocal(dmg, 'Охранник');
+        spawnFloatText(player.r - 0.4, player.c, `−${dmg}`, { color: '#ff4444', size: 16, life: 1000 });
+        try { ws && ws.send(JSON.stringify({ t: 'npc_melee_shoot',
+          d: { dmg, sx: +n.c.toFixed(2), sy: +n.r.toFixed(2) } })); } catch(e) {}
+        if (Math.random() < 0.5) {
+          n.cryText = ['Стой!', 'На пол!', 'Не двигайся!'][Math.floor(Math.random()*3)];
+          n.cryUntil = now + 1200;
+        }
+      }
+      continue;
+    }
+    if (n._hostile && (now >= n._hostileUntil || myDead)) { n._hostile = false; }
+
     // ── Вооружённая контратака NPC (пистолет) ────────────────────────
     if (n._fighting) {
       const d = Math.hypot(player.r - n.r, player.c - n.c);
@@ -9371,7 +9403,7 @@ function handleEventPacket(d) {
       const s = +d.stars | 0;
       QP.cash = (parseInt(QP.cash) || 0) + m;
       myWanted = Math.max(myWanted || 0, s);
-      if (d.biz_id) _robCooldowns[d.biz_id] = Date.now() + 86400000;
+      if (d.biz_id) _robCooldowns[d.biz_id] = Date.now() + 3600000;
       showToast(`💰 Ограбление успешно: +$${m.toLocaleString('ru')} (${s}★)`,
                 '🔪', 3000);
       hapticHit();
@@ -10894,15 +10926,15 @@ function claimBrigadirReward() {
 // бежит в участок (snitch). Убьёшь кассира до окончания таймера — ★ всё
 // равно прилетит за сам факт ограбления (серверный witness), но без snitch.
 const ROB_PAYOUT_PREVIEW = {
-  coffee:     { money:  120, stars: 1 },
-  carwash:    { money:  170, stars: 1 },
-  barbershop: { money:  220, stars: 1 },
-  pizza:      { money:  320, stars: 1 },
-  garage:     { money:  470, stars: 2 },
-  bar:        { money:  720, stars: 2 },
-  club:       { money: 1100, stars: 2 },
-  warehouse:  { money: 1700, stars: 2 },
-  casino:     { money: 2800, stars: 3 },
+  coffee:     { money:   60, stars: 1 },
+  carwash:    { money:   85, stars: 1 },
+  barbershop: { money:  110, stars: 1 },
+  pizza:      { money:  160, stars: 1 },
+  garage:     { money:  235, stars: 2 },
+  bar:        { money:  360, stars: 2 },
+  club:       { money:  550, stars: 2 },
+  warehouse:  { money:  850, stars: 2 },
+  casino:     { money: 1400, stars: 3 },
 };
 const ROB_DURATION_MS = 8000;
 const _robBtn      = document.getElementById('robActionBtn');
@@ -11003,6 +11035,31 @@ function finishRobbery() {
     }
   }
   _robCashierNpc = null;
+  // 20% шанс — выбегает охрана (2 NPC как в банке, бьют дубинками)
+  if (Math.random() < 0.20 && _robTargetBiz) {
+    showToast('🚨 Охрана!', '👮', 2000);
+    const guardLooks = [
+      { gender:0, skin:1, body:1, face:0, hair:1, hat:5 },
+      { gender:0, skin:2, body:2, face:3, hair:0, hat:5 },
+    ];
+    for (let gi = 0; gi < 2; gi++) {
+      const ga = Math.PI * 2 * (gi / 2 + 0.25);
+      const gr = _robTargetR + Math.sin(ga) * 1.2;
+      const gc = _robTargetC + Math.cos(ga) * 1.2;
+      const guard = {
+        r: gr, c: gc, tr: gr, tc: gc,
+        dead: false, panicUntil: 0, snitching: false, snitchUntil: 0,
+        cryUntil: performance.now() + 2000, cryText: 'Стой!',
+        speed: 2.5, hp: 80, hpMax: 80,
+        name: 'Охранник',
+        look: guardLooks[gi],
+        _guard: true, _hostile: true, _hostileUntil: performance.now() + 30000,
+        _attackCd: 0, _meleeDmg: 8,
+        walkPhase: 0, ang: Math.atan2(player.r - gr, player.c - gc),
+      };
+      if (typeof NPCS !== 'undefined') NPCS.push(guard);
+    }
+  }
   // Шлём серверу — он валидирует cooldown/дистанцию/owner и начислит cash + ★
   try {
     ws && ws.send(JSON.stringify({ t: 'shop_rob', d: {
@@ -25241,7 +25298,7 @@ function render() {
     const _cc = (cam.y / (TS * ISO_Y) + cam.x / TS);
     if (isFinite(_cr) && isFinite(_cc)) { _cullR = _cr; _cullC = _cc; }
   }
-  const VIS_R = 18;
+  const VIS_R = 22;
   const r0 = Math.max(0, Math.floor(_cullR - VIS_R));
   const r1 = Math.min(MAP_ROWS, Math.ceil(_cullR + VIS_R));
   const c0 = Math.max(0, Math.floor(_cullC - VIS_R));
