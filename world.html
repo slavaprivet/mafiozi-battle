@@ -9369,6 +9369,9 @@ function handleEventPacket(d) {
     if (d.ok) {
       const m = +d.money | 0;
       const s = +d.stars | 0;
+      QP.cash = (parseInt(QP.cash) || 0) + m;
+      myWanted = Math.max(myWanted || 0, s);
+      if (d.biz_id) _robCooldowns[d.biz_id] = Date.now() + 86400000;
       showToast(`💰 Ограбление успешно: +$${m.toLocaleString('ru')} (${s}★)`,
                 '🔪', 3000);
       hapticHit();
@@ -10912,6 +10915,7 @@ let _robTargetBiz  = null;   // POI который грабим (объект и
 let _robTargetR    = 0;
 let _robTargetC    = 0;
 let _robCashierNpc = null;   // ссылка на NPC из NPCS — кассир (если жив бежит)
+const _robCooldowns = {};    // biz_id → timestamp окончания кулдауна
 
 function startRobbery(biz) {
   if (_robInProgress) return;
@@ -11149,7 +11153,8 @@ function updateGtaInteractions() {
       // ВТОРАЯ кнопка — «Ограбить». Альтернатива покупке.
       // Сумма и ★ серверные, сервер сам отвергнет при cooldown.
       const rcfg = ROB_PAYOUT_PREVIEW[bizNear.id];
-      if (_robBtn && rcfg && !_robInProgress) {
+      const robOnCd = _robCooldowns[bizNear.id] && Date.now() < _robCooldowns[bizNear.id];
+      if (_robBtn && rcfg && !_robInProgress && !robOnCd) {
         _robTargetBiz = bizNear;
         _robBtn.textContent = `🔪 Ограбить ($${rcfg.money}, ${rcfg.stars}★)`;
         _robBtn.style.display = 'block';
