@@ -11396,8 +11396,8 @@ function updateGtaInteractions() {
     return;
   }
   // Гражданская тачка из трафика — можно угнать как в GTA. Игнорируем
-  // полицию (cop_cruiser/paddyvan/swat_truck) — её не угнать без последствий
-  // более тяжёлых чем wanted. И горящие/повреждённые тоже пропускаем.
+  // полицию, горящие/повреждённые. В тюрьме угон запрещён.
+  if (myJailIn > 0) { _gtaActionKind = null; _gtaBtn.style.display = 'none'; return; }
   let nearestCiv = null, nearestCivD = GTA_INTERACT_R;
   const nowAlarm = performance.now();
   for (const car of CARS) {
