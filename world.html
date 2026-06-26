@@ -11204,7 +11204,7 @@ function updateGtaInteractions() {
     }
   }
   // Вход в обычное здание (MAP[r][c]===1, не POI/банк/полиция и т.д.)
-  if (!_buildingInt && !_bankInt && !myDrivingCarId && !myDead) {
+  if (!_buildingInt && !_bankInt && !myDrivingCarId && !myDead && !inArena(player.r, player.c)) {
     const pr = Math.round(player.r), pc = Math.round(player.c);
     let nearBldR = null, nearBldC = null, nearBldD = 2.2;
     for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) {
