@@ -11365,6 +11365,7 @@ function updateGtaInteractions() {
     const dr = qc.y - player.r, dc = qc.x - player.c;
     const d  = Math.hypot(dr, dc);
     if (d > GTA_INTERACT_R) continue;
+    if (qc.wrecked) continue;
     const isMine = String(qc.owner_uid) === String(QP.uid);
     if (isMine && !qc.driver_uid) {
       if (d < nearestD) { nearestD = d; nearestQc = qc; nearestKind = 'driver'; }
@@ -12631,6 +12632,7 @@ let _pendingHijackModel = null;
 function enterCar(carId, asKind) {
   const qc = questCars.get(carId);
   if (!qc) return;
+  if (qc.wrecked) { showToast('🔥 Машина уничтожена', '💥', 1500); return; }
   const isMine = (String(qc.owner_uid) === String(QP.uid));
   // Если я не владелец — пытаемся сесть пассажиром.
   if (!isMine) {
@@ -24377,6 +24379,18 @@ function reportCarCrash(qc, impact, kind) {
   if (hpR < 0.35 && now - _gtaLastWarnAt > 4000) {
     _gtaLastWarnAt = now;
     showToast(hpR < 0.15 ? '🔥 Машина горит — выходи!' : '💨 Машина дымит', '🚗', 1800);
+  }
+  // Клиентский взрыв — если HP упал до 0, а сервер ещё не прислал quest_car_destroyed
+  if (qc.hp <= 0 && !qc.wrecked) {
+    qc.wrecked = true; qc.state = 'wrecked';
+    spawnCarExplosion(qc.y || qc.ty, qc.x || qc.tx, qc);
+    if (myDrivingCarId === qc.id) {
+      myDrivingCarId = null; _exitRequested = false;
+      player.r = (qc.y || qc.ty) + (Math.random() - 0.5) * 0.8;
+      player.c = (qc.x || qc.tx) + (Math.random() - 0.5) * 0.8;
+      myHp = Math.max(1, myHp - 15);
+      showToast('💥 Машина взорвалась!', '🔥', 2500);
+    }
   }
 }
 
