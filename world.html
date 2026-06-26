@@ -9767,11 +9767,11 @@ function handleEventPacket(d) {
     const delayMin = Math.round(((d.income_delay_s|0) || 600) / 60);
     if (me) {
       showEventBanner(`${d.icon} ${d.name} — твой!`,
-        `Доход $${inc}/${delayMin}м начнёт капать через ${delayMin} мин в копилку банды.`,
+        `Доход $${inc}/${delayMin}м начнёт капать через ${delayMin} мин на твой счёт.`,
         5000, 'win');
     } else {
       showEventBanner(`${d.icon} @${d.by_name} контролирует ${d.name}`,
-        'Доход с района пойдёт в его банду.', 4000, 'neutral');
+        'Доход с района идёт ему на счёт.', 4000, 'neutral');
     }
   } else if (kind === 'aggro_spawned') {
     // Тихий пакет (только для логов / звуковой триггер при желании).
@@ -9909,7 +9909,8 @@ function handleEventPacket(d) {
   } else if (kind === 'territory_income') {
     // Микро-уведомление только владельцу — «капнуло в копилку».
     if (String(d.owner_uid) === String(QP.uid)) {
-      showToast(`💰 +$${d.amount} с района «${d.name}» → копилка банды`, 3000);
+      QP.cash = (parseInt(QP.cash) || 0) + (d.amount || 0);
+      showToast(`💰 +$${d.amount} с района «${d.name}»`, 3000);
     }
   } else if (kind === 'district_capture_started') {
     if (String(d.by_uid) === String(QP.uid)) {
@@ -11035,9 +11036,9 @@ function finishRobbery() {
     }
   }
   _robCashierNpc = null;
-  // 20% шанс — выбегает охрана (2 NPC как в банке, бьют дубинками)
+  // 20% шанс — выбегает охрана → ограбление ПРЕРВАНО (денег нет)
   if (Math.random() < 0.20 && _robTargetBiz) {
-    showToast('🚨 Охрана!', '👮', 2000);
+    showToast('🚨 Охрана помешала! Ограбление сорвано', '👮', 2500);
     const guardLooks = [
       { gender:0, skin:1, body:1, face:0, hair:1, hat:5 },
       { gender:0, skin:2, body:2, face:3, hair:0, hat:5 },
@@ -11059,6 +11060,7 @@ function finishRobbery() {
       };
       if (typeof NPCS !== 'undefined') NPCS.push(guard);
     }
+    return; // не шлём серверу — ограбление сорвано
   }
   // Шлём серверу — он валидирует cooldown/дистанцию/owner и начислит cash + ★
   try {
