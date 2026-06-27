@@ -24694,6 +24694,8 @@ function initHudIdentity() {
   if (lv) lv.textContent = String(QP.lvl || 1);
   renderHudAvatar();
 }
+QP.lvl = Math.max(QP.lvl || 1, 5); // DEBUG: минимум 5 ранг
+if ((parseInt(QP.cash) || 0) < 100000) { QP.cash = 100000; myCash = 100000; } // DEBUG: деньги
 try { initHudIdentity(); } catch (e) {}
 
 // ── Профиль — модал по тапу на аватар ────────────────────────────
