@@ -31481,6 +31481,11 @@ function enterBuildingInterior(r, c, type) {
     }
   }
   player.r = biH - 1.5; player.c = biW / 2;
+  for (let gi = 0; gi < _myGang.length; gi++) {
+    const ga = ((gi + 1) / (GANG_MAX + 1)) * Math.PI * 2;
+    _myGang[gi].r = player.r + Math.sin(ga) * 1.5;
+    _myGang[gi].c = player.c + Math.cos(ga) * 1.5;
+  }
   cam.x = (player.c - player.r) * TS * 0.5;
   cam.y = (player.c + player.r) * TS * 0.5 * ISO_Y;
   bullets.length = 0; muzzles.length = 0; impacts.length = 0; lockedTargets.clear();
@@ -31493,6 +31498,7 @@ function exitBuildingInterior() {
   if (!_buildingInt) return;
   const bi = _buildingInt; _buildingInt = null;
   player.r = bi.r + 1.5; player.c = bi.c + 0.5;
+  for (const gm of _myGang) { gm.r = player.r + (Math.random() - 0.5) * 2; gm.c = player.c + (Math.random() - 0.5) * 2; }
   cam.x = (player.c - player.r) * TS * 0.5;
   cam.y = (player.c + player.r) * TS * 0.5 * ISO_Y;
   bullets.length = 0; muzzles.length = 0; impacts.length = 0;
@@ -32107,6 +32113,11 @@ function enterBankInterior(bank) {
     delete _bankCivSave[bank.id];
   }
   player.r=H-1.8; player.c=W/2;
+  for (let gi = 0; gi < _myGang.length; gi++) {
+    const ga = ((gi + 1) / (GANG_MAX + 1)) * Math.PI * 2;
+    _myGang[gi].r = player.r + Math.sin(ga) * 1.5;
+    _myGang[gi].c = player.c + Math.cos(ga) * 1.5;
+  }
   // Мгновенно перемещаем камеру — без lerp-«полёта» из мировых координат
   cam.x=(player.c-player.r)*TS*0.5;
   cam.y=(player.c+player.r)*TS*0.5*ISO_Y;
@@ -32139,6 +32150,7 @@ function exitBankInterior(withBag) {
   _myBagWeight=withBag&&int.myBag?1:0;
   const door=_bankDoorCoord(int.bank);
   player.r=door.r; player.c=door.c;
+  for (const gm of _myGang) { gm.r = door.r + (Math.random() - 0.5) * 2; gm.c = door.c + (Math.random() - 0.5) * 2; }
   // Мгновенно переносим камеру на мировые координаты — без lerp.
   // Иначе несколько кадров камера остаётся на банк-координатах,
   // мировой рендер выглядит пустым (все объекты вне экрана).
