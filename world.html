@@ -7429,6 +7429,7 @@ function _updateGang(dt) {
   for (let i = _myGang.length - 1; i >= 0; i--) {
     const m = _myGang[i];
     if (m.hp <= 0) { _myGang.splice(i, 1); continue; }
+    if (myDead) { m._threatUntil = 0; }
     const hasThreat = m._threatUntil > now && m._threatR && m._threatC;
     let tR, tC;
     if (_bankInt && _bankInt.room === 'vault') {
