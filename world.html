@@ -7478,6 +7478,9 @@ function _updateGang(dt) {
           spawnFloatText(m.r - 0.3, m.c, `−${retDmg}`, { color: '#ff6644', size: 11, life: 800 });
           if (m.hp <= 0) {
             showToast(`💀 ${m.name} погиб!`, '☠️', 2000);
+            NPCS.push({ r: m.r, c: m.c, tr: m.r, tc: m.c, speed: 0,
+              ang: m.ang, walkPhase: 0, look: m.look, hp: 0, max_hp: 80,
+              dead: true, deadAt: performance.now(), _arcKey: 'thug', _arc: {} });
             _saveGang();
           }
         }
