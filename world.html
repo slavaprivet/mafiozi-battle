@@ -25912,7 +25912,8 @@ function render() {
     const _cc = (cam.y / (TS * ISO_Y) + cam.x / TS);
     if (isFinite(_cr) && isFinite(_cc)) { _cullR = _cr; _cullC = _cc; }
   }
-  const VIS_R = 22;
+  const _stageW = document.getElementById('stage').clientWidth || 400;
+  const VIS_R = Math.max(22, Math.ceil(_stageW / TS / 1.5));
   const r0 = Math.max(0, Math.floor(_cullR - VIS_R));
   const r1 = Math.min(MAP_ROWS, Math.ceil(_cullR + VIS_R));
   const c0 = Math.max(0, Math.floor(_cullC - VIS_R));
