@@ -10572,6 +10572,8 @@ function wsConnect() {
           if (o.mode) p.mode = o.mode;
           if (typeof o.jail_in === 'number') p.jail_in = o.jail_in;
           if (o.gang) p.gang = o.gang;
+          if (o.weapon) p.weapon = o.weapon;
+          p.bag = o.bag || 0;
           p.lastT = performance.now();
         }
       }
@@ -15077,7 +15079,9 @@ function sendInput() {
   const sx = _bankInt ? _bankInt.savedC : player.c;
   const sy = _bankInt ? _bankInt.savedR : player.r;
   const inputData = { x: +sx.toFixed(2), y: +sy.toFixed(2),
-       ang: +player.ang.toFixed(2), w: _bankInt ? false : !!player.walking };
+       ang: +player.ang.toFixed(2), w: _bankInt ? false : !!player.walking,
+       weapon: currentWeapon || 'pistol',
+       bag: (_myBagWeight > 0 && _bankRob && _bankRob.myBag) ? 1 : 0 };
   if (_myGang.length > 0 && !_bankInt && !_buildingInt) {
     inputData.gang = _myGang.map(g => ({
       r: +g.r.toFixed(1), c: +g.c.toFixed(1),
@@ -26611,10 +26615,11 @@ function render() {
       // шлёт оружие в snapshot.others, поэтому показываем то что прислал
       // последним событием pvp_shot (lastPlayerWeapon), либо pistol.
       if ((o.mode || 'pvp') !== 'pve' && !o.dead) {
-        const otherW = lastPlayerWeapon.get(String(o.uid)) || 'pistol';
+        const otherW = o.weapon || lastPlayerWeapon.get(String(o.uid)) || 'pistol';
         const otherShotT = lastPlayerShotAt.get(String(o.uid)) || 0;
         drawWeaponInHands(p.x, p.y, o.ang || 0, otherW, 0.85, otherShotT);
       }
+      if (o.bag && !o.dead) _drawCarryingBag(p.x, p.y);
       if (o.wanted > 0) drawWantedStars(p.x, p.y, o.wanted);
       if (o.gangs  > 0) drawWantedGangs(p.x, p.y, o.gangs);
       drawModeTag(p.x, p.y, o.mode || 'pvp');
