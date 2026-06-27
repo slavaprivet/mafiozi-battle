@@ -7974,7 +7974,6 @@ let _localHpHurtAt = 0;
 function _hurtLocal(dmg, by) {
   myHp = Math.max(0, myHp - (dmg | 0));
   _localHpHurtAt = performance.now();
-  _gangAlertThreat(player.r, player.c, by);
   if (myHp <= 0 && !myDead) {
     myDead = true; _localDeath = true;
     myDeathBy = by || 'Город'; myDeathLeft = 5;
