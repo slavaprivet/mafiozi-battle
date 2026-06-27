@@ -10601,6 +10601,23 @@ function wsConnect() {
       pvpActive = !!d.pvp_active;
       // Wanted-система: копы в городе, мои звёзды и тюрьма
       applyCopsTargets(d.cops || []);
+      // Синхронизация мешков на земле (серверные)
+      if (d.dropped_bags) {
+        const serverIds = new Set(d.dropped_bags.map(b => b.id));
+        // Добавляем новые серверные мешки
+        for (const sb of d.dropped_bags) {
+          if (!_vaultDroppedBags.find(lb => lb.id === sb.id)) {
+            _vaultDroppedBags.push({ id: sb.id, r: sb.r, c: sb.c, value: sb.value || 500,
+              bankId: sb.bank_id || 'unknown', droppedAt: performance.now() });
+          }
+        }
+        // Удаляем подобранные другими
+        for (let i = _vaultDroppedBags.length - 1; i >= 0; i--) {
+          if (_vaultDroppedBags[i].id && _vaultDroppedBags[i].id.startsWith('bag_') && !serverIds.has(_vaultDroppedBags[i].id)) {
+            _vaultDroppedBags.splice(i, 1);
+          }
+        }
+      }
       if (d.me) {
         if (typeof d.me.wanted === 'number')  myWanted = d.me.wanted;
         if (typeof d.me.gangs  === 'number') {
@@ -29051,6 +29068,7 @@ function pickupDroppedBag(bagId) {
   _vaultDroppedBags.splice(idx, 1);
   showToast('💼 Поднял мешок', '✅', 1400);
   try { hapticHit && hapticHit(); } catch(e) {}
+  try { ws && ws.send(JSON.stringify({ t: 'bag_pickup_server', d: { bag_id: String(bag.id) } })); } catch(e) {}
   if (typeof _updateBankZoneBtn === 'function') _updateBankZoneBtn();
 }
 
