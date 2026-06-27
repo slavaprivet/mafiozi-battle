@@ -14214,6 +14214,15 @@ function fire(angle = null) {
     addShake(weaponFx(currentWeapon).thick ? 3.5 : 2);
     hapticHit();
   }
+  // Наёмники атакуют цель игрока
+  const _shotTarget = chosenConvoy || chosenCop || chosenCityCop || chosenAggro || chosenMg || pvpTarget;
+  if (_shotTarget) {
+    const tr = _shotTarget.y || _shotTarget.r || 0, tc = _shotTarget.x || _shotTarget.c || 0;
+    _gangAlertThreat(tr, tc, _shotTarget.id);
+  } else {
+    const range = (wcfg.range || 10) * 0.7;
+    _gangAlertThreat(player.r + dirY * range, player.c + dirX * range, 'fire');
+  }
   // Паника NPC: любой выстрел рядом — мирные NPC в радиусе 9 тайлов
   // переключаются в panic. Бегут от стрелка, кричат «ПОМОГИТЕ!» по
   // случайному паттерну. Когда отбежали — успокаиваются (см. updateNpcs).
