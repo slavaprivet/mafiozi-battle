@@ -7345,6 +7345,98 @@ let _bankInt = null;
 // Состояние интерьера обычного здания (null = снаружи)
 let _buildingInt = null;
 let _buildingHideTimer = 0;
+// ── Наёмники (клиентская банда игрока) ────────────────────────────
+const GANG_HIRE_COST = 100;
+const GANG_MAX = 5;
+const GANG_MIN_LVL = 5;
+const _myGang = [];
+let _gangIdCounter = 0;
+function _hireGangMember(botLook, r, c) {
+  if (_myGang.length >= GANG_MAX) { showToast(`👥 Максимум ${GANG_MAX} бойцов`, '⚠️', 1500); return false; }
+  const lvl = parseInt(QP.lvl) || 1;
+  if (lvl < GANG_MIN_LVL) { showToast(`🔒 Нужен ранг ${GANG_MIN_LVL}+`, '⚠️', 1500); return false; }
+  const cash = parseInt(QP.cash) || 0;
+  if (cash < GANG_HIRE_COST) { showToast(`💸 Нужно $${GANG_HIRE_COST}`, '❌', 1500); return false; }
+  QP.cash = cash - GANG_HIRE_COST; myCash = parseInt(QP.cash); updateMoneyHud();
+  const look = Object.assign({}, botLook || { gender: 0, skin: 2, body: 1, face: 2, hair: 3, hat: 0 });
+  const weapons = ['pistol', 'smg', 'shotgun'];
+  const m = {
+    id: '_gang_' + (++_gangIdCounter),
+    r, c, ang: 0, walkPhase: 0,
+    hp: 80, max_hp: 80,
+    look,
+    weapon: weapons[Math.floor(Math.random() * weapons.length)],
+    _nextShootAt: 0,
+    _threatId: null, _threatR: 0, _threatC: 0, _threatUntil: 0,
+    _intR: 0, _intC: 0,
+  };
+  _myGang.push(m);
+  showToast(`🤝 Боец нанят (${_myGang.length}/${GANG_MAX})`, '👊', 2000);
+  return true;
+}
+function _gangAlertThreat(r, c, id) {
+  const now = performance.now();
+  for (const m of _myGang) {
+    if (m.hp <= 0) continue;
+    m._threatR = r; m._threatC = c;
+    m._threatId = id || 'enemy';
+    m._threatUntil = now + 6000;
+  }
+}
+function _updateGang(dt) {
+  const now = performance.now();
+  for (let i = _myGang.length - 1; i >= 0; i--) {
+    const m = _myGang[i];
+    if (m.hp <= 0) { _myGang.splice(i, 1); continue; }
+    const hasThreat = m._threatUntil > now && m._threatR && m._threatC;
+    let tR, tC;
+    if (_buildingInt || _bankInt) {
+      tR = player.r + (((m.id.charCodeAt(5) || 0) % 3) - 1) * 1.5;
+      tC = player.c + (((m.id.charCodeAt(6) || 0) % 3) - 1) * 1.5;
+      m._intR = tR; m._intC = tC;
+    } else {
+      const off = ((m.id.charCodeAt(5) || 0) % 5);
+      const angOff = (off / 5) * Math.PI * 2;
+      tR = player.r + Math.sin(angOff) * 2.0;
+      tC = player.c + Math.cos(angOff) * 2.0;
+    }
+    const dr = tR - m.r, dc = tC - m.c;
+    const dist = Math.hypot(dr, dc);
+    if (dist > 0.5) {
+      const spd = Math.min(dist, 4.0) * dt * 3;
+      m.r += (dr / dist) * spd;
+      m.c += (dc / dist) * spd;
+      m.walkPhase += dt * 10;
+      m.ang = Math.atan2(dr, dc);
+    } else {
+      m.walkPhase = 0;
+    }
+    if (hasThreat) {
+      const tdist = Math.hypot(m._threatR - m.r, m._threatC - m.c);
+      m.ang = Math.atan2(m._threatR - m.r, m._threatC - m.c);
+      if (tdist < 12 && now >= m._nextShootAt) {
+        m._nextShootAt = now + 900 + Math.random() * 500;
+        const muzR = m.r + Math.sin(m.ang) * 0.45;
+        const muzC = m.c + Math.cos(m.ang) * 0.45;
+        const miss = (Math.random() - 0.5) * 0.6;
+        const tgR = m._threatR + miss, tgC = m._threatC + miss;
+        if (!_buildingInt && !_bankInt) {
+          spawnBullet(muzR, muzC, tgR, tgC, { hit: Math.abs(miss) < 0.35, fromNpc: true, weapon: m.weapon });
+          spawnMuzzle(muzR, muzC, m.ang, m.weapon, true);
+        }
+        // Ответный огонь — 25% шанс получить урон
+        if (Math.random() < 0.25) {
+          const retDmg = 5 + Math.floor(Math.random() * 8);
+          m.hp -= retDmg;
+          spawnFloatText(m.r - 0.3, m.c, `−${retDmg}`, { color: '#ff6644', size: 11, life: 800 });
+          if (m.hp <= 0) {
+            showToast('💀 Твой боец погиб!', '☠️', 2000);
+          }
+        }
+      }
+    }
+  }
+}
 // Персистентность охраны банка: bankId → { [guardIdx]: {dead, deadAt, hp, r, c, ang, state} }
 // Живой охранник сохраняется между заходами; мёртвый респавнится через 10 мин.
 const _bankGuardSave = {};
@@ -7811,6 +7903,7 @@ let _localHpHurtAt = 0;
 function _hurtLocal(dmg, by) {
   myHp = Math.max(0, myHp - (dmg | 0));
   _localHpHurtAt = performance.now();
+  _gangAlertThreat(player.r, player.c, by);
   if (myHp <= 0 && !myDead) {
     myDead = true; _localDeath = true;
     myDeathBy = by || 'Город'; myDeathLeft = 5;
@@ -10031,7 +10124,10 @@ function handleEventPacket(d) {
 
 // Кратковременная красная вспышка по краю экрана при попадании в игрока.
 let _hitFlashUntil = 0;
-function flashHitOverlay() { _hitFlashUntil = performance.now() + 350; }
+function flashHitOverlay() {
+  _hitFlashUntil = performance.now() + 350;
+  if (!_buildingInt && !_bankInt) _gangAlertThreat(player.r, player.c, 'enemy');
+}
 // Overlay ареста — короткая (~2.5с) анимация перед окном тюрьмы.
 function showArrestOverlay() {
   const el = document.getElementById('arrestOverlay');
@@ -11455,6 +11551,24 @@ function updateGtaInteractions() {
       return;
     }
   }
+  // Нанять бандита из aggroZones (city_gangs)
+  if (!_buildingInt && !_bankInt && !myDrivingCarId && !myDead && _myGang.length < GANG_MAX) {
+    let nearBot = null, nearBotD = 2.8, nearBotLook = null;
+    for (const z of Object.values(aggroZones || {})) {
+      for (const b of (z.bots || [])) {
+        if (!b.alive && b.alive !== undefined) continue;
+        if (b.dead) continue;
+        const d = Math.hypot(player.r - (b.y||0), player.c - (b.x||0));
+        if (d < nearBotD) { nearBotD = d; nearBot = b; nearBotLook = b.look; }
+      }
+    }
+    if (nearBot) {
+      _gtaActionKind = 'gang_hire'; _gtaActionCarId = nearBot.id;
+      _gtaBtn.textContent = `🤝 Нанять бойца ($${GANG_HIRE_COST})`;
+      _gtaBtn.style.display = 'block';
+      return;
+    }
+  }
   // Box-доставка: pickup (взять коробку) или dropoff (сдать)
   if (myBoxStatus.active) {
     const bq = myBoxStatus.active;
@@ -11752,6 +11866,17 @@ _gtaBtn.addEventListener('click', () => {
     const parts = _gtaActionCarId.split(',');
     const br = +parts[0], bc = +parts[1], btype = parts[2] || null;
     enterBuildingInterior(br, bc, btype);
+  } else if (_gtaActionKind === 'gang_hire') {
+    let hired = false;
+    for (const z of Object.values(aggroZones || {})) {
+      for (const b of (z.bots || [])) {
+        if (String(b.id) === String(_gtaActionCarId) && b.alive !== false && !b.dead) {
+          hired = _hireGangMember(b.look, b.y || player.r, b.x || player.c);
+          break;
+        }
+      }
+      if (hired) break;
+    }
   } else if (_gtaActionKind === 'vending') {
     const VEND_COST = 20, VEND_HEAL = 25;
     const cash = parseInt(QP.cash) || 0;
@@ -15629,6 +15754,7 @@ function update(dt) {
       // могут не работать (bankShield блокирует серверный статус, lockedTargets
       // пуст, myDrivingCarId завис).
       _bankShieldUntil = 0;
+      _myGang.length = 0;
       myDrivingCarId = null;
       myIsPassenger = false;
       _exitRequested = false;
@@ -15668,6 +15794,7 @@ function update(dt) {
       if (player.r >= biH - 0.6 && Math.abs(player.c - biW / 2) < 2.5) { exitBuildingInterior(); }
     }
     if (_buildingInt) _updateInteriorNpcs(_buildingInt, dt);
+    _updateGang(dt);
     const targetCamX = (player.c - player.r) * TS * 0.5;
     const targetCamY = (player.c + player.r) * TS * 0.5 * ISO_Y;
     cam.x += (targetCamX - cam.x) * Math.min(1, dt * 8);
@@ -15887,6 +16014,7 @@ function update(dt) {
   }
   if (!myDrivingCarId) _fuelWarnShown = false;
   updateCityCops(dt);
+  _updateGang(dt);
   updatePets(dt);
   updateServiceVehicles(dt);
   dispatchEmergencyServices();
@@ -25780,6 +25908,20 @@ function render() {
     if (npc.r < r0 || npc.r >= r1 || npc.c < c0 || npc.c >= c1) continue;
     items.push({ depth: npc.r + npc.c + 0.0005, draw: () => drawNpc(npc) });
   }
+  // Наёмники игрока
+  for (const gm of _myGang) {
+    if (gm.r < r0 || gm.r >= r1 || gm.c < c0 || gm.c >= c1) continue;
+    items.push({ depth: gm.r + gm.c + 0.0006, draw: () => {
+      const p = w2s(gm.r, gm.c);
+      drawPerson(p.x, p.y, gm.ang, gm.look, gm.walkPhase, null, null, false, gm.hp, gm.max_hp, false, 0);
+      drawWeaponInHands(p.x, p.y, gm.ang, gm.weapon, 0.88, gm._nextShootAt - 900 || 0);
+      ctx.save();
+      ctx.font = 'bold 8px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillStyle = '#4aff4a'; ctx.shadowColor = '#000'; ctx.shadowBlur = 3;
+      ctx.fillText('👊 Боец', p.x, p.y - 38);
+      ctx.shadowBlur = 0; ctx.restore();
+    }});
+  }
   // Пляжники — мирные NPC в купальниках/плавках
   for (const b of beachgoers.values()) {
     if (b.y < r0 || b.y >= r1 || b.x < c0 || b.x >= c1) continue;
@@ -31114,13 +31256,24 @@ function _updateInteriorNpcs(bi, dt) {
 }
 // Добавляет ambient NPC в items depth-sort массив интерьера
 function _pushInteriorNpcs(bi, items) {
-  if (!bi.npcs) return;
-  for (const n of bi.npcs) {
-    items.push({ d: n.r + n.c + .45, fn: ((nn) => () => {
-      const p = w2s(nn.r + .5, nn.c + .5);
-      drawPerson(p.x, p.y, nn.ang, nn.look, nn.walking ? nn.walkPhase : 0,
-        nn.name, null, false, 100, 100, false, null, false, false);
-    })(n) });
+  if (bi.npcs) {
+    for (const n of bi.npcs) {
+      items.push({ d: n.r + n.c + .45, fn: ((nn) => () => {
+        const p = w2s(nn.r + .5, nn.c + .5);
+        drawPerson(p.x, p.y, nn.ang, nn.look, nn.walking ? nn.walkPhase : 0,
+          nn.name, null, false, 100, 100, false, null, false, false);
+      })(n) });
+    }
+  }
+  for (const gm of _myGang) {
+    items.push({ d: gm.r + gm.c + .46, fn: ((g) => () => {
+      const p = w2s(g.r + .5, g.c + .5);
+      drawPerson(p.x, p.y, g.ang, g.look, g.walkPhase, null, null, false, g.hp, g.max_hp, false, 0);
+      drawWeaponInHands(p.x, p.y, g.ang, g.weapon, 0.85, 0);
+      ctx.save(); ctx.font = 'bold 7px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillStyle = '#4aff4a'; ctx.shadowColor = '#000'; ctx.shadowBlur = 2;
+      ctx.fillText('👊', p.x, p.y - 32); ctx.shadowBlur = 0; ctx.restore();
+    })(gm) });
   }
 }
 
