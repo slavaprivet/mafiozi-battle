@@ -11621,13 +11621,12 @@ function updateGtaInteractions() {
     }
   }
   // Нанять бандита из aggroZones (city_gangs)
-  if (!_buildingInt && !_bankInt && !myDrivingCarId && !myDead && _myGang.length < GANG_MAX) {
+  if (!_buildingInt && !_bankInt && !myDrivingCarId && !myDead && _myGang.length < GANG_MAX && !(myGangs > 0)) {
     let nearBot = null, nearBotD = 2.8, nearBotLook = null;
     for (const z of Object.values(aggroZones || {})) {
       for (const b of (z.bots || [])) {
         if (!b.alive && b.alive !== undefined) continue;
         if (b.dead) continue;
-        if (b.target_uid && String(b.target_uid) === String(QP.uid)) continue;
         const d = Math.hypot(player.r - (b.y||0), player.c - (b.x||0));
         if (d < nearBotD) { nearBotD = d; nearBot = b; nearBotLook = b.look; }
       }
