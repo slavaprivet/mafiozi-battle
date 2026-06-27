@@ -23694,7 +23694,8 @@ function drawPOI(r, c, poi) {
   ctx.arc(p.x, topY - 6, haloR, 0, Math.PI * 2);
   ctx.fill();
   // Подложка-щит
-  const labelW = 92, labelH = 38;
+  ctx.font = 'bold 11px system-ui, sans-serif';
+  const labelW = Math.max(92, 34 + ctx.measureText(poi.name).width), labelH = 38;
   const lx = p.x - labelW / 2, ly = topY - labelH;
   ctx.fillStyle = 'rgba(20,18,12,.92)';
   ctx.strokeStyle = accent;
