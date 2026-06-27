@@ -7407,14 +7407,16 @@ function _updateGang(dt) {
     if (_bankInt && _bankInt.room === 'vault') {
       continue; // в хранилище наёмники стоят на месте в лобби
     } else if (_buildingInt || _bankInt) {
-      tR = player.r + (((m.id.charCodeAt(5) || 0) % 3) - 1) * 1.5;
-      tC = player.c + (((m.id.charCodeAt(6) || 0) % 3) - 1) * 1.5;
+      const idx = _myGang.indexOf(m);
+      const ia = ((idx + 1) / (GANG_MAX + 1)) * Math.PI * 2;
+      tR = player.r + Math.sin(ia) * 1.5;
+      tC = player.c + Math.cos(ia) * 1.5;
       m._intR = tR; m._intC = tC;
     } else {
-      const off = ((m.id.charCodeAt(5) || 0) % 5);
-      const angOff = (off / 5) * Math.PI * 2;
-      tR = player.r + Math.sin(angOff) * 2.0;
-      tC = player.c + Math.cos(angOff) * 2.0;
+      const idx = _myGang.indexOf(m);
+      const angOff = ((idx + 1) / (GANG_MAX + 1)) * Math.PI * 2;
+      tR = player.r + Math.sin(angOff) * 2.5;
+      tC = player.c + Math.cos(angOff) * 2.5;
     }
     const dr = tR - m.r, dc = tC - m.c;
     const dist = Math.hypot(dr, dc);
@@ -7428,13 +7430,15 @@ function _updateGang(dt) {
       m.walkPhase = 0;
     }
     if (hasThreat) {
-      const tdist = Math.hypot(m._threatR - m.r, m._threatC - m.c);
-      m.ang = Math.atan2(m._threatR - m.r, m._threatC - m.c);
+      const tdr = m._threatR - m.r, tdc = m._threatC - m.c;
+      const tdist = Math.hypot(tdr, tdc);
+      m.ang = Math.atan2(tdr, tdc);
       if (tdist < 12 && now >= m._nextShootAt) {
         m._nextShootAt = now + 900 + Math.random() * 500;
-        const muzR = m.r + Math.sin(m.ang) * 0.45;
-        const muzC = m.c + Math.cos(m.ang) * 0.45;
-        const miss = (Math.random() - 0.5) * 0.6;
+        const nd = tdist > 0.01 ? tdist : 1;
+        const muzR = m.r + (tdr / nd) * 0.45;
+        const muzC = m.c + (tdc / nd) * 0.45;
+        const miss = (Math.random() - 0.5) * 0.4;
         const tgR = m._threatR + miss, tgC = m._threatC + miss;
         if (!_buildingInt && !_bankInt) {
           spawnBullet(muzR, muzC, tgR, tgC, { hit: Math.abs(miss) < 0.35, fromNpc: true, weapon: m.weapon });
