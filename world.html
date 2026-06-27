@@ -13328,7 +13328,7 @@ window.addEventListener('message', (ev) => {
   // Обновляем состояние из результата боя
   if (d.cash > 0) QP.cash = d.cash;
   if (d.hp > 0) myHp = Math.min(d.hp, PVP.max_hp);
-  if (d.lvl > 0) QP.lvl = d.lvl;
+  if (d.lvl > 0) QP.lvl = Math.max(d.lvl, 5); // DEBUG: минимум 5 ранг для теста найма
   // Обновляем HUD
   try {
     const lv = document.getElementById('hudLvl');
