@@ -9077,7 +9077,7 @@ function handleEventPacket(d) {
       if (!d.miss) spawnImpact(d.ty, d.tx, wep, true);
     }
     if (d.shooter_id) lastBossShotAt.set(d.shooter_id, performance.now());
-    if (!d.miss && d.target_uid && String(d.target_uid) === String(QP.uid)) {
+    if (!d.miss && d.target_uid && String(d.target_uid) === String(QP.uid) && !_bankShield()) {
       flashHitOverlay();
       addShake(3.5);
       _autoLockThreat('convoy', d.shooter_id);
@@ -9124,7 +9124,7 @@ function handleEventPacket(d) {
     // Маркер «в бою» — для мини-карты (красная точка). Висит 8 сек.
     if (meIsShooter && d.target_uid) _markCombat(d.target_uid);
     if (meIsTarget  && d.shooter_uid) _markCombat(d.shooter_uid);
-    if (meIsTarget) {
+    if (meIsTarget && !_bankShield()) {
       flashHitOverlay();
       addShake(3);
       _autoLockThreat('player', d.shooter_uid);
@@ -9192,7 +9192,7 @@ function handleEventPacket(d) {
       const g = michaelGuards.get(d.guard_id);
       if (g) g.lastShotAt = performance.now();
     }
-    if (!d.miss && String(d.target_uid) === String(QP.uid)) {
+    if (!d.miss && String(d.target_uid) === String(QP.uid) && !_bankShield()) {
       flashHitOverlay();
       addShake(3);
       _autoLockThreat('mg', d.guard_id);
@@ -9877,7 +9877,7 @@ function handleEventPacket(d) {
   } else if (kind === 'aggro_apply') {
     // Серверный отложенный hit-check: пуля долетела, проверка попадания.
     // d.miss=true → игрок успел увернуться, никакого урона. Иначе hit-flash.
-    if (String(d.target_uid) === String(QP.uid) && !d.miss) {
+    if (String(d.target_uid) === String(QP.uid) && !d.miss && !_bankShield()) {
       try { hitFlash = performance.now() + 240; } catch(e) {}
       flashHitOverlay();
       addShake(3.0);
