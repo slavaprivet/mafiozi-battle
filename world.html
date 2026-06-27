@@ -10571,6 +10571,7 @@ function wsConnect() {
           if (typeof o.gangs  === 'number') p.gangs  = o.gangs;
           if (o.mode) p.mode = o.mode;
           if (typeof o.jail_in === 'number') p.jail_in = o.jail_in;
+          if (o.gang) p.gang = o.gang;
           p.lastT = performance.now();
         }
       }
@@ -15075,12 +15076,17 @@ function sendInput() {
   // у входа в банк (игрок для сервера стоит неподвижно снаружи).
   const sx = _bankInt ? _bankInt.savedC : player.c;
   const sy = _bankInt ? _bankInt.savedR : player.r;
-  try {
-    ws.send(JSON.stringify({
-      t: 'input',
-      d: { x: +sx.toFixed(2), y: +sy.toFixed(2),
-           ang: +player.ang.toFixed(2), w: _bankInt ? false : !!player.walking }
+  const inputData = { x: +sx.toFixed(2), y: +sy.toFixed(2),
+       ang: +player.ang.toFixed(2), w: _bankInt ? false : !!player.walking };
+  if (_myGang.length > 0 && !_bankInt && !_buildingInt) {
+    inputData.gang = _myGang.map(g => ({
+      r: +g.r.toFixed(1), c: +g.c.toFixed(1),
+      ang: +(g.ang||0).toFixed(1), wp: g.walkPhase > 0 ? 1 : 0,
+      look: g.look, w: g.weapon, nm: g.name
     }));
+  }
+  try {
+    ws.send(JSON.stringify({ t: 'input', d: inputData }));
   } catch(e) {}
 }
 function sendChat(text) {
@@ -26615,6 +26621,24 @@ function render() {
       // Таймер «бан N сек» над головой если другой игрок сейчас в тюрьме
       if ((o.jail_in || 0) > 0) drawJailTimer(p.x, p.y, o.jail_in);
     } });
+    // Наёмники другого игрока
+    if (o.gang && o.gang.length && !o.dead) {
+      for (const gd of o.gang) {
+        items.push({ depth: (gd.r||0) + (gd.c||0) + 0.0006, draw: ((g) => () => {
+          const gp = w2s((g.r||0) + 0.5, (g.c||0) + 0.5);
+          ctx.save();
+          const gl = ctx.createRadialGradient(gp.x, gp.y+2, 1, gp.x, gp.y+2, 14);
+          gl.addColorStop(0, 'rgba(60,255,60,.12)'); gl.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = gl; ctx.beginPath(); ctx.ellipse(gp.x, gp.y+2, 14, 6, 0, 0, Math.PI*2); ctx.fill();
+          ctx.restore();
+          drawPerson(gp.x, gp.y, g.ang||0, g.look||{}, g.wp ? 3 : 0, null, null, false, 80, 80, false, 0);
+          drawWeaponInHands(gp.x, gp.y, g.ang||0, g.w||'pistol', 0.85, 0);
+          ctx.save(); ctx.font='bold 7px system-ui'; ctx.textAlign='center'; ctx.textBaseline='bottom';
+          ctx.fillStyle='#4aff4a'; ctx.shadowColor='#000'; ctx.shadowBlur=2;
+          ctx.fillText(`👊 ${g.nm||'Боец'}`, gp.x, gp.y-32); ctx.shadowBlur=0; ctx.restore();
+        })(gd) });
+      }
+    }
   }
   // Парковочный асфальт — лежит под всем, рисуется ДО кровавых пятен
   // и тормозных следов чтобы они были видны на разметке.
