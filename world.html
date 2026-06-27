@@ -4534,8 +4534,8 @@ function updateCityCops(dt) {
         continue;
       }
       const bank = _bankRob.bank;
-      if (_bankInt) {
-        // Игрок ВНУТРИ банка (player.r/c — координаты интерьера, их
+      if (_bankInt || _buildingInt) {
+        // Игрок ВНУТРИ банка/здания (player.r/c — координаты интерьера, их
         // использовать нельзя) — держим позицию у входа, ствол на дверь
         if (!cop._post) {
           cop._post = {
@@ -6028,7 +6028,7 @@ function updateNpcs(dt) {
     if (n.dead) continue;
 
     // ── Охранник бизнеса — бежит к игроку и бьёт дубинкой ────────────
-    if (n._hostile && now < n._hostileUntil && !myDead) {
+    if (n._hostile && now < n._hostileUntil && !myDead && !_buildingInt && !_bankInt) {
       const dx = player.c - n.c, dy = player.r - n.r;
       const dist = Math.hypot(dy, dx);
       if (dist > 20) { n._hostile = false; continue; }
@@ -6058,7 +6058,7 @@ function updateNpcs(dt) {
     if (n._hostile && (now >= n._hostileUntil || myDead)) { n._hostile = false; }
 
     // ── Вооружённая контратака NPC (пистолет) ────────────────────────
-    if (n._fighting) {
+    if (n._fighting && !_buildingInt && !_bankInt) {
       const d = Math.hypot(player.r - n.r, player.c - n.c);
       if (d > 11 || myDead) { n._fighting = false; n._nextShootAt = 0; continue; }
       n.ang = Math.atan2(player.r - n.r, player.c - n.c);
@@ -6128,7 +6128,7 @@ function updateNpcs(dt) {
     }
 
     // ── Рукопашная контратака NPC (кулаки/ногой) ─────────────────────
-    if (n._fightingMelee) {
+    if (n._fightingMelee && !_buildingInt && !_bankInt) {
       const d = Math.hypot(player.r - n.r, player.c - n.c);
       // Останавливаем рукопашный бой если далеко или мёртв
       if (d > 6 || myDead) { n._fightingMelee = false; n._nextHitAt = 0; continue; }
