@@ -31173,6 +31173,11 @@ function enterBuildingInterior(r, c, type) {
   {
     const chance = isThemed ? 0.12 : BLDG_LOOT_CHANCE;
     const key = r + ',' + c, now = Date.now();
+    // Чистим просроченные записи (защита от утечки памяти)
+    const cdKeys = Object.keys(_bldgLootCD);
+    if (cdKeys.length > 50) {
+      for (const k of cdKeys) { if (now >= _bldgLootCD[k]) delete _bldgLootCD[k]; }
+    }
     const localOk = !_bldgLootCD[key] || now >= _bldgLootCD[key];
     const globalOk = now >= _bldgLootGlobalCD;
     if (localOk && globalOk && Math.random() < chance) {
