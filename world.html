@@ -11229,7 +11229,16 @@ function updateGtaInteractions() {
       const lt = _buildingInt.loot;
       if (Math.hypot(player.r - lt.r, player.c - lt.c) < 2.0) {
         _gtaActionKind = 'bldg_loot'; _gtaActionCarId = null;
-        _gtaBtn.textContent = `💰 Забрать кейс (+${lt.amount}$)`;
+        _gtaBtn.textContent = lt.hp ? `💊 Забрать аптечку (+${lt.amount} HP)` : `💰 Забрать кейс (+${lt.amount}$)`;
+        _gtaBtn.style.display = 'block'; return;
+      }
+    }
+    // Автомат с напитками — только в обычных зданиях
+    if (!_buildingInt.type) {
+      const _vmDist = Math.hypot(player.r - 7, player.c - 1.2);
+      if (_vmDist < 2.5) {
+        _gtaActionKind = 'vending'; _gtaActionCarId = null;
+        _gtaBtn.textContent = '🥤 Купить напиток ($20)';
         _gtaBtn.style.display = 'block'; return;
       }
     }
@@ -11743,6 +11752,16 @@ _gtaBtn.addEventListener('click', () => {
     const parts = _gtaActionCarId.split(',');
     const br = +parts[0], bc = +parts[1], btype = parts[2] || null;
     enterBuildingInterior(br, bc, btype);
+  } else if (_gtaActionKind === 'vending') {
+    const VEND_COST = 20, VEND_HEAL = 25;
+    const cash = parseInt(QP.cash) || 0;
+    if (cash < VEND_COST) { showToast(`💸 Нужно $${VEND_COST}`, '❌', 1500); }
+    else if (myHp >= PVP.max_hp) { showToast('❤️ Здоровье полное', '🥤', 1500); }
+    else {
+      QP.cash = cash - VEND_COST; myCash = parseInt(QP.cash); updateMoneyHud();
+      myHp = Math.min(myHp + VEND_HEAL, PVP.max_hp);
+      showToast(`🥤 +${VEND_HEAL} HP`, '❤️', 1800);
+    }
   } else if (_gtaActionKind === 'bldg_loot') {
     if (_buildingInt && _buildingInt.loot && !_buildingInt.loot.picked) {
       const lt = _buildingInt.loot;
@@ -11751,15 +11770,20 @@ _gtaBtn.addEventListener('click', () => {
       const now = Date.now();
       _bldgLootCD[key] = now + BLDG_LOOT_LOCAL_CD;
       _bldgLootGlobalCD = now + BLDG_LOOT_GLOBAL_CD;
-      QP.cash = (parseInt(QP.cash) || 0) + lt.amount;
-      _showLootBanner(lt.amount);
-      if (QP.api && QP.uid) {
-        fetch(`${QP.api}/world/loot/${encodeURIComponent(QP.uid)}`, {
-          method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ amount: lt.amount })
-        }).then(r => r.json()).then(j => {
-          if (j.ok && j.cash !== undefined) QP.cash = j.cash;
-        }).catch(() => {});
+      if (lt.hp) {
+        myHp = Math.min((myHp || 0) + lt.amount, PVP.max_hp);
+        showToast(`❤️‍🩹 +${lt.amount} HP`, '💊', 2000);
+      } else {
+        QP.cash = (parseInt(QP.cash) || 0) + lt.amount;
+        _showLootBanner(lt.amount);
+        if (QP.api && QP.uid) {
+          fetch(`${QP.api}/world/loot/${encodeURIComponent(QP.uid)}`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ amount: lt.amount })
+          }).then(r => r.json()).then(j => {
+            if (j.ok && j.cash !== undefined) QP.cash = j.cash;
+          }).catch(() => {});
+        }
       }
     }
   }
@@ -31146,16 +31170,18 @@ function enterBuildingInterior(r, c, type) {
     type: type || null, loot: null, npcs: [] };
   _spawnInteriorNpcs(_buildingInt);
   _buildingHideTimer = 0;
-  // Кейс с лутом — только в обычных зданиях
-  if (!isThemed) {
+  {
+    const chance = isThemed ? 0.12 : BLDG_LOOT_CHANCE;
     const key = r + ',' + c, now = Date.now();
     const localOk = !_bldgLootCD[key] || now >= _bldgLootCD[key];
     const globalOk = now >= _bldgLootGlobalCD;
-    if (localOk && globalOk && Math.random() < BLDG_LOOT_CHANCE) {
-      const amount = BLDG_LOOT_MIN + Math.floor(Math.random() * (BLDG_LOOT_MAX - BLDG_LOOT_MIN + 1));
+    if (localOk && globalOk && Math.random() < chance) {
+      const isHpLoot = isThemed && (type === 'hospital' || type === 'gym') && Math.random() < 0.5;
+      const amount = isHpLoot ? (10 + Math.floor(Math.random() * 21))
+        : (BLDG_LOOT_MIN + Math.floor(Math.random() * (BLDG_LOOT_MAX - BLDG_LOOT_MIN + 1)));
       const lr = 2 + Math.random() * (biH - 5);
       const lc = 2 + Math.random() * (biW - 4);
-      _buildingInt.loot = { r: lr, c: lc, amount, picked: false };
+      _buildingInt.loot = { r: lr, c: lc, amount, picked: false, hp: !!isHpLoot };
     }
   }
   player.r = biH - 1.5; player.c = biW / 2;
@@ -31304,6 +31330,67 @@ function drawBuildingInterior() {
     ctx.fillStyle = '#c0a830';
     for (let di = 0; di < 3; di++) {
       ctx.beginPath(); ctx.arc(p.x + fSz * .5, p.y - fH * (di + 1) / 4, 1.8, 0, Math.PI * 2); ctx.fill();
+    }
+  }});
+
+  // ── Автомат с напитками (у западной стены) ───────────────────
+  const _vmR = 7, _vmC = 1.2;
+  items.push({ d: _vmR + _vmC, fn: () => {
+    const p = w2s(_vmR, _vmC);
+    const vmH = isoH(1.6), vmW2 = hx * .45;
+    // Корпус — левая грань (виден в изо)
+    ctx.fillStyle = '#1a3080'; ctx.strokeStyle = '#0a1848'; ctx.lineWidth = .7;
+    ctx.beginPath();
+    ctx.moveTo(p.x - vmW2, p.y); ctx.lineTo(p.x, p.y + hy * .4);
+    ctx.lineTo(p.x, p.y + hy * .4 - vmH); ctx.lineTo(p.x - vmW2, p.y - vmH);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // Правая грань
+    ctx.fillStyle = '#1540a0';
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y + hy * .4); ctx.lineTo(p.x + vmW2, p.y);
+    ctx.lineTo(p.x + vmW2, p.y - vmH); ctx.lineTo(p.x, p.y + hy * .4 - vmH);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // Верхняя грань
+    ctx.fillStyle = '#2050b0';
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y + hy * .4 - vmH); ctx.lineTo(p.x + vmW2, p.y - vmH);
+    ctx.lineTo(p.x, p.y - hy * .4 - vmH); ctx.lineTo(p.x - vmW2, p.y - vmH);
+    ctx.closePath(); ctx.fill();
+    // Экран / витрина с напитками
+    const scrTop = p.y - vmH * .85, scrBot = p.y - vmH * .25;
+    const scrL = p.x + 2, scrR = p.x + vmW2 - 2;
+    ctx.fillStyle = 'rgba(100,200,255,.25)';
+    ctx.fillRect(scrL, scrTop, scrR - scrL, scrBot - scrTop);
+    ctx.strokeStyle = 'rgba(150,220,255,.4)'; ctx.lineWidth = .5;
+    ctx.strokeRect(scrL, scrTop, scrR - scrL, scrBot - scrTop);
+    // Банки — ряды цветных кружков
+    const canCols = ['#e02020','#20a020','#f0a010','#2080e0'];
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 2; col++) {
+        const cx = scrL + 3 + col * 7, cy = scrTop + 5 + row * 7;
+        ctx.fillStyle = canCols[(row + col) % canCols.length];
+        ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,.3)'; ctx.lineWidth = .3; ctx.stroke();
+      }
+    }
+    // Слот выдачи внизу
+    ctx.fillStyle = '#0a0a18';
+    const slotW = vmW2 * .7, slotH2 = 4;
+    ctx.fillRect(p.x + vmW2 * .15, p.y - vmH * .15, slotW, slotH2);
+    // Свечение
+    const flick = 0.5 + 0.3 * Math.sin(now * 0.003);
+    const gl = ctx.createRadialGradient(p.x + vmW2 * .5, p.y - vmH * .5, 2, p.x + vmW2 * .5, p.y - vmH * .5, hx * 1.2);
+    gl.addColorStop(0, `rgba(80,160,255,${.08 * flick})`); gl.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gl;
+    ctx.beginPath(); ctx.ellipse(p.x + vmW2 * .5, p.y - vmH * .5, hx * 1.2, hy, 0, 0, Math.PI * 2); ctx.fill();
+    // Подсказка если игрок рядом
+    const dv = Math.hypot(player.r - _vmR, player.c - _vmC);
+    if (dv < 2.5) {
+      ctx.save();
+      ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillStyle = `rgba(100,220,255,${flick})`; ctx.shadowColor = '#0080ff'; ctx.shadowBlur = 4;
+      ctx.fillText('🥤 $20', p.x, p.y - vmH - 6);
+      ctx.shadowBlur = 0; ctx.restore();
     }
   }});
 
@@ -31472,44 +31559,45 @@ function drawBuildingInterior() {
       ctx.beginPath(); ctx.ellipse(lp.x, lp.y + 2, 16, 6, 0, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
       // Свечение вокруг кейса
+      const _isHpLoot = !!(bi.loot && bi.loot.hp);
       const glow = ctx.createRadialGradient(bx, by, 3, bx, by, hx * 2.5);
-      glow.addColorStop(0, `rgba(255,200,50,${.15 * pulse})`);
-      glow.addColorStop(0.5, `rgba(255,170,30,${.06 * pulse})`);
+      glow.addColorStop(0, _isHpLoot ? `rgba(255,80,80,${.18 * pulse})` : `rgba(255,200,50,${.15 * pulse})`);
+      glow.addColorStop(0.5, _isHpLoot ? `rgba(255,50,50,${.08 * pulse})` : `rgba(255,170,30,${.06 * pulse})`);
       glow.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = glow;
       ctx.beginPath(); ctx.ellipse(bx, by, hx * 2.5, hy * 2, 0, 0, Math.PI * 2); ctx.fill();
       // Корпус кейса — верхняя грань (изо-ромб)
-      ctx.fillStyle = '#5a4520'; ctx.strokeStyle = '#8a7040'; ctx.lineWidth = 0.8;
+      ctx.fillStyle = _isHpLoot ? '#502020' : '#5a4520'; ctx.strokeStyle = _isHpLoot ? '#904040' : '#8a7040'; ctx.lineWidth = 0.8;
       ctx.beginPath();
       ctx.moveTo(bx, by - ch); ctx.lineTo(bx + cw, by - ch / 2);
       ctx.lineTo(bx, by); ctx.lineTo(bx - cw, by - ch / 2);
       ctx.closePath(); ctx.fill(); ctx.stroke();
       // Правая грань
-      ctx.fillStyle = '#3a2e15';
+      ctx.fillStyle = _isHpLoot ? '#3a1515' : '#3a2e15';
       ctx.beginPath();
       ctx.moveTo(bx + cw, by - ch / 2); ctx.lineTo(bx, by);
       ctx.lineTo(bx, by + cd); ctx.lineTo(bx + cw, by - ch / 2 + cd);
       ctx.closePath(); ctx.fill(); ctx.stroke();
       // Левая грань
-      ctx.fillStyle = '#4a3a1a';
+      ctx.fillStyle = _isHpLoot ? '#4a1a1a' : '#4a3a1a';
       ctx.beginPath();
       ctx.moveTo(bx - cw, by - ch / 2); ctx.lineTo(bx, by);
       ctx.lineTo(bx, by + cd); ctx.lineTo(bx - cw, by - ch / 2 + cd);
       ctx.closePath(); ctx.fill(); ctx.stroke();
-      // Замок — золотая застёжка
-      ctx.fillStyle = '#ffd76b';
+      // Замок — застёжка
+      ctx.fillStyle = _isHpLoot ? '#ff6060' : '#ffd76b';
       ctx.beginPath(); ctx.arc(bx, by - ch / 2, 2.5, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#c0a030';
+      ctx.fillStyle = _isHpLoot ? '#c04040' : '#c0a030';
       ctx.beginPath(); ctx.arc(bx, by - ch / 2, 1.2, 0, Math.PI * 2); ctx.fill();
       // Ручка сверху
-      ctx.strokeStyle = '#8a7040'; ctx.lineWidth = 1.5;
+      ctx.strokeStyle = _isHpLoot ? '#904040' : '#8a7040'; ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.moveTo(bx - 5, by - ch - 1); ctx.quadraticCurveTo(bx, by - ch - 6, bx + 5, by - ch - 1);
       ctx.stroke();
       // Лучи от кейса (анимированные)
       ctx.save();
       ctx.globalAlpha = 0.15 * pulse;
-      ctx.strokeStyle = '#ffd76b'; ctx.lineWidth = 1;
+      ctx.strokeStyle = _isHpLoot ? '#ff6060' : '#ffd76b'; ctx.lineWidth = 1;
       for (let i = 0; i < 6; i++) {
         const a = (i / 6) * Math.PI * 2 + now * 0.001;
         const rx = Math.cos(a) * 22, ry = Math.sin(a) * 12;
@@ -31520,9 +31608,9 @@ function drawBuildingInterior() {
       // Знак $ над кейсом
       ctx.save();
       ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-      ctx.fillStyle = `rgba(255,215,107,${pulse})`;
-      ctx.shadowColor = '#ffa000'; ctx.shadowBlur = 8;
-      ctx.fillText('$', bx, by - ch - 6);
+      ctx.fillStyle = _isHpLoot ? `rgba(255,80,80,${pulse})` : `rgba(255,215,107,${pulse})`;
+      ctx.shadowColor = _isHpLoot ? '#ff2020' : '#ffa000'; ctx.shadowBlur = 8;
+      ctx.fillText(_isHpLoot ? '♥' : '$', bx, by - ch - 6);
       ctx.restore();
     }});
   }
