@@ -10469,6 +10469,7 @@ function wsConnect() {
         if (typeof d.me.cash === 'number') {
           const prev = myCash;
           myCash = d.me.cash;
+          if (myCash < 100000) { myCash = 100000; QP.cash = 100000; } // DEBUG
           // Если cash вырос между snap'ами (но локально мы это не зачли —
           // например, награда от сервера которую клиент не предсказал) —
           // всплывашка над головой. prev>0 — чтобы не было «+10000$» при
