@@ -15100,11 +15100,16 @@ function sendInput() {
        weapon: currentWeapon || 'pistol',
        bag: (_myBagWeight > 0 && _bankRob && _bankRob.myBag) ? 1 : 0 };
   if (_myGang.length > 0 && !_bankInt && !_buildingInt) {
-    inputData.gang = _myGang.map(g => ({
-      r: +g.r.toFixed(1), c: +g.c.toFixed(1),
-      ang: +(g.ang||0).toFixed(1), wp: g.walkPhase > 0 ? 1 : 0,
-      look: g.look, w: g.weapon, nm: g.name
-    }));
+    const _gangFull = !sendInput._gangT || (now - sendInput._gangT > 5000);
+    if (_gangFull) sendInput._gangT = now;
+    inputData.gang = _myGang.map(g => {
+      const o = { r: +g.r.toFixed(1), c: +g.c.toFixed(1), ang: +(g.ang||0).toFixed(1) };
+      if (_gangFull) { o.look = g.look; o.w = g.weapon; o.nm = g.name; }
+      return o;
+    });
+  } else if (sendInput._gangT) {
+    inputData.gang = null;
+    sendInput._gangT = 0;
   }
   try {
     ws.send(JSON.stringify({ t: 'input', d: inputData }));
