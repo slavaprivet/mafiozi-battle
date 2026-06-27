@@ -32136,8 +32136,8 @@ function enterBankInterior(bank) {
   player.r=H-1.8; player.c=W/2;
   for (let gi = 0; gi < _myGang.length; gi++) {
     const ga = ((gi + 1) / (GANG_MAX + 1)) * Math.PI * 2;
-    _myGang[gi].r = player.r + Math.sin(ga) * 1.5;
-    _myGang[gi].c = player.c + Math.cos(ga) * 1.5;
+    _myGang[gi].r = Math.max(2, Math.min(H - 3, player.r - 2 + gi * 1.2));
+    _myGang[gi].c = Math.max(2, Math.min(W - 2, player.c - 2 + gi * 1.5));
   }
   // Мгновенно перемещаем камеру — без lerp-«полёта» из мировых координат
   cam.x=(player.c-player.r)*TS*0.5;
