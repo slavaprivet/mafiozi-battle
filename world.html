@@ -25910,8 +25910,7 @@ function render() {
   }
   const _stEl = document.getElementById('stage');
   const _stageW = _stEl ? _stEl.clientWidth : 400;
-  const _stageH = _stEl ? _stEl.clientHeight : 400;
-  const VIS_R = Math.max(22, Math.ceil((_stageW + _stageH) / TS));
+  const VIS_R = Math.max(22, Math.min(35, Math.ceil(_stageW / TS) + 10));
   const r0 = Math.max(0, Math.floor(_cullR - VIS_R));
   const r1 = Math.min(MAP_ROWS, Math.ceil(_cullR + VIS_R));
   const c0 = Math.max(0, Math.floor(_cullC - VIS_R));
