@@ -13611,7 +13611,7 @@ const _TAXI_DESTINATIONS = [
 ];
 // Добавляем все банки
 for (const bank of BANKS) {
-  _TAXI_DESTINATIONS.push({ icon: '🏦', name: `Банк (${bank.size})`, r: bank.r + 2, c: bank.c + 2 });
+  _TAXI_DESTINATIONS.push({ icon: '🏦', name: bank.name, r: bank.r + 2, c: bank.c + 2 });
 }
 
 function openTaxiModal() {
@@ -13642,12 +13642,15 @@ _taxiList.addEventListener('click', (e) => {
 });
 function _taxiFindPassable(r, c) {
   if (!isBlocked(r, c)) return { r, c };
+  const ri = Math.floor(r), ci = Math.floor(c);
   for (let rad = 1; rad <= 8; rad++) {
     for (let dr = -rad; dr <= rad; dr++) {
       for (let dc = -rad; dc <= rad; dc++) {
         if (Math.abs(dr) !== rad && Math.abs(dc) !== rad) continue;
-        const tr = r + dr, tc = c + dc;
-        if (!isBlocked(tr, tc)) return { r: tr + 0.5, c: tc + 0.5 };
+        const tr = ri + dr, tc = ci + dc;
+        if (tr >= 0 && tr < MAP_ROWS && tc >= 0 && tc < MAP_COLS && PASSABLE.has(MAP[tr][tc])) {
+          return { r: tr + 0.5, c: tc + 0.5 };
+        }
       }
     }
   }
