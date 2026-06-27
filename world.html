@@ -13606,6 +13606,8 @@ const _TAXI_DESTINATIONS = [
   { icon: '⚓', name: 'Порт',           r: 165, c: 38 },
   { icon: '🎰', name: 'Казино',         r: 46,  c: 16 },
   { icon: '🏭', name: 'Промзона',       r: 46,  c: 56 },
+  { icon: '🚒', name: 'Пожарная часть', r: 56,  c: 26 },
+  { icon: '🏴', name: 'Логово',         r: 120, c: 40 },
 ];
 // Добавляем все банки
 for (const bank of BANKS) {
@@ -13613,6 +13615,8 @@ for (const bank of BANKS) {
 }
 
 function openTaxiModal() {
+  if (_buildingInt || _bankInt) { showToast('Сначала выйди из здания', '🚪', 1500); return; }
+  if (myDrivingCarId) { showToast('Сначала выйди из машины', '🚗', 1500); return; }
   const cash = parseInt(QP.cash) || myCash || 0;
   if (cash < TAXI_COST) { showToast(`💸 Нужно ${TAXI_COST}$ на такси`, '🚖', 2000); return; }
   _taxiList.innerHTML = _TAXI_DESTINATIONS.map((d, i) => {
@@ -13636,20 +13640,33 @@ _taxiList.addEventListener('click', (e) => {
   closeTaxiModal();
   _taxiRide(dest);
 });
+function _taxiFindPassable(r, c) {
+  if (!isBlocked(r, c)) return { r, c };
+  for (let rad = 1; rad <= 8; rad++) {
+    for (let dr = -rad; dr <= rad; dr++) {
+      for (let dc = -rad; dc <= rad; dc++) {
+        if (Math.abs(dr) !== rad && Math.abs(dc) !== rad) continue;
+        const tr = r + dr, tc = c + dc;
+        if (!isBlocked(tr, tc)) return { r: tr + 0.5, c: tc + 0.5 };
+      }
+    }
+  }
+  return { r, c };
+}
 function _taxiRide(dest) {
   const cash = parseInt(QP.cash) || myCash || 0;
   if (cash < TAXI_COST) { showToast(`💸 Не хватает денег`, '❌', 1500); return; }
+  if (_buildingInt || _bankInt) { showToast('Сначала выйди из здания', '🚪', 1500); return; }
+  if (myDrivingCarId) { showToast('Сначала выйди из машины', '🚗', 1500); return; }
   QP.cash = cash - TAXI_COST; myCash = parseInt(QP.cash);
   updateMoneyHud();
   showToast(`🚖 Едем: ${dest.name}`, '🚕', 1500);
-  // Fade out
+  const landing = _taxiFindPassable(dest.r + 1.5, dest.c + 1.5);
   _taxiFade.classList.add('active');
   setTimeout(() => {
-    // Телепорт
-    player.r = dest.r + 1.5; player.c = dest.c + 1.5;
+    player.r = landing.r; player.c = landing.c;
     cam.x = (player.c - player.r) * TS * 0.5;
     cam.y = (player.c + player.r) * TS * 0.5 * ISO_Y;
-    // Fade in
     setTimeout(() => { _taxiFade.classList.remove('active'); }, 400);
   }, 700);
 }
