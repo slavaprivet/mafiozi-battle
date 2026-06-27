@@ -9862,7 +9862,7 @@ function handleEventPacket(d) {
     if (d.bot_id) lastBossShotAt.set(d.bot_id, performance.now());
     // Aggro_melee (сабля) применяется мгновенно — урон в d.dmg/killed
     if (kind === 'aggro_melee' && String(d.target_uid) === String(QP.uid)
-        && !d.miss) {
+        && !d.miss && !_bankShield()) {
       try { hitFlash = performance.now() + 240; } catch(e) {}
       flashHitOverlay();
       addShake(3.0);
