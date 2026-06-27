@@ -4611,7 +4611,7 @@ function updateCityCops(dt) {
           if (typeof addShake === 'function') addShake(2.5);
           const dmg = 7 + Math.floor(Math.random() * 5);
           _hurtLocal(dmg, 'Полиция');
-          flashHitOverlay();
+          flashHitOverlay(cop.y, cop.x);
           spawnFloatText(player.r - 0.4, player.c, `−${dmg}`, { color: '#ff4422', size: 13, life: 900 });
           try { hapticHit && hapticHit(); } catch(e) {}
           try { ws && ws.readyState === 1 && ws.send(JSON.stringify({ t: 'npc_melee_shoot',
@@ -6043,7 +6043,7 @@ function updateNpcs(dt) {
         n._attackCd = now + 1200;
         const dmg = n._meleeDmg || 8;
         addShake(2);
-        flashHitOverlay();
+        flashHitOverlay(n.r, n.c);
         _hurtLocal(dmg, 'Охранник');
         spawnFloatText(player.r - 0.4, player.c, `−${dmg}`, { color: '#ff4444', size: 16, life: 1000 });
         try { ws && ws.send(JSON.stringify({ t: 'npc_melee_shoot',
@@ -6080,7 +6080,7 @@ function updateNpcs(dt) {
           const npcDmg = 8 + Math.floor(Math.random() * 7);
           spawnImpact(tR, tC, wep, true);
           addShake(2.5);
-          flashHitOverlay();
+          flashHitOverlay(n.r, n.c);
           _hurtLocal(npcDmg, 'Бандит');  // локальный урон «прилипает» против снапшота
           spawnFloatText(player.r - 0.4, player.c, `−${npcDmg}`, { color: '#ff4444', size: 16, life: 1100 });
           try { ws && ws.send(JSON.stringify({ t: 'npc_melee_shoot',
@@ -6163,7 +6163,7 @@ function updateNpcs(dt) {
         impacts.push({ r: impR, c: impC, parts });
         addShake(1.5);
         hapticHit();
-        flashHitOverlay();
+        flashHitOverlay(n.r, n.c);
         const dmg = 5 + Math.floor(Math.random() * 6);
         _hurtLocal(dmg, 'Бандит');
         spawnFloatText(player.r - 0.4, player.c, `−${dmg}`, { color: '#ff6644', size: 14, life: 1000 });
@@ -9242,7 +9242,7 @@ function handleEventPacket(d) {
     }
     if (d.shooter_id) lastBossShotAt.set(d.shooter_id, performance.now());
     if (!d.miss && d.target_uid && String(d.target_uid) === String(QP.uid) && !_bankShield()) {
-      flashHitOverlay();
+      flashHitOverlay(d.sy, d.sx);
       addShake(3.5);
       _autoLockThreat('convoy', d.shooter_id);
       if (d.killed) myDeathBy = 'Конвой инкассатора';
@@ -9289,7 +9289,7 @@ function handleEventPacket(d) {
     if (meIsShooter && d.target_uid) _markCombat(d.target_uid);
     if (meIsTarget  && d.shooter_uid) _markCombat(d.shooter_uid);
     if (meIsTarget && !_bankShield()) {
-      flashHitOverlay();
+      flashHitOverlay(d.sy, d.sx);
       addShake(3);
       _autoLockThreat('player', d.shooter_uid);
       if (d.killed) {
@@ -9357,7 +9357,7 @@ function handleEventPacket(d) {
       if (g) g.lastShotAt = performance.now();
     }
     if (!d.miss && String(d.target_uid) === String(QP.uid) && !_bankShield()) {
-      flashHitOverlay();
+      flashHitOverlay(d.sy, d.sx);
       addShake(3);
       _autoLockThreat('mg', d.guard_id);
       if (d.killed) myDeathBy = 'Охрана Майкла';
@@ -9398,7 +9398,7 @@ function handleEventPacket(d) {
     // сервера стоит у входа (savedR/savedC), но физически в интерьере и не
     // может уклоняться. Игнорируем эффекты выстрела/ареста пока _bankInt.
     if (!d.miss && String(d.target_uid) === String(QP.uid) && !_bankShield()) {
-      flashHitOverlay();
+      flashHitOverlay(d.sy, d.sx);
       addShake(3);
       _autoLockThreat('cop', d.cop_id);
       if (d.killed) {
@@ -10028,22 +10028,18 @@ function handleEventPacket(d) {
     if (kind === 'aggro_melee' && String(d.target_uid) === String(QP.uid)
         && !d.miss && !_bankShield()) {
       try { hitFlash = performance.now() + 240; } catch(e) {}
-      flashHitOverlay();
+      flashHitOverlay(d.sy, d.sx);
       addShake(3.0);
       _autoLockThreat('aggro_bot', d.bot_id);
       if (d.killed) myDeathBy = 'банда «Логова»';
     }
-    // Aggro_shot — пуля летит, но цель уже известна. Если по мне — лочим стрелка
-    // сразу, не дожидаясь aggro_apply (даст время отреагировать пока пуля летит).
     if (kind === 'aggro_shot' && String(d.target_uid) === String(QP.uid)) {
       _autoLockThreat('aggro_bot', d.bot_id);
     }
   } else if (kind === 'aggro_apply') {
-    // Серверный отложенный hit-check: пуля долетела, проверка попадания.
-    // d.miss=true → игрок успел увернуться, никакого урона. Иначе hit-flash.
     if (String(d.target_uid) === String(QP.uid) && !d.miss && !_bankShield()) {
       try { hitFlash = performance.now() + 240; } catch(e) {}
-      flashHitOverlay();
+      flashHitOverlay(d.sy, d.sx);
       addShake(3.0);
       _autoLockThreat('aggro_bot', d.bot_id);
       if (d.killed) myDeathBy = 'банда «Логова»';
@@ -10195,9 +10191,11 @@ function handleEventPacket(d) {
 
 // Кратковременная красная вспышка по краю экрана при попадании в игрока.
 let _hitFlashUntil = 0;
-function flashHitOverlay() {
+function flashHitOverlay(shooterR, shooterC) {
   _hitFlashUntil = performance.now() + 350;
-  if (!_buildingInt && !_bankInt) _gangAlertThreat(player.r, player.c, 'enemy');
+  if (shooterR !== undefined && shooterC !== undefined) {
+    _gangAlertThreat(shooterR, shooterC, 'enemy');
+  }
 }
 // Overlay ареста — короткая (~2.5с) анимация перед окном тюрьмы.
 function showArrestOverlay() {
