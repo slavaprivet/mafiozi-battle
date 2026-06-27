@@ -7404,7 +7404,9 @@ function _updateGang(dt) {
     if (m.hp <= 0) { _myGang.splice(i, 1); continue; }
     const hasThreat = m._threatUntil > now && m._threatR && m._threatC;
     let tR, tC;
-    if (_buildingInt || _bankInt) {
+    if (_bankInt && _bankInt.room === 'vault') {
+      continue; // в хранилище наёмники стоят на месте в лобби
+    } else if (_buildingInt || _bankInt) {
       tR = player.r + (((m.id.charCodeAt(5) || 0) % 3) - 1) * 1.5;
       tC = player.c + (((m.id.charCodeAt(6) || 0) % 3) - 1) * 1.5;
       m._intR = tR; m._intC = tC;
@@ -13835,6 +13837,7 @@ function _taxiRide(dest) {
   _taxiFade.classList.add('active');
   setTimeout(() => {
     player.r = landing.r; player.c = landing.c;
+    for (const gm of _myGang) { gm.r = landing.r + (Math.random() - 0.5) * 2; gm.c = landing.c + (Math.random() - 0.5) * 2; }
     cam.x = (player.c - player.r) * TS * 0.5;
     cam.y = (player.c + player.r) * TS * 0.5 * ISO_Y;
     setTimeout(() => { _taxiFade.classList.remove('active'); }, 400);
@@ -33758,6 +33761,22 @@ function drawBankInteriorScene() {
     })(lbp, lb)});
   }
 
+  // Наёмники в банке
+  for (const gm of _myGang) {
+    items.push({d:gm.r+gm.c+.04,fn:((g)=>()=>{
+      const p=w2s(g.r+.5,g.c+.5);
+      ctx.save();
+      const gl=ctx.createRadialGradient(p.x,p.y+2,1,p.x,p.y+2,14);
+      gl.addColorStop(0,'rgba(60,255,60,.15)'); gl.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=gl; ctx.beginPath(); ctx.ellipse(p.x,p.y+2,14,6,0,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+      drawPerson(p.x,p.y,g.ang,g.look,g.walkPhase,null,null,false,g.hp,g.max_hp,false,0);
+      drawWeaponInHands(p.x,p.y,g.ang,g.weapon,0.85,0);
+      ctx.save(); ctx.font='bold 7px system-ui'; ctx.textAlign='center'; ctx.textBaseline='bottom';
+      ctx.fillStyle='#4aff4a'; ctx.shadowColor='#000'; ctx.shadowBlur=2;
+      ctx.fillText(`👊 ${g.name}`,p.x,p.y-32); ctx.shadowBlur=0; ctx.restore();
+    })(gm)});
+  }
   // Игрок
   items.push({d:player.r+player.c+.05,fn:()=>{
     const p=w2s(player.r+.5,player.c+.5);
