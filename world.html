@@ -7489,10 +7489,8 @@ function _updateGang(dt) {
         const muzC = m.c + (tdc / nd) * 0.45;
         const miss = (Math.random() - 0.5) * 0.4;
         const tgR = m._threatR + miss, tgC = m._threatC + miss;
-        if (!_buildingInt && !_bankInt) {
-          spawnBullet(muzR, muzC, tgR, tgC, { hit: Math.abs(miss) < 0.35, fromNpc: true, weapon: m.weapon });
-          spawnMuzzle(muzR, muzC, m.ang, m.weapon, true);
-        }
+        spawnBullet(muzR, muzC, tgR, tgC, { hit: Math.abs(miss) < 0.35, fromNpc: true, weapon: m.weapon });
+        spawnMuzzle(muzR, muzC, m.ang, m.weapon, true);
         // Ответный огонь — 25% шанс получить урон
         if (Math.random() < 0.25) {
           const retDmg = 5 + Math.floor(Math.random() * 8);
