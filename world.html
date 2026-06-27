@@ -7428,12 +7428,14 @@ function _loadGang() {
   } catch(e) {}
 }
 _loadGang();
-// DEBUG: автоспавн 3 бойцов если банда пуста
-if (_myGang.length === 0) {
-  for (let _di = 0; _di < 3; _di++) {
-    _hireGangMember({gender:_di%2,skin:_di,body:1,face:_di+1,hair:_di+2,hat:0}, 0, 0);
+// DEBUG: автоспавн 3 бойцов если банда пуста (отложен чтобы showToast была готова)
+setTimeout(() => {
+  if (_myGang.length === 0) {
+    for (let _di = 0; _di < 3; _di++) {
+      _hireGangMember({gender:_di%2,skin:_di,body:1,face:_di+1,hair:_di+2,hat:0}, 0, 0);
+    }
   }
-}
+}, 500);
 function _gangAlertThreat(r, c, id) {
   const now = performance.now();
   for (const m of _myGang) {
