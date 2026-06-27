@@ -6652,6 +6652,19 @@ function initCars() {
   // Логово банды — гангстерская парковка в одном из дальних кварталов.
   // Это 3 сиреневые машины стоят рядом. Их можно расстрелять (+кулачки).
   spawnGangLair();
+  // Такси у Бурж Мафии — всегда на месте для быстрого перемещения
+  const _taxiModel = CAR_MODELS.find(m => m.taxi);
+  if (_taxiModel) {
+    const _burjTaxi = {
+      id: 'burj_taxi_' + Date.now(),
+      r: 34.5, c: 33.5, ang: Math.PI * 0.25,
+      tr: 34.5, tc: 33.5, speed: 0, model: _taxiModel,
+      _parked: true, _static: true, _noDespawn: true,
+      flash: 0, walkPhase: 0, driverId: null,
+      hp: 200, max_hp: 200,
+    };
+    CARS.push(_burjTaxi);
+  }
   // Большие парковки у POI (казино, бар, клуб, автомойка, кофейня).
   // Машины стоят рядами с белой разметкой на сером асфальте.
   _spawnParkingLotCars();
