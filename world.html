@@ -15903,7 +15903,6 @@ function update(dt) {
       if (player.r >= biH - 0.6 && Math.abs(player.c - biW / 2) < 2.5) { exitBuildingInterior(); }
     }
     if (_buildingInt) _updateInteriorNpcs(_buildingInt, dt);
-    _updateGang(dt);
     const targetCamX = (player.c - player.r) * TS * 0.5;
     const targetCamY = (player.c + player.r) * TS * 0.5 * ISO_Y;
     cam.x += (targetCamX - cam.x) * Math.min(1, dt * 8);
