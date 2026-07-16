@@ -4406,7 +4406,14 @@ const DISTRICT_DECOR_GENERATED=new Set([
 ]);
 function pruneDistrictStyleDecor(){
   if(!Array.isArray(_beachDecor))return;
-  _beachDecor=_beachDecor.filter(d=>!d||Number(d.r)>=100||!DISTRICT_DECOR_GENERATED.has(d.kind)||DISTRICT_DECOR_KEEP.has(d.kind));
+  _beachDecor=_beachDecor.filter(d=>{
+    // Старый забор (4,14) проходил прямо поверх фасада банка «Окраина»
+    // (5,15). Удаляем и из генератора, и из уже сохранённых карт редактора.
+    const outskirtsBankFence=d&&d.kind==='old_fence'
+      &&Math.abs(Number(d.r)-4)<.35&&Math.abs(Number(d.c)-14)<.35;
+    if(outskirtsBankFence)return false;
+    return !d||Number(d.r)>=100||!DISTRICT_DECOR_GENERATED.has(d.kind)||DISTRICT_DECOR_KEEP.has(d.kind);
+  });
 }
 function ensureCoastStyleDecor(){
   const defs=[];
@@ -4444,7 +4451,7 @@ function ensureCenterStyleDecor(){
 }
 function ensurePoorStyleDecor(){
   const defs=[
-    {kind:'old_fence',r:4,c:14},{kind:'old_fence',r:4,c:26},{kind:'old_fence',r:34,c:14},{kind:'old_fence',r:34,c:26},
+    {kind:'old_fence',r:4,c:26},{kind:'old_fence',r:34,c:14},{kind:'old_fence',r:34,c:26},
     {kind:'graffiti_wall',r:14,c:4},{kind:'graffiti_wall',r:24,c:34,_studioRot:Math.PI},
     {kind:'trash_pile',r:14,c:14},{kind:'trash_pile',r:24,c:26},{kind:'trash_pile',r:34,c:34},
     {kind:'wood_pallets',r:14,c:16},{kind:'wood_pallets',r:34,c:6},
