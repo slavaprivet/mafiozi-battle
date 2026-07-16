@@ -13531,11 +13531,13 @@ function showModeModal(onPick) {
   pve.onclick = () => close('pve');
 }
 
-// Кнопка «сменить» в HUD — просто перезагрузка страницы. После reload
-// startup-блок снова покажет модал (myMode='' на старте). Игрок выберет
-// заново. Не используем localStorage/URL — режим всегда заново.
+// Кнопка «сменить» перезапускает вход без старого mode в URL. Раньше обычный
+// reload сохранял ?mode=pve/pvp, startup снова принимал его автоматически и
+// окно выбора не появлялось — визуально кнопка выглядела сломанной.
 function switchModeFlow() {
-  location.reload();
+  const next = new URL(location.href);
+  next.searchParams.delete('mode');
+  location.replace(next.toString());
 }
 
 function wsUrl() {
@@ -18877,10 +18879,9 @@ function updatePvpUI() {
   // В машине стрельба ОТКЛЮЧЕНА (обе руки на руле), правый стик и weaponBar
   // скрываются. Возвращаются обратно как только вышел из машины.
   const canShoot   = !isPve && !myDead && !isDriving;
-  // HUD-карточку показываем всегда (часы + K/D + HP). Если игрок в чисто
-  // PvE-режиме (мирный наблюдатель) — скрываем. В обычном городе с
-  // настоящим аккаунтом HUD виден постоянно.
-  _hudPlayer.classList.toggle('show', !isPve);
+  // Профиль, HP, деньги и часы нужны в обоих режимах. PvE отключает только
+  // оружие/огонь, но не должен прятать основную карточку персонажа.
+  _hudPlayer.classList.add('show');
   // Кнопка огня видна только когда можно стрелять и есть смысл (open world
   // с хотя бы одной меткой ИЛИ PvP-арена с free-aim). Иначе скрыта.
   // В банке — как в городе: кнопка только при наличии замка (lockedTargets).
