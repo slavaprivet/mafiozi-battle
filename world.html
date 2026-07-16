@@ -23554,7 +23554,9 @@ function drawThemedBuilding(r, c, opt) {
   ctx.lineTo(p.x, p.y - H - wy); ctx.lineTo(p.x - wx, p.y - H);
   ctx.closePath(); ctx.fill();
   // Неоновая вывеска над крышей
-  const sgnY = p.y - H - wy * 0.2;
+  // На тематических зданиях поднимаем знак над коньком: соседняя крыша
+  // иначе визуально перекрывает нижнюю половину вывески.
+  const sgnY = p.y - H - wy * 0.2 - (opt.signLift || 0);
   const sgnW = wx * 1.5, sgnH = 16;
   const pulse = 0.7 + 0.3 * Math.sin(t * 4);
   ctx.save();
@@ -29706,7 +29708,11 @@ function drawPOI(r, c, poi) {
   // Та же формула высоты, что и в drawBuilding — чтобы знак сел ровно на крышу.
   const seed = ((r * 73 + c * 131) % 7) / 7;
   const H = isoH(1.3 + seed * 1.4);
-  const topY = p.y - H - TS * 0.18;   // чуть выше крыши
+  // Спортзал и Биржа труда выше обычного дома и имеют собственный неон.
+  // Главную POI-плашку держим над ним, а не внутри крыши.
+  const themedSignLift = (poi.special === 'gym' || poi.special === 'job')
+    ? isoH(0.9) + 12 : 0;
+  const topY = p.y - H - TS * 0.18 - themedSignLift;
   // Заблокирован ли по уровню (для районов; шопы/арены — нет)
   const locked = poi.special !== 'shop' && poi.special !== 'arena' && QP.lvl < poi.minLvl;
   // Цвет акцента — золотой если доступен, серо-красный если закрыт
@@ -32271,8 +32277,8 @@ function render() {
           else if (poi && poi.id === 'police')    drawPoliceBuilding(r, c);
           else if (poi && poi.id === 'firestation') drawFireBuilding(r, c);
           else if (poi && poi.special === 'blackmarket') drawBlackmarket(r, c);
-          else if (poi && poi.special === 'gym')  drawThemedBuilding(r, c, { left:'#5a3010', right:'#8a5020', roof:'#3a2008', win:'#ffb050', accent:'#ff9030', emoji:'💪', label:'GYM' });
-          else if (poi && poi.special === 'job')  drawThemedBuilding(r, c, { left:'#103048', right:'#205070', roof:'#0a1e30', win:'#60c0ff', accent:'#40a0ff', emoji:'💼', label:'РАБОТА' });
+          else if (poi && poi.special === 'gym')  drawThemedBuilding(r, c, { left:'#5a3010', right:'#8a5020', roof:'#3a2008', win:'#ffb050', accent:'#ff9030', emoji:'💪', label:'GYM', signLift:18 });
+          else if (poi && poi.special === 'job')  drawThemedBuilding(r, c, { left:'#103048', right:'#205070', roof:'#0a1e30', win:'#60c0ff', accent:'#40a0ff', emoji:'💼', label:'РАБОТА', signLift:18 });
           else if (_bankTileSet.has(r + ',' + c)) { /* bank tile — drawn by drawBankBuilding */ }
           else                                    drawBuilding(r, c);
           if (poi) drawPOI(r, c, poi);
