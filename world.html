@@ -10264,6 +10264,33 @@ function apartmentUpgradeCost(upgrade, lvl) {
   const u = APT_UPGRADES[upgrade];
   return u ? Math.round(u.base * Math.pow(1.75, lvl || 0)) : 999999;
 }
+function apartmentSalePrice(info) {
+  return Math.floor(Math.max(0, parseInt(info && info.price) || 0) * 0.9);
+}
+async function sellCurrentApartment() {
+  if (!_buildingInt || _buildingInt.type) return;
+  const key = _apartmentOwnedKey(_buildingInt.r, _buildingInt.c);
+  const info = key && _myApartments[key];
+  if (!info) { showToast('🏠 Эта квартира тебе не принадлежит', '⚠️', 2000); return; }
+  const refund = apartmentSalePrice(info);
+  if (!confirm(`Продать квартиру за $${refund.toLocaleString('ru')}?\n\nЭто 90% от цены покупки. Улучшения не возвращаются.`)) return;
+  try {
+    const r = await fetch(`${QP.api.replace(/\/+$/, '')}/apartment/${encodeURIComponent(QP.uid)}/sell`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apt_key: key }),
+    });
+    const j = await r.json();
+    if (!j.ok) {
+      showToast(j.error === 'not owned' ? '🏠 Квартира уже не твоя' : '❌ Не удалось продать', '❌', 2300);
+      return;
+    }
+    if (j.cash !== undefined) { QP.cash = j.cash; myCash = parseInt(j.cash) || 0; updateMoneyHud(); }
+    if (j.owned) _myApartments = j.owned;
+    exitBuildingInterior();
+    showToast(`🏠 Квартира продана за $${(+j.refund || refund).toLocaleString('ru')} · Квартира ${_apartmentCounterLabel()}`, '💰', 3000);
+    if (_profileTab === 'status') renderProfileTab();
+  } catch (e) { showToast('⚠️ Ошибка связи с сервером', '❌', 2200); }
+}
 async function upgradeCurrentApartment(upgrade) {
   if (!_buildingInt || _buildingInt.type) return;
   const key = _apartmentOwnedKey(_buildingInt.r, _buildingInt.c);
@@ -10301,10 +10328,13 @@ function showApartmentUpgradeMenu() {
     const cost = apartmentUpgradeCost(id, lvl);
     return `${u.label} Lv.${lvl}/3 — ${lvl >= 3 ? 'MAX' : '$' + cost.toLocaleString('ru')}`;
   });
-  const choice = prompt('Улучшения квартиры:\n\n' + lines.join('\n') + '\n\nВведи: safe, weapon_rack, garage, cameras, repair');
+  const refund = apartmentSalePrice(info);
+  const choice = prompt('Управление квартирой:\n\n' + lines.join('\n') + `\n\n💰 Продать — $${refund.toLocaleString('ru')} (sell)` + '\n\nВведи: safe, weapon_rack, garage, cameras, repair или sell');
   if (!choice) return;
-  if (!APT_UPGRADES[choice]) { showToast('❌ Нет такого улучшения', '❌', 1800); return; }
-  upgradeCurrentApartment(choice);
+  const action = String(choice).trim().toLowerCase();
+  if (action === 'sell' || action === 'продать') { sellCurrentApartment(); return; }
+  if (!APT_UPGRADES[action]) { showToast('❌ Нет такого действия', '❌', 1800); return; }
+  upgradeCurrentApartment(action);
 }
 
 // ── Наёмники (клиентская банда игрока) ────────────────────────────
@@ -15070,7 +15100,7 @@ function updateGtaInteractions() {
         _gtaBtn.style.display = 'block'; return;
       } else {
         _gtaActionKind = 'apt_upgrade'; _gtaActionCarId = null;
-        _gtaBtn.textContent = '🏠 Улучшения квартиры';
+        _gtaBtn.textContent = '🏠 Управление квартирой';
         _gtaBtn.style.display = 'block'; return;
       }
     }
