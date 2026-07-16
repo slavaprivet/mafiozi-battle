@@ -10015,23 +10015,96 @@ let _gangIdCounter = 0;
 // визуально «нанятый бросился на меня» уходит. Ids не переживают
 // перезагрузку — после релоада бот вернётся обычным врагом (ок).
 const _hiredBotIds = new Set();
-// Фразочки наёмников — над головой, как cryText у NPC.
+// Голос отряда. В спокойной обстановке говорит только один боец, а в бою
+// разрешены короткие пересекающиеся выкрики (но не больше трёх одновременно).
 const _GANG_PHRASES = {
-  hire:  ['Работаю, босс', 'В деле!', 'Куда идём?', 'Готов служить', 'Кто наш клиент?'],
-  aim:   ['Пальнём его?', 'Босс, что дальше?', 'Только скажи…', 'Взять его на мушку?', 'Он мне сразу не понравился'],
-  shoot: ['Получай!', 'Лови свинец!', 'За босса!', 'На!', 'Держи, крыса!'],
-  walk:  ['Идём-идём…', 'Пока спокойно', 'Прикрываю тыл', 'Всё чисто', 'За тобой, босс'],
+  hire: [
+    'Работаю, босс', 'Я в деле!', 'Куда идём?', 'Готов, босс', 'Кто наша цель?',
+    'Ствол заряжен', 'Не подведу', 'Теперь я с вами', 'Приказ, босс?', 'Плачу долг работой',
+  ],
+  idle: [
+    'Босс, что дальше?', 'Жду приказа', 'Какой план, босс?', 'Куда двигаем?', 'Я на месте',
+    'Всё спокойно', 'Район под контролем', 'Держу ухо востро', 'Проверяю периметр',
+    'Если что — я рядом', 'Город сегодня тихий', 'Может, прокатимся?', 'Есть работа?',
+    'Ствол почищен', 'Патронов хватит', 'Слежу за улицей', 'Никого подозрительного',
+    'Мы за тобой, босс', 'Команда в сборе', 'Можно двигаться', 'Прикрываю тебя',
+    'Нам бы дельце', 'Чую, скоро будет шумно', 'На районе всё чисто',
+  ],
+  walk: [
+    'За тобой, босс', 'Держу строй', 'Прикрываю тыл', 'Иду следом', 'Не отстаю',
+    'Смотрю по сторонам', 'Держимся вместе', 'Путь чист', 'Двигаемся', 'Я рядом',
+    'Без шума, босс', 'Проверю впереди', 'Улицы знаю', 'Шаг за шагом',
+  ],
+  aim: [
+    'Берём его?', 'Босс, это цель?', 'Взять на мушку?', 'Только скажи', 'Он мне не нравится',
+    'Вижу цель', 'Я его держу', 'Жду команды', 'Стрелять по готовности?', 'Он под прицелом',
+  ],
+  alert: [
+    'Контакт!', 'Враги!', 'Босс, в укрытие!', 'Прикрою!', 'Вижу угрозу!', 'К бою!',
+    'Они нарвались!', 'Работаем!', 'Держим позицию!', 'Не подпускайте их!',
+    'Босс, я разберусь!', 'Стволы вверх!', 'Берём их!', 'Слева движение!',
+  ],
+  shoot: [
+    'Атакую!', 'Огонь!', 'Получай!', 'Лови!', 'За босса!', 'Прижал его!', 'Не уйдёшь!',
+    'Держи, крыса!', 'Цель вижу!', 'Работаю по цели!', 'Подавляю!', 'Вот тебе!',
+    'Минус укрытие!', 'Дожимаем!', 'Не высовывайся!', 'Пошёл!', 'Плотнее огонь!',
+    'Сейчас сниму!', 'Прикрываю огнём!', 'Он мой!',
+  ],
+  hit: [
+    'Задело!', 'Я цел!', 'Не дождётесь!', 'Держу позицию!', 'Это всё?',
+    'Босс, я в порядке!', 'Царапина!', 'Отвечаю огнём!', 'Меня прижали!',
+  ],
+  victory: [
+    'Цель снята', 'Готов!', 'Минус один', 'Чисто!', 'Больше не встанет',
+    'Угроза устранена', 'Путь свободен', 'Закончили', 'Кто следующий?',
+  ],
 };
-function _gangSay(m, kind, chance) {
-  if (chance !== undefined && Math.random() > chance) return;
-  const now = performance.now();
-  // Общий кулдаун на болтовню — чтобы отряд не тараторил хором
-  if (now < (m._sayCdUntil || 0)) return;
+let _gangCalmSpeechUntil = 0;
+let _gangCalmSpeakerId = null;
+let _gangNextIdleSpeechAt = performance.now() + 4500 + Math.random() * 3500;
+let _gangLastCombatSpeechAt = 0;
+
+function _gangSay(m, kind, chance = 1, combat = false) {
+  if (!m || m.hp <= 0 || Math.random() > chance) return false;
   const pool = _GANG_PHRASES[kind];
-  if (!pool) return;
-  m._sayText = pool[(Math.random() * pool.length) | 0];
-  m._sayUntil = now + 2200;
-  m._sayCdUntil = now + 6000 + Math.random() * 8000;
+  if (!pool || !pool.length) return false;
+  const now = performance.now();
+  if (now < (combat ? (m._combatSayCdUntil || 0) : (m._calmSayCdUntil || 0))) return false;
+
+  if (!combat) {
+    // Единая очередь мирных фраз для всего отряда.
+    if (now < _gangCalmSpeechUntil && _gangCalmSpeakerId !== m.id) return false;
+  } else {
+    // В бою допускаем перебивки, но не превращаем экран в стену текста.
+    const activeCombat = _myGang.filter(g => g !== m && now < (g._sayUntil || 0) && g._sayCombat).length;
+    if (activeCombat >= 2 || now - _gangLastCombatSpeechAt < 320) return false;
+    _gangLastCombatSpeechAt = now;
+  }
+
+  let text = pool[(Math.random() * pool.length) | 0];
+  if (text === m._lastSayText && pool.length > 1) {
+    text = pool[(pool.indexOf(text) + 1 + ((Math.random() * (pool.length - 1)) | 0)) % pool.length];
+  }
+  m._lastSayText = text;
+  m._sayText = text;
+  m._sayCombat = combat;
+  m._sayUntil = now + (combat ? 1450 + Math.random() * 450 : 2150 + Math.random() * 450);
+  if (combat) m._combatSayCdUntil = now + 2600 + Math.random() * 2600;
+  else m._calmSayCdUntil = now + 7000 + Math.random() * 5000;
+  if (!combat) {
+    _gangCalmSpeakerId = m.id;
+    _gangCalmSpeechUntil = m._sayUntil + 650;
+  }
+  return true;
+}
+
+function _tickGangChatter(now) {
+  if (!_myGang.length || myDead || now < _gangNextIdleSpeechAt) return;
+  const calm = _myGang.filter(g => g.hp > 0 && !g.targetKind && now > (g._threatUntil || 0));
+  _gangNextIdleSpeechAt = now + 6500 + Math.random() * 6500;
+  if (!calm.length) return;
+  const m = calm[(Math.random() * calm.length) | 0];
+  _gangSay(m, m.walkPhase ? 'walk' : 'idle');
 }
 const _GANG_NAMES = [
   'Винни','Тони','Сальваторе','Луиджи','Марко','Коза','Бруно','Кармине','Нико','Рико',
@@ -10101,8 +10174,10 @@ _loadGang();
 // Автоспавн убран — нанимай бойцов вручную у бандитов
 function _gangAlertThreat(r, c, id, kind = null, ref = null) {
   const now = performance.now();
+  const ready = [];
   for (const m of _myGang) {
     if (m.hp <= 0) continue;
+    if (now >= (m._combatSayCdUntil || 0)) ready.push(m);
     m._threatR = r; m._threatC = c;
     m._threatId = id || 'enemy';
     m._threatKind = kind;
@@ -10112,6 +10187,9 @@ function _gangAlertThreat(r, c, id, kind = null, ref = null) {
     // случайную прежнюю цель. На следующем тике она будет разрешена заново.
     m.targetKind = null; m.targetRef = null; m.targetId = null;
   }
+  // Приказ босса подхватывает один случайный боец. Остальные смогут
+  // подключиться своими короткими выкриками уже во время стрельбы.
+  if (ready.length) _gangSay(ready[(Math.random() * ready.length) | 0], 'alert', 0.85, true);
 }
 const GANG_ENGAGE_R = 10;          // радиус, в котором наёмник ищет/держит цель
 const GANG_SHOT_CD_MIN = 1200, GANG_SHOT_CD_RANGE = 600;  // 1200–1800мс между выстрелами
@@ -10239,6 +10317,7 @@ function _gangTargetPos(kind, ref) {
 
 function _updateGang(dt) {
   const now = performance.now();
+  _tickGangChatter(now);
   for (let i = _myGang.length - 1; i >= 0; i--) {
     const m = _myGang[i];
     if (m.hp <= 0) { _myGang.splice(i, 1); continue; }
@@ -10266,9 +10345,6 @@ function _updateGang(dt) {
       m.c += (dc / dist) * spd;
       m.walkPhase += dt * 10;
       m.ang = Math.atan2(dr, dc);
-      // Редкая болтовня на ходу (~0.1%/кадр; реальную частоту режет
-      // общий кулдаун 6-14с в _gangSay)
-      _gangSay(m, 'walk', 0.001);
     } else {
       m.walkPhase = 0;
     }
@@ -10303,7 +10379,10 @@ function _updateGang(dt) {
       const target = others.get(String(m.targetId)) || others.get(m.targetId);
       stillValid = !!(target && !target.dead); if (stillValid) m.targetRef = target;
     }
-    if (!stillValid) { m.targetKind = null; m.targetRef = null; m.targetId = null; }
+    if (!stillValid) {
+      if (m.targetKind) _gangSay(m, 'victory', 0.32, true);
+      m.targetKind = null; m.targetRef = null; m.targetId = null;
+    }
     if (!m.targetKind) {
       // Приказ/защита босса важнее самостоятельного поиска ближайшего врага.
       const found = _resolveGangAlertTarget(m) || _findGangCompanionTarget(m);
@@ -10311,6 +10390,7 @@ function _updateGang(dt) {
         m.targetKind = found.kind;
         m.targetRef  = found.ref;
         m.targetId   = found.id ?? found.ref.id ?? null;
+        _gangSay(m, 'alert', 0.42, true);
       }
     }
     if (!m.targetKind) continue;
@@ -10318,7 +10398,12 @@ function _updateGang(dt) {
     if (!pos) continue;
     const tdr = pos.r - m.r, tdc = pos.c - m.c;
     const tdist = Math.hypot(tdr, tdc);
-    if (tdist > GANG_ENGAGE_R) continue;   // цель ушла далеко — не тащимся за ней силой
+    if (tdist > GANG_ENGAGE_R) {
+      // Не держим в памяти давно ушедшего врага: иначе боец навсегда
+      // считается «в бою» и больше не участвует в мирных разговорах.
+      m.targetKind = null; m.targetRef = null; m.targetId = null;
+      continue;
+    }
     m.ang = Math.atan2(tdr, tdc);
     if (now < (m._nextShootAt || 0)) continue;
     m._nextShootAt = now + GANG_SHOT_CD_MIN + Math.random() * GANG_SHOT_CD_RANGE;
@@ -10331,7 +10416,7 @@ function _updateGang(dt) {
     const muzR = muz.r, muzC = muz.c;
     spawnBullet(muzR, muzC, pos.r, pos.c, { hit: true, fromNpc: true, weapon: m.weapon });
     spawnMuzzle(muzR, muzC, m.ang, m.weapon, true);
-    _gangSay(m, 'shoot', 0.35);
+    _gangSay(m, 'shoot', 0.58, true);
     const dmg = GANG_SHOT_DMG_MIN + Math.floor(Math.random() * GANG_SHOT_DMG_RANGE);
     if (m.targetKind === 'bank_guard') {
       _hitBankGuard(m.targetRef, dirY, dirX, dmg);
@@ -10354,6 +10439,7 @@ function _updateGang(dt) {
     if (Math.random() < 0.25) {
       const retDmg = 5 + Math.floor(Math.random() * 8);
       m.hp -= retDmg;
+      _gangSay(m, 'hit', 0.62, true);
       spawnFloatText(m.r - 0.3, m.c, `−${retDmg}`, { color: '#ff6644', size: 11, life: 800 });
       if (m.hp <= 0) {
         showToast(`💀 ${m.name} погиб!`, '☠️', 2000);
