@@ -36743,7 +36743,17 @@ async function collectJobSalary(){
     try{d=await _jobFetch('collect',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});}
     catch(e){if(!_LOCAL_PREVIEW)throw e;d={ok:true,success:true,pay:Math.round((def.payMin+def.payMax)/2)};}
     if(!d.ok)throw new Error(d.error||'collect');
-    if(d.pay>0){myCash+=+d.pay;updateMoneyHud();spawnFloatText(player.r,player.c,`+$${d.pay}`,{color:'#63ef8a',size:18,life:1800});}
+    if(d.pay>0){
+      // Сервер может вернуть уже сохранённый итоговый баланс. Если пока
+      // возвращает только сумму выплаты — прибавляем её локально. В обоих
+      // случаях синхронизируем QP.cash: именно его проверяют магазины,
+      // квартиры, такси и другие покупки сразу после получения зарплаты.
+      const savedCash=Number(d.cash);
+      myCash=Number.isFinite(savedCash)?savedCash:(myCash+(+d.pay||0));
+      QP.cash=myCash;
+      updateMoneyHud();
+      spawnFloatText(player.r,player.c,`+$${d.pay}`,{color:'#63ef8a',size:18,life:1800});
+    }
     showToast(d.success===false?'Смена сорвалась — выплаты нет':`💵 Зарплата получена: $${d.pay||0}`,'💼',2600);
     _jobState.job='';_jobState.job_started=0;_jobState.duration=3600;
     if(d.cooldown_job&&d.cooldown_until)_jobState.cooldowns[d.cooldown_job]=d.cooldown_until;
