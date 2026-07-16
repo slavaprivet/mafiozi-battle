@@ -32164,7 +32164,7 @@ function render() {
     const e=_policeState.escort;
     if(e.r>=r0&&e.r<r1&&e.c>=c0&&e.c<c1)items.push({depth:e.r+e.c+.00055,draw:()=>{
       const p=w2s(e.r,e.c);drawPerson(p.x,p.y,e.ang||0,e.look||{},e.walkPhase||0,`🔗 ${e.name}`,null,false,e.boss?135:85,e.boss?135:85,false,null,false,false);
-      ctx.save();ctx.strokeStyle='#b8c8dc';ctx.lineWidth=1.4;ctx.setLineDash([3,2]);ctx.beginPath();ctx.moveTo(p.x-5,p.y-17);ctx.lineTo(p.x+5,p.y-17);ctx.stroke();ctx.restore();
+      ctx.save();ctx.strokeStyle='#b8c8dc';ctx.lineWidth=1.4;ctx.setLineDash([3,2]);ctx.beginPath();ctx.moveTo(p.x-5,p.y-17);ctx.lineTo(p.x+5,p.y-17);ctx.stroke();ctx.restore();_drawPoliceEscortCry(e,p);
     }});
   }
   // Наёмники игрока
@@ -36717,12 +36717,24 @@ Object.assign(_BANK_NPC_LOOKS, {
 // Police wanted missions: stealth knockout, cuffs, escort and hand-in.
 const POLICE_MISSION_MAX=3;
 const _policeStoreKey=`mafiozi_police_missions_${QP.uid||'preview'}`;
-let _policeState={missions:[],cuffs:0,escort:null,earnedXp:0,seq:0};
+let _policeState={employed:false,missions:[],cuffs:0,escort:null,earnedXp:0,seq:0};
 const _policeModal=document.getElementById('policeModal'),_policeModalBody=document.getElementById('policeModalBody'),_stealthBtn=document.getElementById('stealthBtn');
 let _policeStealthTarget=null;
 const _POLICE_CRIMINAL_NAMES=['Кривой Макс','Рыжий Боря','Шрам','Филин','Бык','Лом','Седой','Клык','Гвоздь','Чёрный Гена','Малой','Тихоня'];
+const _POLICE_KNOCKOUT_CRIES=['Эй, ты чего?!','За что?!','Башка…','Подло со спины!','Что происходит?!'];
+const _POLICE_ARREST_CRIES=['За что меня?!','Я ни в чём не виноват!','Отпусти, начальник!','Это ошибка!','Да вы знаете, кто я?!','Наручники сними!','Я всё объясню!'];
+const _POLICE_ESCORT_CRIES=['Куда ты меня ведёшь?','Я адвоката требую!','Это подстава!','За что, говорю?!','Я молчать буду!','Начальник, договоримся?','Мне нечего сказать!','Вы ещё пожалеете!'];
+function _policePick(a){return a[(Math.random()*a.length)|0];}
+function _drawPoliceEscortCry(e,p){
+  if(!e||!p||performance.now()>+e.cryUntil)return;const txt=e.cryText||'За что?!',y=p.y-49;
+  ctx.save();ctx.font='bold 10px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';const w=ctx.measureText(txt).width+14;
+  ctx.fillStyle='rgba(82,28,36,.94)';ctx.strokeStyle='#ef8a9a';ctx.lineWidth=1;
+  ctx.beginPath();if(ctx.roundRect)ctx.roundRect(p.x-w/2,y-9,w,18,5);else ctx.rect(p.x-w/2,y-9,w,18);ctx.fill();ctx.stroke();
+  ctx.beginPath();ctx.moveTo(p.x-3,y+9);ctx.lineTo(p.x+1,y+14);ctx.lineTo(p.x+5,y+9);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#fff';ctx.fillText(txt,p.x,y+1);ctx.restore();
+}
 function _savePoliceState(){try{localStorage.setItem(_policeStoreKey,JSON.stringify(_policeState));}catch(e){}}
-function _loadPoliceState(){try{const s=JSON.parse(localStorage.getItem(_policeStoreKey)||'null');if(s&&Array.isArray(s.missions)){const escort=s.escort||null;if(escort){escort._turningIn=false;escort._inside=false;}_policeState={missions:s.missions.slice(0,POLICE_MISSION_MAX),cuffs:Math.max(0,+s.cuffs||0),escort,earnedXp:+s.earnedXp||0,seq:+s.seq||0};}}catch(e){}}
+function _loadPoliceState(){try{const s=JSON.parse(localStorage.getItem(_policeStoreKey)||'null');if(s&&Array.isArray(s.missions)){const escort=s.escort||null;if(escort){escort._turningIn=false;escort._inside=false;}_policeState={employed:!!s.employed,missions:s.missions.slice(0,POLICE_MISSION_MAX),cuffs:Math.max(0,+s.cuffs||0),escort,earnedXp:+s.earnedXp||0,seq:+s.seq||0};}}catch(e){}}
 function _policeMission(id){return _policeState.missions.find(m=>String(m.id)===String(id))||null;}
 function _policeMissionForNpc(n){return n&&_policeState.missions.find(m=>m.status==='hunt'&&String(m.targetId)===String(n._policeTargetId))||null;}
 function _policeSpawnPoint(seed){for(let i=0;i<100;i++){const a=((seed||1)*1.71+i*.83)%6.283,dist=10+(i%11),r=Math.max(2,Math.min(MAP_ROWS-3,player.r+Math.sin(a)*dist)),c=Math.max(2,Math.min(MAP_COLS-3,player.c+Math.cos(a)*dist));if(!inArena(r,c)&&!inLair(r,c)&&npcPassable(r,c))return{r,c};}return{r:Math.max(2,player.r+8),c:Math.max(2,player.c+8)};}
@@ -36734,13 +36746,22 @@ function _spawnPoliceTarget(m){
 }
 function _ensurePoliceTargets(){for(const m of _policeState.missions)_spawnPoliceTarget(m);}
 function _acceptPoliceMission(){
+  if(!_policeState.employed){showToast('Сначала устройся на службу в участке','👮',2200);return;}
   if(_policeState.missions.length>=POLICE_MISSION_MAX){showToast('📋 Можно вести максимум 3 ориентировки','⚠️',2200);return;}
   const boss=Math.random()<.22,id=++_policeState.seq,targetId=`police_criminal_${QP.uid||'p'}_${Date.now()}_${id}`,name=boss?`Босс «${_POLICE_CRIMINAL_NAMES[(Math.random()*_POLICE_CRIMINAL_NAMES.length)|0]}»`:_POLICE_CRIMINAL_NAMES[(Math.random()*_POLICE_CRIMINAL_NAMES.length)|0];
   const look={gender:0,skin:(Math.random()*5)|0,body:boss?4:((Math.random()*3)|0),face:(Math.random()*4)|0,hair:(Math.random()*5)|0,hat:boss?3:((Math.random()*4)|0),suit:boss?'#552047':'#392841'};
-  _policeState.missions.push({id,targetId,name,boss,status:'hunt',rewardCash:boss?1800:550,rewardXp:boss?180:65,look,seed:Date.now()%9973});_policeState.cuffs++;_savePoliceState();_ensurePoliceTargets();renderPoliceModal();showEventBanner('🚔 НОВАЯ ОРИЕНТИРОВКА',`${name}. Выруби со спины, надень наручники и доставь в участок.`,4400,'neutral');
+  _policeState.missions.push({id,targetId,name,boss,status:'hunt',rewardCash:boss?1800:550,rewardXp:boss?180:65,look,seed:Date.now()%9973});_savePoliceState();_ensurePoliceTargets();renderPoliceModal();renderJobStatus();showEventBanner('🚔 НОВАЯ ОРИЕНТИРОВКА',`${name}. Выруби со спины, надень наручники и доставь в участок.`,4400,'neutral');
+}
+function _joinPoliceService(){
+  if(_policeState.employed)return;
+  if(typeof _jobState!=='undefined'&&_jobState.job){showToast('Сначала уволься с текущей работы','💼',2400);return;}
+  _policeState.employed=true;_policeState.cuffs=Math.max(3,_policeState.cuffs);_savePoliceState();renderPoliceModal();renderJobStatus();
+  showEventBanner('👮 ТЫ ПРИНЯТ В ПОЛИЦИЮ','Статус: КОП · выдано 3 пары наручников. Бери ориентировки у дежурного.',4600,'win');
 }
 function renderPoliceModal(){
-  if(!_policeModalBody)return;const active=_policeState.missions;let html=`<div class="police-note">Активно ${active.length}/${POLICE_MISSION_MAX} · наручники: ${_policeState.cuffs}. Подойди к цели со спины и нажми сиреневую кнопку. Оглушение длится 5 секунд.</div>`;
+  if(!_policeModalBody)return;
+  if(!_policeState.employed){_policeModalBody.innerHTML='<div class="police-note">Дежурный: «Работа непростая. Лови бандитов живыми, доставляй сюда — получишь деньги и опыт. Устроишься копом?»</div><div class="police-row"><div><div class="police-name">👮 Служба в полиции</div><div class="police-sub">Статус КОП · 3 пары наручников · до 3 ориентировок</div></div></div><div style="display:flex;gap:8px;margin-top:10px"><button class="police-action" data-police-action="join">✅ Согласиться</button><button class="police-action" data-police-action="decline" style="background:#49384f;border-color:#84618c">Нет, спасибо</button></div>';return;}
+  const active=_policeState.missions;let html=`<div class="police-note">👮 Статус: КОП · активно ${active.length}/${POLICE_MISSION_MAX} · наручники: ${_policeState.cuffs}. Подойди к цели со спины и нажми сиреневую кнопку. Оглушение длится 5 секунд.</div>`;
   if(!active.length)html+='<div class="police-note">Дежурный: «Есть работа. Нужны преступники живыми».</div>';
   html+=active.map(m=>`<div class="police-row ${m.boss?'boss':''}"><div><div class="police-name">${m.boss?'👑':'🎯'} ${m.name}</div><div class="police-sub">${m.status==='cuffed'?'В наручниках · доставь в участок':'Разыскивается'} · $${m.rewardCash} · ${m.rewardXp} XP</div></div><button class="police-action" disabled>${m.status==='cuffed'?'🚓 Конвой':'🔎 Поиск'}</button></div>`).join('');
   html+=`<button class="police-action" data-police-action="take" ${active.length>=POLICE_MISSION_MAX?'disabled':''}>📋 Взять ориентировку (${active.length}/${POLICE_MISSION_MAX})</button>`;_policeModalBody.innerHTML=html;
@@ -36748,16 +36769,16 @@ function renderPoliceModal(){
 function openPoliceDesk(){renderPoliceModal();_policeModal?.classList.add('show');}
 function closePoliceDesk(){_policeModal?.classList.remove('show');}
 function _findPoliceStealthTarget(){
-  if(_buildingInt||_bankInt||myDrivingCarId||myDead||_policeState.escort||_policeState.cuffs<=0)return null;let best=null,bestD=1.7,now=performance.now();
+  if(!_policeState.employed||_buildingInt||_bankInt||myDrivingCarId||myDead||_policeState.escort||_policeState.cuffs<=0)return null;let best=null,bestD=1.7,now=performance.now();
   for(const n of NPCS){if(!n._policeCriminal||n.dead||n._policeCuffed||(n._knockedUntil||0)>now||!_policeMissionForNpc(n))continue;const dr=player.r-n.r,dc=player.c-n.c,d=Math.hypot(dr,dc);if(d>=bestD)continue;const dot=(Math.sin(n.ang||0)*dr+Math.cos(n.ang||0)*dc)/(d||1);if(dot<-.28){best=n;bestD=d;}}
   return best;
 }
 function _updatePoliceStealthButton(){_policeStealthTarget=_findPoliceStealthTarget();_stealthBtn?.classList.toggle('show',!!_policeStealthTarget);}
-function _knockoutPoliceTarget(){const n=_findPoliceStealthTarget();if(!n)return;const now=performance.now();n._knockedUntil=now+5000;n.idleUntil=n._knockedUntil;n.walkPhase=0;n._fighting=false;n._fightingMelee=false;n.hp=Math.max(1,(n.hp||n.max_hp)-8);n.cryText='Что происходит?..';n.cryUntil=now+800;player.ang=Math.atan2(n.r-player.r,n.c-player.c);addShake(1.8);hapticHit();spawnFloatText(n.r,n.c,'ОГЛУШЁН 5 СЕК.',{color:'#dc8cff',size:14,life:1600});showToast('💫 Цель вырублена — успей надеть наручники','🥷',2200);}
+function _knockoutPoliceTarget(){const n=_findPoliceStealthTarget();if(!n)return;const now=performance.now();n._knockedUntil=now+5000;n.idleUntil=n._knockedUntil;n.walkPhase=0;n._fighting=false;n._fightingMelee=false;n.hp=Math.max(1,(n.hp||n.max_hp)-8);n.cryText=_policePick(_POLICE_KNOCKOUT_CRIES);n.cryUntil=now+1700;player.ang=Math.atan2(n.r-player.r,n.c-player.c);addShake(1.8);hapticHit();spawnFloatText(n.r,n.c,'ОГЛУШЁН 5 СЕК.',{color:'#dc8cff',size:14,life:1600});showToast('💫 Цель вырублена — успей надеть наручники','🥷',2200);}
 function _findArrestablePoliceTarget(){if(_policeState.escort)return null;const now=performance.now();let best=null,bestD=2;for(const n of NPCS){if(!n._policeCriminal||n.dead||n._policeCuffed||!(n._knockedUntil>now))continue;const d=Math.hypot(n.r-player.r,n.c-player.c);if(d<bestD){best=n;bestD=d;}}return best;}
 function _arrestPoliceTarget(n){
   if(_policeState.escort){showToast('🚔 Сначала доставь текущего задержанного','⚠️',2200);return;}
-  if(!n||_policeState.cuffs<=0)return;const m=_policeMissionForNpc(n);if(!m)return;_policeState.cuffs--;m.status='cuffed';n._policeCuffed=true;_policeState.escort={missionId:m.id,targetId:m.targetId,name:m.name,boss:m.boss,look:m.look,r:n.r,c:n.c,ang:n.ang||0};const ix=NPCS.indexOf(n);if(ix>=0)NPCS.splice(ix,1);_savePoliceState();showEventBanner('🔗 ПРЕСТУПНИК АРЕСТОВАН',`${m.name} идёт за тобой. Доставь его в полицейский участок.`,4200,'win');
+  if(!n||_policeState.cuffs<=0)return;const m=_policeMissionForNpc(n);if(!m)return;_policeState.cuffs--;m.status='cuffed';n._policeCuffed=true;const now=performance.now();_policeState.escort={missionId:m.id,targetId:m.targetId,name:m.name,boss:m.boss,look:m.look,r:n.r,c:n.c,ang:n.ang||0,cryText:_policePick(_POLICE_ARREST_CRIES),cryUntil:now+2600,_nextCryAt:now+6500};const ix=NPCS.indexOf(n);if(ix>=0)NPCS.splice(ix,1);_savePoliceState();renderJobStatus();showEventBanner('🔗 ПРЕСТУПНИК АРЕСТОВАН',`${m.name}: «${_policeState.escort.cryText}» · доставь его в участок.`,4200,'win');
 }
 function _tickPoliceEscort(dt){
   const e=_policeState.escort;if(!e)return;
@@ -36765,6 +36786,7 @@ function _tickPoliceEscort(dt){
   const inside=_buildingInt&&_buildingInt.type==='police_st';
   if(inside&&!e._inside){e.r=player.r+.7;e.c=player.c+.7;e._inside=true;}
   if(!inside)e._inside=false;
+  const now=performance.now();if(!e._turningIn&&now>(e._nextCryAt||0)){e.cryText=_policePick(_POLICE_ESCORT_CRIES);e.cryUntil=now+2300;e._nextCryAt=now+7500+Math.random()*6500;}
   let tr=player.r+Math.sin(player.ang+Math.PI)*1.1,tc=player.c+Math.cos(player.ang+Math.PI)*1.1,speed=inside?3.4:4.3;
   if(e._turningIn){tr=6.5;tc=(_buildingInt?.W||18)-5+.5;speed=5.4;}
   const dr=tr-e.r,dc=tc-e.c,d=Math.hypot(dr,dc);
@@ -36773,12 +36795,12 @@ function _tickPoliceEscort(dt){
 }
 function _completePoliceEscort(){const e=_policeState.escort;if(!e||e._turningIn)return;e._turningIn=true;e._turningInAt=performance.now();_savePoliceState();showToast('👮 Конвоир принимает задержанного…','🚔',1800);}
 function _finishPoliceEscortReward(){
-  const e=_policeState.escort;if(!e)return;const m=_policeMission(e.missionId);if(!m)return;const cash=m.rewardCash|0,xp=m.rewardXp|0;myCash+=cash;QP.cash=myCash;QP.exp=(+QP.exp||0)+xp;_policeState.earnedXp+=xp;_policeState.missions=_policeState.missions.filter(x=>x.id!==m.id);_policeState.escort=null;_savePoliceState();updateMoneyHud();renderPoliceModal();
+  const e=_policeState.escort;if(!e)return;const m=_policeMission(e.missionId);if(!m)return;const cash=m.rewardCash|0,xp=m.rewardXp|0;myCash+=cash;QP.cash=myCash;QP.exp=(+QP.exp||0)+xp;_policeState.earnedXp+=xp;_policeState.cuffs=Math.min(3,_policeState.cuffs+1);_policeState.missions=_policeState.missions.filter(x=>x.id!==m.id);_policeState.escort=null;_savePoliceState();updateMoneyHud();renderPoliceModal();renderJobStatus();
   spawnFloatText(player.r,player.c,`+$${cash}  +${xp} XP`,{color:'#7dffad',size:19,life:2300});showEventBanner('🏅 ПРЕСТУПНИК СДАН',`${m.name}: награда $${cash} и ${xp} опыта.`,4300,'win');pushFeedEvent('🚔',`${QP.name||'Игрок'} доставил в участок: ${m.name}`,{accent:'#6bb3ff'});
 }
 function _tickPoliceMissions(now){for(const m of _policeState.missions){if(m.status!=='hunt')continue;const n=NPCS.find(x=>x._policeTargetId===m.targetId);if(n&&n.dead&&now-(n.deadAt||now)>1800){const i=NPCS.indexOf(n);if(i>=0)NPCS.splice(i,1);showToast('⚠️ Преступник нужен живым — цель сменила место','🚔',2300);_spawnPoliceTarget(m);}else if(!n)_spawnPoliceTarget(m);}}
 document.getElementById('policeModalClose')?.addEventListener('click',closePoliceDesk);
-_policeModal?.addEventListener('click',e=>{if(e.target===_policeModal)closePoliceDesk();if(e.target.closest('[data-police-action="take"]')&&!e.target.disabled)_acceptPoliceMission();});
+_policeModal?.addEventListener('click',e=>{if(e.target===_policeModal)closePoliceDesk();const a=e.target.closest('[data-police-action]')?.dataset.policeAction;if(a==='take'&&!e.target.disabled)_acceptPoliceMission();else if(a==='join')_joinPoliceService();else if(a==='decline')closePoliceDesk();});
 _stealthBtn?.addEventListener('pointerdown',e=>{e.preventDefault();_knockoutPoliceTarget();});
 _loadPoliceState();setTimeout(_ensurePoliceTargets,1200);
 
@@ -36830,6 +36852,9 @@ async function loadJobState(){
 function renderJobStatus(){
   const nm=document.getElementById('jobStatusName'),sub=document.getElementById('jobStatusSub'),tm=document.getElementById('jobStatusTimer');
   if(!nm||!sub||!tm)return;
+  const title=_jobStatusHud?.querySelector('.js-title span');
+  if(_policeState.employed){if(title)title.textContent='👮 Служба';_jobStatusHud&&_jobStatusHud.classList.add('ready');nm.textContent='КОП';tm.textContent='НА СЛУЖБЕ';sub.textContent=`Наручники ${_policeState.cuffs}/3 · ориентировки ${_policeState.missions.length}/3`;return;}
+  if(title)title.textContent='💼 Работа';
   const def=_jobDef(_jobState.job),left=_jobRemaining(),ready=!!def&&left<=0;
   _jobStatusHud&&_jobStatusHud.classList.toggle('ready',ready);
   if(!def){nm.textContent='Не трудоустроен';sub.textContent='Устроиться: Биржа труда (36, 16)';tm.textContent='СВОБОДЕН';return;}
@@ -36838,6 +36863,7 @@ function renderJobStatus(){
 }
 function renderJobModal(){
   if(!_jobModalBody)return;
+  if(_policeState.employed){_jobModalBody.innerHTML='<div class="job-note">Ты уже служишь в полиции. Статус: КОП. Ориентировки выдаёт дежурный в полицейском участке.</div>';return;}
   const def=_jobDef(_jobState.job),left=_jobRemaining();
   if(def){
     const ready=left<=0;
@@ -36853,7 +36879,7 @@ function renderJobModal(){
 function openJobOffice(){renderJobModal();_jobModal&&_jobModal.classList.add('show');}
 function closeJobOffice(){_jobModal&&_jobModal.classList.remove('show');}
 async function takeJobAtOffice(id){
-  const def=_jobDef(id);if(!def||_jobBusy||_jobState.job)return;if(!_atJobManager()){showToast('Подойди к менеджеру Биржи труда','💼',1700);closeJobOffice();return;}_jobBusy=true;renderJobModal();
+  const def=_jobDef(id);if(_policeState.employed){showToast('Ты уже служишь копом','👮',1900);return;}if(!def||_jobBusy||_jobState.job)return;if(!_atJobManager()){showToast('Подойди к менеджеру Биржи труда','💼',1700);closeJobOffice();return;}_jobBusy=true;renderJobModal();
   try{
     let d;
     try{d=await _jobFetch('take',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});}
@@ -37754,7 +37780,7 @@ function _drawPoliceStationInterior(bi) {
     items.push({d:_policeState.escort.r+_policeState.escort.c+.45,fn:()=>{
       const e=_policeState.escort,p=w2s(e.r+.5,e.c+.5);
       drawPerson(p.x,p.y,e.ang||0,e.look||{},e.walkPhase||0,`🔗 ${e.name}`,null,false,e.boss?135:85,e.boss?135:85,false,null,false,false);
-      ctx.save();ctx.strokeStyle='#c8d4e8';ctx.lineWidth=1.5;ctx.setLineDash([3,2]);ctx.beginPath();ctx.moveTo(p.x-5,p.y-18);ctx.lineTo(p.x+5,p.y-18);ctx.stroke();ctx.restore();
+      ctx.save();ctx.strokeStyle='#c8d4e8';ctx.lineWidth=1.5;ctx.setLineDash([3,2]);ctx.beginPath();ctx.moveTo(p.x-5,p.y-18);ctx.lineTo(p.x+5,p.y-18);ctx.stroke();ctx.restore();_drawPoliceEscortCry(e,p);
     }});
   }
   items.push({ d: player.r + player.c + .5, fn: () => {
