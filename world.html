@@ -3096,6 +3096,7 @@ let _inventoryItems = [];
 let _myC4Count = 0;
 const worldC4Charges = new Map(); // id → {x,y,ownerUid,ownerName,expiresAt}
 const districtBossCashDrops = new Map(); // общий серверный дроп $200 с боссов районов
+const gangAmmoDrops = new Map(); // физические пачки патронов с убитых бандитов
 let _lastWorldC4PlantAt = 0;
 let _goodName=0, _lostReturns=0, _returnStreak=0;
 const _previewFoundKey = `mafiozi_found_items_${QP.uid || 'demo'}`;
@@ -14094,6 +14095,13 @@ function handleEventPacket(d) {
     }else{
       pushFeedEvent('💰',`${d.picker_name||'Игрок'} подобрал $${d.amount||200} с босса района`,{accent:'#ffd34e'});
     }
+  } else if (kind === 'gang_ammo_picked') {
+    gangAmmoDrops.delete(String(d.loot_id||''));
+    if(String(d.picker_uid)===String(QP.uid)){
+      const added=addAmmoPack(String(d.ammo_type||'9mm'),+d.rounds||0);
+      const label=AMMO_TYPES[d.ammo_type]?.label||d.ammo_type||'патроны';
+      showToast(added>0?`Подобрано: ${label} +${added}`:`Запас ${label} уже полный`,'📦',2200);
+    }
   } else if (kind === 'district_operation_setback') {
     if (String(d.by_uid) === String(QP.uid)) {
       showEventBanner('💼 Сейф выпал', 'Он лежит на земле. Любой игрок может подойти и перехватить его.', 4000, 'lose');
@@ -14794,12 +14802,20 @@ function wsConnect() {
           });
         }
         const lootFresh=new Set();
+        const ammoFresh=new Set();
         for(const q of ((d.districts&&d.districts.loot)||[])){
-          const id=String(q.id||'');if(!id)continue;lootFresh.add(id);
-          districtBossCashDrops.set(id,{id,did:String(q.did||''),x:+q.x||0,y:+q.y||0,
-            amount:+q.amount||200,expiresAt:performance.now()+Math.max(0,+q.expires_in||0)*1000});
+          const id=String(q.id||'');if(!id)continue;
+          if(q.kind==='ammo'){
+            ammoFresh.add(id);gangAmmoDrops.set(id,{id,x:+q.x||0,y:+q.y||0,
+              ammoType:String(q.ammo_type||'9mm'),rounds:+q.rounds||0,
+              expiresAt:performance.now()+Math.max(0,+q.expires_in||0)*1000});
+          }else{
+            lootFresh.add(id);districtBossCashDrops.set(id,{id,did:String(q.did||''),x:+q.x||0,y:+q.y||0,
+              amount:+q.amount||200,expiresAt:performance.now()+Math.max(0,+q.expires_in||0)*1000});
+          }
         }
         for(const id of Array.from(districtBossCashDrops.keys()))if(!lootFresh.has(id))districtBossCashDrops.delete(id);
+        for(const id of Array.from(gangAmmoDrops.keys()))if(!ammoFresh.has(id))gangAmmoDrops.delete(id);
       }
     } else if (pkt.t === 'event') {
       handleEventPacket(pkt.d || {});
@@ -18037,13 +18053,17 @@ function _renderShopItems() {
   _shopList.innerHTML = items.map(it => {
     const weaponId = it.type === 'weapon' ? resolveWeapon(it.id) : null;
     const owned = !!weaponId && _myWeapons.some(w => w.id === weaponId);
+    const ammoDef = it.type==='ammo' ? AMMO_TYPES[it.ammoType] : null;
+    const ammoNow = ammoDef ? Math.max(0,+_ammoState.reserve[it.ammoType]||0) : 0;
+    const ammoFull = !!ammoDef && ammoNow>=ammoDef.max;
     const stat = weaponId ? weaponStatLine(weaponId)
+      : ammoDef ? `${it.desc} · запас ${ammoNow}/${ammoDef.max}`
       : it.atk ? `+${it.atk} атк` : it.def ? `+${it.def} защ` : it.desc;
-    const canBuy = !owned && myCash >= it.price;
+    const canBuy = !owned && !ammoFull && myCash >= it.price;
     return `<div class="shop-item">
       <div class="pic">${it.pic}</div>
       <div class="info"><div class="name">${it.name}</div><div class="desc">${stat} — ${it.price}$</div></div>
-      <button class="buy" data-id="${it.id}" ${canBuy ? '' : 'disabled style="opacity:.55;cursor:default"'}>${owned ? 'Куплено' : canBuy ? 'Купить' : 'Нет $'}</button>
+      <button class="buy" data-id="${it.id}" ${canBuy ? '' : 'disabled style="opacity:.55;cursor:default"'}>${owned ? 'Куплено' : ammoFull ? 'Полный запас' : canBuy ? 'Купить' : 'Нет $'}</button>
     </div>`;
   }).join('');
 }
@@ -18103,6 +18123,11 @@ async function _sellFoundItem(itemId) {
 }
 async function _buyShopItem(itemId) {
   if (!QP.api || !QP.uid) { showToast('Нет связи с сервером', '❌', 1500); return; }
+  const wanted=_SHOP_ITEMS.find(it=>it.id===itemId);
+  if(wanted?.type==='ammo'){
+    const def=AMMO_TYPES[wanted.ammoType],now=Math.max(0,+_ammoState.reserve[wanted.ammoType]||0);
+    if(def&&now>=def.max){showToast(`Запас ${def.label} уже полный`,'📦',1500);return;}
+  }
   try {
     const r = await fetch(`${QP.api}/shop/${QP.uid}/buy`, {
       method: 'POST', headers: {'Content-Type':'application/json'},
@@ -18117,8 +18142,8 @@ async function _buyShopItem(itemId) {
         updateMoneyHud();
       }
       if (bought && bought.type === 'ammo') {
-        addAmmoPack(bought.ammoType, bought.rounds);
-        showToast(`${bought.name}: +${bought.rounds}`, '📦', 1600);
+        const added=addAmmoPack(bought.ammoType, bought.rounds);
+        showToast(`${bought.name}: +${added}`, '📦', 1600);
       } else if (bought && bought.type === 'consumable') {
         await loadInventoryItems();
         showToast(bought.id==='c4' ? `${bought.name} куплен. В наличии: ${_myC4Count}` : `${bought.name} куплен`, bought.pic, 1900);
@@ -18442,14 +18467,14 @@ let currentWeapon = (QP.weapon || 'pistol');
 // Запас общий для оружия одного калибра, магазин хранится отдельно для
 // каждого ствола. Состояние сохраняется локально между входами в WebApp.
 const AMMO_TYPES = {
-  '9mm':    { label:'9 мм',             shopId:'ammo_9mm',    pack:60, price:120, start:150 },
-  magnum:   { label:'.357 Magnum',      shopId:'ammo_magnum', pack:24, price:180, start:48  },
-  shell:    { label:'12 калибр',        shopId:'ammo_shell',  pack:24, price:160, start:36  },
-  rifle:    { label:'5.56 мм',          shopId:'ammo_rifle',  pack:60, price:260, start:120 },
-  sniper:   { label:'7.62 снайперские', shopId:'ammo_sniper', pack:15, price:300, start:20  },
-  rocket:   { label:'РПГ-заряд',        shopId:'ammo_rocket', pack:3,  price:650, start:3   },
+  '9mm':    { label:'9 мм',             shopId:'ammo_9mm',    pack:60, price:120, start:36, max:240 },
+  magnum:   { label:'.357 Magnum',      shopId:'ammo_magnum', pack:24, price:180, start:12, max:72  },
+  shell:    { label:'12 калибр',        shopId:'ammo_shell',  pack:24, price:160, start:12, max:72  },
+  rifle:    { label:'5.56 мм',          shopId:'ammo_rifle',  pack:60, price:260, start:30, max:180 },
+  sniper:   { label:'7.62 снайперские', shopId:'ammo_sniper', pack:15, price:300, start:5,  max:30  },
+  rocket:   { label:'РПГ-заряд',        shopId:'ammo_rocket', pack:3,  price:650, start:1,  max:6   },
 };
-const _ammoSaveKey = `mafiozi_weapon_ammo_v1_${QP.uid || 'guest'}`;
+const _ammoSaveKey = `mafiozi_weapon_ammo_v2_${QP.uid || 'guest'}`;
 let _ammoState = { reserve:{}, mags:{} };
 // Локальное превью — оружейный стенд для проверки всех поз и эффектов.
 // На реальном хосте состав арсенала по-прежнему приходит из инвентаря игрока.
@@ -18460,6 +18485,7 @@ try {
 } catch(e) {}
 for (const [ammoType, def] of Object.entries(AMMO_TYPES)) {
   if (!Number.isFinite(+_ammoState.reserve[ammoType])) _ammoState.reserve[ammoType] = def.start;
+  _ammoState.reserve[ammoType] = Math.max(0, Math.min(def.max, +_ammoState.reserve[ammoType] || 0));
 }
 function _weaponAmmoState(weapon) {
   const id = resolveWeapon(weapon);
@@ -18473,13 +18499,7 @@ function _weaponAmmoState(weapon) {
 function _saveAmmoState() {
   try { localStorage.setItem(_ammoSaveKey, JSON.stringify(_ammoState)); } catch(e) {}
 }
-if (_localWeaponShowcase) {
-  for (const [id, cfg] of Object.entries(WEAPON_FX_CFG)) {
-    _ammoState.mags[id] = { mag: cfg.magSize || 1 };
-    _ammoState.reserve[cfg.ammoType] = Math.max(999, +_ammoState.reserve[cfg.ammoType] || 0);
-  }
-  _saveAmmoState();
-}
+_saveAmmoState();
 let _reloadWeapon = null, _reloadUntil = 0, _reloadTicker = 0, _emptyAmmoToastAt = 0;
 function _isReloadingWeapon(weapon) {
   return !!_reloadWeapon && _reloadWeapon === resolveWeapon(weapon) && performance.now() < _reloadUntil;
@@ -18586,9 +18606,12 @@ function _spendWeaponRound() {
   return true;
 }
 function addAmmoPack(ammoType, rounds) {
-  if (!AMMO_TYPES[ammoType]) return;
-  _ammoState.reserve[ammoType] = Math.max(0, +_ammoState.reserve[ammoType] || 0) + Math.max(0, +rounds || 0);
+  const def=AMMO_TYPES[ammoType];
+  if (!def) return 0;
+  const before=Math.max(0,+_ammoState.reserve[ammoType]||0);
+  _ammoState.reserve[ammoType]=Math.min(def.max,before+Math.max(0,+rounds||0));
   _saveAmmoState(); renderWeaponHud();
+  return _ammoState.reserve[ammoType]-before;
 }
 
 // Найти ближайшую живую цель конвоя в радиусе огня. Используется как
@@ -34918,6 +34941,24 @@ function drawDistrictBossCashDrops(r0,r1,c0,c1){
   }
   ctx.textAlign='left';
 }
+function drawGangAmmoDrops(r0,r1,c0,c1){
+  const now=performance.now();
+  for(const q of gangAmmoDrops.values()){
+    if(q.y<r0-3||q.y>r1+3||q.x<c0-3||q.x>c1+3)continue;
+    const p=w2s(q.y+.5,q.x+.5),bob=Math.sin(now*.007+q.x)*2;
+    ctx.save();ctx.translate(p.x,p.y-8+bob);ctx.textAlign='center';
+    ctx.shadowColor='#ffd34e';ctx.shadowBlur=11;
+    ctx.fillStyle='#3a3020';ctx.strokeStyle='#ffcf55';ctx.lineWidth=2;
+    ctx.beginPath();ctx.roundRect(-15,-9,30,18,4);ctx.fill();ctx.stroke();
+    ctx.shadowBlur=0;ctx.fillStyle='#f4c84c';
+    for(let i=0;i<5;i++){ctx.fillRect(-10+i*5,-5,2,10);ctx.fillStyle=i%2?'#ffe99a':'#f4c84c';}
+    const label=AMMO_TYPES[q.ammoType]?.label||q.ammoType;
+    ctx.font='900 10px system-ui,sans-serif';ctx.lineWidth=4;ctx.strokeStyle='rgba(0,0,0,.85)';
+    ctx.strokeText(`${label} +${q.rounds}`,0,-16);ctx.fillStyle='#ffe78a';ctx.fillText(`${label} +${q.rounds}`,0,-16);
+    ctx.restore();
+  }
+  ctx.textAlign='left';
+}
 function drawDistrictPowerNode(d,point,index,state,active,pulse){
   const p=w2s(point.r+.5,point.c+.5);
   const now=performance.now();
@@ -35006,6 +35047,7 @@ function drawDistrictOperationTargets(r0, r1, c0, c1) {
   const pulse = 0.72 + Math.abs(Math.sin(performance.now() * 0.005)) * 0.28;
   drawWorldC4Charges(r0,r1,c0,c1);
   drawDistrictBossCashDrops(r0,r1,c0,c1);
+  drawGangAmmoDrops(r0,r1,c0,c1);
   for (const d of DISTRICTS) {
     if (!d.capturable) continue;
     const owner = districtOwners[d.id];
