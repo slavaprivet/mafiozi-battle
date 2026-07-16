@@ -9943,11 +9943,12 @@ function _drawGasSigns(r0, c0, r1, c1) {
     const baseX = p.x, baseY = p.y + 4;
     const poleH = 70;
     const topY = baseY - poleH;
-    // Столб тотема
-    ctx.fillStyle = '#565c64';
-    ctx.fillRect(baseX - 2.5, topY, 5, poleH);
-    ctx.fillStyle = 'rgba(255,255,255,.22)';
-    ctx.fillRect(baseX - 2.5, topY, 1.5, poleH);
+    // Тяжёлое бетонное основание и гранёная металлическая стойка.
+    ctx.fillStyle='rgba(0,0,0,.28)';ctx.beginPath();ctx.ellipse(baseX+3,baseY+2,12,4,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#8b8e8b';ctx.beginPath();ctx.moveTo(baseX-7,baseY);ctx.lineTo(baseX,baseY-4);ctx.lineTo(baseX+9,baseY);ctx.lineTo(baseX+2,baseY+4);ctx.closePath();ctx.fill();
+    const poleG=ctx.createLinearGradient(baseX-3,0,baseX+4,0);poleG.addColorStop(0,'#33383b');poleG.addColorStop(.5,'#a3aaad');poleG.addColorStop(1,'#42484c');
+    ctx.fillStyle=poleG;ctx.fillRect(baseX-3,topY,6,poleH);
+    ctx.strokeStyle='rgba(20,25,27,.6)';ctx.lineWidth=1;ctx.strokeRect(baseX-3,topY,6,poleH);
     // Табло
     const W = 54, H = 42;
     const bx = baseX - W / 2, by = topY - H + 6;
@@ -9966,12 +9967,13 @@ function _drawGasSigns(r0, c0, r1, c1) {
     ctx.beginPath(); ctx.roundRect(bx + 2.5, by + 2.5, W - 5, H - 5, 5); ctx.stroke();
     // Содержимое
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.font = '17px "Segoe UI Emoji", system-ui, sans-serif';
-    ctx.fillText('⛽', baseX, by + 13);
+    ctx.fillStyle='#e53930';ctx.beginPath();ctx.arc(baseX,by+10,6,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#fff0d0';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(baseX,by+10,3.1,0,Math.PI*2);ctx.stroke();
     ctx.font = 'bold 9px system-ui, sans-serif'; ctx.fillStyle = '#7eff9a';
-    ctx.fillText('ЗАПРАВКА', baseX, by + 27);
-    ctx.font = '7px system-ui, sans-serif'; ctx.fillStyle = '#f0d060';
-    ctx.fillText('Топливо $5/ед', baseX, by + 36);
+    ctx.fillText('АЗС 24/7', baseX, by + 22);
+    ctx.fillStyle='rgba(255,255,255,.11)';ctx.fillRect(bx+6,by+27,W-12,9);
+    ctx.font = 'bold 7px ui-monospace, monospace'; ctx.fillStyle = '#f7d65f';
+    ctx.fillText('95  •  $5.00', baseX, by + 32);
     ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   }
 }
@@ -31959,26 +31961,39 @@ function render() {
         const damageState = _gasStationState(gs);
         const ruined = damageState === 'burning' || damageState === 'extinguished';
         const leaking = damageState === 'leaking' && gs._damagedPump === pumpIndex;
-        // Тень
-        ctx.fillStyle = 'rgba(0,0,0,.35)';
-        ctx.beginPath(); ctx.ellipse(sx, sy + 1, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
-        const pg = ctx.createLinearGradient(sx - 7, 0, sx + 7, 0);
-        pg.addColorStop(0, ruined ? '#171514' : leaking ? '#641c18' : '#c02820');
-        pg.addColorStop(0.5, ruined ? '#34302d' : leaking ? '#a83228' : '#ff6050');
-        pg.addColorStop(1, ruined ? '#0d0c0b' : leaking ? '#48100e' : '#a01818');
-        ctx.fillStyle = pg;
-        ctx.beginPath(); ctx.roundRect(sx - 7, sy - 24, 14, 22, 2); ctx.fill();
-        ctx.strokeStyle = '#701414'; ctx.lineWidth = 1; ctx.strokeRect(sx - 7, sy - 24, 14, 22);
-        // Экран
-        ctx.fillStyle = '#0a1014'; ctx.fillRect(sx - 5, sy - 21, 10, 7);
-        ctx.fillStyle = ruined ? '#24150f' : leaking ? '#ff5b22' : '#00e8ff'; ctx.fillRect(sx - 4, sy - 20, 8, 5);
-        ctx.font = 'bold 4px system-ui'; ctx.fillStyle = '#062e34'; ctx.textAlign = 'center';
-        ctx.fillText('$5', sx, sy - 16);
-        // Шланг + пистолет
-        ctx.strokeStyle = '#3a3a3a'; ctx.lineWidth = 2.4; ctx.lineCap = 'round';
-        ctx.beginPath(); ctx.moveTo(sx + 7, sy - 15);
-        ctx.bezierCurveTo(sx + 15, sy - 10, sx + 11, sy + 2, sx + 5, sy + 4); ctx.stroke();
-        ctx.fillStyle = '#2a2a2a'; ctx.fillRect(sx + 2, sy + 2, 6, 4);
+        const front = ruined ? '#302b28' : leaking ? '#a83328' : '#e44738';
+        const side  = ruined ? '#171514' : leaking ? '#591612' : '#98251f';
+        // Тень и бетонный островок — ромб совпадает с перспективой тайлов.
+        ctx.fillStyle = 'rgba(0,0,0,.32)';
+        ctx.beginPath(); ctx.ellipse(sx + 2, sy + 2, 13, 5, -.05, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#b8b7ae';
+        ctx.beginPath(); ctx.moveTo(sx-11,sy-3);ctx.lineTo(sx-2,sy-7);ctx.lineTo(sx+13,sy);ctx.lineTo(sx+4,sy+5);ctx.closePath();ctx.fill();
+        ctx.strokeStyle='#686966';ctx.lineWidth=1;ctx.stroke();
+        // Корпус: фронт, боковая грань и металлическая крышка.
+        ctx.fillStyle = front;
+        ctx.beginPath();ctx.moveTo(sx-8,sy-29);ctx.lineTo(sx+6,sy-29);ctx.lineTo(sx+6,sy-5);ctx.lineTo(sx-8,sy-5);ctx.closePath();ctx.fill();
+        ctx.fillStyle = side;
+        ctx.beginPath();ctx.moveTo(sx+6,sy-29);ctx.lineTo(sx+11,sy-32);ctx.lineTo(sx+11,sy-8);ctx.lineTo(sx+6,sy-5);ctx.closePath();ctx.fill();
+        ctx.fillStyle = ruined ? '#49423e' : '#f5eee1';
+        ctx.beginPath();ctx.moveTo(sx-8,sy-29);ctx.lineTo(sx-3,sy-32);ctx.lineTo(sx+11,sy-32);ctx.lineTo(sx+6,sy-29);ctx.closePath();ctx.fill();
+        ctx.strokeStyle = ruined ? '#151311' : '#6e211d'; ctx.lineWidth = 1; ctx.stroke();
+        // Утопленный экран, счётчик литров и три кнопки сорта топлива.
+        ctx.fillStyle='#1a2022';ctx.fillRect(sx-6,sy-26,10,8);
+        ctx.fillStyle = ruined ? '#35231d' : leaking ? '#ff7b32' : '#8fe9d7';ctx.fillRect(sx-5,sy-25,8,5);
+        ctx.font='bold 4px system-ui';ctx.fillStyle=ruined?'#7b5b4b':'#183838';ctx.textAlign='center';
+        ctx.fillText('5.00',sx-1,sy-21);
+        const grades=['#4cac5a','#e5c34c','#425f94'];
+        for(let gi=0;gi<3;gi++){ctx.fillStyle=ruined?'#3b3531':grades[gi];ctx.beginPath();ctx.roundRect(sx-6+gi*3.4,sy-15,2.5,3,0.6);ctx.fill();}
+        ctx.fillStyle=ruined?'#78685d':'#f5e6cf';ctx.font='bold 4px system-ui';ctx.fillText('95',sx-1,sy-9);
+        // Шланг закреплён на боковой грани; пистолет висит в держателе.
+        ctx.strokeStyle = ruined ? '#191715' : '#24282a'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+        ctx.beginPath();ctx.moveTo(sx+9,sy-25);ctx.bezierCurveTo(sx+18,sy-22,sx+17,sy-7,sx+10,sy-5);ctx.stroke();
+        ctx.fillStyle=ruined?'#27211e':'#303538';
+        ctx.beginPath();ctx.roundRect(sx+7,sy-18,4,9,1);ctx.fill();
+        ctx.strokeStyle=ruined?'#55362d':'#f0c63a';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(sx+8,sy-15);ctx.lineTo(sx+12,sy-12);ctx.stroke();
+        // Защитные жёлтые отбойники у каждой колонки.
+        ctx.strokeStyle=ruined?'#57472a':'#f2c52d';ctx.lineWidth=2;
+        ctx.beginPath();ctx.moveTo(sx-12,sy-1);ctx.lineTo(sx-12,sy-11);ctx.moveTo(sx+14,sy+1);ctx.lineTo(sx+14,sy-8);ctx.stroke();
       };
 
       // Угловые точки бетонной площадки (≈4×4 тайла вокруг АЗС)
@@ -31998,6 +32013,16 @@ function render() {
       ctx.moveTo(F_A.x, F_A.y); ctx.lineTo(F_B.x, F_B.y);
       ctx.lineTo(F_C.x, F_C.y); ctx.lineTo(F_D.x, F_D.y); ctx.closePath(); ctx.fill();
       ctx.strokeStyle = 'rgba(240,200,40,.5)'; ctx.lineWidth = 2; ctx.stroke();
+      // Швы бетонных плит и небольшие следы эксплуатации добавляют масштаб,
+      // но остаются под объектами и не спорят с дорожной разметкой.
+      ctx.strokeStyle='rgba(210,215,220,.13)';ctx.lineWidth=1;
+      for(const fr of [.25,.5,.75]){
+        const l1={x:F_A.x+(F_D.x-F_A.x)*fr,y:F_A.y+(F_D.y-F_A.y)*fr};
+        const l2={x:F_B.x+(F_C.x-F_B.x)*fr,y:F_B.y+(F_C.y-F_B.y)*fr};
+        ctx.beginPath();ctx.moveTo(l1.x,l1.y);ctx.lineTo(l2.x,l2.y);ctx.stroke();
+      }
+      ctx.fillStyle='rgba(9,12,14,.18)';
+      ctx.beginPath();ctx.ellipse(p.x+16,p.y+7,10,3.5,-.08,0,Math.PI*2);ctx.fill();
       // Разметка въезда (полосы вдоль ближней грани)
       ctx.strokeStyle = 'rgba(240,200,40,.35)'; ctx.lineWidth = 1.3; ctx.setLineDash([5, 4]);
       for (const fr of [0.32, 0.5, 0.68]) {
@@ -32026,19 +32051,31 @@ function render() {
       ctx.lineTo(shopG.x + shopW / 2, shopG.y - shopH);
       ctx.lineTo(shopG.x + shopW / 2 + shopD, shopG.y - shopH - shopD * 0.5);
       ctx.lineTo(shopG.x - shopW / 2 + shopD, shopG.y - shopH - shopD * 0.5); ctx.closePath(); ctx.fill();
-      // Витрина (стекло)
-      ctx.fillStyle = 'rgba(120,200,230,.7)';
-      ctx.fillRect(shopG.x - shopW / 2 + 3, shopG.y - shopH + 5, shopW - 6, shopH - 12);
-      ctx.strokeStyle = '#6a7278'; ctx.lineWidth = 1;
-      ctx.strokeRect(shopG.x - shopW / 2 + 3, shopG.y - shopH + 5, shopW - 6, shopH - 12);
+      // Толстый карниз делает магазин частью той же изометрической массы.
+      ctx.fillStyle='#b62924';ctx.fillRect(shopG.x-shopW/2-1,shopG.y-shopH-1,shopW+3,5);
+      ctx.fillStyle='#7e1d1b';ctx.beginPath();ctx.moveTo(shopG.x+shopW/2+2,shopG.y-shopH-1);ctx.lineTo(shopG.x+shopW/2+shopD+2,shopG.y-shopH-shopD*.5-1);ctx.lineTo(shopG.x+shopW/2+shopD+2,shopG.y-shopH-shopD*.5+4);ctx.lineTo(shopG.x+shopW/2+2,shopG.y-shopH+4);ctx.closePath();ctx.fill();
+      // Витрина с глубиной, рамами и силуэтами полок внутри.
+      const winX=shopG.x-shopW/2+3,winY=shopG.y-shopH+6,winW=shopW-6,winH=shopH-13;
+      const wg=ctx.createLinearGradient(winX,winY,winX,winY+winH);
+      wg.addColorStop(0,'rgba(86,156,184,.92)');wg.addColorStop(.55,'rgba(43,89,108,.92)');wg.addColorStop(1,'rgba(19,39,48,.96)');
+      ctx.fillStyle=wg;ctx.fillRect(winX,winY,winW,winH);
+      ctx.fillStyle='rgba(255,226,138,.32)';ctx.fillRect(winX+2,winY+3,winW-4,2);
+      ctx.strokeStyle='#606a70';ctx.lineWidth=1;ctx.strokeRect(winX,winY,winW,winH);
+      for(const wx of [winX+7,winX+winW-7]){ctx.beginPath();ctx.moveTo(wx,winY);ctx.lineTo(wx,winY+winH);ctx.stroke();}
+      ctx.strokeStyle='rgba(236,195,89,.4)';ctx.beginPath();ctx.moveTo(winX+2,winY+winH-4);ctx.lineTo(winX+winW-2,winY+winH-4);ctx.stroke();
       // Дверь магазина
       ctx.fillStyle = '#2a3236';
       ctx.fillRect(shopG.x - 4, shopG.y - 12, 8, 12);
+      ctx.fillStyle='rgba(102,184,212,.72)';ctx.fillRect(shopG.x-3,shopG.y-10,6,7);
+      ctx.fillStyle='#f3cc4a';ctx.beginPath();ctx.arc(shopG.x+2,shopG.y-4,1,0,Math.PI*2);ctx.fill();
       // Вывеска SHOP над витриной
       ctx.fillStyle = '#1a8a3a';
       ctx.fillRect(shopG.x - shopW / 2 + 3, shopG.y - shopH, shopW - 6, 5);
       ctx.font = 'bold 5px system-ui'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
-      ctx.fillText('SHOP', shopG.x, shopG.y - shopH + 4);
+      ctx.fillText('24 / 7', shopG.x, shopG.y - shopH + 4);
+      // Кондиционер и вентиляция на боковой стене.
+      ctx.fillStyle='#c4cbd0';ctx.beginPath();ctx.moveTo(shopG.x+shopW/2+6,shopG.y-shopH+7);ctx.lineTo(shopG.x+shopW/2+13,shopG.y-shopH+3.5);ctx.lineTo(shopG.x+shopW/2+13,shopG.y-shopH+10);ctx.lineTo(shopG.x+shopW/2+6,shopG.y-shopH+13.5);ctx.closePath();ctx.fill();
+      ctx.strokeStyle='#687177';ctx.lineWidth=.8;for(let ai=0;ai<3;ai++){ctx.beginPath();ctx.moveTo(shopG.x+shopW/2+8+ai*1.6,shopG.y-shopH+7);ctx.lineTo(shopG.x+shopW/2+8+ai*1.6,shopG.y-shopH+11);ctx.stroke();}
 
       // ── Топливные колонки под навесом (2 шт) ──
       _drawPump(w2s(gs.r + 0.4, gs.c + 0.2).x, w2s(gs.r + 0.4, gs.c + 0.2).y, 0);
@@ -32053,10 +32090,11 @@ function render() {
       const canH = isoH(2.7);
       // Колонны (от земли до навеса) — 4 шт
       for (const cc of [cA, cB, cC, cD]) {
-        ctx.fillStyle = '#b0b4ba';
-        ctx.fillRect(cc.x - 2.5, cc.y - canH, 5, canH);
-        ctx.fillStyle = 'rgba(255,255,255,.25)';
-        ctx.fillRect(cc.x - 2.5, cc.y - canH, 1.5, canH);
+        ctx.fillStyle='rgba(0,0,0,.24)';ctx.beginPath();ctx.ellipse(cc.x+2,cc.y+1,6,2.5,0,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='#d0d2d0';ctx.fillRect(cc.x-3,cc.y-canH,4,canH);
+        ctx.fillStyle='#858b8e';ctx.beginPath();ctx.moveTo(cc.x+1,cc.y-canH);ctx.lineTo(cc.x+4,cc.y-canH-2);ctx.lineTo(cc.x+4,cc.y-2);ctx.lineTo(cc.x+1,cc.y);ctx.closePath();ctx.fill();
+        ctx.fillStyle='#f0f0e9';ctx.fillRect(cc.x-3,cc.y-canH,1.2,canH);
+        ctx.fillStyle='#d0b53c';ctx.beginPath();ctx.moveTo(cc.x-5,cc.y-2);ctx.lineTo(cc.x,cc.y-5);ctx.lineTo(cc.x+6,cc.y-2);ctx.lineTo(cc.x+1,cc.y+1);ctx.closePath();ctx.fill();
       }
       // ── Пульсирующий контур зоны ──────────────────────────────
       const distToGs = Math.hypot(player.r - gs.r, player.c - gs.c);
@@ -32083,14 +32121,23 @@ function render() {
       const canH = isoH(2.7);
       const underCanopy = Math.hypot(player.r - gs.r - 0.6, player.c - gs.c - 0.6) < 2.8;
       ctx.save();
-      ctx.globalAlpha = underCanopy ? 0.25 : 0.55;
-      const fasc = 7;
-      ctx.fillStyle = '#b81818';
+      // Вдали крыша должна читаться как настоящий навес. Призрачной она
+      // становится только когда реально перекрывает игрока.
+      ctx.globalAlpha = underCanopy ? 0.30 : 0.94;
+      const fasc = 8;
+      ctx.fillStyle = '#8f1818';
       for (const [e1, e2] of [[cD, cC], [cB, cC]]) {
         ctx.beginPath();
         ctx.moveTo(e1.x, e1.y - canH); ctx.lineTo(e2.x, e2.y - canH);
         ctx.lineTo(e2.x, e2.y - canH + fasc); ctx.lineTo(e1.x, e1.y - canH + fasc);
         ctx.closePath(); ctx.fill();
+      }
+      // Тёмная нижняя плоскость и встроенные световые панели.
+      ctx.fillStyle='#34383a';
+      ctx.beginPath();ctx.moveTo(cA.x,cA.y-canH+3);ctx.lineTo(cB.x,cB.y-canH+3);ctx.lineTo(cC.x,cC.y-canH+3);ctx.lineTo(cD.x,cD.y-canH+3);ctx.closePath();ctx.fill();
+      for(const lp of [w2s(gs.r+.15,gs.c+.15),w2s(gs.r+1.05,gs.c+1.05)]){
+        const ly=lp.y-canH+3;ctx.save();ctx.shadowColor='rgba(255,240,170,.72)';ctx.shadowBlur=7;
+        ctx.fillStyle='#fff4bd';ctx.beginPath();ctx.ellipse(lp.x,ly,6,2.2,0,0,Math.PI*2);ctx.fill();ctx.restore();
       }
       ctx.fillStyle = '#ffd21a';
       for (const [e1, e2] of [[cD, cC], [cB, cC]]) {
@@ -32100,12 +32147,23 @@ function render() {
         ctx.closePath(); ctx.fill();
       }
       const rg = ctx.createLinearGradient(cA.x, cA.y - canH, cC.x, cC.y - canH);
-      rg.addColorStop(0, '#e83028'); rg.addColorStop(1, '#b81818');
+      rg.addColorStop(0, '#f15a49'); rg.addColorStop(.52, '#d9342c'); rg.addColorStop(1, '#9c1b1b');
       ctx.fillStyle = rg;
       ctx.beginPath();
       ctx.moveTo(cA.x, cA.y - canH); ctx.lineTo(cB.x, cB.y - canH);
       ctx.lineTo(cC.x, cC.y - canH); ctx.lineTo(cD.x, cD.y - canH); ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = 'rgba(255,240,180,.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,238,184,.72)'; ctx.lineWidth = 1.5; ctx.stroke();
+      // Панельные швы на крыше подчёркивают её изометрическую геометрию.
+      ctx.strokeStyle='rgba(103,18,18,.24)';ctx.lineWidth=1;
+      for(const fr of [.33,.66]){
+        const a={x:cA.x+(cD.x-cA.x)*fr,y:cA.y+(cD.y-cA.y)*fr-canH};
+        const b={x:cB.x+(cC.x-cB.x)*fr,y:cB.y+(cC.y-cB.y)*fr-canH};
+        ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+      }
+      // Небольшой фирменный знак на ближнем торце, без чуждого плоского баннера.
+      const logoX=(cD.x+cC.x)*.5,logoY=(cD.y+cC.y)*.5-canH+5;
+      ctx.fillStyle='#fff5d2';ctx.beginPath();ctx.arc(logoX,logoY,3.2,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#b52320';ctx.font='bold 4px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('M',logoX,logoY+.2);
       ctx.restore();
       _drawGasStationFireOverlay(gs);
     }});
