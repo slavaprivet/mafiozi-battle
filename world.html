@@ -13075,6 +13075,7 @@ function handleEventPacket(d) {
         _ex.model = _useModel; _ex._lockedModel = _useModel;
       }
       _pendingHijackModel = null;
+      _dropCarriedBagForVehicleEntry();
       myDrivingCarId = d.car_id;
       myIsPassenger  = false;
       _exitRequested = false;
@@ -15036,6 +15037,7 @@ _handbrakeBtn.addEventListener('mousedown',  () => { _handbrakeActive = true;  _
 _handbrakeBtn.addEventListener('mouseup',    () => { _handbrakeActive = false; _handbrakeBtn.classList.remove('active'); });
 let _gtaActionKind = null;   // 'michael' | 'enter' | 'exit' | 'hijack'
 let _gtaActionCarId = null;
+let _gtaActionBagCarRef = null; // точная машина, чей багажник выбран для мешка
 let _gtaActionEnterAs = null;   // 'driver' | 'passenger'
 let myIsPassenger = false;      // если я сижу пассажиром — не управляю машиной
 const GTA_INTERACT_R = 1.8;  // тайлов — радиус подхода к Майклу/машине
@@ -15056,6 +15058,7 @@ function playEnterCarAnim(r, c) {
 }
 
 function updateGtaInteractions() {
+  _gtaActionBagCarRef = null;
   // Кнопка ручника — видна только за рулём (не пассажир)
   _handbrakeBtn.style.display = (myDrivingCarId && !myIsPassenger) ? 'flex' : 'none';
   // Кнопка «Ограбить» по умолчанию скрыта — показывается только в
@@ -15431,10 +15434,11 @@ function updateGtaInteractions() {
   // Руки пусты, но в стоящей рядом машине лежат НАШИ мешки → достать обратно
   // (можно передумать и понести мешок пешком / переложить). Радиус 3 тайла.
   if (_bankRob && !_bankRob.myBag && (_bankRob.bagsLoaded > 0)) {
-    let nearCarUnload = null, ndU = 3.0;
-    for (const car of CARS) {
+    let nearCarUnload = null, ndU = BAG_TRUNK_INTERACT_R;
+    for (const car of _bagVehicleCandidates()) {
       if (!car || !(car._bagsLoaded > 0)) continue;
-      const d = Math.hypot(player.r - car.r, player.c - car.c);
+      if (!_bagVehicleAvailable(car)) continue;
+      const d = _bagTrunkDistance(car);
       if (d < ndU) { ndU = d; nearCarUnload = car; }
     }
     // Банковский фургон у банка (виртуальный — мешки в _bankRob.bagsLoaded)
@@ -15447,6 +15451,7 @@ function updateGtaInteractions() {
     if (nearCarUnload) {
       _gtaActionKind = 'bag_unload';
       _gtaActionCarId = nearCarUnload.id;
+      _gtaActionBagCarRef = nearCarUnload;
       _gtaBtn.textContent = '💼 Достать мешок из машины';
       _gtaBtn.style.display = 'block';
       return;
@@ -15454,11 +15459,11 @@ function updateGtaInteractions() {
   }
   // Несём мешок снаружи банка → кнопка погрузки в любую стоящую машину
   if (_bankRob && _bankRob.myBag && (_bankRob.phase === 'loading' || _bankRob.phase === 'carrying')) {
-    let nearCarForLoad = null, nearLoadDist = 3.0;
-    for (const car of CARS) {
+    let nearCarForLoad = null, nearLoadDist = BAG_TRUNK_INTERACT_R;
+    for (const car of _bagVehicleCandidates()) {
       if (!car) continue;
-      if (car.driverId) continue;
-      const d = Math.hypot(player.r - car.r, player.c - car.c);
+      if (!_bagVehicleAvailable(car)) continue;
+      const d = _bagTrunkDistance(car);
       if (d < nearLoadDist) { nearLoadDist = d; nearCarForLoad = car; }
     }
     // Также проверить зону фургона у банка
@@ -15467,10 +15472,12 @@ function updateGtaInteractions() {
       if (Math.hypot(player.r - vz.r, player.c - vz.c) < 3.0) nearCarForLoad = { type: 'van', model: { name: 'van' } };
     }
     if (nearCarForLoad) {
-      const ct = (nearCarForLoad.model && nearCarForLoad.model.name) || nearCarForLoad.type || 'default';
+      const ct = _bagVehicleType(nearCarForLoad);
       const max = BAG_CAPACITY[ct] !== undefined ? BAG_CAPACITY[ct] : BAG_CAPACITY['default'];
       const cur = nearCarForLoad._bagsLoaded || 0;
       _gtaActionKind = 'bag_load';
+      _gtaActionCarId = nearCarForLoad.id || null;
+      _gtaActionBagCarRef = nearCarForLoad;
       _gtaBtn.textContent = (max === 0)
         ? `🚌 Сюда нельзя (0 мест)`
         : cur >= max
@@ -15645,9 +15652,9 @@ _gtaBtn.addEventListener('click', () => {
   } else if (_gtaActionKind === 'bag_pickup') {
     pickupDroppedBag(_gtaActionCarId);
   } else if (_gtaActionKind === 'bag_load') {
-    loadBagIntoVan();
+    loadBagIntoVan(_gtaActionBagCarRef);
   } else if (_gtaActionKind === 'bag_unload') {
-    unloadBagFromCar(_gtaActionCarId);
+    unloadBagFromCar(_gtaActionCarId, _gtaActionBagCarRef);
   } else if (_gtaActionKind === 'biz_deliver') {
     deliverBagsToBusinesses();
   } else if (_gtaActionKind === 'building_enter') {
@@ -16871,6 +16878,7 @@ function enterCar(carId, asKind) {
       // gta_drive_reject — оптимистичная посадка откатится.
       try { ws && ws.send(JSON.stringify({ t: 'gta_enter', d: { car_id: carId } })); }
       catch(e) {}
+      _dropCarriedBagForVehicleEntry();
       myDrivingCarId = carId;
       myIsPassenger = false;
       _exitRequested = false;
@@ -16884,6 +16892,7 @@ function enterCar(carId, asKind) {
     // Серверу шлём явный gta_enter — он проверит дистанцию и место
     try { ws && ws.send(JSON.stringify({ t: 'gta_enter', d: { car_id: carId } })); }
     catch(e) {}
+    _dropCarriedBagForVehicleEntry();
     myDrivingCarId = carId;
     myIsPassenger  = true;
     _exitRequested = false;
@@ -16900,6 +16909,7 @@ function enterCar(carId, asKind) {
   const needLockpick = !qc._lockpicked && !qc.civilian;
   const _seat = () => {
     qc._lockpicked = true;
+    _dropCarriedBagForVehicleEntry();
     myIsPassenger = false;
     myDrivingCarId = carId;
     _exitRequested = false;
@@ -35144,6 +35154,59 @@ function dropVaultBag() {
   if (typeof _updateBankZoneBtn === 'function') _updateBankZoneBtn();
 }
 
+// При успешной посадке мешок не телепортируется и не исчезает вместе со
+// скрытым спрайтом игрока: он остаётся ровно у двери, откуда игрок сел.
+function _dropCarriedBagForVehicleEntry() {
+  if (_myBagWeight > 0 && _bankRob && _bankRob.myBag) dropVaultBag();
+}
+
+const BAG_TRUNK_INTERACT_R = 1.65;
+function _bagVehicleCandidates() {
+  const out = CARS.slice();
+  for (const qc of questCars.values()) if (qc && !out.includes(qc)) out.push(qc);
+  return out;
+}
+function _bagVehicleAvailable(car) {
+  if (!car || car.wrecked || car._wrecked) return false;
+  if (car.driverId || car.driver_uid) return false;
+  const isQuest = car.x !== undefined && car.y !== undefined;
+  if (!isQuest && !car.parked) return false;
+  const speed = car.x !== undefined
+    ? Math.hypot(car.vx || 0, car.vy || 0)
+    : Math.hypot(car.vr || 0, car.vc || 0);
+  return speed < 0.35;
+}
+function _bagVehicleModel(car) {
+  if (!car) return null;
+  if (car.model && typeof car.model === 'object') return car.model;
+  return resolveCarModel(car.model || car.type) || null;
+}
+function _bagVehicleType(car) {
+  const model = _bagVehicleModel(car);
+  return (model && model.name) || (typeof car.model === 'string' ? car.model : null) || car.type || 'default';
+}
+function _bagTrunkPoint(car) {
+  if (!car) return null;
+  const isQuest = car.x !== undefined && car.y !== undefined;
+  const r = isQuest ? car.y : car.r, c = isQuest ? car.x : car.c;
+  if (!Number.isFinite(r) || !Number.isFinite(c)) return null;
+  const ang = Number.isFinite(car.ang)
+    ? car.ang
+    : Math.atan2(Number(car.dirDy) || Number(car.vr) || 0,
+                 Number(car.dirDx) || Number(car.vc) || 1);
+  const model = _bagVehicleModel(car);
+  const rearOffset = Math.max(0.72, Math.min(1.35, ((model && model.L) || 1.7) * 0.58));
+  return { r: r - Math.sin(ang) * rearOffset, c: c - Math.cos(ang) * rearOffset };
+}
+function _bagTrunkDistance(car) {
+  const p = _bagTrunkPoint(car);
+  return p ? Math.hypot(player.r - p.r, player.c - p.c) : Infinity;
+}
+function _bagVehicleWithinTrunkReach(car) {
+  return _bagVehicleAvailable(car) && _bagTrunkDistance(car) <= BAG_TRUNK_INTERACT_R;
+}
+
+
 // Загрузить мешок в фургон
 function _carTypeName(type) {
   const names = {van:'фургоне',truck:'грузовике',minivan:'минивэне',suv:'внедорожнике',
@@ -35156,15 +35219,16 @@ function _carTypeName(type) {
   return names[type] || names.default;
 }
 
-function loadBagIntoVan() {
+function loadBagIntoVan(preferredCar) {
   if (!_bankRob || !_bankRob.myBag) return;
 
   // Зона фургона у банка — основной транспорт для отгрузки добычи, вмещает
   // ВЕСЬ улов банка (bagsMax), чтобы погрузка не упиралась в штатную вместимость
   // обычной машины (sedan=2, van=6) посреди взлома medium/large банка (12/18 мешков)
   // и игрок не застревал с мешком в руках без возможности его сгрузить.
-  let nearCar = null, maxBagsOverride = null;
-  if (_bankRob.bank) {
+  let nearCar = _bagVehicleWithinTrunkReach(preferredCar) ? preferredCar : null;
+  let maxBagsOverride = null;
+  if (!nearCar && _bankRob.bank) {
     const vz = _getBankVanZone(_bankRob.bank);
     if (Math.hypot(player.r - vz.r, player.c - vz.c) < 3.0) {
       nearCar = { type: 'van', id: 'bank_van', _isBankVan: true };
@@ -35174,11 +35238,11 @@ function loadBagIntoVan() {
 
   // Иначе — ближайшая стоящая машина рядом с игроком (радиус 3 тайла)
   if (!nearCar) {
-    let nearDist = 3.0;
-    for (const car of CARS) {
+    let nearDist = BAG_TRUNK_INTERACT_R;
+    for (const car of _bagVehicleCandidates()) {
       if (!car) continue;
-      if (car.driverId) continue;  // кто-то едет — пропустить
-      const d = Math.hypot(player.r - car.r, player.c - car.c);
+      if (!_bagVehicleAvailable(car)) continue;
+      const d = _bagTrunkDistance(car);
       if (d < nearDist) { nearDist = d; nearCar = car; }
     }
   }
@@ -35189,7 +35253,7 @@ function loadBagIntoVan() {
   }
 
   // Вместимость по типу машины
-  const carType = (nearCar.model && nearCar.model.name) || nearCar.type || 'default';
+  const carType = _bagVehicleType(nearCar);
   const maxBags = maxBagsOverride != null ? maxBagsOverride
     : (BAG_CAPACITY[carType] !== undefined ? BAG_CAPACITY[carType] : BAG_CAPACITY['default']);
   if (maxBags === 0) {
@@ -35225,24 +35289,29 @@ function loadBagIntoVan() {
 // Достать мешок ОБРАТНО из машины — зеркало loadBagIntoVan. Берём один
 // мешок в руки (phase carrying), уменьшаем счётчик загруженных. Нужно чтобы
 // игрок не «терял» мешки безвозвратно, погрузив их в тачку.
-function unloadBagFromCar(carId) {
+function unloadBagFromCar(carId, preferredCar) {
   if (!_bankRob || _bankRob.myBag) return;
   if ((_bankRob.bagsLoaded || 0) <= 0) {
     showToast('🚗 В машине нет мешков', 'ℹ️', 1500);
     return;
   }
-  let car = null;
-  if (carId && carId !== 'bank_van') {
-    car = CARS.find(c => c && c.id === carId && (c._bagsLoaded > 0));
+  let car = _bagVehicleWithinTrunkReach(preferredCar) && preferredCar._bagsLoaded > 0 ? preferredCar : null;
+  if (!car && carId && carId !== 'bank_van') {
+    car = _bagVehicleCandidates().find(c => c && c.id === carId && c._bagsLoaded > 0 && _bagVehicleWithinTrunkReach(c));
   }
   if (!car && carId !== 'bank_van') {
     // запрошенной нет — ближайшая с грузом в радиусе 3
-    let nd = 3.0;
-    for (const c of CARS) {
+    let nd = BAG_TRUNK_INTERACT_R;
+    for (const c of _bagVehicleCandidates()) {
       if (!c || !(c._bagsLoaded > 0)) continue;
-      const d = Math.hypot(player.r - c.r, player.c - c.c);
+      if (!_bagVehicleAvailable(c)) continue;
+      const d = _bagTrunkDistance(c);
       if (d < nd) { nd = d; car = c; }
     }
+  }
+  if (!car && carId !== 'bank_van') {
+    showToast('🚗 Подойди к багажнику сзади машины', '⚠️', 1800);
+    return;
   }
   if (car) car._bagsLoaded = Math.max(0, (car._bagsLoaded || 0) - 1);
   // Снимаем один мешок с общего счётчика, берём в руки
