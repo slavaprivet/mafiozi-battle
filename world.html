@@ -602,6 +602,24 @@ body.in-pvp #robActionBtn { top: 152px; }
 #missionHudBtn.active .mission-count { display: inline-flex; }
 #missionHudBtn.minimized { animation: missionHudPulse 1.8s ease-in-out infinite; }
 @keyframes missionHudPulse { 50% { box-shadow: 0 0 16px rgba(230,184,63,.62); } }
+#gangRosterHud {
+  position: absolute; left: 14px; top: 174px; width: min(168px, 46vw);
+  padding: 7px 8px 8px; border-radius: 9px; z-index: 7;
+  background: linear-gradient(145deg,rgba(18,22,30,.94),rgba(8,11,17,.92));
+  border: 1px solid rgba(104,126,158,.55); box-shadow: 0 5px 16px rgba(0,0,0,.42);
+  font: 700 10px/1.2 system-ui,sans-serif; pointer-events: none;
+}
+#gangRosterHud .gr-head { display:flex;align-items:center;justify-content:space-between;gap:5px;color:#f0f3fa;margin-bottom:5px; }
+#gangRosterHud .gr-count { color:#7eff9a;font-size:9px;padding:1px 5px;border-radius:7px;background:rgba(45,105,65,.28); }
+#gangRosterList { display:flex;flex-direction:column;gap:3px;max-height:116px;overflow:hidden; }
+#gangRosterList .gr-row { display:flex;align-items:center;gap:5px;min-width:0;color:#dce4ef; }
+#gangRosterList .gr-dot { width:6px;height:6px;border-radius:50%;flex:0 0 auto;background:#53df79;box-shadow:0 0 5px rgba(83,223,121,.65); }
+#gangRosterList .gr-name { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+#gangRosterList .gr-weapon { margin-left:auto;color:#9aa6b8;font-size:9px; }
+#gangRosterList .gr-row.dead { color:#737b88;opacity:.82; }
+#gangRosterList .gr-row.dead .gr-dot { background:#8a3030;box-shadow:none; }
+#gangRosterList .gr-row.dead .gr-name { text-decoration:line-through;text-decoration-thickness:1.5px; }
+#gangRosterList .gr-empty { color:#727d8f;font-weight:600;font-style:italic;padding:1px 0; }
 #districtMissionClose {
   position: absolute; left: calc(50% + min(38vw, 150px) - 17px); top: calc(70% - 31px);
   width: 27px; height: 27px; display: none; align-items: center; justify-content: center;
@@ -1622,6 +1640,10 @@ body.in-pvp #robActionBtn { top: 152px; }
   <button id="missionHudBtn" type="button" title="Открыть активные миссии">
     <span class="mission-label">📋 Миссии</span><span class="mission-count">0</span>
   </button>
+  <section id="gangRosterHud" aria-label="Моя банда">
+    <div class="gr-head"><span>👥 Моя банда</span><span class="gr-count" id="gangRosterCount">0/5</span></div>
+    <div id="gangRosterList"><div class="gr-empty">Бойцов пока нет</div></div>
+  </section>
   <button id="districtMissionClose" type="button" aria-label="Скрыть задание" title="Скрыть задание, не отменяя его">×</button>
   <!-- Модал выбора режима PvP/PvE (первый вход в мир) -->
   <div id="modeModal">
@@ -10344,7 +10366,40 @@ const GANG_HIRE_COST = 100;
 const GANG_MAX = 5;
 const GANG_MIN_LVL = 5;
 const _myGang = [];
+const _gangFallen = [];
+const GANG_FALLEN_KEEP = 12;
 let _gangIdCounter = 0;
+let _gangRosterUiKey = '';
+const _gangWeaponIcon = { pistol:'🔫',pistol_heavy:'🔫',pistol_gold:'🔫',nagan:'🔫',smg:'▰',tommy_gun:'▰',shotgun:'◼',rifle:'⌁',sniper:'⌖',rpg:'🚀' };
+function syncGangRosterHud() {
+  const list=document.getElementById('gangRosterList'),count=document.getElementById('gangRosterCount');
+  if(!list||!count)return;
+  const active=_myGang.filter(g=>g&&g.hp>0);
+  const deadSlots=Math.max(3,8-active.length);
+  const fallen=_gangFallen.slice(-deadSlots).reverse();
+  const key=active.map(g=>`${g.id}:${g.name}:${g.weapon}`).join('|')+'#'+fallen.map(g=>`${g.name}:${g.weapon}:${g.at}`).join('|');
+  if(key===_gangRosterUiKey)return;
+  _gangRosterUiKey=key;
+  count.textContent=`${active.length}/${GANG_MAX}`+(_gangFallen.length?` · ☠${_gangFallen.length}`:'');
+  list.replaceChildren();
+  const addRow=(g,dead)=>{
+    const row=document.createElement('div');row.className='gr-row'+(dead?' dead':'');
+    const dot=document.createElement('span');dot.className='gr-dot';
+    const name=document.createElement('span');name.className='gr-name';name.textContent=g.name||'Боец';
+    const weapon=document.createElement('span');weapon.className='gr-weapon';weapon.textContent=_gangWeaponIcon[g.weapon]||'🔫';
+    row.title=dead?`${g.name||'Боец'} — погиб`:`${g.name||'Боец'} — в строю`;
+    row.append(dot,name,weapon);list.appendChild(row);
+  };
+  for(const g of active)addRow(g,false);
+  for(const g of fallen)addRow(g,true);
+  if(!active.length&&!fallen.length){const empty=document.createElement('div');empty.className='gr-empty';empty.textContent='Бойцов пока нет';list.appendChild(empty);}
+}
+function _recordGangFallen(m,persist=true) {
+  if(!m)return;
+  _gangFallen.push({name:m.name||'Боец',weapon:m.weapon||'pistol',at:Date.now()});
+  if(_gangFallen.length>GANG_FALLEN_KEEP)_gangFallen.splice(0,_gangFallen.length-GANG_FALLEN_KEEP);
+  if(persist)_saveGang();else syncGangRosterHud();
+}
 // Id уличных ботов, которых игрок НАНЯЛ. Сервер про найм не знает и
 // продолжает слать бота в снапшотах (applyAggroTargets пересобирает
 // список 15 раз/сек — клиентский splice бесполезен). Фильтруем по id:
@@ -10488,14 +10543,15 @@ function _saveGang() {
   try {
     const data = _myGang.map(g => ({ name: g.name, look: g.look, weapon: g.weapon, hp: g.hp }));
     localStorage.setItem('_myGang', JSON.stringify(data));
+    localStorage.setItem('_myGangFallen', JSON.stringify(_gangFallen));
   } catch(e) {}
+  _gangRosterUiKey='';syncGangRosterHud();
 }
 function _loadGang() {
   try {
     const raw = localStorage.getItem('_myGang');
-    if (!raw) return;
-    const data = JSON.parse(raw);
-    if (!Array.isArray(data)) return;
+    const data = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(data)) throw new Error('bad gang data');
     for (const g of data) {
       if (_myGang.length >= GANG_MAX) break;
       const m = {
@@ -10507,7 +10563,13 @@ function _loadGang() {
       };
       _myGang.push(m);
     }
+    const fallenRaw=localStorage.getItem('_myGangFallen');
+    const fallen=fallenRaw?JSON.parse(fallenRaw):[];
+    if(Array.isArray(fallen))for(const g of fallen.slice(-GANG_FALLEN_KEEP)){
+      if(g&&g.name)_gangFallen.push({name:String(g.name).slice(0,28),weapon:g.weapon||'pistol',at:+g.at||Date.now()});
+    }
   } catch(e) {}
+  syncGangRosterHud();
 }
 _loadGang();
 // Автоспавн убран — нанимай бойцов вручную у бандитов
@@ -10659,7 +10721,12 @@ function _updateGang(dt) {
   _tickGangChatter(now);
   for (let i = _myGang.length - 1; i >= 0; i--) {
     const m = _myGang[i];
-    if (m.hp <= 0) { _myGang.splice(i, 1); continue; }
+    if (m.hp <= 0) {
+      _recordGangFallen(m,false);
+      _myGang.splice(i,1);
+      _saveGang();
+      continue;
+    }
     if (myDead) { m._threatUntil = 0; m.targetKind = null; m.targetRef = null; m.targetId = null; }
     let tR, tC;
     if (_bankInt && _bankInt.room === 'vault') {
@@ -20659,7 +20726,10 @@ function update(dt) {
       // могут не работать (bankShield блокирует серверный статус, lockedTargets
       // пуст, myDrivingCarId завис).
       _bankShieldUntil = 0;
-      _myGang.length = 0; _saveGang();
+      // При гибели босса отряд считается потерянным: имена остаются в HUD
+      // зачёркнутыми, а места в активной пятёрке освобождаются.
+      for(const gm of _myGang)_recordGangFallen(gm,false);
+      _myGang.length=0;_saveGang();
       myDrivingCarId = null;
       myIsPassenger = false;
       _exitRequested = false;
