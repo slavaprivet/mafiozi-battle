@@ -3900,6 +3900,21 @@ function generateBeachDecor() {
     { r: 167, c: 70, col: '#f1c40f' },
     { r: 168, c: 50, col: '#2ecc71' },
   ]) _beachDecor.push({ kind: 'float_ring', r: sp.r, c: sp.c, col: sp.col });
+  // 15b) Классификация «Побережье»: большие силуэтные пальмы, два
+  // самостоятельных пляжных бара и мягкие песчаные тропы к воде.
+  for (const sp of [
+    {r:151.2,c:5.0,s:1.52,v:0},{r:151.0,c:16.0,s:1.62,v:1},
+    {r:152.0,c:35.0,s:1.48,v:2},{r:151.0,c:47.0,s:1.58,v:0},
+    {r:151.5,c:61.0,s:1.55,v:1},{r:152.0,c:76.0,s:1.68,v:2},
+  ]) _beachDecor.push({kind:'big_palm',r:sp.r,c:sp.c,scale:sp.s,variant:sp.v});
+  _beachDecor.push({kind:'tiki_bar',r:154.0,c:6.5,coastBar:true});
+  _beachDecor.push({kind:'tiki_bar',r:154.0,c:70.5,coastBar:true});
+  for (const c of [10,26,54,69])
+    _beachDecor.push({kind:'sand_path',r:157.0,r0:150.0,r1:164.5,c});
+  for (const sp of [
+    {r:152.6,c:3.8},{r:155.4,c:9.0},{r:152.6,c:67.8},{r:155.4,c:73.0},
+    {r:162.7,c:34.0},{r:162.7,c:46.0},
+  ]) _beachDecor.push({kind:'beach_lamp',r:sp.r,c:sp.c});
   // 16) Гоночная зона: у полотна трека, паддока и разгонки декору не место —
   //     пальмы/зонты/замки на трассе мешают и выглядят мусором. Правило:
   //     тайл 18 в радиусе 1 клетки или разгонный коридор → выкинуть.
@@ -3922,6 +3937,27 @@ function generateBeachDecor() {
     variant: 2,
     scale: 1.65
   });
+}
+
+// Миграция старых сохранений редактора: decorFull из map_overrides.json
+// создавался до классификации районов и целиком заменяет генератор. Один
+// раз добавляем новые объекты Побережья; после сохранения редактор пишет
+// districtStyleVersion=1, поэтому удалённые вручную объекты не воскресают.
+function ensureCoastStyleDecor(){
+  const defs=[];
+  for(const sp of [
+    {r:151.2,c:5.0,s:1.52,v:0},{r:151.0,c:16.0,s:1.62,v:1},
+    {r:152.0,c:35.0,s:1.48,v:2},{r:151.0,c:47.0,s:1.58,v:0},
+    {r:151.5,c:61.0,s:1.55,v:1},{r:152.0,c:76.0,s:1.68,v:2},
+  ])defs.push({kind:'big_palm',r:sp.r,c:sp.c,scale:sp.s,variant:sp.v});
+  defs.push({kind:'tiki_bar',r:154.0,c:6.5,coastBar:true},{kind:'tiki_bar',r:154.0,c:70.5,coastBar:true});
+  for(const c of [10,26,54,69])defs.push({kind:'sand_path',r:157,r0:150,r1:164.5,c});
+  for(const sp of [{r:152.6,c:3.8},{r:155.4,c:9},{r:152.6,c:67.8},{r:155.4,c:73},{r:162.7,c:34},{r:162.7,c:46}])
+    defs.push({kind:'beach_lamp',r:sp.r,c:sp.c});
+  for(const d of defs){
+    const exists=_beachDecor.some(x=>x.kind===d.kind&&Math.abs((x.r||0)-d.r)<.08&&Math.abs((x.c||0)-d.c)<.08);
+    if(!exists)_beachDecor.push({...d});
+  }
 }
 
 // ── POI районов ────────────────────────────────────────────────
@@ -4067,6 +4103,32 @@ function inAggroZone(r, c) {
 //   город r0..99 (4 квадранта по c=40 и r=40) + Логово r100..149 + берег r150..199.
 // hq — штаб района (точка захвата, совпадает с DISTRICTS_DEF на сервере).
 // income — пассивный доход банде-владельцу за тик. capturable:false у Логова.
+// Визуальная классификация независима от механики захвата: один большой
+// захватываемый район может включать несколько архитектурных кварталов.
+// Так Южная сторона делится на богатый, ночной и загородный пояса, а
+// серверные id захвата и сохранения игроков остаются совместимыми.
+const DISTRICT_STYLE_PROFILES = Object.freeze({
+  coast:       { name:'Побережье',       icon:'🌴', mood:'Майами / Лос-Анджелес', sky:'#ffb86b', accent:'#28d7b2' },
+  downtown:    { name:'Центр города',    icon:'🌆', mood:'Деловой и богатый',     sky:'#7fcfff', accent:'#65e7ff' },
+  poor:        { name:'Бедный район',    icon:'🏚', mood:'Стартовый квартал',     sky:'#b99772', accent:'#e46d4a' },
+  industrial:  { name:'Промзона',        icon:'🏭', mood:'Нелегальный бизнес',    sky:'#9b8d7c', accent:'#f39a42' },
+  countryside: { name:'Загородный район',icon:'🌲', mood:'Тихая окраина',         sky:'#8fd68a', accent:'#78c86f' },
+  rich:        { name:'Богатый район',   icon:'🏎', mood:'Виллы и охрана',        sky:'#d7c8ff', accent:'#e8ce73' },
+  nightlife:   { name:'Ночной район',    icon:'🌃', mood:'Клубы, казино и неон',  sky:'#6842a8', accent:'#ff4fd8' },
+});
+const DISTRICT_STYLE_ZONES = Object.freeze([
+  { id:'downtown',    r0:0,   r1:39,  c0:40, c1:79 },
+  { id:'poor',        r0:0,   r1:39,  c0:0,  c1:39 },
+  { id:'rich',        r0:40,  r1:59,  c0:0,  c1:39 },
+  { id:'nightlife',   r0:60,  r1:79,  c0:0,  c1:39 },
+  { id:'countryside', r0:80,  r1:99,  c0:0,  c1:39 },
+  { id:'industrial',  r0:40,  r1:99,  c0:40, c1:79 },
+  { id:'coast',       r0:140, r1:199, c0:0,  c1:79 },
+]);
+function districtStyleAt(r,c){
+  const z=DISTRICT_STYLE_ZONES.find(x=>r>=x.r0&&r<=x.r1&&c>=x.c0&&c<=x.c1);
+  return z ? DISTRICT_STYLE_PROFILES[z.id] : null;
+}
 const DISTRICTS = [
   { id:'northside',  name:'Норт-Сайд',  icon:'🏪', color:'#4aa3df',
     r0:0,   r1:39,  c0:0,  c1:39, capturable:true,  bonus:'+25% доход с рынка',
@@ -17287,6 +17349,22 @@ function drawNightTint() {
   ctx.fillRect(0, 0, gc.width, gc.height);
   ctx.restore();
 }
+function drawDistrictAtmosphereTint(){
+  if(typeof player==='undefined'||!player||player.r<140)return;
+  const h=_gameMinutes/60;
+  // Побережье получает отдельный золотой час: максимум около 19:00,
+  // затем тепло плавно растворяется в общей синей ночной тонировке.
+  let sunset=0;
+  if(h>=16&&h<19)sunset=(h-16)/3;
+  else if(h>=19&&h<22)sunset=1-(h-19)/3;
+  if(sunset<=.002)return;
+  ctx.save();
+  const g=ctx.createLinearGradient(0,0,0,gc.height);
+  g.addColorStop(0,`rgba(255,126,70,${(.035*sunset).toFixed(3)})`);
+  g.addColorStop(.55,`rgba(255,166,72,${(.075*sunset).toFixed(3)})`);
+  g.addColorStop(1,`rgba(255,205,112,${(.13*sunset).toFixed(3)})`);
+  ctx.fillStyle=g;ctx.fillRect(0,0,gc.width,gc.height);ctx.restore();
+}
 const _deathOv   = document.getElementById('deathOverlay');
 const _deathBy   = document.getElementById('deathBy');
 const _deathCnt  = document.getElementById('deathCnt');
@@ -21247,6 +21325,7 @@ const _MFZ_DECOR_GHOST_PROFILE = Object.freeze({
   umbrella:     { width: 34, height: 92,  front: 22, minAlpha: 0.34 },
   lifeguard:    { width: 34, height: 126, front: 24, minAlpha: 0.32 },
   tiki_bar:     { width: 42, height: 62,  front: 22, minAlpha: 0.38 },
+  beach_lamp:   { width: 22, height: 82,  front: 18, minAlpha: 0.40 },
   volleyball:   { width: 44, height: 76,  front: 20, minAlpha: 0.38 },
   icecream_cart:{ width: 36, height: 62,  front: 22, minAlpha: 0.40 },
 });
@@ -21394,6 +21473,41 @@ function drawPlankPath(r0, r1, c) {
   }
 }
 
+function drawCoastSandPath(r0, r1, c) {
+  // Светлая утоптанная дорожка остаётся песком, но читается как маршрут
+  // от набережной к воде. Объект декоративный и не меняет коллизии карты.
+  ctx.save();
+  for (let r=r0;r<r1;r+=0.72) {
+    const bend=Math.sin((r-r0)*0.72+c)*0.32,p=w2s(r,c+bend);
+    const fade=Math.min(1,(r-r0)/1.4,(r1-r)/1.4);
+    ctx.globalAlpha=Math.max(0,fade)*0.42;
+    ctx.fillStyle='#f6d99b';
+    ctx.beginPath();ctx.ellipse(p.x,p.y,20,6,0,0,Math.PI*2);ctx.fill();
+    if((((r-r0)/.72)|0)%3===0){
+      ctx.globalAlpha=Math.max(0,fade)*0.34;ctx.fillStyle='#9f7b48';
+      ctx.beginPath();ctx.ellipse(p.x-5,p.y-1,2.2,1.1,-.3,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.ellipse(p.x+2,p.y+2,2.2,1.1,.25,0,Math.PI*2);ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function drawCoastLamp(r,c){
+  const p=w2s(r,c),night=(typeof getNightAlpha==='function'?getNightAlpha():0);
+  ctx.save();ctx.lineCap='round';
+  ctx.strokeStyle='#604225';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(p.x,p.y+3);ctx.lineTo(p.x,p.y-37);ctx.stroke();
+  ctx.strokeStyle='#b88a48';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(p.x-5,p.y-34);ctx.lineTo(p.x+5,p.y-34);ctx.stroke();
+  if(night>.035){
+    const glow=ctx.createRadialGradient(p.x,p.y-35,1,p.x,p.y-35,31);
+    glow.addColorStop(0,`rgba(255,211,112,${Math.min(.72,night*1.35)})`);
+    glow.addColorStop(1,'rgba(255,174,62,0)');ctx.fillStyle=glow;
+    ctx.beginPath();ctx.arc(p.x,p.y-35,31,0,Math.PI*2);ctx.fill();
+  }
+  ctx.fillStyle=night>.035?'#ffd877':'#ead7a0';ctx.shadowColor='#ffb449';ctx.shadowBlur=night*18;
+  ctx.beginPath();ctx.arc(p.x,p.y-35,3.4,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+  ctx.restore();
+}
+
 function drawBeachedBoat(r, c, ang, col) {
   const p = w2s(r, c);
   ctx.save();
@@ -21491,8 +21605,16 @@ function drawShell(r, c) {
   ctx.moveTo(p.x - 2, p.y); ctx.lineTo(p.x + 2, p.y); ctx.stroke();
 }
 
-function drawTikiBar(r, c) {
+function drawTikiBar(r, c, premium=false) {
   const p = w2s(r, c);
+  if(premium){
+    // Приподнятая деревянная терраса с диагональными досками и ступенью.
+    ctx.save();ctx.fillStyle='rgba(0,0,0,.32)';ctx.beginPath();ctx.ellipse(p.x,p.y+10,47,16,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#8d6136';ctx.beginPath();ctx.moveTo(p.x-43,p.y+1);ctx.lineTo(p.x,p.y-11);ctx.lineTo(p.x+43,p.y+1);ctx.lineTo(p.x,p.y+15);ctx.closePath();ctx.fill();
+    ctx.strokeStyle='rgba(60,31,13,.65)';ctx.lineWidth=1;
+    for(let i=-36;i<=36;i+=8){ctx.beginPath();ctx.moveTo(p.x+i,p.y+2-Math.abs(i)*.13);ctx.lineTo(p.x+i+28,p.y+11-Math.abs(i+28)*.08);ctx.stroke();}
+    ctx.fillStyle='#5b351b';ctx.fillRect(p.x-24,p.y+13,48,4);ctx.restore();
+  }
   // Тень
   ctx.fillStyle = 'rgba(0,0,0,.45)';
   ctx.beginPath();
@@ -21535,11 +21657,11 @@ function drawTikiBar(r, c) {
   }
   // Вывеска BAR
   ctx.fillStyle = '#1a1410';
-  ctx.fillRect(p.x - 14, p.y - H, 28, 8);
+  ctx.fillRect(p.x - (premium?22:14), p.y - H, premium?44:28, 8);
   ctx.fillStyle = '#ffd76b';
-  ctx.font = 'bold 8px system-ui';
+  ctx.font = `bold ${premium?7:8}px system-ui`;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('🍹 BAR', p.x, p.y - H + 4);
+  ctx.fillText(premium?'🌴 COAST BAR':'🍹 BAR', p.x, p.y - H + 4);
   // Гирлянда лампочек
   const tm = performance.now() * 0.001;
   for (let i = 0; i < 6; i++) {
@@ -21558,6 +21680,20 @@ function drawTikiBar(r, c) {
     ctx.fillRect(bx, p.y - 5, 3, 7);
     ctx.fillStyle = '#222';
     ctx.fillRect(bx, p.y - 7, 3, 2);
+  }
+  if(premium){
+    // Барные табуреты, меню коктейлей и стойка с двумя досками для сёрфа.
+    for(const sx of [-18,0,18]){
+      ctx.strokeStyle='#4b2c18';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(p.x+sx,p.y+5);ctx.lineTo(p.x+sx,p.y+13);ctx.stroke();
+      ctx.fillStyle=['#ef5a59','#ffd34d','#39c8d0'][(sx+18)/18];ctx.beginPath();ctx.ellipse(p.x+sx,p.y+5,6,2.7,0,0,Math.PI*2);ctx.fill();
+    }
+    ctx.fillStyle='#18252c';ctx.strokeStyle='#f2d487';ctx.lineWidth=1;ctx.fillRect(p.x-22,p.y-17,13,12);ctx.strokeRect(p.x-22,p.y-17,13,12);
+    ctx.fillStyle='#f9e6a9';ctx.font='700 5px system-ui';ctx.textAlign='center';ctx.fillText('MENU',p.x-15.5,p.y-12);
+    for(let i=0;i<2;i++){
+      ctx.save();ctx.translate(p.x+34+i*6,p.y-7);ctx.rotate(.12-i*.2);ctx.fillStyle=i?'#4fd4dc':'#ff6a59';
+      ctx.beginPath();ctx.ellipse(0,-7,2.5,12,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#fff';ctx.beginPath();ctx.moveTo(0,-17);ctx.lineTo(0,3);ctx.stroke();ctx.restore();
+    }
+    ctx.textAlign='left';
   }
 }
 
@@ -31277,6 +31413,11 @@ if (d.kind === 'plank_path') {
                    draw: () => _mfzDrawDecorRotated(d, () => drawPlankPath(d.r0, d.r1, d.c))});
       continue;
     }
+    if (d.kind === 'sand_path') {
+      if (d.r1 < r0 || d.r0 >= r1 || d.c < c0 || d.c >= c1) continue;
+      items.push({depth:d.r0+d.c-0.8,draw:()=>_mfzDrawDecorRotated(d,()=>drawCoastSandPath(d.r0,d.r1,d.c))});
+      continue;
+    }
     if (d.r < r0 || d.r >= r1 || d.c < c0 || d.c >= c1) continue;
     if (d.kind === 'big_palm')
       items.push({ depth: d.r + d.c, draw: () => _mfzDrawDecorRotated(d, () => drawBigPalmTree(d.r, d.c, d.variant, d.scale))});
@@ -31293,7 +31434,9 @@ if (d.kind === 'plank_path') {
     else if (d.kind === 'shell')
       items.push({ depth: d.r + d.c - 0.1, draw: () => _mfzDrawDecorRotated(d, () => drawShell(d.r, d.c))});
     else if (d.kind === 'tiki_bar')
-      items.push({ depth: d.r + d.c, draw: () => _mfzDrawDecorRotated(d, () => drawTikiBar(d.r, d.c))});
+      items.push({ depth: d.r + d.c, draw: () => _mfzDrawDecorRotated(d, () => drawTikiBar(d.r, d.c, !!d.coastBar))});
+    else if (d.kind === 'beach_lamp')
+      items.push({ depth: d.r + d.c, draw: () => _mfzDrawDecorRotated(d, () => drawCoastLamp(d.r, d.c))});
     else if (d.kind === 'surfboard')
       items.push({ depth: d.r + d.c, draw: () => _mfzDrawDecorRotated(d, () => drawSurfboard(d.r, d.c, d.col, d.ang))});
     else if (d.kind === 'ball')
@@ -31618,6 +31761,7 @@ if (d.kind === 'plank_path') {
   // Ночной тинт — поверх ВСЕХ объектов мира, но ПОД UI-слоем (стрелки,
   // мини-карта рисуются после, чтобы остаться читаемыми).
   drawNightTint();
+  drawDistrictAtmosphereTint();
   // Стрелки-указатели на POI, которые сейчас за пределами видимости.
   drawPOIArrows(r0, r1, c0, c1);
   // Стрелка-указатель на инкассатора если он за пределами экрана
@@ -33408,10 +33552,11 @@ function drawDistrictOperationTargets(r0, r1, c0, c1) {
 // Следим за текущим районом игрока; при въезде в новый — взводим баннер.
 function _updateDistrictBanner() {
   const d = districtAt(player.r, player.c);
-  const id = d ? d.id : null;
+  const style=d?districtStyleAt(player.r,player.c):null;
+  const id = d ? d.id+':'+(style?.name||'') : null;
   if (id !== _curDistrictId) {
     _curDistrictId = id;
-    if (d) _districtBanner = { d, t: performance.now() };
+    if (d) _districtBanner = { d, style, t: performance.now() };
   }
 }
 // GTA-стиль баннер «въезд в район»: название крупно + статус/бонус мелко,
@@ -33422,6 +33567,7 @@ function drawDistrictBanner() {
   const DUR = 3500;
   if (age > DUR) { _districtBanner = null; return; }
   const d = _districtBanner.d;
+  const style=_districtBanner.style;
   let alpha = 1, slide = 0;
   if (age < 300)      { alpha = age / 300; slide = (1 - age / 300) * 36; }
   else if (age > 3000) { alpha = 1 - (age - 3000) / 500; }
@@ -33442,17 +33588,20 @@ function drawDistrictBanner() {
   const tW = ctx.measureText(d.icon + ' ' + d.name).width;
   ctx.font = '600 12px system-ui, sans-serif';
   const sW = ctx.measureText(sub).width;
-  const panelW = Math.max(tW, sW) + 40, panelH = 52;
+  const styleLine=style?`${style.icon} ${style.name} · ${style.mood}`:'';
+  const styleW=styleLine?ctx.measureText(styleLine).width:0;
+  const panelW = Math.max(tW, sW, styleW) + 40, panelH = styleLine?68:52;
   ctx.fillStyle = 'rgba(10,12,18,.78)';
-  ctx.beginPath(); ctx.roundRect(cx - panelW / 2, y - 26, panelW, panelH, 10); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(cx - panelW / 2, y - 28, panelW, panelH, 10); ctx.fill();
   ctx.strokeStyle = col; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.roundRect(cx - panelW / 2, y - 26, panelW, panelH, 10); ctx.stroke();
+  ctx.beginPath(); ctx.roundRect(cx - panelW / 2, y - 28, panelW, panelH, 10); ctx.stroke();
   // Название района
   ctx.font = '700 23px system-ui, sans-serif';
   ctx.fillStyle = col; ctx.fillText(d.icon + ' ' + d.name, cx, y - 1);
   // Подпись
   ctx.font = '600 12px system-ui, sans-serif';
-  ctx.fillStyle = '#dfe4ea'; ctx.fillText(sub, cx, y + 17);
+  ctx.fillStyle = '#dfe4ea'; ctx.fillText(sub, cx, y + 16);
+  if(styleLine){ctx.font='700 10px system-ui,sans-serif';ctx.fillStyle=style.accent||'#fff';ctx.fillText(styleLine,cx,y+31);}
   ctx.restore();
   ctx.textAlign = 'left';
 }
@@ -40219,12 +40368,509 @@ function chatDuration(text) {
   let baseMap=null, undoStack=[], redoStack=[];
 
   const DECOR_TYPES = [
-    ['palm','🌴 Пальма'],['umbrella','⛱ Зонт'],['chair','🛏 Лежак'],
+    ['palm','🌴 Пальма'],['big_palm','🌴 Высокая пальма'],['umbrella','⛱ Зонт'],['chair','🛏 Лежак'],
     ['boat','🛶 Лодка'],['lifeguard','🛟 Вышка'],['surfboard','🏄 Сёрф'],
+    ['tiki_bar','🍹 Пляжный бар'],['beach_lamp','💡 Тёплый фонарь'],['sand_path','👣 Песчаная тропа'],
     ['ball','⚽ Мяч'],['towel','🧺 Полотенце'],['sandcastle','🏰 Замок'],
     ['volleyball','🏐 Сетка'],['icecream_cart','🍦 Тележка'],
     ['starfish','⭐ Звезда'],['grass','🌾 Трава'],['float_ring','⭕ Круг']
   ];
+
+  const ready=()=>typeof MAP!=='undefined'&&Array.isArray(MAP)&&
+    typeof _beachDecor!=='undefined'&&Array.isArray(_beachDecor)&&
+    typeof canvas!=='undefined'&&typeof w2s==='function'&&typeof s2w==='function';
+
+  function clone(v){return JSON.parse(JSON.stringify(v));}
+  function cleanDecor(d){
+    const out={};
+    for(const [k,v] of Object.entries(d)) {
+      if(!k.startsWith('_') || k==='_studioRot') out[k]=v;
+    }
+    return out;
+  }
+
+  function snapshot(){
+    return JSON.stringify({
+      map:MAP.map(row=>row.slice()),
+      decor:_beachDecor.map(cleanDecor)
+    });
+  }
+  function restore(raw){
+    const s=JSON.parse(raw);
+    for(let r=0;r<Math.min(MAP.length,s.map.length);r++){
+      MAP[r].splice(0,MAP[r].length,...s.map[r]);
+    }
+    _beachDecor.splice(0,_beachDecor.length,...s.decor.map(x=>clone(x)));
+    selected=null;updateInfo();
+  }
+  function pushUndo(){
+    undoStack.push(snapshot());
+    if(undoStack.length>40)undoStack.shift();
+    redoStack.length=0;
+  }
+  function undo(){
+    if(!undoStack.length)return;
+    redoStack.push(snapshot());restore(undoStack.pop());
+  }
+  function redo(){
+    if(!redoStack.length)return;
+    undoStack.push(snapshot());restore(redoStack.pop());
+  }
+
+  function screen(e){
+    const rect=canvas.getBoundingClientRect();
+    return {
+      x:(e.clientX-rect.left)*(canvas.width/rect.width),
+      y:(e.clientY-rect.top)*(canvas.height/rect.height)
+    };
+  }
+
+  function baseTile(r,c){
+    if(r<=0||c<=0||r>=MAP_ROWS-1||c>=MAP_COLS-1)return 1;
+    if(r>=140)return 15;
+    const roadR=(r%BLOCK<=3),roadC=(c%BLOCK<=3);
+    if(roadR||roadC)return 0;
+    const sideR=(r%BLOCK===4)||(r%BLOCK===BLOCK-1);
+    const sideC=(c%BLOCK===4)||(c%BLOCK===BLOCK-1);
+    if(sideR||sideC)return 9;
+    return 8;
+  }
+
+  function lockedBuilding(r,c){
+    const key=r+','+c;
+    if(typeof BURJ_POS!=='undefined'&&r===BURJ_POS.r&&c===BURJ_POS.c)return true;
+    if(typeof POI_BY_RC!=='undefined'&&POI_BY_RC.get(key))return true;
+    if(typeof BUSINESS_BY_RC!=='undefined'&&BUSINESS_BY_RC.get(key))return true;
+    if(typeof _bankTileSet!=='undefined'&&_bankTileSet.has(key))return true;
+    return false;
+  }
+
+  function visibleBounds(){
+    const a=s2w(-100,-180),b=s2w(canvas.width+100,canvas.height+100);
+    return {
+      r0:Math.max(0,Math.floor(Math.min(a.r,b.r))-8),
+      r1:Math.min(MAP_ROWS,Math.ceil(Math.max(a.r,b.r))+8),
+      c0:Math.max(0,Math.floor(Math.min(a.c,b.c))-8),
+      c1:Math.min(MAP_COLS,Math.ceil(Math.max(a.c,b.c))+8)
+    };
+  }
+
+  function cityHit(x,y){
+    const b=visibleBounds();
+    let best=null,bestScore=Infinity;
+    for(let r=b.r0;r<b.r1;r++)for(let c=b.c0;c<b.c1;c++){
+      const t=MAP[r]?.[c];
+      if(t<1||t>7)continue;
+      if(t===1&&lockedBuilding(r,c))continue;
+
+      const p=w2s(r+.5,c+.5);
+      let left=p.x-30,right=p.x+30,top=p.y-50,bottom=p.y+18,cy=p.y-20;
+      if(t===1){
+        const seed=((r*73+c*131)%7)/7;
+        const H=isoH(1.3+seed*1.4);
+        left=p.x-42;right=p.x+42;top=p.y-H-24;bottom=p.y+20;cy=p.y-H*.48;
+      }else if(t===6){
+        left=p.x-28;right=p.x+28;top=p.y-85;bottom=p.y+16;cy=p.y-38;
+      }else if(t===7){
+        left=p.x-18;right=p.x+18;top=p.y-75;bottom=p.y+15;cy=p.y-34;
+      }
+      if(x<left||x>right||y<top||y>bottom)continue;
+      const score=Math.abs(x-p.x)*.7+Math.abs(y-cy);
+      if(score<bestScore){
+        bestScore=score;
+        best={type:'map',r,c,t,kind:t===1?'building':['','building','car','crate','barrel','dumpster','tree','lamp'][t]};
+      }
+    }
+    return best;
+  }
+
+  function decorHit(x,y){
+    let best=null,bestScore=Infinity;
+    for(let i=0;i<_beachDecor.length;i++){
+      const d=_beachDecor[i];
+      if(typeof d.r!=='number'||typeof d.c!=='number')continue;
+      const p=w2s(d.r,d.c);
+      let rx=28,ry=45;
+      if(d.kind==='palm'||d.kind==='big_palm'){rx=35;ry=110;}
+      if(d.kind==='umbrella'){rx=35;ry=55;}
+      if(d.kind==='boat'){rx=50;ry=35;}
+      if(d.kind==='tiki_bar'){rx=55;ry=65;}
+      if(d.kind==='beach_lamp'){rx=25;ry=85;}
+      if(d.kind==='sand_path'){rx=35;ry=80;}
+      if(x<p.x-rx||x>p.x+rx||y<p.y-ry||y>p.y+20)continue;
+      const score=Math.abs(x-p.x)+Math.abs(y-(p.y-ry*.35));
+      if(score<bestScore){bestScore=score;best={type:'decor',index:i,obj:d,kind:d.kind};}
+    }
+    return best;
+  }
+
+  function pick(e){
+    const p=screen(e);
+    return layer==='beach'?decorHit(p.x,p.y):cityHit(p.x,p.y);
+  }
+
+  function canPlaceMap(r,c,t){
+    if(r<=0||c<=0||r>=MAP_ROWS-1||c>=MAP_COLS-1)return false;
+    if(t===1&&lockedBuilding(r,c))return false;
+    const cur=MAP[r]?.[c];
+    return cur===0||cur===8||cur===9||cur===15;
+  }
+
+  function moveSelected(e){
+    if(!selected)return;
+    const p=screen(e),w=s2w(p.x,p.y);
+    if(selected.type==='decor'){
+      const nr=snap?Math.round(w.r*4)/4:w.r;
+      if(selected.obj.kind==='sand_path'&&Number.isFinite(selected.obj.r0)&&Number.isFinite(selected.obj.r1)){
+        const dr=nr-selected.obj.r;selected.obj.r0+=dr;selected.obj.r1+=dr;
+      }
+      selected.obj.r=nr;
+      selected.obj.c=snap?Math.round(w.c*4)/4:w.c;
+    }else{
+      selected.previewR=Math.round(w.r);
+      selected.previewC=Math.round(w.c);
+      selected.valid=canPlaceMap(selected.previewR,selected.previewC,selected.t);
+    }
+    updateInfo();
+  }
+
+  function commitMove(){
+    if(!selected||selected.type!=='map'||selected.previewR==null||!selected.valid)return;
+    MAP[selected.r][selected.c]=baseTile(selected.r,selected.c);
+    MAP[selected.previewR][selected.previewC]=selected.t;
+    selected.r=selected.previewR;selected.c=selected.previewC;
+    selected.previewR=null;selected.previewC=null;selected.valid=null;
+  }
+
+  function removeSelected(){
+    if(!selected)return;
+    pushUndo();
+    if(selected.type==='decor'){
+      _beachDecor.splice(selected.index,1);
+    }else{
+      MAP[selected.r][selected.c]=baseTile(selected.r,selected.c);
+    }
+    selected=null;updateInfo();
+  }
+
+  function rotate(delta){
+    if(!selected||selected.type!=='decor')return;
+    pushUndo();
+    const d=selected.obj;
+    if(typeof d._studioRot!=='number')d._studioRot=0;
+    d._studioRot+=delta;
+    updateInfo();
+  }
+
+  function duplicate(){
+    if(!selected)return;
+    pushUndo();
+    if(selected.type==='decor'){
+      const d=clone(selected.obj);d.r+=.5;d.c+=.5;
+      if(d.kind==='sand_path'){if(Number.isFinite(d.r0))d.r0+=.5;if(Number.isFinite(d.r1))d.r1+=.5;}
+      _beachDecor.push(d);
+      selected={type:'decor',index:_beachDecor.length-1,obj:d,kind:d.kind};
+    }else{
+      const nr=selected.r+1,nc=selected.c+1;
+      if(canPlaceMap(nr,nc,selected.t)){
+        MAP[nr][nc]=selected.t;
+        selected={type:'map',r:nr,c:nc,t:selected.t,kind:selected.kind};
+      }
+    }
+    updateInfo();
+  }
+
+  function addDecor(kind){
+    const w=s2w(canvas.width/2,canvas.height/2);
+    const d={kind,r:Math.round(w.r*4)/4,c:Math.round(w.c*4)/4};
+    Object.assign(d,{
+      palm:{variant:1},big_palm:{variant:1,scale:1.6},umbrella:{col:'#2ecc71'},chair:{ang:.15},
+      boat:{ang:.3,col:'#2980b9'},surfboard:{ang:.1,col:'#f1c40f'},
+      ball:{col1:'#e74c3c',col2:'#fff'},towel:{col:'#3498db'},
+      tiki_bar:{coastBar:true},sand_path:{r0:d.r-5,r1:d.r+5},
+      starfish:{col:'#e67e22'},grass:{variant:1},float_ring:{col:'#e74c3c'}
+    }[kind]||{});
+    pushUndo();_beachDecor.push(d);
+    selected={type:'decor',index:_beachDecor.length-1,obj:d,kind};
+    updateInfo();
+  }
+
+  async function load(){
+    if(loaded||!ready())return;
+    loaded=true;
+    baseMap=MAP.map(row=>row.slice());
+    try{
+      const r=await fetch(LOAD_URL,{cache:'no-store'});
+      if(!r.ok)return;
+      const data=await r.json();
+      if(Array.isArray(data.decorFull)){
+        _beachDecor.splice(0,_beachDecor.length,...data.decorFull.map(x=>clone(x)));
+      }else if(Array.isArray(data.decor)){
+        // Совместимость со старым форматом.
+        const byId=new Map();
+        _beachDecor.forEach((d,i)=>byId.set(`${d.kind}:${Math.round(d.r*100)}:${Math.round(d.c*100)}`,d));
+        for(const x of data.decor){
+          if(x.added&&x.data)_beachDecor.push(clone(x.data));
+          else{
+            const d=byId.get(x.id);
+            if(d){d.r=x.r;d.c=x.c;if(typeof x.angle==='number')d.ang=x.angle;}
+          }
+        }
+      }
+      if((Number(data.districtStyleVersion)||0)<1&&typeof ensureCoastStyleDecor==='function')ensureCoastStyleDecor();
+      for(const q of data.mapEdits||[]){
+        if(MAP[q.r])MAP[q.r][q.c]=q.value;
+      }
+      // Совместимость со старыми buildingMoves/deletedBuildings.
+      for(const b of data.deletedBuildings||[])for(const q of b.cells||[])if(MAP[q.r])MAP[q.r][q.c]=baseTile(q.r,q.c);
+      for(const m of data.buildingMoves||[]){
+        for(const q of m.from||[])if(MAP[q.r])MAP[q.r][q.c]=baseTile(q.r,q.c);
+        for(const q of m.to||[])if(MAP[q.r])MAP[q.r][q.c]=1;
+      }
+    }catch(e){console.warn('Studio map load:',e);}
+  }
+
+  async function save(){
+    const edits=[];
+    for(let r=0;r<MAP.length;r++)for(let c=0;c<MAP[r].length;c++){
+      if(MAP[r][c]!==baseMap[r][c])edits.push({r,c,value:MAP[r][c]});
+    }
+    const data={version:20,districtStyleVersion:1,decorFull:_beachDecor.map(cleanDecor),mapEdits:edits};
+    try{
+      const r=await fetch('/__studio_map',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(data,null,2)
+      });
+      const body=await r.text();
+      if(!r.ok)throw new Error(`HTTP ${r.status}: ${body}`);
+      alert(`Карта обновлена. Изменено тайлов: ${edits.length}`);
+    }catch(e){alert('Не удалось сохранить: '+e.message);}
+  }
+
+  function teleport(r,c){
+    if(typeof player==='undefined'||typeof cam==='undefined')return;
+    if((typeof myDrivingCarId!=='undefined'&&myDrivingCarId)||
+       (typeof _bankInt!=='undefined'&&_bankInt)||
+       (typeof _buildingInt!=='undefined'&&_buildingInt)){
+      alert('Сначала выйди из машины или здания.');return;
+    }
+    player.r=Math.max(1,Math.min(MAP_ROWS-2,r));
+    player.c=Math.max(1,Math.min(MAP_COLS-2,c));
+    if('vr'in player)player.vr=0;if('vc'in player)player.vc=0;
+    cam.x=(player.c-player.r)*TS*.5;cam.y=(player.c+player.r)*TS*.5*ISO_Y;
+    window._studioTeleportUntil=Date.now()+10000;
+  }
+
+  function drawMini(){
+    const m=panel?.querySelector('#mfzMini');if(!m||!ready())return;
+    const g=m.getContext('2d'),W=m.width,H=m.height;
+    g.fillStyle='#091019';g.fillRect(0,0,W,H);
+    const sr=Math.max(1,Math.ceil(MAP_ROWS/H)),sc=Math.max(1,Math.ceil(MAP_COLS/W));
+    for(let r=0;r<MAP_ROWS;r+=sr)for(let c=0;c<MAP_COLS;c+=sc){
+      const t=MAP[r]?.[c];
+      g.fillStyle=t===0?'#303943':t===1?'#8a6a4f':t===15?'#cbb16d':
+        t===16?'#275d83':t===8?'#315b39':t===9?'#747b78':'#17202b';
+      g.fillRect(c/MAP_COLS*W,r/MAP_ROWS*H,Math.max(1,sc/MAP_COLS*W+1),Math.max(1,sr/MAP_ROWS*H+1));
+    }
+    if(typeof player!=='undefined'){g.fillStyle='#00f5ff';g.beginPath();g.arc(player.c/MAP_COLS*W,player.r/MAP_ROWS*H,4,0,Math.PI*2);g.fill();}
+  }
+
+  function updateInfo(){
+    if(!info)return;
+    if(!selected)info.textContent='Ничего не выбрано';
+    else if(selected.type==='decor'){
+      const a=typeof selected.obj._studioRot==='number'?Math.round(selected.obj._studioRot*180/Math.PI):0;
+      info.textContent=`${selected.kind} · r ${selected.obj.r.toFixed(2)} · c ${selected.obj.c.toFixed(2)} · ${a}°`;
+    }else info.textContent=`${selected.kind} · tile ${selected.t} · r ${selected.r} · c ${selected.c}`;
+  }
+
+  function overlay(){
+    if(!active||!selected||typeof ctx==='undefined')return;
+    ctx.save();ctx.lineWidth=3;
+    ctx.strokeStyle=selected.valid===false?'#ff3b3b':'#00e5ff';
+    ctx.fillStyle='rgba(0,229,255,.12)';
+    if(selected.type==='decor'){
+      const p=w2s(selected.obj.r,selected.obj.c);
+      ctx.beginPath();ctx.ellipse(p.x,p.y,32,16,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+    }else{
+      const r=selected.previewR??selected.r,c=selected.previewC??selected.c,p=w2s(r+.5,c+.5);
+      ctx.beginPath();ctx.ellipse(p.x,p.y,32,16,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function buildPanel(){
+    panel=document.createElement('div');panel.id='mfzEditor20';
+    panel.innerHTML=`
+      <div class="head"><b>🛠 MAFIOZY JSON MAP EDITOR 4.0</b><span>F8</span></div>
+      <div class="tabs"><button data-layer="city">Город</button><button data-layer="beach">Пляж</button></div>
+      <div id="mfzInfo">Ничего не выбрано</div>
+      <div class="miniTitle">🗺 Клик — телепорт</div><canvas id="mfzMini" width="320" height="130"></canvas>
+      <div id="mfzCatalog" class="catalog"></div>
+      <div class="actions">
+        <button data-a="rotL">↺ Повернуть -15°</button><button data-a="rotR">↻ Повернуть +15°</button>
+        <button data-a="dup">📋 Дублировать</button><button data-a="del">🗑 Удалить</button>
+        <button data-a="undo">↩ Undo</button><button data-a="redo">↪ Redo</button>
+        <button data-a="snap">🧲 Сетка: ВКЛ</button><button class="save" data-a="save">💾 ОБНОВИТЬ КАРТУ</button>
+      </div>
+      <small>ЛКМ — выбрать/тащить · Q/E — поворот · Delete · Ctrl+S</small>`;
+    const style=document.createElement('style');style.textContent=`
+      #mfzEditor20{position:fixed;z-index:999999;left:14px;top:14px;width:350px;background:#111722f3;
+      border:2px solid #d5aa3d;border-radius:12px;color:#fff;font:13px Segoe UI,Arial;padding:12px;
+      box-shadow:0 14px 45px #000b;display:none}
+      #mfzEditor20 .head{display:flex;justify-content:space-between;color:#ffd76b;font-size:15px;margin-bottom:8px}
+      #mfzEditor20 .tabs,#mfzEditor20 .actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+      #mfzEditor20 button{background:#29384b;color:#fff;border:1px solid #41536a;border-radius:6px;padding:7px;cursor:pointer}
+      #mfzInfo{background:#1d2634;padding:8px;border-radius:7px;margin:8px 0;color:#bfe6ff}
+      .miniTitle{font-size:11px;color:#9fdcf1;margin:5px 0}#mfzMini{width:100%;height:130px;border:1px solid #40536a;border-radius:6px;cursor:crosshair}
+      .catalog{display:none;grid-template-columns:1fr 1fr;gap:5px;max-height:150px;overflow:auto;margin-top:8px}
+      .actions{margin-top:9px}.actions .save{grid-column:1/3;background:#876814;border-color:#d4aa37;font-weight:700}
+      #mfzEditor20 small{display:block;color:#9facbd;margin-top:8px}body.mfz-edit20 canvas{cursor:crosshair!important}`;
+    document.head.appendChild(style);document.body.appendChild(panel);info=panel.querySelector('#mfzInfo');
+    const cat=panel.querySelector('#mfzCatalog');
+    DECOR_TYPES.forEach(([k,l])=>{const b=document.createElement('button');b.textContent=l;b.onclick=()=>addDecor(k);cat.appendChild(b);});
+    const mini=panel.querySelector('#mfzMini');
+    mini.onclick=e=>{const r=mini.getBoundingClientRect();teleport((e.clientY-r.top)/r.height*MAP_ROWS,(e.clientX-r.left)/r.width*MAP_COLS);};
+    panel.onclick=e=>{
+      const l=e.target.dataset.layer;if(l){layer=l;cat.style.display=l==='beach'?'grid':'none';selected=null;updateInfo();}
+      const a=e.target.dataset.a;
+      if(a==='rotL')rotate(-Math.PI/12);if(a==='rotR')rotate(Math.PI/12);
+      if(a==='dup')duplicate();if(a==='del')removeSelected();if(a==='undo')undo();if(a==='redo')redo();if(a==='save')save();
+      if(a==='snap'){snap=!snap;e.target.textContent=`🧲 Сетка: ${snap?'ВКЛ':'ВЫКЛ'}`;}
+    };
+  }
+
+  function toggle(){if(!LOCAL)return;active=!active;panel.style.display=active?'block':'none';document.body.classList.toggle('mfz-edit20',active);}
+
+  function init(){
+    buildPanel();
+    const wait=setInterval(async()=>{
+      if(!ready())return;clearInterval(wait);await load();
+      requestAnimationFrame(function loop(){try{overlay();drawMini();}catch(_){}requestAnimationFrame(loop);});
+      if(!LOCAL)return;
+      window.addEventListener('keydown',e=>{
+        if(e.key==='F8'){e.preventDefault();toggle();}
+        if(!active)return;
+        if(e.key.toLowerCase()==='q'){e.preventDefault();rotate(-Math.PI/12);}
+        if(e.key.toLowerCase()==='e'){e.preventDefault();rotate(Math.PI/12);}
+        if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();save();}
+        if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo();}
+        if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo();}
+        if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='d'){e.preventDefault();duplicate();}
+        if(e.key==='Delete'){e.preventDefault();removeSelected();}
+      },true);
+      canvas.addEventListener('pointerdown',e=>{
+        if(!active)return;e.preventDefault();e.stopImmediatePropagation();
+        selected=pick(e);updateInfo();
+        if(selected){pushUndo();dragging=true;canvas.setPointerCapture(e.pointerId);}
+      },true);
+      canvas.addEventListener('pointermove',e=>{
+        if(!active||!dragging||!selected)return;e.preventDefault();e.stopImmediatePropagation();moveSelected(e);
+      },true);
+      canvas.addEventListener('pointerup',e=>{
+        if(!active||!dragging)return;e.preventDefault();e.stopImmediatePropagation();dragging=false;commitMove();
+      },true);
+    },250);
+  }
+  init();
+})();
+</script>
+
+
+<script>
+// MAFIOZY_JSON_MAP_ENGINE_5_0
+(() => {
+  const LOCAL = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
+  const LOAD_URL = LOCAL ? '/__studio_map' : './map_overrides.json';
+
+  let active=false, layer='city', selected=null, dragging=false;
+  let panel=null, info=null, snap=true, loaded=false;
+  let baseMap=null, undoStack=[], redoStack=[];
+
+
+  const DECOR_GROUPS = {
+    coast: {
+      title: '🌴 Побережье',
+      items: [
+        ['palm_tall','🌴 Высокая пальма'],['palm_coconut','🥥 Кокосовая пальма'],
+        ['palm_bent','🌴 Наклонная пальма'],['beach_bush','🌿 Пляжный куст'],
+        ['beach_grass_tuft','🌾 Пучок травы'],['rock_large','🪨 Большой валун'],
+        ['rock_cluster','🪨 Группа камней'],['driftwood','🪵 Коряга'],
+        ['shell_cluster','🐚 Ракушки'],['starfish_group','⭐ Морские звёзды'],
+        ['beach_shower','🚿 Пляжный душ'],['changing_booth','🚪 Раздевалка'],
+        ['lifeguard_modern','🛟 Новая вышка'],['beach_bar','🍹 Пляжный бар'],
+        ['drink_cooler','🧊 Холодильник'],['beach_sign','🪧 Пляжный указатель'],
+        ['jet_ski','🚤 Гидроцикл'],['buoy_line','⚓ Буйки'],
+        ['wood_pier_piece','🪵 Секция пирса'],['tiki_torch','🔥 Факел']
+      ]
+    },
+    center: {
+      title: '🏙 Центр',
+      items: [
+        ['modern_bench','🪑 Современная скамейка'],['city_bin','🗑 Городская урна'],
+        ['flower_planter','🌺 Клумба'],['city_fountain','⛲ Фонтан'],
+        ['ad_panel','🖼 Рекламная панель'],['bus_stop','🚏 Остановка'],
+        ['cafe_table','☕ Столик кафе'],['modern_lamp','💡 Современный фонарь'],
+        ['bollard','🚧 Боллард'],['bike_rack','🚲 Велопарковка'],
+        ['news_kiosk','📰 Киоск'],['street_clock','🕰 Уличные часы']
+      ]
+    },
+    poor: {
+      title: '🏚 Бедный район',
+      items: [
+        ['trash_pile','🗑 Куча мусора'],['old_fence','🪵 Старый забор'],
+        ['graffiti_wall','🎨 Граффити-панель'],['wood_pallets','📦 Поддоны'],
+        ['tire_stack','🛞 Покрышки'],['wrecked_car','🚗 Разбитая машина'],
+        ['clothes_line','👕 Верёвка с бельём'],['rust_lamp','💡 Ржавый фонарь'],
+        ['cardboard_home','📦 Картонное укрытие'],['broken_sofa','🛋 Старый диван']
+      ]
+    },
+    industrial: {
+      title: '🏭 Промзона',
+      items: [
+        ['cargo_container','🚢 Контейнер'],['industrial_barrels','🛢 Бочки'],
+        ['pipe_stack','🔩 Трубы'],['fuel_tank','⛽ Цистерна'],
+        ['wood_crates','📦 Ящики'],['generator','⚡ Генератор'],
+        ['flood_light','🔦 Прожектор'],['chain_fence','🚧 Сетка-ограда'],
+        ['warning_sign','⚠ Предупреждение'],['forklift','🏗 Погрузчик'],
+        ['cable_reel','🧵 Кабельная катушка'],['industrial_vent','♨ Вентиляция']
+      ]
+    },
+    elite: {
+      title: '💎 Элитный район',
+      items: [
+        ['luxury_fountain','⛲ Элитный фонтан'],['pool_small','🏊 Бассейн'],
+        ['hedge_block','🌳 Живая изгородь'],['luxury_planter','🪴 Дорогой вазон'],
+        ['marble_statue','🗿 Статуя'],['guard_booth','🛡 Будка охраны'],
+        ['gold_lamp','💡 Золотой фонарь'],['villa_gate','🚪 Ворота виллы'],
+        ['topiary','🌲 Топиарий'],['sports_car_prop','🏎 Спорткар-декор']
+      ]
+    },
+    country: {
+      title: '🌲 Загород',
+      items: [
+        ['oak_tree','🌳 Дуб'],['pine_tree','🌲 Сосна'],['wild_bush','🌿 Дикий куст'],
+        ['country_rock','🪨 Камень'],['gazebo','🏡 Беседка'],
+        ['wood_bridge','🌉 Деревянный мост'],['farm_fence','🪵 Фермерский забор'],
+        ['hay_bales','🌾 Тюки сена'],['water_well','🪣 Колодец'],
+        ['camp_fire','🔥 Костёр'],['picnic_table','🧺 Стол для пикника'],
+        ['mail_box','📫 Почтовый ящик']
+      ]
+    },
+    night: {
+      title: '🌃 Ночной район',
+      items: [
+        ['neon_sign','💡 Неоновая вывеска'],['club_rope','🪢 VIP-ограждение'],
+        ['club_light','🔦 Клубный прожектор'],['taxi_prop','🚕 Такси-декор'],
+        ['casino_sign','🎰 Вывеска казино'],['night_billboard','🌆 Ночной билборд'],
+        ['street_barrier','🚧 Барьер'],['vip_booth','🥂 VIP-будка'],
+        ['led_strip','🌈 LED-панель'],['night_food_cart','🌭 Ночная тележка']
+      ]
+    }
+  };
+
+  const DECOR_TYPES = Object.values(DECOR_GROUPS).flatMap(group => group.items);
+
 
   const ready=()=>typeof MAP!=='undefined'&&Array.isArray(MAP)&&
     typeof _beachDecor!=='undefined'&&Array.isArray(_beachDecor)&&
@@ -40458,6 +41104,7 @@ function chatDuration(text) {
           }
         }
       }
+      if((Number(data.districtStyleVersion)||0)<1&&typeof ensureCoastStyleDecor==='function')ensureCoastStyleDecor();
       for(const q of data.mapEdits||[]){
         if(MAP[q.r])MAP[q.r][q.c]=q.value;
       }
@@ -40475,7 +41122,7 @@ function chatDuration(text) {
     for(let r=0;r<MAP.length;r++)for(let c=0;c<MAP[r].length;c++){
       if(MAP[r][c]!==baseMap[r][c])edits.push({r,c,value:MAP[r][c]});
     }
-    const data={version:20,decorFull:_beachDecor.map(cleanDecor),mapEdits:edits};
+    const data={version:20,districtStyleVersion:1,decorFull:_beachDecor.map(cleanDecor),mapEdits:edits};
     try{
       const r=await fetch('/__studio_map',{
         method:'POST',headers:{'Content-Type':'application/json'},
@@ -40539,10 +41186,93 @@ function chatDuration(text) {
     ctx.restore();
   }
 
+
+  function _mfzDrawIsoBox(x,y,w,h,d,top='#777',left='#555',right='#666'){
+    ctx.save();
+    ctx.beginPath();ctx.moveTo(x,y-h);ctx.lineTo(x+w,y-h+w*.5);ctx.lineTo(x,y-h+w);ctx.lineTo(x-w,y-h+w*.5);ctx.closePath();ctx.fillStyle=top;ctx.fill();
+    ctx.beginPath();ctx.moveTo(x-w,y-h+w*.5);ctx.lineTo(x,y-h+w);ctx.lineTo(x,y+d);ctx.lineTo(x-w,y+d-w*.5);ctx.closePath();ctx.fillStyle=left;ctx.fill();
+    ctx.beginPath();ctx.moveTo(x+w,y-h+w*.5);ctx.lineTo(x,y-h+w);ctx.lineTo(x,y+d);ctx.lineTo(x+w,y+d-w*.5);ctx.closePath();ctx.fillStyle=right;ctx.fill();
+    ctx.restore();
+  }
+
+  function drawDistrictDecor(d){
+    const p=w2s(d.r,d.c),x=p.x,y=p.y,a=Number(d._studioRot||0),s=Number(d.scale||1);
+    ctx.save();ctx.translate(x,y);ctx.rotate(a);ctx.scale(s,s);ctx.translate(-x,-y);
+    const k=d.kind;
+    ctx.lineWidth=2;ctx.strokeStyle='#1b1b1b';
+    const box=(w,h,dep,t,l,r)=>_mfzDrawIsoBox(x,y,w,h,dep,t,l,r);
+
+    if(k.startsWith('palm_')){drawPalmTree(d.r,d.c,d.variant||1);}
+    else if(k==='beach_bush'||k==='wild_bush'){ctx.fillStyle='#2d6a3d';for(let i=-2;i<=2;i++){ctx.beginPath();ctx.arc(x+i*7,y-10-Math.abs(i)*2,11,0,Math.PI*2);ctx.fill();}}
+    else if(k==='beach_grass_tuft'){ctx.strokeStyle='#6f8f42';for(let i=-6;i<=6;i+=2){ctx.beginPath();ctx.moveTo(x+i,y);ctx.quadraticCurveTo(x+i*1.2,y-18,x+i+4,y-28);ctx.stroke();}}
+    else if(k.includes('rock')){ctx.fillStyle='#777';ctx.beginPath();ctx.moveTo(x-24,y);ctx.lineTo(x-15,y-20);ctx.lineTo(x+6,y-28);ctx.lineTo(x+26,y-8);ctx.lineTo(x+18,y+2);ctx.closePath();ctx.fill();ctx.stroke();}
+    else if(k==='driftwood'){ctx.strokeStyle='#7a4e2e';ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(x-28,y-5);ctx.lineTo(x+26,y-12);ctx.stroke();ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x-5,y-8);ctx.lineTo(x-15,y-23);ctx.stroke();}
+    else if(k==='shell_cluster'||k==='starfish_group'){ctx.fillStyle=k==='shell_cluster'?'#f3d6b3':'#e67e22';for(let i=0;i<4;i++){ctx.beginPath();ctx.arc(x-18+i*12,y-3-(i%2)*5,4,0,Math.PI*2);ctx.fill();}}
+    else if(k==='beach_shower'){box(18,55,4,'#9fd3e6','#6ea5b8','#7fb9cb');ctx.strokeStyle='#d9f4ff';ctx.beginPath();ctx.moveTo(x,y-55);ctx.lineTo(x+18,y-70);ctx.stroke();ctx.beginPath();ctx.arc(x+18,y-72,6,0,Math.PI*2);ctx.stroke();}
+    else if(k==='changing_booth'||k==='guard_booth'||k==='vip_booth'){box(24,55,5,k==='changing_booth'?'#f6c85f':'#555','#8a5a2b','#a66a32');ctx.fillStyle='#222';ctx.fillRect(x-7,y-42,14,27);}
+    else if(k==='lifeguard_modern'){box(28,50,4,'#f5f5f5','#d54','#e76');ctx.fillStyle='#e74c3c';ctx.fillRect(x-22,y-68,44,8);}
+    else if(k==='beach_bar'||k==='news_kiosk'){box(35,42,6,'#d7a45d','#8a5a2b','#a66a32');ctx.fillStyle='#f6c85f';ctx.fillRect(x-30,y-58,60,10);}
+    else if(k==='drink_cooler'){box(18,28,4,'#fff','#4aa3df','#63b3ed');ctx.fillStyle='#e74c3c';ctx.fillRect(x-9,y-17,18,7);}
+    else if(k==='beach_sign'||k==='warning_sign'){ctx.strokeStyle='#6b4a2d';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y-45);ctx.stroke();ctx.fillStyle=k==='warning_sign'?'#f1c40f':'#e8d19d';ctx.fillRect(x-24,y-60,48,20);ctx.strokeRect(x-24,y-60,48,20);}
+    else if(k==='jet_ski'){box(28,18,3,'#e74c3c','#9b2c2c','#c0392b');ctx.fillStyle='#111';ctx.fillRect(x-8,y-22,16,7);}
+    else if(k==='buoy_line'){ctx.strokeStyle='#ddd';ctx.beginPath();ctx.moveTo(x-30,y-5);ctx.lineTo(x+30,y-5);ctx.stroke();for(let i=-2;i<=2;i++){ctx.fillStyle=i%2?'#fff':'#e74c3c';ctx.beginPath();ctx.arc(x+i*14,y-6,5,0,Math.PI*2);ctx.fill();}}
+    else if(k==='wood_pier_piece'||k==='wood_bridge'){box(34,8,3,'#a66a32','#6b3f1f','#8b5528');for(let i=-2;i<=2;i++){ctx.strokeStyle='#5d351b';ctx.beginPath();ctx.moveTo(x+i*12,y-4);ctx.lineTo(x+i*12,y+10);ctx.stroke();}}
+    else if(k==='tiki_torch'||k==='camp_fire'){ctx.strokeStyle='#6b3f1f';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y-36);ctx.stroke();ctx.fillStyle='#ff9f1c';ctx.beginPath();ctx.arc(x,y-43,8,0,Math.PI*2);ctx.fill();}
+    else if(k==='modern_bench'||k==='broken_sofa'||k==='picnic_table'){box(32,14,4,'#9b7653','#5d4037','#7b5e48');if(k==='modern_bench'){ctx.strokeStyle='#333';ctx.beginPath();ctx.moveTo(x-24,y-12);ctx.lineTo(x-24,y-34);ctx.lineTo(x+24,y-34);ctx.lineTo(x+24,y-12);ctx.stroke();}}
+    else if(k==='city_bin'||k==='trash_pile'){ctx.fillStyle=k==='city_bin'?'#444':'#6d5f50';ctx.beginPath();ctx.ellipse(x,y-8,14,10,0,0,Math.PI*2);ctx.fill();ctx.fillRect(x-14,y-8,28,18);}
+    else if(k==='flower_planter'||k==='luxury_planter'){box(22,12,4,'#8d6e63','#5d4037','#795548');for(let i=-2;i<=2;i++){ctx.fillStyle=['#e74c3c','#f1c40f','#9b59b6'][i+2];ctx.beginPath();ctx.arc(x+i*8,y-20-(i%2)*4,6,0,Math.PI*2);ctx.fill();}}
+    else if(k.includes('fountain')){ctx.fillStyle='#bdc3c7';ctx.beginPath();ctx.ellipse(x,y,34,16,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#55b7dd';ctx.beginPath();ctx.ellipse(x,y-4,27,11,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#8fd3ef';ctx.beginPath();ctx.moveTo(x,y-7);ctx.quadraticCurveTo(x,y-45,x+1,y-8);ctx.stroke();}
+    else if(k==='ad_panel'||k==='night_billboard'||k==='graffiti_wall'){ctx.strokeStyle='#555';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(x-18,y);ctx.lineTo(x-18,y-55);ctx.moveTo(x+18,y);ctx.lineTo(x+18,y-55);ctx.stroke();ctx.fillStyle=k==='graffiti_wall'?'#7f8c8d':'#2c3e50';ctx.fillRect(x-32,y-78,64,30);ctx.strokeRect(x-32,y-78,64,30);}
+    else if(k==='bus_stop'){ctx.strokeStyle='#555';ctx.lineWidth=4;ctx.strokeRect(x-30,y-70,60,55);ctx.fillStyle='rgba(120,190,220,.35)';ctx.fillRect(x-28,y-68,56,50);}
+    else if(k==='cafe_table'){ctx.fillStyle='#8b5a2b';ctx.beginPath();ctx.ellipse(x,y-24,18,9,0,0,Math.PI*2);ctx.fill();ctx.fillRect(x-3,y-24,6,24);}
+    else if(k.includes('lamp')||k==='flood_light'||k==='club_light'){ctx.strokeStyle=k==='gold_lamp'?'#d4af37':'#333';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y-65);ctx.stroke();ctx.fillStyle=k==='club_light'?'#8e44ad':'#ffeaa7';ctx.beginPath();ctx.arc(x,y-72,9,0,Math.PI*2);ctx.fill();}
+    else if(k==='bollard'){box(8,25,3,'#777','#444','#555');}
+    else if(k==='bike_rack'){ctx.strokeStyle='#777';ctx.lineWidth=4;for(let i=-2;i<=2;i++){ctx.beginPath();ctx.arc(x+i*12,y-12,8,Math.PI,0);ctx.stroke();}}
+    else if(k==='street_clock'){ctx.strokeStyle='#333';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y-70);ctx.stroke();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y-82,15,0,Math.PI*2);ctx.fill();ctx.stroke();}
+    else if(k==='old_fence'||k==='farm_fence'||k==='chain_fence'){ctx.strokeStyle=k==='chain_fence'?'#777':'#7a4e2e';ctx.lineWidth=5;for(let i=-2;i<=2;i++){ctx.beginPath();ctx.moveTo(x+i*16,y);ctx.lineTo(x+i*16,y-42);ctx.stroke();}ctx.beginPath();ctx.moveTo(x-38,y-30);ctx.lineTo(x+38,y-30);ctx.moveTo(x-38,y-12);ctx.lineTo(x+38,y-12);ctx.stroke();}
+    else if(k==='wood_pallets'||k==='wood_crates'){box(25,20,4,'#b07d42','#6b4423','#8b5a2b');}
+    else if(k==='tire_stack'){ctx.strokeStyle='#222';ctx.lineWidth=7;for(let i=0;i<3;i++){ctx.beginPath();ctx.ellipse(x,y-i*10,18,8,0,0,Math.PI*2);ctx.stroke();}}
+    else if(k==='wrecked_car'||k==='sports_car_prop'||k==='taxi_prop'){box(32,17,4,k==='taxi_prop'?'#f1c40f':k==='sports_car_prop'?'#e74c3c':'#555','#333','#444');ctx.fillStyle='#111';ctx.fillRect(x-18,y-19,36,8);}
+    else if(k==='clothes_line'){ctx.strokeStyle='#654321';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(x-35,y);ctx.lineTo(x-35,y-55);ctx.moveTo(x+35,y);ctx.lineTo(x+35,y-55);ctx.moveTo(x-35,y-48);ctx.lineTo(x+35,y-48);ctx.stroke();ctx.fillStyle='#3498db';ctx.fillRect(x-20,y-48,14,18);ctx.fillStyle='#e74c3c';ctx.fillRect(x+4,y-48,14,16);}
+    else if(k==='cardboard_home'){box(28,32,5,'#a67c52','#6d4c41','#8d6e63');}
+    else if(k==='cargo_container'){box(42,34,8,'#c0392b','#7b241c','#922b21');for(let i=-2;i<=2;i++){ctx.strokeStyle='#5d1c16';ctx.beginPath();ctx.moveTo(x+i*14,y-28);ctx.lineTo(x+i*14,y+4);ctx.stroke();}}
+    else if(k==='industrial_barrels'){for(let i=-1;i<=1;i++){ctx.fillStyle='#34495e';ctx.fillRect(x+i*18-7,y-24,14,25);ctx.beginPath();ctx.ellipse(x+i*18,y-24,7,4,0,0,Math.PI*2);ctx.fill();}}
+    else if(k==='pipe_stack'){ctx.strokeStyle='#777';ctx.lineWidth=8;for(let i=-1;i<=1;i++){ctx.beginPath();ctx.ellipse(x+i*18,y-8,8,4,0,0,Math.PI*2);ctx.stroke();}}
+    else if(k==='fuel_tank'){ctx.fillStyle='#95a5a6';ctx.fillRect(x-28,y-42,56,36);ctx.beginPath();ctx.ellipse(x,y-42,28,10,0,0,Math.PI*2);ctx.fill();}
+    else if(k==='generator'){box(26,28,5,'#f1c40f','#9a7d0a','#b7950b');ctx.fillStyle='#333';ctx.fillRect(x-14,y-22,28,10);}
+    else if(k==='warning_sign'){ctx.fillStyle='#f1c40f';ctx.fillRect(x-24,y-55,48,20);}
+    else if(k==='forklift'){box(30,20,5,'#f39c12','#9c640c','#b9770e');ctx.strokeStyle='#555';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(x+25,y-15);ctx.lineTo(x+25,y-55);ctx.moveTo(x+35,y-15);ctx.lineTo(x+35,y-55);ctx.stroke();}
+    else if(k==='cable_reel'){ctx.strokeStyle='#6b4f2a';ctx.lineWidth=7;ctx.beginPath();ctx.arc(x,y-18,18,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#8b6b3f';ctx.beginPath();ctx.arc(x,y-18,6,0,Math.PI*2);ctx.fill();}
+    else if(k==='industrial_vent'){box(22,30,4,'#7f8c8d','#4d5656','#626567');ctx.fillStyle='#222';ctx.beginPath();ctx.arc(x,y-18,8,0,Math.PI*2);ctx.fill();}
+    else if(k==='pool_small'){ctx.fillStyle='#ecf0f1';ctx.beginPath();ctx.ellipse(x,y,40,20,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#5dade2';ctx.beginPath();ctx.ellipse(x,y-3,34,15,0,0,Math.PI*2);ctx.fill();}
+    else if(k==='hedge_block'||k==='topiary'){ctx.fillStyle='#216e39';if(k==='hedge_block')ctx.fillRect(x-30,y-32,60,32);else{ctx.beginPath();ctx.arc(x,y-42,24,0,Math.PI*2);ctx.fill();ctx.fillRect(x-4,y-20,8,20);}}
+    else if(k==='marble_statue'){box(12,18,3,'#ddd','#aaa','#bbb');ctx.fillStyle='#ddd';ctx.beginPath();ctx.arc(x,y-38,12,0,Math.PI*2);ctx.fill();}
+    else if(k==='villa_gate'){ctx.strokeStyle='#444';ctx.lineWidth=6;ctx.strokeRect(x-40,y-70,80,70);for(let i=-3;i<=3;i++){ctx.beginPath();ctx.moveTo(x+i*11,y);ctx.lineTo(x+i*11,y-68);ctx.stroke();}}
+    else if(k==='oak_tree'||k==='pine_tree'){if(k==='pine_tree'){ctx.fillStyle='#1e6b3f';for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(x,y-85+i*22);ctx.lineTo(x-28+i*4,y-35+i*18);ctx.lineTo(x+28-i*4,y-35+i*18);ctx.closePath();ctx.fill();}}else{ctx.fillStyle='#2e7d32';for(let i=-2;i<=2;i++){ctx.beginPath();ctx.arc(x+i*12,y-55-Math.abs(i)*4,20,0,Math.PI*2);ctx.fill();}}ctx.fillStyle='#6d4c41';ctx.fillRect(x-5,y-38,10,38);}
+    else if(k==='gazebo'){ctx.strokeStyle='#6d4c41';ctx.lineWidth=5;for(let i=-1;i<=1;i+=2){ctx.beginPath();ctx.moveTo(x+i*28,y);ctx.lineTo(x+i*28,y-50);ctx.stroke();}ctx.fillStyle='#b07d42';ctx.beginPath();ctx.moveTo(x-38,y-50);ctx.lineTo(x,y-80);ctx.lineTo(x+38,y-50);ctx.closePath();ctx.fill();}
+    else if(k==='hay_bales'){ctx.fillStyle='#d4a017';for(let i=-1;i<=1;i++){ctx.fillRect(x+i*22-10,y-22,20,22);}}
+    else if(k==='water_well'){ctx.fillStyle='#777';ctx.beginPath();ctx.ellipse(x,y-8,25,12,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#5d4037';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(x-22,y-6);ctx.lineTo(x-22,y-55);ctx.moveTo(x+22,y-6);ctx.lineTo(x+22,y-55);ctx.stroke();}
+    else if(k==='mail_box'){ctx.strokeStyle='#555';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y-38);ctx.stroke();ctx.fillStyle='#c0392b';ctx.fillRect(x-14,y-55,28,18);}
+    else if(k==='neon_sign'||k==='casino_sign'||k==='led_strip'){ctx.shadowBlur=18;ctx.shadowColor=k==='casino_sign'?'#f1c40f':'#ff00cc';ctx.fillStyle=k==='casino_sign'?'#f1c40f':'#ff00cc';ctx.fillRect(x-30,y-60,60,18);ctx.shadowBlur=0;}
+    else if(k==='club_rope'||k==='street_barrier'){ctx.strokeStyle='#c0392b';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(x-28,y);ctx.lineTo(x-28,y-35);ctx.moveTo(x+28,y);ctx.lineTo(x+28,y-35);ctx.moveTo(x-28,y-28);ctx.lineTo(x+28,y-28);ctx.stroke();}
+    else if(k==='night_food_cart'){box(28,30,5,'#2c3e50','#17202a','#1b2631');ctx.fillStyle='#ff00cc';ctx.fillRect(x-22,y-48,44,8);}
+    else {box(20,24,4,'#888','#555','#666');}
+    ctx.restore();
+  }
+
+  function drawDistrictDecorLayer(){
+    if(typeof _beachDecor==='undefined')return;
+    for(const d of _beachDecor){
+      if(d && typeof d.kind==='string' && DECOR_TYPES.some(x=>x[0]===d.kind)){
+        drawDistrictDecor(d);
+      }
+    }
+  }
+
   function buildPanel(){
     panel=document.createElement('div');panel.id='mfzEditor20';
     panel.innerHTML=`
-      <div class="head"><b>🛠 MAFIOZY JSON MAP EDITOR 4.0</b><span>F8</span></div>
+      <div class="head"><b>🛠 MAFIOZY DISTRICT MAP EDITOR 5.0</b><span>F8</span></div>
       <div class="tabs"><button data-layer="city">Город</button><button data-layer="beach">Пляж</button></div>
       <div id="mfzInfo">Ничего не выбрано</div>
       <div class="miniTitle">🗺 Клик — телепорт</div><canvas id="mfzMini" width="320" height="130"></canvas>
@@ -40568,7 +41298,16 @@ function chatDuration(text) {
       #mfzEditor20 small{display:block;color:#9facbd;margin-top:8px}body.mfz-edit20 canvas{cursor:crosshair!important}`;
     document.head.appendChild(style);document.body.appendChild(panel);info=panel.querySelector('#mfzInfo');
     const cat=panel.querySelector('#mfzCatalog');
-    DECOR_TYPES.forEach(([k,l])=>{const b=document.createElement('button');b.textContent=l;b.onclick=()=>addDecor(k);cat.appendChild(b);});
+
+    Object.entries(DECOR_GROUPS).forEach(([groupId,group])=>{
+      const title=document.createElement('div');
+      title.textContent=group.title;title.className='groupTitle';cat.appendChild(title);
+      group.items.forEach(([k,l])=>{
+        const b=document.createElement('button');b.textContent=l;b.dataset.kind=k;
+        b.onclick=()=>addDecor(k);cat.appendChild(b);
+      });
+    });
+
     const mini=panel.querySelector('#mfzMini');
     mini.onclick=e=>{const r=mini.getBoundingClientRect();teleport((e.clientY-r.top)/r.height*MAP_ROWS,(e.clientX-r.left)/r.width*MAP_COLS);};
     panel.onclick=e=>{
@@ -40586,7 +41325,7 @@ function chatDuration(text) {
     buildPanel();
     const wait=setInterval(async()=>{
       if(!ready())return;clearInterval(wait);await load();
-      requestAnimationFrame(function loop(){try{overlay();drawMini();}catch(_){}requestAnimationFrame(loop);});
+      requestAnimationFrame(function loop(){try{drawDistrictDecorLayer();overlay();drawMini();}catch(_){}requestAnimationFrame(loop);});
       if(!LOCAL)return;
       window.addEventListener('keydown',e=>{
         if(e.key==='F8'){e.preventDefault();toggle();}
