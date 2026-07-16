@@ -13258,7 +13258,7 @@ function handleEventPacket(d) {
         myCash = parseInt(d.cash) || 0;
         updateMoneyHud();
       }
-      const place = d.place === 'apartment' ? '🏠 Мешок спрятан в квартире!' : '🏆 Ограбление завершено!';
+      const place = d.place === 'apartment' ? '🏠 Деньги спрятаны в штаб-квартире! Мешок убран.' : '🏆 Ограбление завершено!';
       showToast(`${place} +$${payout.toLocaleString('ru')} (${d.bags || 1} меш.)`, '💰', 5000);
       try { hapticHit && hapticHit(); } catch(e) {}
       _bankRob = null;
@@ -15078,8 +15078,8 @@ function updateGtaInteractions() {
       const reward = (_bankRob.bank && _bankRob.bank.reward_per_bag) || _bankRob.myBag.value || 1200;
       _gtaActionKind = 'apt_bag_deliver'; _gtaActionCarId = null;
       _gtaBtn.textContent = _bankRob._deliveryPending
-        ? '⏳ Прячем мешок…'
-        : `🏠 Спрятать мешок (+$${reward.toLocaleString('ru')})`;
+        ? '⏳ Прячем деньги…'
+        : `💵 Спрятать деньги (+$${reward.toLocaleString('ru')})`;
       _gtaBtn.style.display = 'block'; return;
     }
     // Кейс с лутом
@@ -35367,7 +35367,7 @@ function deliverBagToApartment() {
     bank_id: _bankRob.bank && _bankRob.bank.id,
     apt_key: aptKey,
   }}));
-  showToast('🏠 Прячем мешок в квартире…', '💼', 1800);
+  showToast('🏠 Прячем деньги в штаб-квартире…', '💵', 1800);
 }
 
 // Копы забирают мешок при аресте — игрок не должен попадать в тюрьму с
