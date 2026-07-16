@@ -20378,14 +20378,21 @@ function updateDistrictCapture() {
     }
   }
   if (!point) return;
+  const dr = player.r - point.r, dc = player.c - point.c;
+  const nearObjective = dr * dr + dc * dc <= DIST_ACTION_RAD * DIST_ACTION_RAD;
+  // Вход в границы района сам по себе не является началом операции.
+  // До взятия досье показываем HUD миссии только внутри стартового круга.
+  if (!op && !nearObjective) {
+    _cancelDistrictNodeDisable();
+    return;
+  }
   if(_districtNodeDisable&&(phase!=='sabotage'||_districtNodeDisable.did!==d.id||
       _districtNodeDisable.targetIndex!==_myDistrictObjective?.targetIndex||_myDistrictObjective?.planted)){
     _cancelDistrictNodeDisable();
   }
   _myInsideDistHq = d.id;
   if(!_myDistrictObjective)_myDistrictObjective = { did:d.id, point, phase, label, icon };
-  const dr = player.r - point.r, dc = player.c - point.c;
-  if (dr * dr + dc * dc > DIST_ACTION_RAD * DIST_ACTION_RAD) {
+  if (!nearObjective) {
     if(_districtNodeDisable&&_districtNodeDisable.did===d.id)_cancelDistrictNodeDisable(true);
     return;
   }
