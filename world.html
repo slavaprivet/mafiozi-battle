@@ -10020,6 +10020,13 @@ function _beginWorldResume() {
 // (старая система магазина/статуса) и с myBusinesses (POI-бизнесы).
 let _myApartments = {};
 let _apartmentStateLoaded = false;
+const APARTMENT_OWNERSHIP_LIMIT = 5;
+function _apartmentOwnedCount() {
+  return Object.keys(_myApartments || {}).length;
+}
+function _apartmentCounterLabel() {
+  return `${Math.min(_apartmentOwnedCount(), APARTMENT_OWNERSHIP_LIMIT)}/${APARTMENT_OWNERSHIP_LIMIT}`;
+}
 // Каждый тайл внутри городского квадрата 4×4 — отдельное мини-здание.
 // Новый ключ хранит точный тайл входа. Старые записи формата "br,bc"
 // продолжают работать и отображаются на центральном мини-здании квартала.
@@ -10226,6 +10233,10 @@ async function buyCurrentApartment() {
   if (!_buildingInt || _buildingInt.type) return;
   const key = _aptTileKey(_buildingInt.r, _buildingInt.c);
   if (_myApartments[key]) { showToast('🏠 Эта квартира уже твоя', '✅', 1800); return; }
+  if (_apartmentOwnedCount() >= APARTMENT_OWNERSHIP_LIMIT) {
+    showToast(`🏠 Лимит квартир: ${_apartmentCounterLabel()}`, '⚠️', 2600);
+    return;
+  }
   const price = apartmentPrice(_buildingInt.r, _buildingInt.c);
   if ((parseInt(QP.cash) || 0) < price) {
     showToast(`💸 Нужно $${price.toLocaleString('ru')}`, '❌', 2200); return;
@@ -10237,12 +10248,15 @@ async function buyCurrentApartment() {
     });
     const j = await r.json();
     if (!j.ok) {
-      showToast(j.error === 'no cash' ? '💸 Недостаточно денег' : '❌ Не удалось купить', '❌', 2200);
+      const msg = j.error === 'no cash' ? '💸 Недостаточно денег'
+        : j.error === 'apartment limit' ? `🏠 Лимит квартир: ${APARTMENT_OWNERSHIP_LIMIT}/${APARTMENT_OWNERSHIP_LIMIT}`
+        : '❌ Не удалось купить';
+      showToast(msg, '❌', 2600);
       return;
     }
     if (j.cash !== undefined) { QP.cash = j.cash; myCash = parseInt(j.cash) || 0; updateMoneyHud(); }
     if (j.owned) _myApartments = j.owned;
-    showToast('🏠 Квартира куплена!', '✅', 2200);
+    showToast(`🏠 Квартира куплена! Квартира ${_apartmentCounterLabel()}`, '✅', 2800);
     if (_profileTab === 'status') renderProfileTab();
   } catch (e) { showToast('⚠️ Ошибка связи с сервером', '❌', 2200); }
 }
@@ -15050,7 +15064,9 @@ function updateGtaInteractions() {
       if (!owned) {
         const price = apartmentPrice(_buildingInt.r, _buildingInt.c);
         _gtaActionKind = 'apt_buy'; _gtaActionCarId = null;
-        _gtaBtn.textContent = `🏠 Купить квартиру за $${price.toLocaleString('ru')}`;
+        _gtaBtn.textContent = _apartmentOwnedCount() >= APARTMENT_OWNERSHIP_LIMIT
+          ? `🏠 Лимит квартир ${_apartmentCounterLabel()}`
+          : `🏠 Купить квартиру за $${price.toLocaleString('ru')} · ${_apartmentCounterLabel()}`;
         _gtaBtn.style.display = 'block'; return;
       } else {
         _gtaActionKind = 'apt_upgrade'; _gtaActionCarId = null;
@@ -37568,7 +37584,7 @@ function drawBuildingInterior() {
     ctx.font = 'bold 12px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const txt = info ? '🏠 Твоя квартира' : `🏠 Можно купить: $${apartmentPrice(bi.r, bi.c).toLocaleString('ru')}`;
+    const txt = info ? `🏠 Твоя квартира · ${_apartmentCounterLabel()}` : `🏠 Можно купить: $${apartmentPrice(bi.r, bi.c).toLocaleString('ru')} · ${_apartmentCounterLabel()}`;
     const tw = ctx.measureText(txt).width + 18;
     ctx.fillStyle = 'rgba(0,0,0,.55)';
     ctx.strokeStyle = info ? 'rgba(130,255,160,.7)' : 'rgba(255,215,107,.7)';
