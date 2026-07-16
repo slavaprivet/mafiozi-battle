@@ -620,6 +620,29 @@ body.in-pvp #robActionBtn { top: 152px; }
 #gangRosterList .gr-row.dead .gr-dot { background:#8a3030;box-shadow:none; }
 #gangRosterList .gr-row.dead .gr-name { text-decoration:line-through;text-decoration-thickness:1.5px; }
 #gangRosterList .gr-empty { color:#727d8f;font-weight:600;font-style:italic;padding:1px 0; }
+#jobStatusHud {
+  position:absolute;left:14px;top:246px;width:min(168px,46vw);z-index:7;
+  padding:7px 8px;border-radius:9px;pointer-events:none;
+  background:linear-gradient(145deg,rgba(18,27,38,.95),rgba(8,13,21,.92));
+  border:1px solid rgba(74,142,201,.62);box-shadow:0 5px 16px rgba(0,0,0,.4);
+  color:#dcecff;font:700 10px/1.25 system-ui,sans-serif;
+}
+#jobStatusHud .js-title{display:flex;align-items:center;justify-content:space-between;color:#8fd1ff;margin-bottom:3px}
+#jobStatusHud .js-state{color:#f2f6fb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#jobStatusHud .js-sub{color:#93a4b8;font-size:9px;margin-top:2px}
+#jobStatusHud.ready{border-color:#58dd82;box-shadow:0 0 12px rgba(70,210,110,.24)}
+#jobModal{display:none;position:fixed;inset:0;z-index:120;background:rgba(2,5,10,.76);align-items:center;justify-content:center;padding:16px}
+#jobModal.show{display:flex}
+#jobModal .job-card{width:min(430px,94vw);max-height:82vh;overflow:auto;border-radius:14px;padding:15px;background:linear-gradient(155deg,#172333,#0b111b);border:1px solid #3d78a8;box-shadow:0 20px 60px rgba(0,0,0,.72);color:#eaf4ff;font:700 12px system-ui,sans-serif}
+#jobModal .job-head{display:flex;align-items:center;justify-content:space-between;font-size:17px;color:#8fd1ff;margin-bottom:7px}
+#jobModal .job-close{width:30px;height:30px;border-radius:50%;border:1px solid #65778c;background:#273444;color:#fff;font-size:18px;cursor:pointer}
+#jobModal .job-note{color:#9cb0c5;font-size:10px;margin-bottom:10px}
+#jobModal .job-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:9px;margin:6px 0;border-radius:9px;background:rgba(255,255,255,.045);border:1px solid rgba(120,165,205,.23)}
+#jobModal .job-row.locked{opacity:.48}
+#jobModal .job-name{color:#f3f7fb}.job-pay{color:#79e99b;font-size:10px;margin-top:3px}
+#jobModal .job-action{border:1px solid #4e9bd6;border-radius:8px;background:#245f8a;color:#fff;padding:7px 9px;font:800 10px system-ui;cursor:pointer}
+#jobModal .job-action.danger{border-color:#b64b55;background:#762d35}.job-action.pay{border-color:#58d37c;background:#207642}
+#jobModal .job-action:disabled{opacity:.45;cursor:default}
 #districtMissionClose {
   position: absolute; left: calc(50% + min(38vw, 150px) - 17px); top: calc(70% - 31px);
   width: 27px; height: 27px; display: none; align-items: center; justify-content: center;
@@ -1644,6 +1667,14 @@ body.in-pvp #robActionBtn { top: 152px; }
     <div class="gr-head"><span>👥 Моя банда</span><span class="gr-count" id="gangRosterCount">0/5</span></div>
     <div id="gangRosterList"><div class="gr-empty">Бойцов пока нет</div></div>
   </section>
+  <section id="jobStatusHud" aria-label="Статус работы">
+    <div class="js-title"><span>💼 Работа</span><span id="jobStatusTimer">—</span></div>
+    <div class="js-state" id="jobStatusName">Не трудоустроен</div>
+    <div class="js-sub" id="jobStatusSub">Биржа труда: район (36, 16)</div>
+  </section>
+  <div id="jobModal" role="dialog" aria-label="Биржа труда">
+    <div class="job-card"><div class="job-head"><span>💼 Биржа труда</span><button class="job-close" id="jobModalClose" type="button">×</button></div><div id="jobModalBody"></div></div>
+  </div>
   <button id="districtMissionClose" type="button" aria-label="Скрыть задание" title="Скрыть задание, не отменяя его">×</button>
   <!-- Модал выбора режима PvP/PvE (первый вход в мир) -->
   <div id="modeModal">
@@ -2032,6 +2063,236 @@ const TRACK_PTS = [
   [190, 8],  [184, 5],  [176, 5],  [170, 7],    // западный загиб вверх
 ];
 const TRACK_HALF_W = 2.2;   // полуширина полотна (~4-5 тайлов)
+
+// ── Водная жизнь: глубина, плавание и гидроциклы ──────────────────
+// Берег остаётся проходимым пешком до воды, затем персонаж сначала идёт
+// вброд, а на глубине ложится на воду. Дальняя граница нужна, чтобы игрок
+// не уплывал за игровую акваторию и не пересекал морское кольцо гонок.
+const SWIM_DEEP_R = BEACH_R1 + 2.25;
+const SWIM_LIMIT_R = BEACH_R1 + 10.5;
+let _playerInWater = false;
+let _playerSwimmingDeep = false;
+let _playerWaterDepthM = 0;
+let _swimNoticeShown = false;
+
+function _isWaterTile(r, c) {
+  const ri = Math.floor(r), ci = Math.floor(c);
+  return !!(MAP && MAP[ri] && MAP[ri][ci] === 16);
+}
+function _waterDepthM(r, c) {
+  return _isWaterTile(r, c) ? Math.max(0.2, (r - BEACH_R1 + 0.7) * 0.58) : 0;
+}
+function _isSwimmableWater(r, c) {
+  return r >= BEACH_R1 - 0.15 && r <= SWIM_LIMIT_R && _isWaterTile(r, c);
+}
+function _isPlayerCoastBlocked(r, c) {
+  if (_isSwimmableWater(r, c)) return false;
+  return isBlockedPed(r, c);
+}
+function _tryMovePlayerCoast(obj, dr, dc) {
+  const pad = 0.22;
+  const blocked = _isPlayerCoastBlocked;
+  let nr = obj.r + dr;
+  if (!blocked(nr - pad, obj.c) && !blocked(nr + pad, obj.c) &&
+      !blocked(nr, obj.c - pad) && !blocked(nr, obj.c + pad)) obj.r = nr;
+  let nc = obj.c + dc;
+  if (!blocked(obj.r - pad, nc) && !blocked(obj.r + pad, nc) &&
+      !blocked(obj.r, nc - pad) && !blocked(obj.r, nc + pad)) obj.c = nc;
+}
+function _refreshPlayerWaterState() {
+  _playerInWater = _isSwimmableWater(player.r, player.c);
+  _playerWaterDepthM = _waterDepthM(player.r, player.c);
+  const wasDeep = _playerSwimmingDeep;
+  _playerSwimmingDeep = _playerInWater && player.r >= SWIM_DEEP_R && !myJetSkiId;
+  if (_playerSwimmingDeep && !wasDeep && !_swimNoticeShown) {
+    _swimNoticeShown = true;
+    showToast('🌊 Глубина — плывём. Оружие использовать нельзя', '🏊', 2600);
+  }
+  if (!_playerInWater) _swimNoticeShown = false;
+}
+
+const JET_SKI_PARKING = [
+  { id:'hydro_red',  homeR:166.35, homeC:49.2, color:'#ef3f43', accent:'#ffd54a' },
+  { id:'hydro_blue', homeR:166.35, homeC:54.0, color:'#2098e8', accent:'#e9f7ff' },
+];
+const JET_SKIS = JET_SKI_PARKING.map((p, i) => ({
+  ...p, r:p.homeR, c:p.homeC, ang:Math.PI, speed:0, throttle:0,
+  driver:false, parked:true, returning:false, abandonedAt:0, phase:i * 2.7,
+}));
+let myJetSkiId = null;
+let _jetExitRequested = false;
+const _jetSpray = [];
+
+function _jetSkiById(id) { return JET_SKIS.find(j => j.id === id) || null; }
+function _jetSkiCanMove(r, c) {
+  return r >= BEACH_R1 && r < MAP_ROWS - 1 && c >= 1 && c < MAP_COLS - 1 && _isWaterTile(r, c);
+}
+function _nearestJetSki(maxD=2.4) {
+  let best=null, bd=maxD;
+  for (const j of JET_SKIS) {
+    if (j.driver || j.returning) continue;
+    const d=Math.hypot(j.r-player.r,j.c-player.c);
+    if (d<bd) { bd=d; best=j; }
+  }
+  return best;
+}
+function enterJetSki(id) {
+  const j=_jetSkiById(id);
+  if (!j || j.driver || myDrivingCarId || _inBus || myDead) return;
+  if (Math.hypot(j.r-player.r,j.c-player.c)>3) return;
+  if (_bankRob && _bankRob.myBag && typeof dropVaultBag === 'function') dropVaultBag();
+  myJetSkiId=j.id; j.driver=true; j.parked=false; j.returning=false;
+  j.abandonedAt=0; _jetExitRequested=false;
+  player.r=j.r; player.c=j.c; player.ang=j.ang;
+  lockedTargets.clear(); fireFromAimHold(0,false);
+  showToast('🌊 Гидроцикл заведён — держи газ!', '🛥️', 1800);
+}
+function exitJetSki(force=false) {
+  const j=_jetSkiById(myJetSkiId);
+  if (!j) { myJetSkiId=null; return; }
+  if (!force && Math.abs(j.speed)>.8) {
+    _jetExitRequested=true;
+    showToast('Сначала сбрасываем скорость…', '🌊', 1200);
+    return;
+  }
+  const sideR=Math.cos(j.ang)*.75, sideC=-Math.sin(j.ang)*.75;
+  const nr=j.r+sideR, nc=j.c+sideC;
+  player.r=_isSwimmableWater(nr,nc)?nr:j.r;
+  player.c=_isSwimmableWater(nr,nc)?nc:j.c;
+  player.ang=j.ang; j.driver=false; j.throttle=0; j.speed=0;
+  j.abandonedAt=performance.now(); myJetSkiId=null; _jetExitRequested=false;
+  _refreshPlayerWaterState();
+}
+function _spawnJetSpray(j, amount) {
+  const backR=-Math.sin(j.ang), backC=-Math.cos(j.ang);
+  for(let i=0;i<amount;i++) {
+    const side=(Math.random()-.5)*.26;
+    _jetSpray.push({
+      r:j.r+backR*.55+Math.cos(j.ang)*side,
+      c:j.c+backC*.55-Math.sin(j.ang)*side,
+      vr:backR*(2.3+Math.random()*2.4)+(Math.random()-.5)*.7,
+      vc:backC*(2.3+Math.random()*2.4)+(Math.random()-.5)*.7,
+      life:.55+Math.random()*.45, max:.9, size:1.4+Math.random()*2.7,
+    });
+  }
+}
+function _updateJetSkis(dt, inDx, inDy) {
+  const now=performance.now();
+  const mine=_jetSkiById(myJetSkiId);
+  if (mine) {
+    const mag=Math.min(1,Math.hypot(inDx,inDy));
+    if (mag>.08) {
+      const d=inDx, s=inDy/ISO_Y, dc=(s+d)*.5, dr=(s-d)*.5;
+      const wanted=Math.atan2(dr,dc);
+      let da=wanted-mine.ang; while(da>Math.PI)da-=Math.PI*2; while(da<-Math.PI)da+=Math.PI*2;
+      mine.ang += da*Math.min(1,dt*(3.4+Math.abs(mine.speed)*.12));
+      mine.throttle=mag;
+      mine.speed=Math.min(19.5,mine.speed+23*dt*mag);
+    } else {
+      mine.throttle=0; mine.speed*=Math.pow(.18,dt);
+    }
+    if (_jetExitRequested) { mine.throttle=0; mine.speed*=Math.pow(.035,dt); }
+    const nr=mine.r+Math.sin(mine.ang)*mine.speed*dt;
+    const nc=mine.c+Math.cos(mine.ang)*mine.speed*dt;
+    if (_jetSkiCanMove(nr,nc)) { mine.r=nr; mine.c=nc; }
+    else { mine.speed*=-.16; mine.ang+=Math.PI*.08; }
+    player.r=mine.r; player.c=mine.c; player.ang=mine.ang; player.walking=false;
+    if (mine.throttle>.1 && mine.speed>1) _spawnJetSpray(mine, Math.min(5,1+Math.floor(mine.speed/5)));
+    if (_jetExitRequested && Math.abs(mine.speed)<.55) exitJetSki(true);
+  }
+  for (const j of JET_SKIS) {
+    if (j.driver) continue;
+    if (!j.parked && !j.returning && j.abandonedAt && now-j.abandonedAt>14000) j.returning=true;
+    if (j.returning) {
+      const dr=j.homeR-j.r, dc=j.homeC-j.c, dist=Math.hypot(dr,dc);
+      if (dist<.18) {
+        j.r=j.homeR; j.c=j.homeC; j.ang=Math.PI; j.speed=0;
+        j.parked=true; j.returning=false; j.abandonedAt=0;
+      } else {
+        j.ang=Math.atan2(dr,dc); const step=Math.min(dist,4.2*dt);
+        const nr=j.r+dr/dist*step, nc=j.c+dc/dist*step;
+        if (_jetSkiCanMove(nr,nc)) { j.r=nr; j.c=nc; _spawnJetSpray(j,1); }
+        else { j.r=j.homeR; j.c=j.homeC; j.parked=true; j.returning=false; }
+      }
+    }
+  }
+  for(let i=_jetSpray.length-1;i>=0;i--){
+    const p=_jetSpray[i]; p.life-=dt;
+    if(p.life<=0){_jetSpray.splice(i,1);continue;}
+    p.r+=p.vr*dt; p.c+=p.vc*dt; p.vr*=Math.pow(.3,dt);p.vc*=Math.pow(.3,dt);
+  }
+}
+
+function drawJetSkiParking() {
+  const bays=JET_SKI_PARKING;
+  ctx.save();
+  // Два плавающих бокса: понтоны, жёлтая разметка, кнехты и табличка.
+  for(const b of bays){
+    const a=w2s(b.homeR-.72,b.homeC-1.25), q=w2s(b.homeR-.72,b.homeC+1.25);
+    const c=w2s(b.homeR+.72,b.homeC+1.25), d=w2s(b.homeR+.72,b.homeC-1.25);
+    ctx.fillStyle='rgba(8,39,53,.7)';ctx.beginPath();ctx.moveTo(a.x,a.y+4);ctx.lineTo(q.x,q.y+4);ctx.lineTo(c.x,c.y+4);ctx.lineTo(d.x,d.y+4);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#76502d';ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(q.x,q.y);ctx.lineTo(c.x,c.y);ctx.lineTo(d.x,d.y);ctx.closePath();ctx.fill();
+    ctx.strokeStyle='#efc84b';ctx.lineWidth=2;ctx.setLineDash([7,4]);ctx.stroke();ctx.setLineDash([]);
+    for(const k of [a,q]){ctx.fillStyle='#292d2f';ctx.fillRect(k.x-2,k.y-8,4,9);ctx.fillStyle='#c6d1d5';ctx.fillRect(k.x-2,k.y-8,4,2);}
+  }
+  const sign=w2s(165.15,51.6);ctx.fillStyle='rgba(8,15,22,.9)';ctx.strokeStyle='#43c7ef';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.roundRect(sign.x-35,sign.y-34,70,18,5);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#dff8ff';ctx.font='bold 10px system-ui';ctx.textAlign='center';ctx.fillText('ГИДРО • ПАРКИНГ',sign.x,sign.y-21);
+  ctx.restore();
+}
+function drawJetSki(j) {
+  const p=w2s(j.r,j.c), wr=Math.sin(j.ang), wc=Math.cos(j.ang);
+  let sx=wc-wr, sy=(wc+wr)*ISO_Y, sm=Math.hypot(sx,sy)||1; sx/=sm;sy/=sm;
+  const a=Math.atan2(sy,sx), bob=Math.sin(performance.now()*.004+j.phase)*1.2;
+  ctx.save();ctx.translate(p.x,p.y+bob);ctx.rotate(a);
+  ctx.fillStyle='rgba(0,20,32,.38)';ctx.beginPath();ctx.ellipse(-2,7,27,8,0,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='rgba(196,242,250,.75)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-26,6);ctx.quadraticCurveTo(-10,12,18,7);ctx.stroke();
+  // Нижняя грань корпуса и острый нос.
+  ctx.fillStyle='#122b38';ctx.beginPath();ctx.moveTo(-25,3);ctx.lineTo(13,-9);ctx.lineTo(29,0);ctx.lineTo(15,9);ctx.lineTo(-19,10);ctx.closePath();ctx.fill();
+  ctx.fillStyle=j.color;ctx.beginPath();ctx.moveTo(-22,0);ctx.lineTo(10,-10);ctx.lineTo(28,0);ctx.lineTo(11,7);ctx.lineTo(-18,7);ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.28)';ctx.beginPath();ctx.moveTo(6,-8);ctx.lineTo(26,0);ctx.lineTo(12,1);ctx.closePath();ctx.fill();
+  ctx.fillStyle=j.accent;ctx.beginPath();ctx.moveTo(-15,4);ctx.lineTo(12,3);ctx.lineTo(20,0);ctx.lineTo(10,6);ctx.lineTo(-15,7);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#182127';ctx.beginPath();ctx.roundRect(-13,-5,23,9,4);ctx.fill();
+  ctx.fillStyle='#3d4b51';ctx.beginPath();ctx.roundRect(-8,-7,14,5,3);ctx.fill();
+  ctx.strokeStyle='#20282d';ctx.lineWidth=2.3;ctx.beginPath();ctx.moveTo(7,-5);ctx.lineTo(12,-13);ctx.moveTo(8,-11);ctx.lineTo(17,-14);ctx.stroke();
+  ctx.fillStyle='#e8fbff';ctx.beginPath();ctx.arc(24,0,2.2,0,Math.PI*2);ctx.fill();
+  if(j.driver){
+    const skin=SKINS[(QP.look&&QP.look.skin)||0]||SKINS[0];
+    ctx.fillStyle='#1e2630';ctx.beginPath();ctx.ellipse(-3,-9,7,10,-.25,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=skin;ctx.lineWidth=3.5;ctx.beginPath();ctx.moveTo(0,-13);ctx.lineTo(11,-12);ctx.moveTo(-1,-11);ctx.lineTo(9,-8);ctx.stroke();
+    ctx.fillStyle=skin;ctx.beginPath();ctx.arc(-2,-22,6,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#2b211d';ctx.beginPath();ctx.arc(-3,-24,5.2,Math.PI,Math.PI*2);ctx.fill();
+  }
+  ctx.restore();
+  if(j.returning){ctx.fillStyle='#8fe9ff';ctx.font='bold 9px system-ui';ctx.textAlign='center';ctx.fillText('↩ НА ПАРКОВКУ',p.x,p.y-30);}
+}
+function drawJetSpray() {
+  ctx.save();
+  for(const s of _jetSpray){const p=w2s(s.r,s.c),a=Math.max(0,s.life/s.max);ctx.globalAlpha=a;ctx.fillStyle=a>.45?'#e9fcff':'#8fd6e7';ctx.beginPath();ctx.arc(p.x,p.y-s.size*a,s.size*a,0,Math.PI*2);ctx.fill();}
+  ctx.restore();
+}
+function drawWaterDepthGuides(r0,c0,r1,c1) {
+  if(r1<BEACH_R1||r0>SWIM_LIMIT_R) return;
+  ctx.save();ctx.textAlign='center';ctx.lineWidth=1.5;
+  for(const g of [{r:SWIM_DEEP_R,col:'rgba(255,220,91,.72)',txt:'ГЛУБИНА 1.5 м'},{r:SWIM_LIMIT_R,col:'rgba(112,210,236,.48)',txt:'ГРАНИЦА ПЛАВАНИЯ'}]){
+    const from=Math.max(1,c0-2),to=Math.min(MAP_COLS-1,c1+2),a=w2s(g.r,from),b=w2s(g.r,to);
+    ctx.strokeStyle=g.col;ctx.setLineDash([8,8]);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.setLineDash([]);
+    const label=w2s(g.r,Math.max(from,Math.min(to,58)));ctx.fillStyle='rgba(5,34,48,.82)';ctx.fillRect(label.x-40,label.y-14,80,13);ctx.fillStyle=g.col;ctx.font='bold 8px system-ui';ctx.fillText(g.txt,label.x,label.y-4);
+  }
+  for(const c of [8,28,62,74]){const p=w2s(SWIM_DEEP_R,c);ctx.fillStyle='#f4d34e';ctx.beginPath();ctx.arc(p.x,p.y-5,3.2,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#f06a46';ctx.beginPath();ctx.moveTo(p.x,p.y-2);ctx.lineTo(p.x,p.y+5);ctx.stroke();}
+  ctx.restore();
+}
+function drawSwimmingPlayer(px,py) {
+  const t=performance.now()*.008, skin=SKINS[(QP.look&&QP.look.skin)||0]||SKINS[0];
+  ctx.save();ctx.translate(px,py+Math.sin(t)*1.1);ctx.rotate(player.ang);
+  ctx.strokeStyle='rgba(200,243,251,.68)';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(0,3,25,8,0,0,Math.PI*2);ctx.stroke();
+  ctx.fillStyle='#283646';ctx.beginPath();ctx.ellipse(-2,0,12,6,0,0,Math.PI*2);ctx.fill();
+  const stroke=Math.sin(t*1.7),a1=-13-stroke*9,a2=13+stroke*9;
+  ctx.strokeStyle='rgba(18,67,84,.42)';ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(2,-3);ctx.lineTo(a1,-14);ctx.moveTo(2,3);ctx.lineTo(a2,14);ctx.stroke();
+  ctx.strokeStyle=skin;ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(3,-3);ctx.lineTo(a1,-14);ctx.moveTo(3,3);ctx.lineTo(a2,14);ctx.stroke();
+  ctx.fillStyle=skin;ctx.beginPath();ctx.arc(12,0,7,0,Math.PI*2);ctx.fill();ctx.fillStyle='#2b211d';ctx.beginPath();ctx.arc(11,-2,6,Math.PI*.85,Math.PI*1.8);ctx.fill();
+  ctx.restore();
+}
 let _trackTiles = null, _trackPathPts = null;
 function _nearestRaceTrackPoint(r, c) {
   if (!_trackPathPts) _buildTrackTiles();
@@ -10374,11 +10635,12 @@ const _gangWeaponIcon = { pistol:'🔫',pistol_heavy:'🔫',pistol_gold:'🔫',n
 function syncGangRosterHud() {
   const list=document.getElementById('gangRosterList'),count=document.getElementById('gangRosterCount');
   if(!list||!count)return;
+  const placeJobHud=()=>{const roster=document.getElementById('gangRosterHud'),job=document.getElementById('jobStatusHud');if(roster&&job)job.style.top=(roster.offsetTop+roster.offsetHeight+8)+'px';};
   const active=_myGang.filter(g=>g&&g.hp>0);
   const deadSlots=Math.max(3,8-active.length);
   const fallen=_gangFallen.slice(-deadSlots).reverse();
   const key=active.map(g=>`${g.id}:${g.name}:${g.weapon}`).join('|')+'#'+fallen.map(g=>`${g.name}:${g.weapon}:${g.at}`).join('|');
-  if(key===_gangRosterUiKey)return;
+  if(key===_gangRosterUiKey){placeJobHud();return;}
   _gangRosterUiKey=key;
   count.textContent=`${active.length}/${GANG_MAX}`+(_gangFallen.length?` · ☠${_gangFallen.length}`:'');
   list.replaceChildren();
@@ -10393,6 +10655,7 @@ function syncGangRosterHud() {
   for(const g of active)addRow(g,false);
   for(const g of fallen)addRow(g,true);
   if(!active.length&&!fallen.length){const empty=document.createElement('div');empty.className='gr-empty';empty.textContent='Бойцов пока нет';list.appendChild(empty);}
+  requestAnimationFrame(placeJobHud);
 }
 function _recordGangFallen(m,persist=true) {
   if(!m)return;
@@ -12276,7 +12539,7 @@ function _joyRAimAngle() {
 }
 function _syncPlayerAimFromJoyR() {
   const ang = _joyRAimAngle();
-  if (ang === null || myDead || myDrivingCarId || _inBus) return false;
+  if (ang === null || myDead || myDrivingCarId || myJetSkiId || _playerSwimmingDeep || _inBus) return false;
   player.ang = ang;
   return true;
 }
@@ -14167,7 +14430,7 @@ function wsConnect() {
         // авторитетно), а сервер эхо-шлёт устаревшую позицию. Без этого
         // исключения коррекция тянула player НАЗАД, автобус — ВПЕРЁД →
         // жёсткая тряска камеры, нарастающая по мере поездки (баг найден 05.07.2026).
-        const _driving = !!myDrivingCarId && !myIsPassenger;
+        const _driving = (!!myDrivingCarId && !myIsPassenger) || !!myJetSkiId || _playerSwimmingDeep;
         // В ТЮРЬМЕ позиция клиент-авторитетна (tryMove клампит к двору 7×7,
         // телепорт при аресте — см. обработку jail_in ниже). Сервер держит
         // игрока у центра участка → коррекция тянула бы сквозь здания.
@@ -15194,6 +15457,16 @@ function updateGtaInteractions() {
         _gtaBtn.style.display = 'block'; return;
       }
     }
+    // Менеджер Биржи труда — нарисован отдельно и не входит в bi.npcs.
+    if (_buildingInt.type === 'job') {
+      const mgrR=2.3,mgrC=_buildingInt.W/2+.5;
+      if(Math.hypot(player.r-mgrR,player.c-mgrC)<2.6){
+        const _jd=_jobDef(_jobState.job),_jl=_jobRemaining();
+        _gtaActionKind=(_jd&&_jl<=0)?'job_collect':'job_open';_gtaActionCarId=null;
+        _gtaBtn.textContent=!_jd?'💼 Устроиться на работу':(_jl<=0?'💵 Получить зарплату у менеджера':`💼 Моя работа · ${_jobTime(_jl)}`);
+        _gtaBtn.style.display='block';return;
+      }
+    }
     // Взаимодействие с персоналом — рядом с любым сотрудником (bi.npcs)
     if (_buildingInt.npcs && _buildingInt.npcs.length) {
       const _BTN_BY_TYPE = { hospital:'🏥 Лечиться', police_st:'👮 Поговорить', gym:'💪 Тренировка', job:'💼 Устроиться' };
@@ -15203,8 +15476,16 @@ function updateGtaInteractions() {
         if (d < nearD) { nearD = d; nearNpc = n; }
       }
       if (nearNpc) {
-        _gtaActionKind = 'bldg_npc'; _gtaActionCarId = null;
-        _gtaBtn.textContent = _BTN_BY_TYPE[_buildingInt.type] || `💬 ${nearNpc.name}`;
+        if (_buildingInt.type === 'job') {
+          const _jd=_jobDef(_jobState.job),_jl=_jobRemaining();
+          _gtaActionKind = (_jd&&_jl<=0) ? 'job_collect' : 'job_open';
+          _gtaBtn.textContent = !_jd ? '💼 Устроиться на работу'
+            : (_jl<=0 ? '💵 Получить зарплату у менеджера' : `💼 Моя работа · ${_jobTime(_jl)}`);
+        } else {
+          _gtaActionKind = 'bldg_npc';
+          _gtaBtn.textContent = _BTN_BY_TYPE[_buildingInt.type] || `💬 ${nearNpc.name}`;
+        }
+        _gtaActionCarId = null;
         _gtaBtn.style.display = 'block'; return;
       }
     }
@@ -15232,6 +15513,14 @@ function updateGtaInteractions() {
     _gtaBtn.style.display = 'block';
     return;
   }
+  if (myJetSkiId) {
+    _handbrakeBtn.style.display = 'none';
+    _gtaActionKind = 'jetski_exit';
+    _gtaActionCarId = myJetSkiId;
+    _gtaBtn.textContent = '🌊 Сойти с гидроцикла';
+    _gtaBtn.style.display = 'block';
+    return;
+  }
   if (_inBus) {
     _gtaActionKind = 'bus_exit';
     _gtaActionCarId = null;
@@ -15252,6 +15541,14 @@ function updateGtaInteractions() {
       _gtaBtn.style.display = 'block';
       return;
     }
+  }
+  const nearJet = _nearestJetSki();
+  if (nearJet && !myDead && !myDrivingCarId && !_inBus) {
+    _gtaActionKind = 'jetski_enter';
+    _gtaActionCarId = nearJet.id;
+    _gtaBtn.textContent = '🛥️ Сесть на гидроцикл';
+    _gtaBtn.style.display = 'block';
+    return;
   }
   // Майкл — приоритет если рядом
   const dmR = MICHAEL_POS.r - player.r;
@@ -15684,6 +15981,10 @@ _gtaBtn.addEventListener('click', () => {
     }
   } else if (_gtaActionKind === 'exit') {
     exitCar('manual');
+  } else if (_gtaActionKind === 'jetski_enter') {
+    enterJetSki(_gtaActionCarId);
+  } else if (_gtaActionKind === 'jetski_exit') {
+    exitJetSki(false);
   } else if (_gtaActionKind === 'hijack') {
     hijackCivilianCar(_hijackedCarRef);
   } else if (_gtaActionKind === 'box_pickup') {
@@ -15703,6 +16004,10 @@ _gtaBtn.addEventListener('click', () => {
   } else if (_gtaActionKind === 'bldg_npc') {
     const _msg = { hospital:'🏥 Лечение скоро будет', police_st:'👮 Тут скоро будет участок-меню', gym:'💪 Тренировки скоро', job:'💼 Работа скоро будет' };
     showToast(_msg[_buildingInt && _buildingInt.type] || '💬 Скоро будет', 'ℹ️', 2000);
+  } else if (_gtaActionKind === 'job_open') {
+    openJobOffice();
+  } else if (_gtaActionKind === 'job_collect') {
+    collectJobSalary();
   } else if (_gtaActionKind === 'brigadir') {
     takeBrigadirContract();
   } else if (_gtaActionKind === 'brigadir_claim') {
@@ -18069,7 +18374,7 @@ function _finishDueWeaponReload(weapon) {
   }
 }
 function reloadCurrentWeapon(manual = true) {
-  if (!_isArmed() || myDead || myDrivingCarId || _inBus) return false;
+  if (!_isArmed() || myDead || myDrivingCarId || myJetSkiId || _playerSwimmingDeep || _inBus) return false;
   _finishDueWeaponReload(currentWeapon);
   const st = _weaponAmmoState(currentWeapon);
   if (_isReloadingWeapon(st.id)) return false;
@@ -18233,7 +18538,7 @@ function fireFromAimHold(angle, active) {
 // Firearms keep direct right-stick fire. In melee the stick only aims/locks;
 // the separate punch button performs the strike.
 function attackFromAimHold(angle, active) {
-  if (!active || myDead || myDrivingCarId || _inBus) return;
+  if (!active || myDead || myDrivingCarId || myJetSkiId || _playerSwimmingDeep || _inBus) return;
   if (_isArmed()) {
     fireFromAimHold(angle, true);
   } else {
@@ -18569,7 +18874,7 @@ function fire(angle = null) {
     angle = Math.atan2(_dr, _dc);
   }
   // В машине или в автобусе нельзя стрелять — обе руки на руле / двери закрыты.
-  if (myDrivingCarId || _inBus) return;
+  if (myDrivingCarId || myJetSkiId || _playerSwimmingDeep || _inBus) return;
   if(currentWeapon==='c4'){
     placeWorldC4();
     return;
@@ -19113,7 +19418,7 @@ function _findNearestMeleeTarget(aimAngle = null) {
 
 function punch(force, aimAngle = null) {
   if (myMode === 'pve') { showToast('🕵️ Наблюдатель не может драться', 'ℹ️', 1500); return; }
-  if (myDead || myDrivingCarId || _inBus) return;
+  if (myDead || myDrivingCarId || myJetSkiId || _playerSwimmingDeep || _inBus) return;
   if (!force && _isArmed()) return;   // есть оружие — использовать fire() (кроме тюрьмы: force)
   if (!force && !lockedTargets.size) return; // сначала выбрать цель правым стиком/тапом
   const now = performance.now();
@@ -19397,7 +19702,7 @@ function updatePvpUI() {
   // даже если стрелять не в кого, ствол в руке и стик готов — это даёт
   // ощущение полноценной боёвки.
   const isPve      = (myMode === 'pve');
-  const isDriving  = !!myDrivingCarId || _inBus;
+  const isDriving  = !!myDrivingCarId || !!myJetSkiId || _playerSwimmingDeep || _inBus;
   // В машине стрельба ОТКЛЮЧЕНА (обе руки на руле), правый стик и weaponBar
   // скрываются. Возвращаются обратно как только вышел из машины.
   const canShoot   = !isPve && !myDead && !isDriving;
@@ -20113,6 +20418,9 @@ function update(dt) {
   // Нормализация если выходит за круг
   const inMag = Math.hypot(inDx, inDy);
   if (inMag > 1) { inDx /= inMag; inDy /= inMag; }
+  // Гидроциклы обновляются всегда: активный слушает левый стик, а брошенные
+  // через несколько секунд самостоятельно возвращаются в свои боксы.
+  _updateJetSkis(dt, inDx, inDy);
   // Сохраняем для курсор-рендера в drawQuestCar
   if (myDrivingCarId) {
     const _qcRef = questCars.get(myDrivingCarId);
@@ -20893,22 +21201,27 @@ function update(dt) {
 
   // Замедление при несении мешка из банка
   const _bagSpeedMul = _myBagWeight > 0 ? 0.5 : 1.0;
-  const speed = 5.0 * _bagSpeedMul; // тайлов/сек
+  _refreshPlayerWaterState();
+  const _waterSpeedMul = _playerSwimmingDeep ? 0.49 : (_playerInWater ? 0.68 : 1.0);
+  const speed = 5.0 * _bagSpeedMul * _waterSpeedMul; // тайлов/сек
   player.walking = false;
   // Мёртвый игрок не двигается — ждём респауна сервера, иначе появлялся
   // в той же точке где умер (баг: «бегать могу и возрождаюсь там же»).
   if (myDead) inDx = 0, inDy = 0;
-  if (Math.abs(inDx) > 0.08 || Math.abs(inDy) > 0.08) {
+  if (!myJetSkiId && (Math.abs(inDx) > 0.08 || Math.abs(inDy) > 0.08)) {
     const d = inDx, s = inDy / ISO_Y;
     const dc = (s + d) * 0.5;
     const dr = (s - d) * 0.5;
     const mag = Math.hypot(dr, dc) || 1;
     const mv = Math.min(1, Math.hypot(inDx, inDy));
-    tryMove(player, dr / mag * speed * dt * mv, dc / mag * speed * dt * mv);
+    const coastMove = player.r > BEACH_R1 - 2 || _playerInWater;
+    if (coastMove) _tryMovePlayerCoast(player, dr / mag * speed * dt * mv, dc / mag * speed * dt * mv);
+    else tryMove(player, dr / mag * speed * dt * mv, dc / mag * speed * dt * mv);
     player.ang = Math.atan2(dr, dc);
     player.walking = mv > 0.15;
     player.walkPhase += dt * 10 * mv;
   }
+  _refreshPlayerWaterState();
   // Ходьба тоже меняет player.ang, поэтому прицел имеет приоритет каждый кадр.
   _syncPlayerAimFromJoyR();
   // Камера следит за игроком — держим его ровно по центру экрана.
@@ -20966,7 +21279,7 @@ function update(dt) {
   // ближайшей залоченной цели РОВНО в неё. Без лока кнопка бьёт кулаком /
   // стреляет в направление взгляда (fire(null)). Правый стик = только
   // прицеливание/лок (лазер). В PvP-арене (inArena) — free-aim по стику.
-  if (myMode !== 'pve' && !myDead && !myDrivingCarId) {
+  if (myMode !== 'pve' && !myDead && !myDrivingCarId && !myJetSkiId && !_playerSwimmingDeep) {
     const meInArena = inArena(player.r, player.c);
     if (RIGHT_STICK_DIRECT_FIRE && joyR.active && joyR.hasAim) {
       const ang = _joyRAimAngle();
@@ -31670,6 +31983,7 @@ function render() {
       if (MAP[r][c] !== 1) drawTile(r, c);
   // 1.2) Гоночный трек «Прибой» — гладкая лента поверх воды (юг карты)
   if (r1 >= 160) drawRaceTrackRibbon();
+  drawWaterDepthGuides(r0, c0, r1, c1);
   // 1.5) Граница PVP-арены — красный пунктир поверх пола
   drawArenaPerimeter();
   // 1.55) Граница логова — красный пунктир (только если рядом)
@@ -31689,6 +32003,13 @@ function render() {
   drawBoxQuestMarkers();
   // 2) Объекты с depth-sort
   const items = [];
+  if (r1 >= BEACH_R1 && r0 <= BEACH_R1 + 3) {
+    items.push({ depth: BEACH_R1 + 51.6 - 1, draw: drawJetSkiParking });
+  }
+  for (const j of JET_SKIS) {
+    if (j.r < r0-2 || j.r >= r1+2 || j.c < c0-2 || j.c >= c1+2) continue;
+    items.push({ depth:j.r+j.c+.0014, draw:()=>drawJetSki(j) });
+  }
   for (let r = r0; r < r1; r++) {
     for (let c = c0; c < c1; c++) {
       const t = MAP[r][c];
@@ -32472,7 +32793,7 @@ if (d.kind === 'plank_path') {
   items.push({ depth: player.r + player.c + 0.001, draw: () => {
     // В машине или в автобусе — спрайт игрока не рисуем (виден через
     // крышу/окна); только имя/звёзды над корпусом.
-    if (myDrivingCarId || _inBus) {
+    if (myDrivingCarId || myJetSkiId || _inBus) {
       const p = w2s(player.r + 0.5, player.c + 0.5);
       const headY = p.y - TS * (_inBus ? 1.6 : 0.9);
       ctx.font = 'bold 12px system-ui, sans-serif';
@@ -32488,6 +32809,16 @@ if (d.kind === 'plank_path') {
     }
     let px = w2s(player.r + 0.5, player.c + 0.5).x;
     let py = w2s(player.r + 0.5, player.c + 0.5).y;
+    if (_playerSwimmingDeep && !myDead) {
+      drawSwimmingPlayer(px, py);
+      ctx.font='bold 11px system-ui';ctx.textAlign='center';ctx.fillStyle='rgba(0,0,0,.75)';ctx.fillText(QP.name||'Игрок',px+1,py-31);
+      ctx.fillStyle='#ffd76b';ctx.fillText(QP.name||'Игрок',px,py-32);ctx.textAlign='left';
+      const hpW=28,hpK=Math.max(0,Math.min(1,myHp/(PVP.max_hp||100)));ctx.fillStyle='rgba(0,0,0,.72)';ctx.fillRect(px-hpW/2-1,py-28,hpW+2,5);
+      ctx.fillStyle=hpK>.5?'#5dd55d':(hpK>.25?'#dda53a':'#dd3a3a');ctx.fillRect(px-hpW/2,py-27,hpW*hpK,3);
+      drawModeTag(px,py,myMode||'pvp');
+      if(myWanted>0)drawWantedStars(px,py,myWanted);if(myGangs>0)drawWantedGangs(px,py,myGangs);
+      return;
+    }
     // Отдача — лёгкое смещение НАЗАД от прицела ~80мс после выстрела
     const sinceShot = performance.now() - lastShotClientT;
     if (sinceShot < 90 && lastShotClientT > 0) {
@@ -32504,6 +32835,9 @@ if (d.kind === 'plank_path') {
                myHp, PVP.max_hp, myDead, null,
                !!((_punchAnim && _punchAnim.type !== 'kick') || (myMode !== 'pve' && !myDead && _isArmed() && !_punchAnim)),
                !!(_punchAnim && _punchAnim.type === 'kick'));
+    if (_playerInWater) {
+      ctx.save();ctx.strokeStyle='rgba(190,235,245,.72)';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(px,py+2,18,6,0,0,Math.PI*2);ctx.stroke();ctx.restore();
+    }
     if (myMode !== 'pve' && !myDead) {
       if (_isArmed() && !_punchAnim) drawWeaponInHands(px, py, player.ang, currentWeapon, 0.9, lastShotClientT);
       if (_punchAnim) _drawPunchAnim(px, py);
@@ -32620,6 +32954,7 @@ if (d.kind === 'plank_path') {
   for (const it of items) {
     try { it.draw(); } catch (e) {}
   }
+  drawJetSpray();
   // Маркеры собственности — отдельный верхний слой, чтобы соседние части
   // многоэтажки не перекрывали подпись и контур купленной квартиры.
   drawOwnedApartmentWorldMarkers(r0, r1, c0, c1);
@@ -36319,6 +36654,114 @@ Object.assign(_BANK_NPC_LOOKS, {
 // ══════════════════════════════════════════════════════════════════
 // ══════════════════════════════════════════════════════════════════
 // ── БИРЖА ТРУДА (job office) ─────────────────────────────────────
+const JOB_DEFS = [
+  {id:'newspapers',name:'🗞 Раздавать газеты с компроматом',rank:1,payMin:50,payMax:100},
+  {id:'bikes',name:'🚲 Угонять велосипеды',rank:2,payMin:70,payMax:130},
+  {id:'shawarma_runner',name:'🥡 Развозить шаурму на стрёме',rank:2,payMin:90,payMax:160},
+  {id:'lookout',name:'👀 Стоять на шухере у склада',rank:3,payMin:120,payMax:200},
+  {id:'stall_tax',name:'💰 Собирать дань с ларьков',rank:4,payMin:160,payMax:260},
+  {id:'thimblerig',name:'🃏 Крутить напёрстки на вокзале',rank:5,payMin:200,payMax:320},
+  {id:'moonshine',name:'🍾 Гнать самогон в гараже',rank:6,payMin:350,payMax:550},
+  {id:'car_jacker',name:'🚗 Угонять тачки на заказ',rank:8,payMin:500,payMax:800},
+  {id:'blackmail',name:'📞 Шантажировать чиновника',rank:10,payMin:700,payMax:1100},
+  {id:'arson',name:'🔥 Поджечь магазин конкурентов',rank:12,payMin:900,payMax:1400},
+  {id:'smuggling',name:'📦 Контрабанда стволов из порта',rank:13,payMin:1200,payMax:1800},
+  {id:'forger',name:'📜 Подделывать паспорта',rank:14,payMin:1500,payMax:2200},
+];
+let _jobState={job:'',job_started:0,duration:3600,cooldowns:{}};
+let _jobBusy=false;
+const _jobLocalKey=`mafiozi_job_${QP.uid||'preview'}`;
+const _jobModal=document.getElementById('jobModal');
+const _jobModalBody=document.getElementById('jobModalBody');
+const _jobStatusHud=document.getElementById('jobStatusHud');
+
+function _jobDef(id){return JOB_DEFS.find(j=>j.id===id)||null;}
+function _atJobManager(){return !!(_buildingInt&&_buildingInt.type==='job'&&Math.hypot(player.r-2.3,player.c-(_buildingInt.W/2+.5))<3.0);}
+function _jobRemaining(){
+  if(!_jobState.job||!_jobState.job_started)return 0;
+  return Math.max(0,(_jobState.job_started+(_jobState.duration||3600))-Math.floor(Date.now()/1000));
+}
+function _jobTime(sec){sec=Math.max(0,sec|0);const h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),s=sec%60;return h?`${h}ч ${String(m).padStart(2,'0')}м`:`${m}:${String(s).padStart(2,'0')}`;}
+function _jobSaveLocal(){try{localStorage.setItem(_jobLocalKey,JSON.stringify(_jobState));}catch(e){}}
+function _jobLoadLocal(){try{const v=JSON.parse(localStorage.getItem(_jobLocalKey)||'null');if(v&&typeof v==='object')_jobState={..._jobState,...v};}catch(e){}}
+async function _jobFetch(path,opts={}){
+  if(!QP.api)throw new Error('offline');
+  const r=await fetch(`${QP.api.replace(/\/+$/,'')}/job/${encodeURIComponent(QP.uid)}/${path}`,{cache:'no-store',...opts});
+  if(!r.ok)throw new Error(`http ${r.status}`);
+  return r.json();
+}
+async function loadJobState(){
+  try{
+    const d=await _jobFetch('state');
+    if(!d.ok)throw new Error(d.error||'state');
+    _jobState.job=d.job||'';_jobState.job_started=+d.job_started||0;_jobState.cooldowns=d.cooldowns||{};
+    _jobState.duration=3600;_jobSaveLocal();
+  }catch(e){if(_LOCAL_PREVIEW)_jobLoadLocal();}
+  renderJobStatus();
+}
+function renderJobStatus(){
+  const nm=document.getElementById('jobStatusName'),sub=document.getElementById('jobStatusSub'),tm=document.getElementById('jobStatusTimer');
+  if(!nm||!sub||!tm)return;
+  const def=_jobDef(_jobState.job),left=_jobRemaining(),ready=!!def&&left<=0;
+  _jobStatusHud&&_jobStatusHud.classList.toggle('ready',ready);
+  if(!def){nm.textContent='Не трудоустроен';sub.textContent='Устроиться: Биржа труда (36, 16)';tm.textContent='СВОБОДЕН';return;}
+  nm.textContent=def.name;tm.textContent=ready?'ГОТОВО':_jobTime(left);
+  sub.textContent=ready?'Зарплата ждёт у менеджера':'Смена идёт · вернись после таймера';
+}
+function renderJobModal(){
+  if(!_jobModalBody)return;
+  const def=_jobDef(_jobState.job),left=_jobRemaining();
+  if(def){
+    const ready=left<=0;
+    _jobModalBody.innerHTML=`<div class="job-note">Твоя текущая работа сохраняется, даже если выйти из игры.</div><div class="job-row"><div><div class="job-name">${def.name}</div><div class="job-pay">${ready?'Смена завершена — забери зарплату':'До зарплаты: '+_jobTime(left)}</div></div><button class="job-action ${ready?'pay':'danger'}" data-job-action="${ready?'collect':'abandon'}">${ready?'💵 Получить зарплату':'🚪 Уволиться'}</button></div>`;
+    return;
+  }
+  const now=Math.floor(Date.now()/1000);
+  _jobModalBody.innerHTML='<div class="job-note">Выбери работу. Смена длится 60 минут; после неё вернись к менеджеру за зарплатой.</div>'+JOB_DEFS.map(j=>{
+    const locked=QP.lvl<j.rank,cd=Math.max(0,(+_jobState.cooldowns[j.id]||0)-now),disabled=locked||cd>0||_jobBusy;
+    return `<div class="job-row ${disabled?'locked':''}"><div><div class="job-name">${j.name}</div><div class="job-pay">$${j.payMin}–${j.payMax} · ранг ${j.rank}${cd?` · отдых ${_jobTime(cd)}`:''}</div></div><button class="job-action" data-job-take="${j.id}" ${disabled?'disabled':''}>${locked?'🔒 Ранг '+j.rank:(cd?'⏳ Отдых':'Устроиться')}</button></div>`;
+  }).join('');
+}
+function openJobOffice(){renderJobModal();_jobModal&&_jobModal.classList.add('show');}
+function closeJobOffice(){_jobModal&&_jobModal.classList.remove('show');}
+async function takeJobAtOffice(id){
+  const def=_jobDef(id);if(!def||_jobBusy||_jobState.job)return;if(!_atJobManager()){showToast('Подойди к менеджеру Биржи труда','💼',1700);closeJobOffice();return;}_jobBusy=true;renderJobModal();
+  try{
+    let d;
+    try{d=await _jobFetch('take',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});}
+    catch(e){if(!_LOCAL_PREVIEW)throw e;d={ok:true,job:id,job_started:Math.floor(Date.now()/1000),duration:3600};}
+    if(!d.ok)throw new Error(d.error||'take');
+    _jobState={..._jobState,job:id,job_started:+d.job_started||Math.floor(Date.now()/1000),duration:+d.duration||3600};_jobSaveLocal();
+    showToast(`💼 Ты устроился: ${def.name}`, '✅', 2300);
+  }catch(e){showToast('Не удалось устроиться. Проверь ранг или связь.', '⚠️', 2400);}
+  _jobBusy=false;renderJobStatus();renderJobModal();
+}
+async function collectJobSalary(){
+  const def=_jobDef(_jobState.job);if(!def||_jobRemaining()>0||_jobBusy)return;if(!_atJobManager()){showToast('Зарплату выдаёт менеджер на Бирже труда','💼',1900);closeJobOffice();return;}_jobBusy=true;
+  try{
+    let d;
+    try{d=await _jobFetch('collect',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});}
+    catch(e){if(!_LOCAL_PREVIEW)throw e;d={ok:true,success:true,pay:Math.round((def.payMin+def.payMax)/2)};}
+    if(!d.ok)throw new Error(d.error||'collect');
+    if(d.pay>0){myCash+=+d.pay;updateMoneyHud();spawnFloatText(player.r,player.c,`+$${d.pay}`,{color:'#63ef8a',size:18,life:1800});}
+    showToast(d.success===false?'Смена сорвалась — выплаты нет':`💵 Зарплата получена: $${d.pay||0}`,'💼',2600);
+    _jobState.job='';_jobState.job_started=0;_jobState.duration=3600;
+    if(d.cooldown_job&&d.cooldown_until)_jobState.cooldowns[d.cooldown_job]=d.cooldown_until;
+    _jobSaveLocal();
+  }catch(e){showToast('Зарплата ещё не готова или сервер недоступен','⚠️',2300);}
+  _jobBusy=false;renderJobStatus();renderJobModal();
+}
+async function abandonJob(){
+  if(!_jobState.job||_jobBusy)return;if(!_atJobManager()){showToast('Уволиться можно у менеджера Биржи труда','💼',1900);closeJobOffice();return;}_jobBusy=true;
+  try{try{const d=await _jobFetch('abandon',{method:'POST'});if(!d.ok)throw new Error(d.error||'abandon');}catch(e){if(!_LOCAL_PREVIEW)throw e;}
+    _jobState.job='';_jobState.job_started=0;_jobState.duration=3600;_jobSaveLocal();showToast('Ты уволился. Незаконченная зарплата сгорела.','🚪',2200);
+  }catch(e){showToast('Не удалось уволиться — нет связи','⚠️',2000);}
+  _jobBusy=false;renderJobStatus();renderJobModal();
+}
+document.getElementById('jobModalClose')?.addEventListener('click',closeJobOffice);
+_jobModal?.addEventListener('click',e=>{if(e.target===_jobModal)closeJobOffice();const take=e.target.closest('[data-job-take]');if(take&&!take.disabled)takeJobAtOffice(take.dataset.jobTake);const act=e.target.closest('[data-job-action]');if(act?.dataset.jobAction==='collect')collectJobSalary();else if(act?.dataset.jobAction==='abandon')abandonJob();});
+loadJobState();setInterval(renderJobStatus,1000);setInterval(loadJobState,30000);
+
 function _drawJobOfficeInterior(bi) {
   const W = bi.W, H = bi.H;
   const {clientWidth: SW, clientHeight: SH} = document.getElementById('stage');
