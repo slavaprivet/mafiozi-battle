@@ -13111,7 +13111,12 @@ function handleEventPacket(d) {
     spawnWorldC4Explosion(+d.y||0,+d.x||0);
     const victims=Array.isArray(d.victims)?d.victims:[];
     if(victims.some(v=>String(v.uid)===String(QP.uid)))myDeathBy=`взрыв C4 (${d.by_name||'неизвестный'})`;
-    if(victims.length)pushFeedEvent('💥',`C4 взорвалась · жертв: ${victims.length}`,{accent:'#ff3b1f'});
+    const npcVictims=Array.isArray(d.npc_victims)?d.npc_victims:[];
+    if(victims.length||npcVictims.length)pushFeedEvent('💥',`C4 взорвалась · жертв: ${victims.length+npcVictims.length}`,{accent:'#ff3b1f'});
+  } else if (kind === 'district_guard_c4_evade') {
+    if(String(d.target_uid||'')===String(QP.uid)){
+      showToast('Охрана заметила C4: бойцы разбегаются и занимают позиции!','💣',2600);
+    }
   } else if (kind === 'district_c4_planted') {
     if (String(d.by_uid) === String(QP.uid)) {
       _districtNodeDisable=null;
@@ -26828,6 +26833,16 @@ function drawAggroBot(bot) {
   ctx.fillStyle = '#fff';
   ctx.fillText(isBoss ? '👹' : '🥷', p.x, p.y - (isBoss ? 56 : 44));
   if(bot.kind==='district_boss'&&bot.boss_name){ctx.font='900 10px system-ui,sans-serif';ctx.fillStyle='#ffcf55';ctx.fillText(bot.boss_name,p.x,p.y-68);}
+  if(bot.kind==='district_boss'||bot.kind==='district_guard'){
+    const hp=Math.max(0,+bot.hp||0),maxHp=Math.max(1,+bot.max_hp||1),bw=isBoss?48:40;
+    const by=p.y-(isBoss?86:58);
+    ctx.fillStyle='rgba(5,7,12,.86)';ctx.fillRect(p.x-bw/2,by,bw,5);
+    ctx.fillStyle=hp/maxHp>.55?'#48df77':hp/maxHp>.25?'#ffd34d':'#ff4f48';
+    ctx.fillRect(p.x-bw/2+1,by+1,(bw-2)*(hp/maxHp),3);
+    ctx.font='800 8px system-ui,sans-serif';ctx.fillStyle='#fff';
+    ctx.fillText(`${Math.ceil(hp)} HP · ${Math.max(0,+bot.damage||0)} УР`,p.x,by-3);
+    if(bot.evading_c4){ctx.font='900 10px system-ui,sans-serif';ctx.fillStyle='#ff7048';ctx.fillText('💣 ОТХОД!',p.x,by-13);}
+  }
   ctx.textAlign = 'left';
 }
 
