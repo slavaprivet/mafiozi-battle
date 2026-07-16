@@ -8481,7 +8481,7 @@ function updateNpcs(dt) {
         n._attackCd = now + 1200;
         const dmg = n._meleeDmg || 8;
         addShake(2);
-        flashHitOverlay(n.r, n.c);
+        flashHitOverlay(n.r, n.c, n._policeTargetId || `street_npc_${NPCS.indexOf(n)}`, 'street_npc', n);
         _hurtLocal(dmg, 'Охранник');
         spawnFloatText(player.r - 0.4, player.c, `−${dmg}`, { color: '#ff4444', size: 16, life: 1000 });
         try { ws && ws.send(JSON.stringify({ t: 'npc_melee_shoot',
@@ -8518,7 +8518,7 @@ function updateNpcs(dt) {
           const npcDmg = 8 + Math.floor(Math.random() * 7);
           spawnImpact(tR, tC, wep, true);
           addShake(2.5);
-          flashHitOverlay(n.r, n.c);
+          flashHitOverlay(n.r, n.c, n._policeTargetId || `street_npc_${NPCS.indexOf(n)}`, 'street_npc', n);
           _hurtLocal(npcDmg, 'Бандит');  // локальный урон «прилипает» против снапшота
           spawnFloatText(player.r - 0.4, player.c, `−${npcDmg}`, { color: '#ff4444', size: 16, life: 1100 });
           try { ws && ws.send(JSON.stringify({ t: 'npc_melee_shoot',
@@ -8601,7 +8601,7 @@ function updateNpcs(dt) {
         impacts.push({ r: impR, c: impC, parts });
         addShake(1.5);
         hapticHit();
-        flashHitOverlay(n.r, n.c);
+        flashHitOverlay(n.r, n.c, n._policeTargetId || `street_npc_${NPCS.indexOf(n)}`, 'street_npc', n);
         const dmg = 5 + Math.floor(Math.random() * 6);
         _hurtLocal(dmg, 'Бандит');
         spawnFloatText(player.r - 0.4, player.c, `−${dmg}`, { color: '#ff6644', size: 14, life: 1000 });
@@ -10899,6 +10899,7 @@ function _resolveGangAlertTarget(m) {
   if (kind === 'bank_guard' && _bankInt && direct && alive(direct)) return { kind, ref: direct, id };
   if (kind === 'city_cop' && direct && direct.alive) return { kind, ref: direct, id: id || direct.id };
   if (kind === 'gang_car' && direct && !direct._wrecked) return { kind, ref: direct, id: id || direct.id };
+  if (kind === 'street_npc' && direct && alive(direct)) return { kind, ref: direct, id };
   if (kind === 'aggro_bot') {
     const ref = direct || _findAggroBotById(id); if (alive(ref)) return { kind, ref, id: id || ref.id };
   }
@@ -10930,8 +10931,10 @@ function _resolveGangAlertTarget(m) {
     const d = Math.hypot(r - tr, c - tc);
     if (d < bestD) { bestD = d; best = { kind:k, ref, id:rid }; }
   };
-  for (const c of cityCops) take('city_cop', c, c.id, c.y, c.x);
-  for (const c of (worldCops || [])) take('world_cop', c, c.id, c.y, c.x);
+  // Нейтральная полиция не является запасной целью: иначе случайный выстрел
+  // рядом с патрулём заставлял банду первой начинать войну с копами.
+  for (const c of cityCops) if (c._pursuing) take('city_cop', c, c.id, c.y, c.x);
+  if (myWanted > 0) for (const c of (worldCops || [])) take('world_cop', c, c.id, c.y, c.x);
   for (const [, g] of michaelGuards) take('michael_guard', g, g.id, g.y, g.x);
   for (const car of CARS) if (car && car.gang) take('gang_car', car, car.id, car.r, car.c);
   for (const tid of Object.keys(aggroZones)) for (const b of (aggroZones[tid]?.bots || []))
@@ -10998,7 +11001,7 @@ function _findGangCompanionTarget(m) {
 
 function _gangTargetPos(kind, ref) {
   if (!ref) return null;
-  if (kind === 'bank_guard' || kind === 'gang_car') return { r: ref.r, c: ref.c };
+  if (kind === 'bank_guard' || kind === 'gang_car' || kind === 'street_npc') return { r: ref.r, c: ref.c };
   return { r: ref.y, c: ref.x };   // копы / боты / конвой / игроки / охрана
 }
 
@@ -11049,16 +11052,18 @@ function _updateGang(dt) {
     if (m.targetKind === 'bank_guard') {
       stillValid = !!(_bankInt && m.targetRef && !m.targetRef.dead && m.targetRef.state !== 'fled');
     } else if (m.targetKind === 'city_cop') {
-      stillValid = !!(m.targetRef && m.targetRef.alive);
+      stillValid = !!(m.targetRef && m.targetRef.alive && m.targetRef._pursuing);
     } else if (m.targetKind === 'gang_car') {
       stillValid = !!(m.targetRef && CARS.includes(m.targetRef) && !m.targetRef._wrecked);
+    } else if (m.targetKind === 'street_npc') {
+      stillValid = !!(m.targetRef && NPCS.includes(m.targetRef) && !m.targetRef.dead && m.targetRef.hp !== 0);
     } else if (m.targetKind === 'aggro_bot') {
       const bot = _findAggroBotById(m.targetId);
       stillValid = !!(bot && !bot.dead && bot.hp > 0);
       if (stillValid) m.targetRef = bot;
     } else if (m.targetKind === 'world_cop') {
       const wc = (worldCops || []).find(c => String(c.id) === String(m.targetId));
-      stillValid = !!wc;
+      stillValid = !!(wc && myWanted > 0);
       if (stillValid) m.targetRef = wc;
     } else if (m.targetKind === 'convoy') {
       const pool = worldEvent ? [worldEvent.boss, ...(worldEvent.guards || [])] : [];
@@ -11116,6 +11121,8 @@ function _updateGang(dt) {
       hitCityCop(m.targetRef, dirY, dirX, dmg);
     } else if (m.targetKind === 'gang_car') {
       hitGangCar(m.targetRef, dmg);
+    } else if (m.targetKind === 'street_npc') {
+      hitNpc(m.targetRef, dirY, dirX, m.weapon, dmg);
     } else if (m.targetKind === 'aggro_bot') {
       try { ws && ws.send(JSON.stringify({ t: 'aggro_shoot', d: { target: m.targetRef.id, weapon: m.weapon } })); } catch(e) {}
     } else if (m.targetKind === 'world_cop') {
