@@ -6300,7 +6300,7 @@ function updateCityCops(dt) {
           if (typeof addShake === 'function') addShake(2.5);
           const dmg = 7 + Math.floor(Math.random() * 5);
           _hurtLocal(dmg, 'Полиция');
-          flashHitOverlay(cop.y, cop.x);
+          flashHitOverlay(cop.y, cop.x, cop.id, 'city_cop', cop);
           spawnFloatText(player.r - 0.4, player.c, `−${dmg}`, { color: '#ff4422', size: 13, life: 900 });
           try { hapticHit && hapticHit(); } catch(e) {}
           try { ws && ws.readyState === 1 && ws.send(JSON.stringify({ t: 'npc_melee_shoot',
@@ -9942,13 +9942,18 @@ function _loadGang() {
 }
 _loadGang();
 // Автоспавн убран — нанимай бойцов вручную у бандитов
-function _gangAlertThreat(r, c, id) {
+function _gangAlertThreat(r, c, id, kind = null, ref = null) {
   const now = performance.now();
   for (const m of _myGang) {
     if (m.hp <= 0) continue;
     m._threatR = r; m._threatC = c;
     m._threatId = id || 'enemy';
+    m._threatKind = kind;
+    m._threatRef = ref;
     m._threatUntil = now + 6000;
+    // Новый приказ босса или напавший на босса враг сразу перебивает
+    // случайную прежнюю цель. На следующем тике она будет разрешена заново.
+    m.targetKind = null; m.targetRef = null; m.targetId = null;
   }
 }
 const GANG_ENGAGE_R = 10;          // радиус, в котором наёмник ищет/держит цель
@@ -9963,6 +9968,57 @@ function _findAggroBotById(id) {
     if (bot) return bot;
   }
   return null;
+}
+
+function _resolveGangAlertTarget(m) {
+  if (!m || performance.now() > (m._threatUntil || 0)) return null;
+  const id = m._threatId, kind = m._threatKind, direct = m._threatRef;
+  const alive = ref => ref && ref.dead !== true && ref.alive !== false && ref.hp !== 0 && !ref._wrecked;
+  if (kind === 'bank_guard' && _bankInt && direct && alive(direct)) return { kind, ref: direct, id };
+  if (kind === 'city_cop' && direct && direct.alive) return { kind, ref: direct, id: id || direct.id };
+  if (kind === 'gang_car' && direct && !direct._wrecked) return { kind, ref: direct, id: id || direct.id };
+  if (kind === 'aggro_bot') {
+    const ref = direct || _findAggroBotById(id); if (alive(ref)) return { kind, ref, id: id || ref.id };
+  }
+  if (kind === 'world_cop') {
+    const ref = direct || (worldCops || []).find(x => String(x.id) === String(id));
+    if (alive(ref)) return { kind, ref, id: id || ref.id };
+  }
+  if (kind === 'convoy') {
+    const pool = worldEvent ? [worldEvent.boss, ...(worldEvent.guards || [])] : [];
+    const ref = direct || pool.find(x => x && String(x.id) === String(id));
+    if (alive(ref)) return { kind, ref, id: id || ref.id };
+  }
+  if (kind === 'michael_guard') {
+    const ref = direct || michaelGuards.get(id);
+    if (alive(ref)) return { kind, ref, id: id || ref.id };
+  }
+  if (kind === 'player') {
+    const ref = direct || others.get(String(id)) || others.get(id);
+    if (alive(ref)) return { kind, ref, id: id || ref.uid };
+  }
+
+  // Старые/локальные события иногда знают только координаты стрелка.
+  // Ищем ближайшего реального врага к этой точке, а не игнорируем тревогу.
+  const tr = Number(m._threatR), tc = Number(m._threatC);
+  if (!Number.isFinite(tr) || !Number.isFinite(tc)) return null;
+  let best = null, bestD = 2.6;
+  const take = (k, ref, rid, r, c) => {
+    if (!alive(ref)) return;
+    const d = Math.hypot(r - tr, c - tc);
+    if (d < bestD) { bestD = d; best = { kind:k, ref, id:rid }; }
+  };
+  for (const c of cityCops) take('city_cop', c, c.id, c.y, c.x);
+  for (const c of (worldCops || [])) take('world_cop', c, c.id, c.y, c.x);
+  for (const [, g] of michaelGuards) take('michael_guard', g, g.id, g.y, g.x);
+  for (const car of CARS) if (car && car.gang) take('gang_car', car, car.id, car.r, car.c);
+  for (const tid of Object.keys(aggroZones)) for (const b of (aggroZones[tid]?.bots || []))
+    if (!_hiredBotIds.has(String(b.id))) take('aggro_bot', b, b.id, b.y, b.x);
+  if (worldEvent) for (const e of [worldEvent.boss, ...(worldEvent.guards || [])])
+    if (e) take('convoy', e, e.id, e.y, e.x);
+  for (const [uid, o] of others) take('player', o, uid, o.y, o.x);
+  if (_bankInt) for (const n of (_bankInt.npcs || [])) take('bank_guard', n, _bankInt.npcs.indexOf(n), n.r, n.c);
+  return best;
 }
 
 // Приоритет боевой цели наёмника: живой NPC банка (если внутри) > городской
@@ -9994,6 +10050,7 @@ function _findGangCompanionTarget(m) {
     if (!az || !az.bots) continue;
     for (const bot of az.bots) {
       if (bot.dead || bot.hp <= 0) continue;
+      if (_hiredBotIds.has(String(bot.id))) continue;
       const d = Math.hypot(bot.y - m.r, bot.x - m.c);
       if (d < bestBotD) { bestBotD = d; bestBot = bot; }
     }
@@ -10020,7 +10077,7 @@ function _findGangCompanionTarget(m) {
 function _gangTargetPos(kind, ref) {
   if (!ref) return null;
   if (kind === 'bank_guard' || kind === 'gang_car') return { r: ref.r, c: ref.c };
-  return { r: ref.y, c: ref.x };   // city_cop / aggro_bot / world_cop
+  return { r: ref.y, c: ref.x };   // копы / боты / конвой / игроки / охрана
 }
 
 function _updateGang(dt) {
@@ -10075,17 +10132,28 @@ function _updateGang(dt) {
       stillValid = !!(bot && !bot.dead && bot.hp > 0);
       if (stillValid) m.targetRef = bot;
     } else if (m.targetKind === 'world_cop') {
-      const wc = (worldCops || []).find(c => c.id === m.targetId);
+      const wc = (worldCops || []).find(c => String(c.id) === String(m.targetId));
       stillValid = !!wc;
       if (stillValid) m.targetRef = wc;
+    } else if (m.targetKind === 'convoy') {
+      const pool = worldEvent ? [worldEvent.boss, ...(worldEvent.guards || [])] : [];
+      const target = pool.find(x => x && String(x.id) === String(m.targetId));
+      stillValid = !!(target && target.alive !== false); if (stillValid) m.targetRef = target;
+    } else if (m.targetKind === 'michael_guard') {
+      const target = michaelGuards.get(m.targetId);
+      stillValid = !!(target && target.dead !== true && target.hp !== 0); if (stillValid) m.targetRef = target;
+    } else if (m.targetKind === 'player') {
+      const target = others.get(String(m.targetId)) || others.get(m.targetId);
+      stillValid = !!(target && !target.dead); if (stillValid) m.targetRef = target;
     }
     if (!stillValid) { m.targetKind = null; m.targetRef = null; m.targetId = null; }
     if (!m.targetKind) {
-      const found = _findGangCompanionTarget(m);
+      // Приказ/защита босса важнее самостоятельного поиска ближайшего врага.
+      const found = _resolveGangAlertTarget(m) || _findGangCompanionTarget(m);
       if (found) {
         m.targetKind = found.kind;
         m.targetRef  = found.ref;
-        m.targetId   = found.id || found.ref.id || null;
+        m.targetId   = found.id ?? found.ref.id ?? null;
       }
     }
     if (!m.targetKind) continue;
@@ -10118,6 +10186,12 @@ function _updateGang(dt) {
       try { ws && ws.send(JSON.stringify({ t: 'aggro_shoot', d: { target: m.targetRef.id, weapon: m.weapon } })); } catch(e) {}
     } else if (m.targetKind === 'world_cop') {
       try { ws && ws.send(JSON.stringify({ t: 'cop_shoot', d: { target: m.targetRef.id, weapon: m.weapon } })); } catch(e) {}
+    } else if (m.targetKind === 'convoy') {
+      try { ws && ws.send(JSON.stringify({ t: 'event_shoot', d: { target: m.targetId, weapon: m.weapon } })); } catch(e) {}
+    } else if (m.targetKind === 'michael_guard') {
+      try { ws && ws.send(JSON.stringify({ t: 'mg_shoot', d: { target: m.targetId, weapon: m.weapon } })); } catch(e) {}
+    } else if (m.targetKind === 'player') {
+      try { ws && ws.send(JSON.stringify({ t: 'player_shoot', d: { target_uid: m.targetId, weapon: m.weapon } })); } catch(e) {}
     }
     // Ответный огонь — 25% шанс получить урон
     if (Math.random() < 0.25) {
@@ -12065,7 +12139,7 @@ function handleEventPacket(d) {
     }
     if (d.shooter_id) lastBossShotAt.set(d.shooter_id, performance.now());
     if (!d.miss && d.target_uid && String(d.target_uid) === String(QP.uid) && !_bankShield()) {
-      flashHitOverlay(d.sy, d.sx);
+      flashHitOverlay(d.sy, d.sx, d.shooter_id, 'convoy');
       addShake(3.5);
       _autoLockThreat('convoy', d.shooter_id);
       if (d.killed) myDeathBy = 'Конвой инкассатора';
@@ -12114,7 +12188,7 @@ function handleEventPacket(d) {
     if (meIsShooter && d.target_uid) _markCombat(d.target_uid);
     if (meIsTarget  && d.shooter_uid) _markCombat(d.shooter_uid);
     if (meIsTarget && !_bankShield()) {
-      flashHitOverlay(d.sy, d.sx);
+      flashHitOverlay(d.sy, d.sx, d.shooter_uid, 'player');
       addShake(3);
       _autoLockThreat('player', d.shooter_uid);
       if (d.killed) {
@@ -12182,7 +12256,7 @@ function handleEventPacket(d) {
       if (g) g.lastShotAt = performance.now();
     }
     if (!d.miss && String(d.target_uid) === String(QP.uid) && !_bankShield()) {
-      flashHitOverlay(d.sy, d.sx);
+      flashHitOverlay(d.sy, d.sx, d.guard_id, 'michael_guard');
       addShake(3);
       _autoLockThreat('mg', d.guard_id);
       if (d.killed) myDeathBy = 'Охрана Майкла';
@@ -12224,7 +12298,7 @@ function handleEventPacket(d) {
     // сервера стоит у входа (savedR/savedC), но физически в интерьере и не
     // может уклоняться. Игнорируем эффекты выстрела/ареста пока _bankInt.
     if (!d.miss && String(d.target_uid) === String(QP.uid) && !_bankShield()) {
-      flashHitOverlay(d.sy, d.sx);
+      flashHitOverlay(d.sy, d.sx, d.cop_id, 'world_cop');
       addShake(3);
       _autoLockThreat('cop', d.cop_id);
       if (d.killed) {
@@ -12887,7 +12961,7 @@ function handleEventPacket(d) {
     if (kind === 'aggro_melee' && String(d.target_uid) === String(QP.uid)
         && !d.miss && !_bankShield()) {
       try { hitFlash = performance.now() + 240; } catch(e) {}
-      flashHitOverlay(d.sy, d.sx);
+      flashHitOverlay(d.sy, d.sx, d.bot_id, 'aggro_bot');
       addShake(3.0);
       _autoLockThreat('aggro_bot', d.bot_id);
       if (d.killed) myDeathBy = 'банда «Логова»';
@@ -12899,7 +12973,7 @@ function handleEventPacket(d) {
     if (d.bot_id && _hiredBotIds.has(String(d.bot_id))) return;
     if (String(d.target_uid) === String(QP.uid) && !d.miss && !_bankShield()) {
       try { hitFlash = performance.now() + 240; } catch(e) {}
-      flashHitOverlay(d.sy, d.sx);
+      flashHitOverlay(d.sy, d.sx, d.bot_id, 'aggro_bot');
       addShake(3.0);
       _autoLockThreat('aggro_bot', d.bot_id);
       if (d.killed) myDeathBy = 'банда «Логова»';
@@ -13168,10 +13242,10 @@ function handleEventPacket(d) {
 
 // Кратковременная красная вспышка по краю экрана при попадании в игрока.
 let _hitFlashUntil = 0;
-function flashHitOverlay(shooterR, shooterC) {
+function flashHitOverlay(shooterR, shooterC, shooterId = 'enemy', shooterKind = null, shooterRef = null) {
   _hitFlashUntil = performance.now() + 350;
   if (shooterR !== undefined && shooterC !== undefined) {
-    _gangAlertThreat(shooterR, shooterC, 'enemy');
+    _gangAlertThreat(shooterR, shooterC, shooterId, shooterKind, shooterRef);
   }
 }
 // Overlay ареста — короткая (~2.5с) анимация перед окном тюрьмы.
@@ -18047,14 +18121,23 @@ function fire(angle = null) {
     addShake(weaponFx(currentWeapon).thick ? 3.5 : 2);
     hapticHit();
   }
-  // Наёмники атакуют цель игрока
-  const _shotTarget = chosenConvoy || chosenCop || chosenCityCop || chosenAggro || chosenMg || pvpTarget;
-  if (_shotTarget) {
-    const tr = _shotTarget.y || _shotTarget.r || 0, tc = _shotTarget.x || _shotTarget.c || 0;
-    _gangAlertThreat(tr, tc, _shotTarget.id);
-  } else {
+  // Наёмники атакуют именно ту цель, по которой открыл огонь босс.
+  const _shotTarget = chosenConvoy || chosenCop || chosenCityCop || chosenAggro || chosenMg || chosenBankGuard || pvpTarget;
+  if (chosenConvoy) _gangAlertThreat(chosenConvoy.y, chosenConvoy.x, chosenConvoy.id, 'convoy');
+  else if (chosenCop) _gangAlertThreat(chosenCop.y, chosenCop.x, chosenCop.id, 'world_cop');
+  else if (chosenCityCop) _gangAlertThreat(chosenCityCop.y, chosenCityCop.x, chosenCityCop.cop.id, 'city_cop', chosenCityCop.cop);
+  else if (chosenAggro) _gangAlertThreat(chosenAggro.y, chosenAggro.x, chosenAggro.id, 'aggro_bot');
+  else if (chosenMg) _gangAlertThreat(chosenMg.y, chosenMg.x, chosenMg.id, 'michael_guard');
+  else if (chosenBankGuard) _gangAlertThreat(chosenBankGuard.y, chosenBankGuard.x,
+    _bankInt.npcs.indexOf(chosenBankGuard.npc), 'bank_guard', chosenBankGuard.npc);
+  else if (pvpTarget) _gangAlertThreat(pvpTarget.y, pvpTarget.x, pvpTarget.uid, 'player');
+  if (!_shotTarget) {
+    // Выстрел без попадания: бойцы смотрят в сторону огня и подхватывают
+    // ближайшего настоящего врага у линии выстрела, если он там есть.
     const range = (wcfg.range || 10) * 0.7;
     _gangAlertThreat(player.r + dirY * range, player.c + dirX * range, 'fire');
+  } else {
+    for (const gm of _myGang) gm._threatUntil = Math.max(gm._threatUntil || 0, performance.now() + 6000);
   }
   // Паника NPC: любой выстрел рядом — мирные NPC в радиусе 9 тайлов
   // переключаются в panic. Бегут от стрелка, кричат «ПОМОГИТЕ!» по
@@ -37552,7 +37635,7 @@ function _updateBankInterior(dt) {
           npc._punchDir = Math.atan2(player.r - npc.r, player.c - npc.c);
           const dmg = 12 + Math.floor(Math.random()*6);
           _hurtLocal(dmg, 'Охрана банка');
-          flashHitOverlay();
+          flashHitOverlay(npc.r, npc.c, int.npcs.indexOf(npc), 'bank_guard', npc);
           spawnFloatText(player.r - 0.4, player.c, `−${dmg}`, { color: '#ff6644', size: 14, life: 1000 });
           try { hapticHit && hapticHit(); } catch(e) {}
           if (typeof addShake === 'function') addShake(2);
@@ -37598,7 +37681,7 @@ function _updateBankInterior(dt) {
             if (typeof addShake === 'function') addShake(2.5);
             const dmg = 8 + Math.floor(Math.random()*5);
             _hurtLocal(dmg, 'Охрана банка');
-            flashHitOverlay();
+            flashHitOverlay(npc.r, npc.c, int.npcs.indexOf(npc), 'bank_guard', npc);
             spawnFloatText(player.r - 0.4, player.c, `−${dmg}`, { color: '#ff4422', size: 13, life: 900 });
             try { hapticHit && hapticHit(); } catch(e) {}
             // Авто-лок на стреляющего охранника
