@@ -14896,7 +14896,9 @@ function updateZoneBtn() {
   // для специальных POI (магазин/арена/госпиталь — где есть смысл войти).
   let best = null, bestD2 = ENTER_R * ENTER_R;
   for (const poi of POI) {
-    if (!poi.special || poi.special === 'blackmarket' || poi.special === 'job' || poi.special === 'gym') continue;
+    // У участка есть отдельная рабочая кнопка входа в GTA-панели.
+    // Общая зелёная POI-кнопка дублировала её и ничего не делала.
+    if (!poi.special || poi.special === 'blackmarket' || poi.special === 'job' || poi.special === 'gym' || poi.special === 'jail') continue;
     const dr = poi.r - player.r, dc = poi.c - player.c;
     const d2 = dr * dr + dc * dc;
     if (d2 < bestD2) { best = poi; bestD2 = d2; }
