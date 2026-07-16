@@ -32333,6 +32333,9 @@ if (d.kind === 'plank_path') {
       py -= Math.sin(player.ang) * k;
     }
     const myChat = (_localChat && performance.now() - _localChatT < chatDuration(_localChat)) ? _localChat : null;
+    if (_bankRob && _bankRob.myBag) {
+      _drawCarryingBag(px, py, { layer:'back', ang:player.ang, walking:player.walking, walkPhase:player.walkPhase });
+    }
     drawPerson(px, py, player.ang, QP.look,
                player.walking ? player.walkPhase : 0, QP.name, myChat, true,
                myHp, PVP.max_hp, myDead, null,
@@ -32348,7 +32351,7 @@ if (d.kind === 'plank_path') {
     // Несём мешок по городу — ТА ЖЕ анимация что в банке (мешок на верёвке
     // через плечо + покачивание при ходьбе), а не просто эмодзи над головой.
     if (_bankRob && _bankRob.myBag) {
-      _drawCarryingBag(px, py);
+      _drawCarryingBag(px, py, { layer:'strap', ang:player.ang, walking:player.walking, walkPhase:player.walkPhase });
     }
     // Рендер упавших мешков на земле (мини 3D-мешок с пульсирующим свечением)
     const _nowBag = performance.now();
@@ -32396,6 +32399,7 @@ if (d.kind === 'plank_path') {
       const phase = (o.w ? (o._walkPhase || 0) : 0);
       const chat = (o.chat && performance.now() - o.chatT < chatDuration(o.chat)) ? o.chat : null;
       const otherArmed = (o.mode || 'pvp') !== 'pve' && !o.dead;
+      if (o.bag && !o.dead) _drawCarryingBag(p.x, p.y, { layer:'back', ang:o.ang||0, walking:!!o.w, walkPhase:phase });
       drawPerson(p.x, p.y, o.ang || 0, o.look || {}, phase, o.name, chat, false,
                  o.hp, PVP.max_hp, o.dead, 0, otherArmed, false);
       // Оружие в руке другого игрока — если PvP и жив. Сервер пока не
@@ -32406,7 +32410,7 @@ if (d.kind === 'plank_path') {
         const otherShotT = lastPlayerShotAt.get(String(o.uid)) || 0;
         drawWeaponInHands(p.x, p.y, o.ang || 0, otherW, 0.85, otherShotT);
       }
-      if (o.bag && !o.dead) _drawCarryingBag(p.x, p.y);
+      if (o.bag && !o.dead) _drawCarryingBag(p.x, p.y, { layer:'strap', ang:o.ang||0, walking:!!o.w, walkPhase:phase });
       if (o.wanted > 0) drawWantedStars(p.x, p.y, o.wanted);
       if (o.gangs  > 0) drawWantedGangs(p.x, p.y, o.gangs);
       drawModeTag(p.x, p.y, o.mode || 'pvp');
@@ -38928,27 +38932,68 @@ function _drawMoneyBag(x, y, scale, opts) {
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
 }
 
-function _drawCarryingBag(x, y) {
+function _drawCarryingBag(x, y, opts) {
+  opts = opts || {};
   const now = performance.now();
-  // Покачивание при ходьбе: используем фазу шага игрока, если он идёт,
-  // иначе — лёгкое "дыхание" по времени, когда стоит на месте
-  const walking = !!(player && player.walking);
-  const wp = (player && player.walkPhase) || 0;
-  const bob = walking ? Math.sin(wp * 2) * 2.5 : Math.sin(now * 0.003) * 1;
-  const sway = walking ? Math.sin(wp * 2) * 0.12 : Math.sin(now * 0.0025) * 0.04; // лёгкий поворот мешка
-  const bh = isoH(0.55);
-  const bx = x + 12;
-  const by = y - isoH(1.1) + bob;
-  ctx.save();
-  // Верёвка от плеча к мешку
-  ctx.strokeStyle = 'rgba(100,70,40,0.8)';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(x + 6, y - isoH(0.9));
-  ctx.quadraticCurveTo(bx - 4, by + bh*0.3, bx, by + bh*0.5);
-  ctx.stroke();
-  ctx.restore();
-  _drawMoneyBag(bx, by, 1, { lying:false, showDollar:true, angle: sway });
+  const ang = Number.isFinite(opts.ang) ? opts.ang : ((player && player.ang) || 0);
+  const walking = opts.walking != null ? !!opts.walking : !!(player && player.walking);
+  const wp = Number.isFinite(opts.walkPhase) ? opts.walkPhase : ((player && player.walkPhase) || 0);
+  const layer = opts.layer || 'all';
+  // Переводим направление персонажа из координат мира в экранный вектор.
+  // Благодаря этому мешок остаётся за плечом при любом изометрическом повороте.
+  const wr = Math.sin(ang), wc = Math.cos(ang);
+  let fx = wc - wr, fy = (wc + wr) * ISO_Y;
+  const fl = Math.hypot(fx, fy) || 1; fx /= fl; fy /= fl;
+  const sx = -fy, sy = fx;
+  const step = walking ? Math.sin(wp * 2) : Math.sin(now * 0.0028) * 0.28;
+  const bob = step * (walking ? 1.35 : 0.45);
+  const sway = step * (walking ? 0.07 : 0.025);
+  // Чуть в сторону от позвоночника: мешок виден, но не закрывает тело.
+  const bx = x - fx * 4.5 + sx * 5.5;
+  const by = y - isoH(0.78) - fy * 2.2 + sy * 0.8 + bob;
+
+  if (layer === 'back' || layer === 'all') {
+    ctx.save();
+    ctx.translate(bx, by);
+    ctx.rotate(sway);
+    // Мягкая тень отделяет мешок от одежды, не превращая его в чёрный круг.
+    ctx.fillStyle = 'rgba(0,0,0,.28)';
+    ctx.beginPath();
+    ctx.moveTo(-4,-9); ctx.bezierCurveTo(-10,-5,-10,7,-5,11);
+    ctx.bezierCurveTo(0,14,8,11,9,5); ctx.bezierCurveTo(10,-3,5,-8,2,-9);
+    ctx.closePath(); ctx.fill();
+    const cloth = ctx.createLinearGradient(-8,-8,8,11);
+    cloth.addColorStop(0,'#b47a3d'); cloth.addColorStop(.48,'#8d582a'); cloth.addColorStop(1,'#5d3518');
+    ctx.fillStyle = cloth; ctx.strokeStyle = '#3c2412'; ctx.lineWidth = 1.15;
+    ctx.beginPath();
+    ctx.moveTo(-3,-10); ctx.bezierCurveTo(-8,-7,-9,-1,-8,5);
+    ctx.bezierCurveTo(-7,12,0,14,6,11); ctx.bezierCurveTo(11,8,10,0,7,-5);
+    ctx.bezierCurveTo(5,-8,3,-9,2,-10); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // Горловина и верёвка.
+    ctx.fillStyle='#75502a';
+    ctx.beginPath(); ctx.moveTo(-4,-12); ctx.lineTo(-2,-9); ctx.lineTo(3,-9); ctx.lineTo(5,-12); ctx.lineTo(1,-15); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='#d4ad68'; ctx.lineWidth=1.4;
+    ctx.beginPath(); ctx.moveTo(-4,-9); ctx.quadraticCurveTo(0,-7,5,-9); ctx.stroke();
+    // Складки и маленькая маркировка — читается как мешок, а не как шар.
+    ctx.strokeStyle='rgba(55,31,13,.42)'; ctx.lineWidth=.75;
+    for (const ox of [-3,1,4]) { ctx.beginPath(); ctx.moveTo(ox,-6); ctx.quadraticCurveTo(ox-2,2,ox,9); ctx.stroke(); }
+    ctx.fillStyle='#f0c64b'; ctx.font='900 7px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('$',1,3);
+    ctx.restore();
+  }
+
+  if (layer === 'strap' || layer === 'all') {
+    // Только ремень идёт поверх корпуса; сам мешок уже находится за персонажем.
+    const shoulderX = x - sx * 4.5, shoulderY = y - isoH(1.02);
+    const hipX = x + sx * 5.0, hipY = y - isoH(0.35);
+    ctx.save(); ctx.lineCap='round';
+    ctx.strokeStyle='rgba(42,25,13,.82)'; ctx.lineWidth=3.2;
+    ctx.beginPath(); ctx.moveTo(shoulderX,shoulderY); ctx.quadraticCurveTo(x-fx*1.5,y-isoH(.7),hipX,hipY); ctx.stroke();
+    ctx.strokeStyle='rgba(190,137,76,.9)'; ctx.lineWidth=1.25;
+    ctx.beginPath(); ctx.moveTo(shoulderX,shoulderY); ctx.quadraticCurveTo(x-fx*1.5,y-isoH(.7),hipX,hipY); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
 }
 
 function _drawBankInteriorNpc(npc) {
@@ -39392,9 +39437,10 @@ function _drawVaultRoom(int) {
   // Игрок
   items.push({d:player.r+player.c*0.01+0.5, fn:()=>{
     const p=w2s(player.r+.5, player.c+.5);
+    if (int.myBag) _drawCarryingBag(p.x, p.y, { layer:'back', ang:player.ang, walking:player.walking, walkPhase:player.walkPhase });
     drawPerson(p.x,p.y,player.ang,QP.look,player.walking?player.walkPhase:0,QP.name,null,true,myHp,PVP.max_hp||100,myDead,null,!!(_punchAnim && _punchAnim.type !== 'kick'),!!(_punchAnim && _punchAnim.type === 'kick'));
     if (!myDead) { if (_isArmed() && !_punchAnim) drawWeaponInHands(p.x,p.y,player.ang,currentWeapon,.9,lastShotClientT); if (_punchAnim) _drawPunchAnim(p.x,p.y); }
-    if (int.myBag) _drawCarryingBag(p.x, p.y);
+    if (int.myBag) _drawCarryingBag(p.x, p.y, { layer:'strap', ang:player.ang, walking:player.walking, walkPhase:player.walkPhase });
   }});
 
   // Южная стена + дверь выхода — полупрозрачная (ближайшая к камере,
@@ -40057,9 +40103,10 @@ function drawBankInteriorScene() {
   // Игрок
   items.push({d:player.r+player.c+.05,fn:()=>{
     const p=w2s(player.r+.5,player.c+.5);
+    if (myBag) _drawCarryingBag(p.x, p.y, { layer:'back', ang:player.ang, walking:player.walking, walkPhase:player.walkPhase });
     drawPerson(p.x,p.y,player.ang,QP.look,player.walking?player.walkPhase:0,QP.name,null,true,myHp,PVP.max_hp||100,myDead,null,!!(_punchAnim && _punchAnim.type !== 'kick'),!!(_punchAnim && _punchAnim.type === 'kick'));
     if (!myDead) { if (_isArmed() && !_punchAnim) drawWeaponInHands(p.x,p.y,player.ang,currentWeapon,.9,lastShotClientT); if (_punchAnim) _drawPunchAnim(p.x,p.y); }
-    if (myBag){ _drawCarryingBag(p.x, p.y); }
+    if (myBag) _drawCarryingBag(p.x, p.y, { layer:'strap', ang:player.ang, walking:player.walking, walkPhase:player.walkPhase });
   }});
 
   // ── ВНУТРЕННЯЯ СТЕНА на archRow — разделяет лобби от зон персонала/отдыха ──
