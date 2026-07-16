@@ -30283,7 +30283,9 @@ try { document.getElementById('hudAvatar').addEventListener('click', toggleProfi
 // браузеры блокируют autoplay. _tone — пиковый осциллятор с фейдом,
 // _noise — белый шум через фильтр. Громкость общая (sfxVol).
 let _audioCtx = null;
-let _sfxVol   = 0.5;
+let _sfxBus = null;
+let _sharedNoiseBuffer = null;
+let _sfxVol = 0.5;
 function _ac() {
   if (_audioCtx) return _audioCtx;
   try {
@@ -30291,32 +30293,55 @@ function _ac() {
   } catch (e) { _audioCtx = null; }
   return _audioCtx;
 }
-function _tone({ freq=440, freqEnd, dur=0.1, type='square', vol=0.2 }) {
-  const ac = _ac(); if (!ac) return;
-  const o = ac.createOscillator();
-  const g = ac.createGain();
-  o.type = type; o.frequency.value = freq;
-  if (typeof freqEnd === 'number') {
-    o.frequency.linearRampToValueAtTime(freqEnd, ac.currentTime + dur);
-  }
-  g.gain.value = vol * _sfxVol;
-  g.gain.linearRampToValueAtTime(0.0001, ac.currentTime + dur);
-  o.connect(g); g.connect(ac.destination);
-  o.start(); o.stop(ac.currentTime + dur + 0.02);
+function _sfxOut(ac) {
+  if (_sfxBus) return _sfxBus;
+  const comp=ac.createDynamicsCompressor();
+  comp.threshold.value=-12;comp.knee.value=8;comp.ratio.value=5;
+  comp.attack.value=.002;comp.release.value=.14;
+  comp.connect(ac.destination);_sfxBus=comp;
+  return comp;
 }
-function _noise({ dur=0.1, vol=0.18, filter='highpass', filterFreq=600 }) {
-  const ac = _ac(); if (!ac) return;
-  const n = Math.floor(ac.sampleRate * dur);
-  const buf = ac.createBuffer(1, n, ac.sampleRate);
-  const data = buf.getChannelData(0);
-  for (let i = 0; i < n; i++) data[i] = (Math.random() * 2 - 1);
-  const src = ac.createBufferSource(); src.buffer = buf;
-  const f = ac.createBiquadFilter(); f.type = filter; f.frequency.value = filterFreq;
-  const g = ac.createGain();
-  g.gain.value = vol * _sfxVol;
-  g.gain.linearRampToValueAtTime(0.0001, ac.currentTime + dur);
-  src.connect(f); f.connect(g); g.connect(ac.destination);
-  src.start(); src.stop(ac.currentTime + dur + 0.02);
+function _tone({ freq=440, freqEnd, dur=0.1, type='square', vol=0.2, delay=0, attack=.001 }) {
+  const ac=_ac();if(!ac)return;
+  const t0=ac.currentTime+Math.max(0,delay),t1=t0+Math.max(.008,dur);
+  const o=ac.createOscillator(),g=ac.createGain();
+  o.type=type;o.frequency.setValueAtTime(Math.max(1,freq),t0);
+  if(typeof freqEnd==='number')o.frequency.exponentialRampToValueAtTime(Math.max(1,freqEnd),t1);
+  const peak=Math.max(.0001,vol*_sfxVol);
+  g.gain.setValueAtTime(.0001,t0);g.gain.exponentialRampToValueAtTime(peak,t0+Math.max(.0005,attack));
+  g.gain.exponentialRampToValueAtTime(.0001,t1);
+  o.connect(g);g.connect(_sfxOut(ac));o.start(t0);o.stop(t1+.02);
+}
+function _noise({ dur=0.1, vol=0.18, filter='highpass', filterFreq=600, q=.7, delay=0, attack=.001 }) {
+  const ac=_ac();if(!ac)return;
+  if(!_sharedNoiseBuffer||_sharedNoiseBuffer.sampleRate!==ac.sampleRate){
+    const n=Math.floor(ac.sampleRate*2),buf=ac.createBuffer(1,n,ac.sampleRate),data=buf.getChannelData(0);
+    for(let i=0;i<n;i++)data[i]=Math.random()*2-1;
+    _sharedNoiseBuffer=buf;
+  }
+  const t0=ac.currentTime+Math.max(0,delay),t1=t0+Math.max(.008,dur);
+  const src=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();src.buffer=_sharedNoiseBuffer;
+  f.type=filter;f.frequency.setValueAtTime(Math.max(30,filterFreq),t0);f.Q.value=q;
+  const peak=Math.max(.0001,vol*_sfxVol);
+  g.gain.setValueAtTime(.0001,t0);g.gain.exponentialRampToValueAtTime(peak,t0+Math.max(.0005,attack));
+  g.gain.exponentialRampToValueAtTime(.0001,t1);
+  src.connect(f);f.connect(g);g.connect(_sfxOut(ac));
+  const maxOffset=Math.max(0,_sharedNoiseBuffer.duration-dur-.02);
+  src.start(t0,Math.random()*maxOffset);src.stop(t1+.02);
+}
+function _gunMechanic(delay=.09,weight=1){
+  _noise({dur:.018,vol:.09*weight,filter:'highpass',filterFreq:2400,q:1.2,delay,attack:.0005});
+  _tone({freq:760,freqEnd:280,dur:.028,type:'triangle',vol:.055*weight,delay,attack:.0005});
+}
+function _gunShot(p={}){
+  const power=p.power||1,body=p.body||120;
+  _noise({dur:p.crackDur||.018,vol:(p.crack||.28)*power,filter:'highpass',filterFreq:p.crackFreq||1800,q:.8,attack:.0004});
+  _noise({dur:p.blastDur||.075,vol:(p.blast||.24)*power,filter:'bandpass',filterFreq:p.blastFreq||720,q:p.blastQ||.65,attack:.0007});
+  _tone({freq:body,freqEnd:Math.max(24,body*.28),dur:p.bodyDur||.09,type:'sine',vol:(p.low||.22)*power,attack:.0007});
+  if(p.tail!==0)_noise({dur:p.tailDur||.16,vol:(p.tail||.075)*power,filter:'lowpass',filterFreq:p.tailFreq||950,q:.45,delay:.012,attack:.004});
+  if(p.ring)_tone({freq:p.ring,freqEnd:p.ring*.72,dur:p.ringDur||.11,type:'sine',vol:(p.ringVol||.035)*power,delay:.006,attack:.002});
+  if(p.mech!==false)_gunMechanic(p.mechDelay===undefined ? .085 : p.mechDelay,p.mechWeight||1);
+  if(p.echo)_noise({dur:p.echoDur||.12,vol:p.echo*power,filter:'bandpass',filterFreq:p.echoFreq||520,q:.5,delay:p.echoDelay||.105,attack:.006});
 }
 // Разбудить аудио на первом тапе/клике (firefox/ios safari)
 window.addEventListener('pointerdown', () => {
@@ -30328,25 +30353,25 @@ window.addEventListener('pointerdown', () => {
 // Порт из demo_isometric WEAPON_FX_CFG. cd — секунды. tip — длина ствола
 // в пикселях (для muzzle). thick=true делает трассер толще + светится.
 const WEAPON_FX = {
-  pistol:       { cd:0.40, sound:()=>{ _tone({freq:300,freqEnd:80,dur:0.08,type:'square',vol:0.30}); _noise({dur:0.05,vol:0.18}); },
+  pistol:       { cd:0.40, sound:()=>_gunShot({body:135,crack:.30,blast:.22,tail:.055,tailDur:.11,mechDelay:.095}),
                   color:'#ffea80', recoil:1.4, shake:1.2, tip:14, spread:0 },
-  nagan:        { cd:0.45, sound:()=>{ _tone({freq:340,freqEnd:90,dur:0.09,type:'square',vol:0.32}); _noise({dur:0.05,vol:0.18}); },
+  nagan:        { cd:0.45, sound:()=>_gunShot({body:118,power:1.08,crack:.32,blast:.23,tail:.06,ring:920,ringVol:.025,mechDelay:.13}),
                   color:'#ffe080', recoil:1.5, shake:1.3, tip:14, spread:0 },
-  pistol_heavy: { cd:0.55, sound:()=>{ _tone({freq:200,freqEnd:50,dur:0.13,type:'square',vol:0.36}); _noise({dur:0.07,vol:0.22,filter:'lowpass',filterFreq:800}); },
+  pistol_heavy: { cd:0.55, sound:()=>_gunShot({body:82,power:1.18,crack:.38,blast:.31,blastDur:.10,tail:.11,tailDur:.22,tailFreq:720,mechDelay:.14,mechWeight:1.15}),
                   color:'#ffb060', recoil:2.0, shake:1.8, tip:20, spread:0, thick:true },
-  pistol_gold:  { cd:0.50, sound:()=>{ _tone({freq:620,freqEnd:200,dur:0.10,type:'sawtooth',vol:0.30}); _tone({freq:1200,freqEnd:400,dur:0.08,type:'sine',vol:0.14}); _noise({dur:0.05,vol:0.15}); },
+  pistol_gold:  { cd:0.50, sound:()=>_gunShot({body:112,power:1.05,crack:.34,blast:.23,tail:.065,ring:1320,ringVol:.043,ringDur:.13,mechDelay:.11}),
                   color:'#ffd76b', recoil:1.6, shake:1.4, tip:18, spread:0 },
-  shotgun:      { cd:0.85, sound:()=>{ _tone({freq:120,freqEnd:30,dur:0.18,type:'square',vol:0.42}); _noise({dur:0.14,vol:0.32,filter:'lowpass',filterFreq:500}); },
+  shotgun:      { cd:0.85, sound:()=>{_gunShot({body:58,power:1.24,crack:.38,blast:.43,blastDur:.14,blastFreq:520,low:.30,bodyDur:.18,tail:.15,tailDur:.30,tailFreq:580,mech:false});_gunMechanic(.31,1.25);_gunMechanic(.43,1.0);},
                   color:'#ffaa50', recoil:3.5, shake:3.8, tip:28, spread:0.32, pellets:6, thick:true },
-  smg:          { cd:0.20, sound:()=>{ _tone({freq:380,freqEnd:120,dur:0.05,type:'square',vol:0.18}); _noise({dur:0.03,vol:0.12}); },
+  smg:          { cd:0.20, sound:()=>_gunShot({body:158,crack:.22,crackDur:.012,blast:.15,blastDur:.045,low:.13,bodyDur:.055,tail:.032,tailDur:.07,mechDelay:.05,mechWeight:.7}),
                   color:'#ffea80', recoil:0.9, shake:0.9, tip:22, spread:0.10 },
-  tommy_gun:    { cd:0.25, sound:()=>{ _tone({freq:340,freqEnd:140,dur:0.06,type:'square',vol:0.22}); _noise({dur:0.04,vol:0.14}); },
+  tommy_gun:    { cd:0.25, sound:()=>_gunShot({body:104,crack:.25,crackDur:.014,blast:.19,blastDur:.06,blastFreq:610,low:.17,bodyDur:.07,tail:.043,tailDur:.09,mechDelay:.065,mechWeight:.8}),
                   color:'#ffce70', recoil:1.0, shake:1.0, tip:22, spread:0.08 },
-  rifle:        { cd:0.50, sound:()=>{ _tone({freq:260,freqEnd:80,dur:0.10,type:'square',vol:0.34}); _noise({dur:0.07,vol:0.22,filter:'lowpass',filterFreq:1500}); },
+  rifle:        { cd:0.50, sound:()=>_gunShot({body:92,power:1.10,crack:.42,crackFreq:2600,blast:.28,blastDur:.09,blastFreq:820,tail:.10,tailDur:.22,echo:.038,echoDelay:.095,mechDelay:.15}),
                   color:'#ffea80', recoil:2.4, shake:2.0, tip:32, spread:0.02, thick:true },
-  sniper:       { cd:1.20, sound:()=>{ _tone({freq:80,freqEnd:25,dur:0.40,type:'sawtooth',vol:0.42}); _noise({dur:0.18,vol:0.28,filter:'lowpass',filterFreq:400}); _tone({freq:1800,freqEnd:200,dur:0.30,type:'sine',vol:0.10}); },
+  sniper:       { cd:1.20, sound:()=>{_gunShot({body:54,power:1.34,crack:.50,crackFreq:3100,crackDur:.025,blast:.36,blastDur:.14,blastFreq:650,low:.32,bodyDur:.24,tail:.16,tailDur:.40,tailFreq:520,echo:.10,echoDur:.24,echoDelay:.12,echoFreq:420,mech:false});_gunMechanic(.34,1.25);_gunMechanic(.49,1.05);},
                   color:'#ff5050', recoil:5.0, shake:5.0, tip:44, spread:0, thick:true },
-  rpg:          { cd:1.80, sound:()=>{ _tone({freq:60,freqEnd:20,dur:0.50,type:'sawtooth',vol:0.45}); _noise({dur:0.40,vol:0.35,filter:'lowpass',filterFreq:300}); setTimeout(()=>{ _tone({freq:200,freqEnd:40,dur:0.30,type:'square',vol:0.42}); _noise({dur:0.30,vol:0.40}); }, 240); },
+  rpg:          { cd:1.80, sound:()=>{_noise({dur:.42,vol:.38,filter:'lowpass',filterFreq:520,q:.5,attack:.012});_noise({dur:.15,vol:.25,filter:'highpass',filterFreq:1450,q:.5,attack:.001});_tone({freq:72,freqEnd:24,dur:.46,type:'sawtooth',vol:.34,attack:.008});},
                   color:'#ff6020', recoil:6.0, shake:7.0, tip:46, spread:0, thick:true },
 };
 function weaponFx(w) {
