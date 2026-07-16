@@ -14504,7 +14504,7 @@ function wsConnect() {
         if (typeof d.me.cash === 'number') {
           const prev = myCash;
           myCash = d.me.cash;
-          if (myCash < 100000) { myCash = 100000; QP.cash = 100000; } // DEBUG
+          QP.cash = d.me.cash;
           // Если cash вырос между snap'ами (но локально мы это не зачли —
           // например, награда от сервера которую клиент не предсказал) —
           // всплывашка над головой. prev>0 — чтобы не было «+10000$» при
@@ -17670,10 +17670,9 @@ window.addEventListener('message', (ev) => {
   if (!d || typeof d !== 'object') return;
   if (d.type !== 'battle_done') return;
   // Обновляем состояние из результата боя
-  if (d.cash > 0) QP.cash = d.cash;
+  if (typeof d.cash === 'number') { QP.cash = d.cash; myCash = d.cash; }
   if (d.hp > 0) myHp = Math.min(d.hp, PVP.max_hp);
   if (d.lvl > 0) QP.lvl = Math.max(d.lvl, 5); // DEBUG: минимум 5 ранг для теста найма
-  if ((parseInt(QP.cash) || 0) < 100000) { QP.cash = 100000; myCash = 100000; } // DEBUG: деньги на тест
   // Обновляем HUD
   try {
     const lv = document.getElementById('hudLvl');
@@ -30763,7 +30762,6 @@ function initHudIdentity() {
   renderHudAvatar();
 }
 QP.lvl = Math.max(QP.lvl || 1, 5); // DEBUG: минимум 5 ранг
-if ((parseInt(QP.cash) || 0) < 100000) { QP.cash = 100000; myCash = 100000; } // DEBUG: деньги
 try { initHudIdentity(); } catch (e) {}
 
 // ── Профиль — модал по тапу на аватар ────────────────────────────
