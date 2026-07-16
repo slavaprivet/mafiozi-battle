@@ -10338,6 +10338,19 @@ function _beginWorldResume() {
 let _myApartments = {};
 let _apartmentStateLoaded = false;
 const APARTMENT_OWNERSHIP_LIMIT = 5;
+// Цена квартиры зависит от класса квартала. Сервер использует ту же
+// таблицу и не доверяет сумме, присланной браузером.
+const APARTMENT_DISTRICT_MARKET = Object.freeze({
+  poor:        { price: 3500,  label: 'Бедный район' },
+  lair:        { price: 5500,  label: 'Логово' },
+  industrial:  { price: 7000,  label: 'Промзона' },
+  countryside: { price: 8500,  label: 'Загородный район' },
+  nightlife:   { price: 14000, label: 'Ночной район' },
+  downtown:    { price: 18000, label: 'Центр города' },
+  coast:       { price: 24000, label: 'Побережье' },
+  rich:        { price: 32000, label: 'Богатый район' },
+  standard:    { price: 6500,  label: 'Обычный район' },
+});
 function _apartmentOwnedCount() {
   return Object.keys(_myApartments || {}).length;
 }
@@ -10365,12 +10378,12 @@ const APT_UPGRADES = {
   repair:      { label: '🛋 Ремонт',         base: 500,  desc: 'Уют и статус квартиры' },
 };
 function apartmentPrice(r, c) {
-  // Дороже ближе к центру (Бурж Мафия) — как и было задумано.
-  const center = _aptBlockCenter(r, c);
-  const d = Math.hypot(center.r - BURJ_POS.r, center.c - BURJ_POS.c);
-  const maxD = Math.hypot(BURJ_POS.r, BURJ_POS.c) + 40; // грубая нормализация на размер карты
-  const k = Math.max(0, Math.min(1, 1 - d / maxD));
-  return Math.round((1200 + k * 8800) / 100) * 100;
+  return apartmentDistrictMarket(r, c).price;
+}
+function apartmentDistrictMarket(r, c) {
+  let id = typeof districtStyleIdAt === 'function' ? districtStyleIdAt(r, c) : null;
+  if (!id && r >= 100 && r <= 149 && c >= 0 && c <= 79) id = 'lair';
+  return APARTMENT_DISTRICT_MARKET[id] || APARTMENT_DISTRICT_MARKET.standard;
 }
 function isApartmentCandidateTile(r, c) {
   if (r < 0 || r >= MAP_ROWS || c < 0 || c >= MAP_COLS) return false;
@@ -10578,7 +10591,8 @@ async function buyCurrentApartment() {
     }
     if (j.cash !== undefined) { QP.cash = j.cash; myCash = parseInt(j.cash) || 0; updateMoneyHud(); }
     if (j.owned) _myApartments = j.owned;
-    showToast(`🏠 Квартира куплена! Квартира ${_apartmentCounterLabel()}`, '✅', 2800);
+    const paid = Number(j.price) || price;
+    showToast(`🏠 Квартира куплена за $${paid.toLocaleString('ru')}! ${_apartmentCounterLabel()}`, '✅', 2800);
     if (_profileTab === 'status') renderProfileTab();
   } catch (e) { showToast('⚠️ Ошибка связи с сервером', '❌', 2200); }
 }
@@ -15526,10 +15540,11 @@ function updateGtaInteractions() {
       const owned = isApartmentOwned(_buildingInt.r, _buildingInt.c);
       if (!owned) {
         const price = apartmentPrice(_buildingInt.r, _buildingInt.c);
+        const market = apartmentDistrictMarket(_buildingInt.r, _buildingInt.c);
         _gtaActionKind = 'apt_buy'; _gtaActionCarId = null;
         _gtaBtn.textContent = _apartmentOwnedCount() >= APARTMENT_OWNERSHIP_LIMIT
           ? `🏠 Лимит квартир ${_apartmentCounterLabel()}`
-          : `🏠 Купить квартиру за $${price.toLocaleString('ru')} · ${_apartmentCounterLabel()}`;
+          : `🏠 ${market.label}: $${price.toLocaleString('ru')} · ${_apartmentCounterLabel()}`;
         _gtaBtn.style.display = 'block'; return;
       } else {
         _gtaActionKind = 'apt_upgrade'; _gtaActionCarId = null;
@@ -38798,7 +38813,9 @@ function drawBuildingInterior() {
     ctx.font = 'bold 12px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const txt = info ? `🏠 Твоя квартира · ${_apartmentCounterLabel()}` : `🏠 Можно купить: $${apartmentPrice(bi.r, bi.c).toLocaleString('ru')} · ${_apartmentCounterLabel()}`;
+    const txt = info
+      ? `🏠 Твоя квартира · ${_apartmentCounterLabel()}`
+      : `🏠 ${apartmentDistrictMarket(bi.r, bi.c).label}: $${apartmentPrice(bi.r, bi.c).toLocaleString('ru')} · ${_apartmentCounterLabel()}`;
     const tw = ctx.measureText(txt).width + 18;
     ctx.fillStyle = 'rgba(0,0,0,.55)';
     ctx.strokeStyle = info ? 'rgba(130,255,160,.7)' : 'rgba(255,215,107,.7)';
