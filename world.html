@@ -34750,11 +34750,17 @@ function drawDistrictBossCashDrops(r0,r1,c0,c1){
   for(const q of districtBossCashDrops.values()){
     if(q.y<r0-3||q.y>r1+3||q.x<c0-3||q.x>c1+3)continue;
     const p=w2s(q.y+.5,q.x+.5),bob=Math.sin(now*.006)*3;
-    ctx.save();ctx.translate(p.x,p.y-10+bob);ctx.textAlign='center';
-    ctx.shadowColor='#ffd93b';ctx.shadowBlur=12;ctx.fillStyle='#ffc928';
-    for(let i=0;i<5;i++){ctx.beginPath();ctx.ellipse((i-2)*5,Math.abs(i-2)*1.5,5,2.8,0,0,Math.PI*2);ctx.fill();}
-    ctx.shadowBlur=0;ctx.font='900 11px system-ui,sans-serif';ctx.lineWidth=4;ctx.strokeStyle='rgba(0,0,0,.8)';ctx.strokeText(`💰 $${q.amount}`,0,-13);
-    ctx.fillStyle='#ffe36b';ctx.fillText(`💰 $${q.amount}`,0,-13);ctx.restore();
+    ctx.save();ctx.translate(p.x,p.y-10+bob);ctx.rotate(-.16);ctx.textAlign='center';
+    ctx.shadowColor='#41ff79';ctx.shadowBlur=13;
+    for(let i=0;i<4;i++){
+      const ox=i*1.5-3,oy=-i*2;
+      ctx.fillStyle=i===3?'#51bd68':'#338b50';ctx.strokeStyle='#17492c';ctx.lineWidth=.8;
+      ctx.fillRect(-15+ox,-7+oy,30,13);ctx.strokeRect(-15+ox,-7+oy,30,13);
+      ctx.fillStyle='#b9efbf';ctx.fillRect(-3+ox,-7+oy,6,13);
+      ctx.fillStyle='#176035';ctx.font='900 8px system-ui,sans-serif';ctx.fillText('$',ox,3+oy);
+    }
+    ctx.shadowBlur=0;ctx.rotate(.16);ctx.font='900 11px system-ui,sans-serif';ctx.lineWidth=4;ctx.strokeStyle='rgba(0,0,0,.82)';ctx.strokeText(`ПАЧКА $${q.amount}`,0,-22);
+    ctx.fillStyle='#72f08c';ctx.fillText(`ПАЧКА $${q.amount}`,0,-22);ctx.restore();
   }
   ctx.textAlign='left';
 }
