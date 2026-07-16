@@ -40441,7 +40441,7 @@ function drawBankInteriorScene() {
     const vr=Math.min(dw,dh)*0.26; // радиус штурвала — пропорционален двери
 
     // ── Массивная стальная рама проёма (всегда видна, под дверью) ──────
-    const frameW=dw+10, frameH=dh+8;
+    const frameW=dw+8, frameH=dh+6;
     const frameGrd=ctx.createLinearGradient(vc.x-frameW/2,vcy-frameH,vc.x+frameW/2,vcy);
     frameGrd.addColorStop(0,'#3a3e54');frameGrd.addColorStop(0.5,'#262a3c');frameGrd.addColorStop(1,'#1a1d2c');
     ctx.fillStyle=frameGrd;
@@ -40465,12 +40465,16 @@ function drawBankInteriorScene() {
         const timerStr = `${mm}:${String(ss).padStart(2,'0')}`;
         const urgent = left < 60000;
         ctx.save();
-        ctx.font = 'bold 11px system-ui';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+        // Таймер находится внутри проёма: надпись больше не уезжает к
+        // верхнему краю экрана и не пересекается с названием банка.
+        ctx.fillStyle='rgba(8,12,24,.82)';
+        ctx.beginPath();ctx.roundRect(vc.x-19,vcy-dh+5,38,12,4);ctx.fill();
+        ctx.font = 'bold 8px system-ui';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillStyle = urgent ? '#ff4040' : '#ffd76b';
         ctx.shadowColor = urgent ? '#ff0000' : '#ffa500';
-        ctx.shadowBlur = urgent ? 12 : 6;
-        ctx.fillText(`🔓 ${timerStr}`, vc.x, vcy - frameH - 10);
+        ctx.shadowBlur = urgent ? 8 : 4;
+        ctx.fillText(`ОТКРЫТО  ${timerStr}`, vc.x, vcy-dh+11);
         ctx.shadowBlur = 0;
         ctx.restore();
       }
@@ -40496,7 +40500,8 @@ function drawBankInteriorScene() {
       ctx.strokeStyle='#cfe0ff';ctx.lineWidth=2;
       for(let i=0;i<5;i++){
         const lx=vc.x-dw/2+8+(dw-16)*(i/4);
-        ctx.beginPath();ctx.moveTo(lx,vcy-dh+2);ctx.lineTo(lx+(Math.random()-0.5)*6,vcy-2);ctx.stroke();
+        const drift=Math.sin(now2*.002+i*1.9)*2.5;
+        ctx.beginPath();ctx.moveTo(lx,vcy-dh+2);ctx.lineTo(lx+drift,vcy-2);ctx.stroke();
       }
       ctx.globalAlpha=1;
       ctx.restore();
@@ -40540,11 +40545,12 @@ function drawBankInteriorScene() {
         ctx.strokeRect(vc.x+dw/2-edgeW,vcy-dh,edgeW,dh);
       }
 
-      ctx.fillStyle='rgba(120,220,140,0.95)';
-      ctx.shadowColor='#000';ctx.shadowBlur=4;
-      ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.fillText('🔓 ОТКРЫТО — ВХОД В ХРАНИЛИЩЕ',vc.x,vcy-frameH-6);
-      ctx.shadowBlur=0;
+      // Короткий статус встроен в верхнюю балку. Длинную зелёную строку
+      // убрали: в изометрическом shear она уходила по диагонали за стену.
+      ctx.fillStyle='#111827';ctx.beginPath();ctx.roundRect(vc.x-17,vcy-frameH+1,34,8,2);ctx.fill();
+      ctx.strokeStyle='rgba(93,255,142,.65)';ctx.lineWidth=.8;ctx.stroke();
+      ctx.fillStyle='#73f79c';ctx.font='bold 6px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('ВХОД ОТКРЫТ',vc.x,vcy-frameH+5);
       ctx.textAlign='left';ctx.textBaseline='alphabetic';
 
     } else if (phase==='cracking') {
@@ -40714,11 +40720,10 @@ function drawBankInteriorScene() {
       ctx.fillStyle='rgba(140,150,190,0.6)';ctx.font='5px monospace';ctx.textAlign='center';
       ctx.fillText('CODE',padX,padY+4);ctx.textAlign='left';
 
-      ctx.fillStyle='rgba(180,190,230,0.85)';
-      ctx.shadowColor='#000';ctx.shadowBlur=4;
-      ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.fillText('🔒 ХРАНИЛИЩЕ',vc.x,vcy-frameH-6);
-      ctx.shadowBlur=0;
+      ctx.fillStyle='#111827';ctx.beginPath();ctx.roundRect(vc.x-18,vcy-frameH+1,36,8,2);ctx.fill();
+      ctx.strokeStyle='rgba(180,190,230,.55)';ctx.lineWidth=.8;ctx.stroke();
+      ctx.fillStyle='#c9d0eb';ctx.font='bold 6px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('ХРАНИЛИЩЕ',vc.x,vcy-frameH+5);
       ctx.textAlign='left';ctx.textBaseline='alphabetic';
     }
     ctx.restore();
