@@ -607,15 +607,23 @@ body.in-pvp #robActionBtn { top: 152px; }
   padding: 7px 8px 8px; border-radius: 9px; z-index: 7;
   background: linear-gradient(145deg,rgba(18,22,30,.94),rgba(8,11,17,.92));
   border: 1px solid rgba(104,126,158,.55); box-shadow: 0 5px 16px rgba(0,0,0,.42);
-  font: 700 10px/1.2 system-ui,sans-serif; pointer-events: none;
+  font: 700 10px/1.2 system-ui,sans-serif; pointer-events: auto;
 }
-#gangRosterHud .gr-head { display:flex;align-items:center;justify-content:space-between;gap:5px;color:#f0f3fa;margin-bottom:5px; }
+#gangRosterHud .gr-head { display:flex;align-items:center;justify-content:space-between;gap:5px;color:#f0f3fa;margin-bottom:5px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent; }
+#gangRosterHud .gr-head:active { transform:scale(.985); }
 #gangRosterHud .gr-count { color:#7eff9a;font-size:9px;padding:1px 5px;border-radius:7px;background:rgba(45,105,65,.28); }
-#gangRosterList { display:flex;flex-direction:column;gap:3px;max-height:116px;overflow:hidden; }
+#gangRosterList { display:flex;flex-direction:column;gap:3px;max-height:172px;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin; }
 #gangRosterList .gr-row { display:flex;align-items:center;gap:5px;min-width:0;color:#dce4ef; }
 #gangRosterList .gr-dot { width:6px;height:6px;border-radius:50%;flex:0 0 auto;background:#53df79;box-shadow:0 0 5px rgba(83,223,121,.65); }
 #gangRosterList .gr-name { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
 #gangRosterList .gr-weapon { margin-left:auto;color:#9aa6b8;font-size:9px; }
+#gangRosterList .gr-dismiss { width:17px;height:17px;padding:0;border:1px solid rgba(242,95,95,.55);border-radius:5px;background:rgba(102,22,27,.58);color:#ff8b8b;font:900 12px/15px system-ui;cursor:pointer; }
+#gangRosterList .gr-dismiss:active { transform:scale(.9); }
+#gangRosterList .gr-confirm { display:flex;align-items:center;gap:4px;padding:4px 5px;border-radius:6px;background:rgba(58,18,22,.88);color:#ffd1d1;font-size:9px; }
+#gangRosterList .gr-confirm span { flex:1;min-width:0; }
+#gangRosterList .gr-confirm button { border:0;border-radius:4px;padding:3px 7px;color:#fff;font:800 9px system-ui;cursor:pointer; }
+#gangRosterList .gr-confirm .yes { background:#a7353d; }
+#gangRosterList .gr-confirm .no { background:#46505f; }
 #gangRosterList .gr-row.dead { color:#737b88;opacity:.82; }
 #gangRosterList .gr-row.dead .gr-dot { background:#8a3030;box-shadow:none; }
 #gangRosterList .gr-row.dead .gr-name { text-decoration:line-through;text-decoration-thickness:1.5px; }
@@ -654,8 +662,13 @@ body.in-pvp #robActionBtn { top: 152px; }
 #policeModal .police-name{color:#fff}.police-sub{color:#8fc0ff;font-size:10px;margin-top:3px}
 #policeModal .police-action{border:1px solid #66a7f0;border-radius:8px;background:#28639f;color:#fff;padding:8px 10px;font:800 10px system-ui;cursor:pointer}
 #policeModal .police-action:disabled{opacity:.45}
-#stealthBtn{display:none;position:absolute;right:111px;bottom:158px;width:58px;height:58px;border-radius:50%;z-index:8;border:2px solid #f0c6ff;background:radial-gradient(circle at 35% 30%,#ca72ed,#663083);box-shadow:0 5px 20px rgba(183,70,235,.58);color:#fff;font-size:24px;align-items:center;justify-content:center;user-select:none;-webkit-tap-highlight-color:transparent}
-#stealthBtn.show{display:flex}#stealthBtn:active{transform:scale(.92)}
+#stealthBtn{display:none;position:absolute;right:105px;bottom:154px;width:68px;height:68px;border-radius:50%;z-index:8;border:2px solid #8ec7ff;background:radial-gradient(circle at 35% 25%,#376da8 0,#17345e 48%,#09172d 100%);box-shadow:0 6px 22px rgba(42,130,235,.62),inset 0 0 0 4px rgba(255,255,255,.08);color:#fff;align-items:center;justify-content:center;user-select:none;-webkit-tap-highlight-color:transparent;overflow:visible}
+#stealthBtn.show{display:flex;animation:policeBtnPulse 1.35s ease-in-out infinite}#stealthBtn:active{transform:scale(.9);animation:none}
+#stealthBtn .baton{position:absolute;width:9px;height:43px;border-radius:5px;background:linear-gradient(90deg,#101820,#506171 45%,#111a23 70%);border:1px solid #91a9ba;box-shadow:0 2px 5px #000;transform:rotate(42deg)}
+#stealthBtn .baton:after{content:'';position:absolute;width:14px;height:8px;border-radius:5px;background:#111820;border:1px solid #7d94a5;left:-3px;bottom:4px}
+#stealthBtn .baton-hit{position:absolute;color:#ffe45b;font:900 21px system-ui;right:-4px;top:-8px;text-shadow:0 0 8px #ffb300;transform:rotate(-12deg)}
+#stealthBtn .baton-label{position:absolute;bottom:-20px;background:rgba(5,15,30,.94);border:1px solid #5da6eb;border-radius:7px;padding:2px 7px;color:#b9dcff;font:900 8px system-ui;white-space:nowrap}
+@keyframes policeBtnPulse{50%{box-shadow:0 6px 30px rgba(69,159,255,.95),inset 0 0 0 4px rgba(255,255,255,.14)}}
 #districtMissionClose {
   position: absolute; left: calc(50% + min(38vw, 150px) - 17px); top: calc(70% - 31px);
   width: 27px; height: 27px; display: none; align-items: center; justify-content: center;
@@ -964,7 +977,12 @@ body.in-pvp #robActionBtn { top: 152px; }
 }
 #hpBarFill.low  { background: linear-gradient(90deg,#ffd24a,#cf8a20); }
 #hpBarFill.crit { background: linear-gradient(90deg,#ff5050,#a02020); }
-#hudPlayer .stat-money { color: #5dd55d; font-weight: 800; display: inline-flex; align-items: center; gap: 3px; }
+#hudPlayer .stat-money {
+  color: #5dd55d; font-weight: 800; display: inline-flex; align-items: center; gap: 3px;
+  cursor: pointer; pointer-events: auto; user-select: none; border-radius: 5px;
+  padding: 1px 3px; margin-left: -3px; touch-action: manipulation;
+}
+#hudPlayer .stat-money:active { background: rgba(93,213,93,.16); transform: scale(.97); }
 #hudPlayer .stat-time  { color: #ffd76b; font-weight: 700; display: inline-flex; align-items: center; gap: 3px; }
 #hudPlayer .stat-time .clock { color: #ffd76b; font-weight: 700; }
 
@@ -1757,14 +1775,14 @@ body.in-pvp #robActionBtn { top: 152px; }
         </span>
       </div>
       <div class="stat-row">
-        <span class="stat-money">💰<span id="hudMoneyVal">0</span></span>
+        <span class="stat-money" id="hudMoneyToggle" role="button" tabindex="0" title="Нажми, чтобы показать точный баланс" aria-label="Показать точный баланс">💰<span id="hudMoneyVal">0</span></span>
         <span class="stat-time"><span id="timeEmoji" title="Время в городе">☀️</span><span class="clock" id="gameClock">12:00</span></span>
         <span style="display:none"><span id="hudKills">0</span><span id="hudDeaths">0</span></span>
       </div>
     </div>
   </div>
   <button id="fireBtn">🔫</button>
-  <button id="stealthBtn" type="button" aria-label="Вырубить со спины" title="Вырубить со спины">🥷</button>
+  <button id="stealthBtn" type="button" aria-label="Оглушить дубинкой" title="Оглушить дубинкой"><span class="baton"></span><span class="baton-hit">✦</span><span class="baton-label">ОГЛУШИТЬ</span></button>
   <!-- Огнетушитель — появляется когда у тебя есть хоть один + рядом
        горит уничтоженная тачка. Бейдж = кол-во в инвентаре. -->
   <button id="extinguishBtn">🧯<span class="badge" id="extBadge">0</span></button>
@@ -1914,6 +1932,9 @@ const QP = {
   has_look: _qInt('has_look', 0),
   mode: _UP.get('mode') || '',  // 'pvp'/'pve' если передан ботом → пропускаем модал
   weapon: _UP.get('weapon') || '',
+  // Только для локального превью: позволяет выдать тестовый баланс через
+  // ?cash=1000000 без изменения реального аккаунта.
+  cash: _LOCAL_PREVIEW ? _qInt('cash', 0) : 0,
 };
 
 // ── Telegram WebApp ─────────────────────────────────────────────
@@ -1943,6 +1964,11 @@ try {
 // поддомен (юзер уже открыл мини-апп с api=…старый-туннель и hub в URL не
 // перепишет — он там просто живёт фоном).
 async function _fetchApiFallback() {
+  // Локальное превью всегда работает со своим сервером на :8080. Публичный
+  // coop_api.json относится к Telegram-версии и не должен уводить тестовую
+  // страницу на cloudflared-туннель, иначе покупки и прочие POST-запросы
+  // начинают падать при каждой смене/остановке туннеля.
+  if (_LOCAL_PREVIEW) return QP.api;
   try {
     const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
     if (ctl) setTimeout(() => ctl.abort(), 3000);
@@ -2061,6 +2087,39 @@ const PIER_R0  = 165, PIER_R1  = 175;   // деревянный причал в�
 const PIER_C0  = 36,  PIER_C1  = 44;
 const SHIP_R0  = 175, SHIP_R1  = 185;   // корпус корабля Майкла
 const SHIP_C0  = 28,  SHIP_C1  = 56;
+
+// Контейнеры порта описаны один раз: эти же размеры используются и рисунком,
+// и физикой. w — полуразмер по c, h — полуразмер по r.
+const PORT_CONTAINER_PRESETS = [
+  { col:'#c0392b', logo:'MAERSK',    code:'MAEU' },
+  { col:'#2980b9', logo:'MSC',       code:'MSCU' },
+  { col:'#f39c12', logo:'HAPAG',     code:'HLBU' },
+  { col:'#27ae60', logo:'EVERGREEN', code:'EGHU' },
+  { col:'#8e44ad', logo:'ONE',       code:'ONEU' },
+  { col:'#d35400', logo:'COSCO',     code:'CSNU' },
+  { col:'#34495e', logo:'CMA-CGM',   code:'CMAU' },
+];
+const PORT_CONTAINER_LAYOUT = [];
+for (let ri=0; ri<2; ri++) for (let ci=0; ci<4; ci++) {
+  const presetIndex=(ri*4+ci+3)%PORT_CONTAINER_PRESETS.length;
+  PORT_CONTAINER_LAYOUT.push({
+    r:SHIP_R0+4.5+ri*1.4, c:SHIP_C0+6+ci*5, w:1.3, h:.55, height:.95,
+    presetIndex, seed:(ri*10+ci)*137,
+    stackIndex:((ri+ci)&1)===0&&ci<3 ? (presetIndex+2)%PORT_CONTAINER_PRESETS.length : -1,
+    stackSeed:(ri*10+ci)*213, stackLift:.95,
+  });
+}
+for (let i=0; i<3; i++) PORT_CONTAINER_LAYOUT.push({
+  r:PIER_R0+1+i*2.3, c:PIER_C0+1.5, w:1.1, h:.5, height:.85,
+  presetIndex:(i+1)%PORT_CONTAINER_PRESETS.length, seed:i*419, stackIndex:-1,
+});
+PORT_CONTAINER_LAYOUT.push({
+  r:PIER_R1-1.2, c:PIER_C1-1.4, w:1.1, h:.5, height:.85,
+  presetIndex:4, seed:991, stackIndex:-1,
+});
+function _isPortContainerSolid(r,c) {
+  return PORT_CONTAINER_LAYOUT.some(q=>Math.abs(r-q.r)<=q.h+.04&&Math.abs(c-q.c)<=q.w+.04);
+}
 // Тайл-коды южной зоны: 14 песок, 15 причал, 16 вода (БЛОК), 17 палуба,
 // 18 гоночный трек (асфальт, проходим для машин и пешеходов).
 // ── Гоночный трек «Прибой» v2 — ПЛАВНОЕ кольцо в море, ОГИБАЕТ порт ──
@@ -2090,6 +2149,10 @@ const SWIM_LIMIT_R = BEACH_R1 + 10.5;
 let _playerInWater = false;
 let _playerSwimmingDeep = false;
 let _playerWaterDepthM = 0;
+// При пересечении кромки воды сервер ещё может прислать последнее положение
+// на песке. На короткое время оставляем движение клиент-авторитетным, чтобы
+// запоздавший снапшот не выбрасывал игрока обратно на берег.
+let _playerWaterAuthorityUntil = 0;
 let _swimNoticeShown = false;
 
 function _isWaterTile(r, c) {
@@ -2117,7 +2180,11 @@ function _tryMovePlayerCoast(obj, dr, dc) {
       !blocked(obj.r, nc - pad) && !blocked(obj.r, nc + pad)) obj.c = nc;
 }
 function _refreshPlayerWaterState() {
+  const wasInWater = _playerInWater;
   _playerInWater = _isSwimmableWater(player.r, player.c);
+  if (_playerInWater && !wasInWater) {
+    _playerWaterAuthorityUntil = Date.now() + 1800;
+  }
   _playerWaterDepthM = _waterDepthM(player.r, player.c);
   const wasDeep = _playerSwimmingDeep;
   _playerSwimmingDeep = _playerInWater && player.r >= SWIM_DEEP_R && !myJetSkiId;
@@ -2126,6 +2193,23 @@ function _refreshPlayerWaterState() {
     showToast('🌊 Глубина — плывём. Оружие использовать нельзя', '🏊', 2600);
   }
   if (!_playerInWater) _swimNoticeShown = false;
+}
+function _worldAngleToScreen(ang) {
+  const wr=Math.sin(ang||0),wc=Math.cos(ang||0);
+  const sx=wc-wr,sy=(wc+wr)*ISO_Y;
+  return Math.atan2(sy,sx);
+}
+// Единый живой образ локального игрока. Его запрашивают каждый кадр и обычный
+// персонаж, и пловец, и водитель гидроцикла — образ не фиксируется при посадке.
+// Форма копа имеет приоритет над гражданской одеждой, даже если сервер в этот
+// момент прислал обновление образа из редактора.
+function _livePlayerLook(){
+  const base=QP.look||{};
+  try{
+    if(_policeState&&_policeState.employed&&typeof _policeUniformLook==='function')
+      return _policeUniformLook(_policeState.civilianLook||base);
+  }catch(e){}
+  return base;
 }
 
 const JET_SKI_PARKING = [
@@ -2258,30 +2342,71 @@ function drawJetSkiParking() {
   ctx.restore();
 }
 function drawJetSki(j) {
-  const p=w2s(j.r,j.c), wr=Math.sin(j.ang), wc=Math.cos(j.ang);
-  let sx=wc-wr, sy=(wc+wr)*ISO_Y, sm=Math.hypot(sx,sy)||1; sx/=sm;sy/=sm;
-  const a=Math.atan2(sy,sx), bob=Math.sin(performance.now()*.004+j.phase)*1.2;
-  ctx.save();ctx.translate(p.x,p.y+bob);ctx.rotate(a);
-  ctx.fillStyle='rgba(0,20,32,.38)';ctx.beginPath();ctx.ellipse(-2,7,27,8,0,0,Math.PI*2);ctx.fill();
-  ctx.strokeStyle='rgba(196,242,250,.75)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-26,6);ctx.quadraticCurveTo(-10,12,18,7);ctx.stroke();
-  // Нижняя грань корпуса и острый нос.
-  ctx.fillStyle='#122b38';ctx.beginPath();ctx.moveTo(-25,3);ctx.lineTo(13,-9);ctx.lineTo(29,0);ctx.lineTo(15,9);ctx.lineTo(-19,10);ctx.closePath();ctx.fill();
-  ctx.fillStyle=j.color;ctx.beginPath();ctx.moveTo(-22,0);ctx.lineTo(10,-10);ctx.lineTo(28,0);ctx.lineTo(11,7);ctx.lineTo(-18,7);ctx.closePath();ctx.fill();
-  ctx.fillStyle='rgba(255,255,255,.28)';ctx.beginPath();ctx.moveTo(6,-8);ctx.lineTo(26,0);ctx.lineTo(12,1);ctx.closePath();ctx.fill();
-  ctx.fillStyle=j.accent;ctx.beginPath();ctx.moveTo(-15,4);ctx.lineTo(12,3);ctx.lineTo(20,0);ctx.lineTo(10,6);ctx.lineTo(-15,7);ctx.closePath();ctx.fill();
-  ctx.fillStyle='#182127';ctx.beginPath();ctx.roundRect(-13,-5,23,9,4);ctx.fill();
-  ctx.fillStyle='#3d4b51';ctx.beginPath();ctx.roundRect(-8,-7,14,5,3);ctx.fill();
-  ctx.strokeStyle='#20282d';ctx.lineWidth=2.3;ctx.beginPath();ctx.moveTo(7,-5);ctx.lineTo(12,-13);ctx.moveTo(8,-11);ctx.lineTo(17,-14);ctx.stroke();
-  ctx.fillStyle='#e8fbff';ctx.beginPath();ctx.arc(24,0,2.2,0,Math.PI*2);ctx.fill();
-  if(j.driver){
-    const skin=SKINS[(QP.look&&QP.look.skin)||0]||SKINS[0];
-    ctx.fillStyle='#1e2630';ctx.beginPath();ctx.ellipse(-3,-9,7,10,-.25,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle=skin;ctx.lineWidth=3.5;ctx.beginPath();ctx.moveTo(0,-13);ctx.lineTo(11,-12);ctx.moveTo(-1,-11);ctx.lineTo(9,-8);ctx.stroke();
-    ctx.fillStyle=skin;ctx.beginPath();ctx.arc(-2,-22,6,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#2b211d';ctx.beginPath();ctx.arc(-3,-24,5.2,Math.PI,Math.PI*2);ctx.fill();
+  const p=w2s(j.r,j.c);
+  const a=_worldAngleToScreen(j.ang), bob=Math.sin(performance.now()*.004+j.phase)*1.2;
+  const ca=Math.cos(a),sa=Math.sin(a),pt=(front,side,z=0)=>({x:p.x+ca*front-sa*side,y:p.y+bob+sa*front+ca*side-z});
+  const poly=(pts,fill,stroke=null)=>{ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);ctx.closePath();ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.stroke();}};
+  const top=[pt(29,0,4),pt(13,8,4),pt(-23,7,4),pt(-24,-7,4),pt(13,-8,4)];
+  const low=top.map(v=>({x:v.x,y:v.y+7}));
+  ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
+  // Тень и киль всегда опущены вертикально вниз экрана. Раньше нижняя грань
+  // вращалась вместе с картинкой и корпус выглядел лежащим на боку.
+  ctx.fillStyle='rgba(0,20,32,.42)';ctx.beginPath();ctx.ellipse(p.x-ca*2,p.y+bob+8,29,8,a,0,Math.PI*2);ctx.fill();
+  poly(low,'#0a202b');
+  poly([top[1],top[2],low[2],low[1]],'#163b49');
+  poly([top[2],top[3],low[3],low[2]],'#0d2935');
+  poly([top[3],top[4],low[4],low[3]],'#102f3b');
+  poly([top[4],top[0],low[0],low[4]],'#1a4655');
+  poly(top,j.color,'rgba(7,25,34,.9)');
+  // Светлая палуба, боковая полоса и объёмное сиденье.
+  poly([pt(7,-7,4.3),pt(27,0,4.3),pt(10,1,4.3)],'rgba(255,255,255,.27)');
+  poly([pt(-16,5,4.5),pt(13,4,4.5),pt(21,0,4.5),pt(10,6,4.5),pt(-17,7,4.5)],j.accent);
+  const seat=pt(-5,0,7);ctx.fillStyle='#151e24';ctx.beginPath();ctx.ellipse(seat.x,seat.y,14,5.5,a,0,Math.PI*2);ctx.fill();
+  const seatHi=pt(-3,0,9);ctx.fillStyle='#3d4b51';ctx.beginPath();ctx.ellipse(seatHi.x,seatHi.y,9,3.4,a,0,Math.PI*2);ctx.fill();
+  // Поднятая рулевая колонка и поперечный руль подчёркивают, где верх гидроцикла.
+  const stem0=pt(6,0,5),stem1=pt(10,0,12),gripL=pt(10,-6,12),gripR=pt(10,6,12);
+  ctx.strokeStyle='#17232a';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(stem0.x,stem0.y);ctx.lineTo(stem1.x,stem1.y);ctx.moveTo(gripL.x,gripL.y);ctx.lineTo(gripR.x,gripR.y);ctx.stroke();
+  const lamp=pt(25,0,6);ctx.fillStyle='#e8fbff';ctx.beginPath();ctx.arc(lamp.x,lamp.y,2.4,0,Math.PI*2);ctx.fill();
+  const rear=pt(-23,0,1);ctx.strokeStyle='rgba(196,242,250,.8)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(rear.x-sa*7,rear.y+ca*7);ctx.quadraticCurveTo(rear.x-ca*12,rear.y-sa*12+7,rear.x+sa*7,rear.y-ca*7);ctx.stroke();
+  ctx.restore();
+  if(j.driver)_drawJetSkiRider(j,p,a,bob);
+  if(j.returning){ctx.fillStyle='#8fe9ff';ctx.font='bold 9px system-ui';ctx.textAlign='center';ctx.fillText('↩ НА ПАРКОВКУ',p.x,p.y-30);}
+}
+function _drawJetSkiRider(j,p,screenAng,bob){
+  // Никакой копии образа в j не храним: форма/одежда меняются прямо во время езды.
+  const look=_livePlayerLook(),skin=SKINS[look.skin|0]||SKINS[0];
+  const ca=Math.cos(screenAng),sa=Math.sin(screenAng);
+  const localPoint=(x,y)=>({x:p.x+ca*x-sa*y,y:p.y+bob+sa*x+ca*y});
+  const seat=localPoint(-5,0),handle=localPoint(10,0);seat.y-=3;handle.y-=12;
+  // Настоящий спрайт игрока остаётся вертикальным относительно экрана:
+  // гидроцикл наклонён изометрией, но человек больше не лежит набок вместе с ним.
+  // В getSprite остаётся запас под ноги, поэтому 42px давали крошечный торс.
+  // 74px визуально равны обычному персонажу, но сидячая нижняя часть скрыта корпусом.
+  const sprite=getSprite(look,true,true),sh=74,sw=sh*.72;
+  const gender=look.gender|0;
+  const bodyCols=gender?['#3a1a3a','#1a2a3a','#3a1a1a','#1a3a2a']:['#1a1a2e','#1a2e1a','#2e1a1a','#1a1e2e'];
+  const sleeve=look.suit||bodyCols[(look.body|0)%bodyCols.length];
+  ctx.save();
+  ctx.fillStyle='rgba(0,10,18,.35)';ctx.beginPath();ctx.ellipse(seat.x,seat.y+3,11,4,0,0,Math.PI*2);ctx.fill();
+  ctx.drawImage(sprite,Math.round(seat.x-sw/2),Math.round(seat.y-sh*.91),sw,sh);
+  // Согнутые руки: плечо → локоть → отдельная рукоять. Прямые линии раньше
+  // выглядели длиннее всего персонажа и пересекались над рулём.
+  const sideX=-sa,sideY=ca;
+  const shoulders=[{x:seat.x-8,y:seat.y-39},{x:seat.x+8,y:seat.y-39}];
+  const hands=[{x:handle.x+sideX*3,y:handle.y+sideY*3},{x:handle.x-sideX*3,y:handle.y-sideY*3}];
+  const elbows=[
+    {x:(shoulders[0].x+hands[0].x)*.5-6,y:(shoulders[0].y+hands[0].y)*.5+3},
+    {x:(shoulders[1].x+hands[1].x)*.5+6,y:(shoulders[1].y+hands[1].y)*.5+3},
+  ];
+  ctx.lineCap='round';ctx.lineJoin='round';
+  for(let i=0;i<2;i++){
+    const s=shoulders[i],e=elbows[i],h=hands[i];
+    ctx.strokeStyle='rgba(18,16,17,.78)';ctx.lineWidth=6.8;ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(e.x,e.y);ctx.lineTo(h.x,h.y);ctx.stroke();
+    ctx.strokeStyle=sleeve;ctx.lineWidth=4.8;ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(e.x,e.y);ctx.stroke();
+    ctx.strokeStyle=skin;ctx.lineWidth=4.1;ctx.beginPath();ctx.moveTo(e.x,e.y);ctx.lineTo(h.x,h.y);ctx.stroke();
+    ctx.fillStyle=skin;ctx.beginPath();ctx.arc(h.x,h.y,2.4,0,Math.PI*2);ctx.fill();
   }
   ctx.restore();
-  if(j.returning){ctx.fillStyle='#8fe9ff';ctx.font='bold 9px system-ui';ctx.textAlign='center';ctx.fillText('↩ НА ПАРКОВКУ',p.x,p.y-30);}
 }
 function drawJetSpray() {
   ctx.save();
@@ -2289,25 +2414,35 @@ function drawJetSpray() {
   ctx.restore();
 }
 function drawWaterDepthGuides(r0,c0,r1,c1) {
-  if(r1<BEACH_R1||r0>SWIM_LIMIT_R) return;
-  ctx.save();ctx.textAlign='center';ctx.lineWidth=1.5;
-  for(const g of [{r:SWIM_DEEP_R,col:'rgba(255,220,91,.72)',txt:'ГЛУБИНА 1.5 м'},{r:SWIM_LIMIT_R,col:'rgba(112,210,236,.48)',txt:'ГРАНИЦА ПЛАВАНИЯ'}]){
-    const from=Math.max(1,c0-2),to=Math.min(MAP_COLS-1,c1+2),a=w2s(g.r,from),b=w2s(g.r,to);
-    ctx.strokeStyle=g.col;ctx.setLineDash([8,8]);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.setLineDash([]);
-    const label=w2s(g.r,Math.max(from,Math.min(to,58)));ctx.fillStyle='rgba(5,34,48,.82)';ctx.fillRect(label.x-40,label.y-14,80,13);ctx.fillStyle=g.col;ctx.font='bold 8px system-ui';ctx.fillText(g.txt,label.x,label.y-4);
-  }
-  for(const c of [8,28,62,74]){const p=w2s(SWIM_DEEP_R,c);ctx.fillStyle='#f4d34e';ctx.beginPath();ctx.arc(p.x,p.y-5,3.2,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#f06a46';ctx.beginPath();ctx.moveTo(p.x,p.y-2);ctx.lineTo(p.x,p.y+5);ctx.stroke();}
-  ctx.restore();
+  // Служебные линии «Глубина 1.5 м» и «Граница плавания» скрыты.
+  // Ограничения и физика воды остаются игровыми, без разметки поверх карты.
 }
 function drawSwimmingPlayer(px,py) {
-  const t=performance.now()*.008, skin=SKINS[(QP.look&&QP.look.skin)||0]||SKINS[0];
-  ctx.save();ctx.translate(px,py+Math.sin(t)*1.1);ctx.rotate(player.ang);
-  ctx.strokeStyle='rgba(200,243,251,.68)';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(0,3,25,8,0,0,Math.PI*2);ctx.stroke();
-  ctx.fillStyle='#283646';ctx.beginPath();ctx.ellipse(-2,0,12,6,0,0,Math.PI*2);ctx.fill();
-  const stroke=Math.sin(t*1.7),a1=-13-stroke*9,a2=13+stroke*9;
-  ctx.strokeStyle='rgba(18,67,84,.42)';ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(2,-3);ctx.lineTo(a1,-14);ctx.moveTo(2,3);ctx.lineTo(a2,14);ctx.stroke();
-  ctx.strokeStyle=skin;ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(3,-3);ctx.lineTo(a1,-14);ctx.moveTo(3,3);ctx.lineTo(a2,14);ctx.stroke();
-  ctx.fillStyle=skin;ctx.beginPath();ctx.arc(12,0,7,0,Math.PI*2);ctx.fill();ctx.fillStyle='#2b211d';ctx.beginPath();ctx.arc(11,-2,6,Math.PI*.85,Math.PI*1.8);ctx.fill();
+  const look=_livePlayerLook(),moving=!!player.walking;
+  const t=moving?(player.walkPhase*.72):(performance.now()*.0024);
+  const skin=SKINS[look.skin|0]||SKINS[0],gender=look.gender|0;
+  const bodyCols=gender?['#3a1a3a','#1a2a3a','#3a1a1a','#1a3a2a']:['#1a1a2e','#1a2e1a','#2e1a1a','#1a1e2e'];
+  const clothes=look.suit||bodyCols[(look.body|0)%bodyCols.length];
+  const hairCols=gender?HAIR_COLORS_F:HAIR_COLORS_M;
+  const hair=hairCols[(look.hair|0)%hairCols.length]||hairCols[0];
+  const screenAng=_worldAngleToScreen(player.ang);
+  ctx.save();ctx.translate(px,py+Math.sin(t*1.7)*1.1);ctx.rotate(screenAng);
+  // След, рябь и брызги показывают движение, даже когда спрайт мал на общем зуме.
+  ctx.strokeStyle='rgba(205,244,252,.55)';ctx.lineWidth=1.7;ctx.lineCap='round';ctx.beginPath();
+  ctx.moveTo(-6,-7);ctx.quadraticCurveTo(-20,-12,-31,-5);ctx.moveTo(-6,7);ctx.quadraticCurveTo(-20,12,-31,5);ctx.stroke();
+  ctx.strokeStyle='rgba(111,200,223,.42)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-14,-4);ctx.lineTo(-30,0);ctx.lineTo(-14,4);ctx.stroke();
+  // Ноги работают попеременно и частично скрыты водой.
+  const kick=Math.sin(t*2.1)*3.2;ctx.strokeStyle=clothes;ctx.lineWidth=5.2;ctx.beginPath();ctx.moveTo(-9,-3);ctx.lineTo(-25,-5-kick);ctx.moveTo(-9,3);ctx.lineTo(-25,5+kick);ctx.stroke();
+  ctx.fillStyle=clothes;ctx.beginPath();ctx.ellipse(-4,0,14,6.5,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=skin;ctx.beginPath();ctx.ellipse(7,0,12,7,0,0,Math.PI*2);ctx.fill();
+  // Попеременный гребок руками: одна рука вытягивается, другая завершает цикл.
+  const stroke=Math.sin(t),a1=-10-stroke*10,a2=10+stroke*10;
+  ctx.strokeStyle='rgba(18,67,84,.42)';ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(3,-4);ctx.lineTo(a1,-15);ctx.moveTo(3,4);ctx.lineTo(a2,15);ctx.stroke();
+  ctx.strokeStyle=skin;ctx.lineWidth=4.2;ctx.beginPath();ctx.moveTo(4,-4);ctx.lineTo(a1,-15);ctx.moveTo(4,4);ctx.lineTo(a2,15);ctx.stroke();
+  ctx.fillStyle=skin;ctx.beginPath();ctx.arc(18,0,7,0,Math.PI*2);ctx.fill();ctx.fillStyle=hair;ctx.beginPath();ctx.arc(17,-1,6.3,Math.PI*.82,Math.PI*1.8);ctx.fill();
+  if(look.hat){ctx.fillStyle=['#222','#5a3825','#263b58','#6b2530','#d6c7a1'][look.hat%5];ctx.fillRect(11,-7,12,3);ctx.fillRect(14,-10,7,4);}
+  if(moving){ctx.fillStyle='rgba(229,251,255,.85)';for(let i=0;i<3;i++){ctx.beginPath();ctx.arc(25+i*4,-2+i%2*4,1.3-i*.18,0,Math.PI*2);ctx.fill();}}
+  ctx.strokeStyle='rgba(178,232,244,.8)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-18,3);ctx.quadraticCurveTo(1,-1,24,3);ctx.stroke();
   ctx.restore();
 }
 let _trackTiles = null, _trackPathPts = null;
@@ -3124,7 +3259,7 @@ async function _keepBeachFoundItem(it) {
     const j=await r.json(); if(!j.ok)throw new Error(j.error||'save failed');
     await loadInventoryItems(); showToast(`${def.icon} ${def.name} — в инвентаре`,'🎒',2400); return true;
   } catch(e) {
-    if(!location.pathname.includes('/preview/')) {showToast('Не удалось сохранить находку','❌',2200);return false;}
+    if(!_LOCAL_PREVIEW) {showToast('Не удалось сохранить находку','❌',2200);return false;}
     const saved=_readPreviewFound();saved[def.id]=(saved[def.id]||0)+1;_writePreviewFound(saved);
     await loadInventoryItems();showToast(`${def.icon} ${def.name} — в разделе «Вещи»`,'🎒',2400);return true;
   } finally {it._saving=false;}
@@ -3137,7 +3272,7 @@ async function _returnBeachFoundItem(it) {
     await loadInventoryItems();
     return j;
   } catch(e) {
-    if(!location.pathname.includes('/preview/')){showToast('Не удалось получить награду','❌',2000);return false;}
+    if(!_LOCAL_PREVIEW){showToast('Не удалось получить награду','❌',2000);return false;}
     const def=BEACH_FOUND_DEFS[it.kind],saved=_readPreviewFound();
     if(!def||!(saved[def.id]>0)){showToast('Этой вещи уже нет в инвентаре','❌',1900);return false;}
     saved[def.id]--;_writePreviewFound(saved);
@@ -5980,6 +6115,12 @@ function hitGangCar(car, damage) {
 // hp вычитается. При hp<=0 → dead (тело остаётся как splat).
 function hitNpc(npc, dirY, dirX, weapon, damage) {
   if (!npc || npc.dead) return;
+  if (npc._invulnerable) {
+    npc.cryText = 'У нас ещё много дел.';
+    npc.cryUntil = performance.now() + 1300;
+    spawnFloatText(npc.r - .3, npc.c, 'ВАЖНЫЙ NPC', { color:'#ffd76b', size:13, life:1100 });
+    return;
+  }
   npc.hp = Math.max(0, (npc.hp | 0) - (damage | 0));
   // Knockback
   const kb = 0.35;
@@ -6260,12 +6401,31 @@ const NPC_RESPAWN_MIN_DIST = 22;   // не спаунить ближе этог�
 let _nextNpcRespawnAt = 0;
 let _gameMinutes = 12 * 60;        // 12:00 — нужно до initNpcs (TDZ fix)
 
+const SAID_NPC = {
+  r: 86.5, c: 82.5, tr: 86.5, tc: 82.5, speed: 0.82, ang: 0,
+  walkPhase: 0, idleUntil: 0, hp: 999999, max_hp: 999999,
+  look: { gender:0, skin:2, body:1, face:2, hair:1, hat:0, suit:'#f4f2e9' },
+  _arcKey: 'businessman', _arc: null,
+  _relation: 1, _said: true, _invulnerable: true, _allowBeach: true,
+};
+
+function _placeSaidInCity() {
+  SAID_NPC._arc = NPC_ARCHETYPES.businessman || NPC_ARCHETYPES.worker;
+  const anchors = [[86.5,82.5],[52.5,62.5],[112.5,95.5],[35.5,42.5],[132.5,68.5]];
+  const pos = anchors.find(([r,c]) => npcPassable(r,c)) || [86.5,82.5];
+  SAID_NPC.r=pos[0]; SAID_NPC.c=pos[1]; SAID_NPC.tr=pos[0]; SAID_NPC.tc=pos[1];
+  SAID_NPC.dead=false; SAID_NPC.hp=999999; SAID_NPC.idleUntil=0;
+  pickNpcWaypoint(SAID_NPC);
+  NPCS.push(SAID_NPC);
+}
+
 function initNpcs() {
   NPCS.length = 0;
   for (let i = 0; i < TARGET_NPC_COUNT; i++) {
     const n = spawnNpc(i);
     if (n) { pickNpcWaypoint(n); NPCS.push(n); }
   }
+  _placeSaidInCity();
 }
 
 // Раз в ~1.2 с проверяем сколько живых NPC. Если меньше TARGET — спауним
@@ -8978,6 +9138,12 @@ function spawnCar(idx, opts) {
       vc: dirDx * (1.5 + Math.random() * 0.8) * speedMul,
       dirDx, dirDy,
       model,
+      // Любая машина из spawnCar относится к одному и тому же пулу
+      // фонового трафика, независимо от модели. Без этого полиция/скорая/
+      // пожарка выпадали из подсчёта плотности: после каждого превращения
+      // гражданской машины в спецтранспорт система добавляла ей замену,
+      // а старую уже никогда не учитывала. За долгую сессию CARS разрастался.
+      _ambientTraffic: true,
       braking: false,
       flash: 0,
       _fuel: 55 + Math.random() * 45,   // 55–100% топлива при спауне
@@ -10134,12 +10300,12 @@ function _maintainTrafficDensity(now) {
   if (now - _lastDensityCheckAt < 4000) return;
   _lastDensityCheckAt = now;
   const target = _getTrafficTarget();
-  const civCars = CARS.filter(c =>
-    !c.parked && !c.gang && !c._policeEscort && !c._policeChase &&
-    !(c.model && (c.model.paddyvan || c.model.cruiser ||
-                  c.model.ambulance || c.model.firetruck || c.model.swat_truck))
-  );
-  const diff = target - civCars.length;
+  // Считаем весь пул spawnCar, а не только гражданские модели. Модель при
+  // респауне выбирается заново и может стать cruiser/paddyvan/ambulance/
+  // firetruck; исключение этих моделей создавало бесконечный положительный
+  // diff и новую машину каждые 4 секунды.
+  const ambientCars = CARS.filter(c => c && c._ambientTraffic);
+  const diff = target - ambientCars.length;
   if (diff > 0) {
     const toAdd = Math.min(diff, 3);
     for (let i = 0; i < toAdd; i++) {
@@ -10151,9 +10317,7 @@ function _maintainTrafficDensity(now) {
     const toRemove = Math.min(-diff - 4, 2);
     for (let i = CARS.length - 1; i >= 0 && removed < toRemove; i--) {
       const c = CARS[i];
-      if (c.parked || c.gang || c._policeEscort || c._policeChase) continue;
-      if (c.model && (c.model.paddyvan || c.model.cruiser ||
-                      c.model.ambulance || c.model.firetruck)) continue;
+      if (!c || !c._ambientTraffic) continue;
       if (_carCanDisappear(c, 25)) {
         CARS.splice(i, 1); removed++;
       }
@@ -10484,7 +10648,8 @@ function drawOwnedBusinessWorldMarkers(r0, r1, c0, c1) {
     for (let i=1;i<corners.length;i++) ctx.lineTo(corners[i].x,corners[i].y);
     ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.shadowBlur = 0;
-    const label = `${biz.emoji} СОБСТВЕННОСТЬ`, y = p.y - 94 - pulse * 3;
+    // Плашка должна висеть над крышей и не перекрывать название/декор фасада.
+    const label = `${biz.emoji} СОБСТВЕННОСТЬ`, y = p.y - 112 - pulse * 3;
     ctx.font = '900 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const tw = ctx.measureText(label).width + 20;
     ctx.fillStyle = 'rgba(7,24,13,.96)'; ctx.strokeStyle = '#7eff9a'; ctx.lineWidth = 1.7;
@@ -10678,41 +10843,49 @@ const GANG_HIRE_COST = 100;
 const GANG_MAX = 5;
 const GANG_MIN_LVL = 5;
 const _myGang = [];
-const _gangFallen = [];
-const GANG_FALLEN_KEEP = 12;
+const _formerGang = [];
 let _gangIdCounter = 0;
 let _gangRosterUiKey = '';
+let _gangRosterOpen = false;
+let _gangDismissConfirmId = null;
+const GANG_RETURN_TO_LAIR_MS = 2 * 60 * 1000;
 const _gangWeaponIcon = { pistol:'🔫',pistol_heavy:'🔫',pistol_gold:'🔫',nagan:'🔫',smg:'▰',tommy_gun:'▰',shotgun:'◼',rifle:'⌁',sniper:'⌖',rpg:'🚀' };
 function syncGangRosterHud() {
   const list=document.getElementById('gangRosterList'),count=document.getElementById('gangRosterCount');
   if(!list||!count)return;
   const placeJobHud=()=>{const roster=document.getElementById('gangRosterHud'),job=document.getElementById('jobStatusHud');if(roster&&job)job.style.top=(roster.offsetTop+roster.offsetHeight+8)+'px';};
   const active=_myGang.filter(g=>g&&g.hp>0);
-  const deadSlots=Math.max(3,8-active.length);
-  const fallen=_gangFallen.slice(-deadSlots).reverse();
-  const key=active.map(g=>`${g.id}:${g.name}:${g.weapon}`).join('|')+'#'+fallen.map(g=>`${g.name}:${g.weapon}:${g.at}`).join('|');
+  const key=`${_gangRosterOpen}:${_gangDismissConfirmId||''}:`+active.map(g=>`${g.id}:${g.name}:${g.weapon}`).join('|');
   if(key===_gangRosterUiKey){placeJobHud();return;}
   _gangRosterUiKey=key;
-  count.textContent=`${active.length}/${GANG_MAX}`+(_gangFallen.length?` · ☠${_gangFallen.length}`:'');
+  count.textContent=`${active.length}/${GANG_MAX}`;
   list.replaceChildren();
-  const addRow=(g,dead)=>{
-    const row=document.createElement('div');row.className='gr-row'+(dead?' dead':'');
+  const addRow=(g)=>{
+    const row=document.createElement('div');row.className='gr-row';
     const dot=document.createElement('span');dot.className='gr-dot';
     const name=document.createElement('span');name.className='gr-name';name.textContent=g.name||'Боец';
     const weapon=document.createElement('span');weapon.className='gr-weapon';weapon.textContent=_gangWeaponIcon[g.weapon]||'🔫';
-    row.title=dead?`${g.name||'Боец'} — погиб`:`${g.name||'Боец'} — в строю`;
-    row.append(dot,name,weapon);list.appendChild(row);
+    row.title=`${g.name||'Боец'} — в строю`;
+    row.append(dot,name,weapon);
+    if(_gangRosterOpen){
+      const dismiss=document.createElement('button');dismiss.type='button';dismiss.className='gr-dismiss';dismiss.textContent='×';dismiss.title=`Удалить ${g.name||'бойца'} из банды`;
+      dismiss.addEventListener('click',ev=>{ev.stopPropagation();_gangDismissConfirmId=g.id;_gangRosterUiKey='';syncGangRosterHud();});
+      row.appendChild(dismiss);
+    }
+    list.appendChild(row);
+    if(_gangRosterOpen&&_gangDismissConfirmId===g.id){
+      const confirmRow=document.createElement('div');confirmRow.className='gr-confirm';
+      const question=document.createElement('span');question.textContent=`Удалить ${g.name||'бойца'}?`;
+      const yes=document.createElement('button');yes.type='button';yes.className='yes';yes.textContent='Да';
+      const no=document.createElement('button');no.type='button';no.className='no';no.textContent='Нет';
+      yes.addEventListener('click',ev=>{ev.stopPropagation();_dismissGangMember(g.id);});
+      no.addEventListener('click',ev=>{ev.stopPropagation();_gangDismissConfirmId=null;_gangRosterUiKey='';syncGangRosterHud();});
+      confirmRow.append(question,yes,no);list.appendChild(confirmRow);
+    }
   };
-  for(const g of active)addRow(g,false);
-  for(const g of fallen)addRow(g,true);
-  if(!active.length&&!fallen.length){const empty=document.createElement('div');empty.className='gr-empty';empty.textContent='Бойцов пока нет';list.appendChild(empty);}
+  for(const g of active)addRow(g);
+  if(!active.length){const empty=document.createElement('div');empty.className='gr-empty';empty.textContent='Бойцов пока нет';list.appendChild(empty);}
   requestAnimationFrame(placeJobHud);
-}
-function _recordGangFallen(m,persist=true) {
-  if(!m)return;
-  _gangFallen.push({name:m.name||'Боец',weapon:m.weapon||'pistol',at:Date.now()});
-  if(_gangFallen.length>GANG_FALLEN_KEEP)_gangFallen.splice(0,_gangFallen.length-GANG_FALLEN_KEEP);
-  if(persist)_saveGang();else syncGangRosterHud();
 }
 // Id уличных ботов, которых игрок НАНЯЛ. Сервер про найм не знает и
 // продолжает слать бота в снапшотах (applyAggroTargets пересобирает
@@ -10826,7 +10999,7 @@ const _GANG_NAMES = [
   'Джек','Хантер','Блэйд','Рэй','Коул','Дейв','Чак','Бакс','Флинт','Рэкс',
   'Спайк','Кэш','Скарр','Зеро','Бойд','Нэш','Фокс','Волк','Крот','Змей',
 ];
-function _hireGangMember(botLook, r, c) {
+function _hireGangMember(botLook, r, c, sourceBotId = null) {
   if (_myGang.length >= GANG_MAX) { showToast(`👥 Максимум ${GANG_MAX} бойцов`, '⚠️', 1500); return false; }
   const lvl = parseInt(QP.lvl) || 1;
   if (lvl < GANG_MIN_LVL) { showToast(`🔒 Нужен ранг ${GANG_MIN_LVL}+`, '⚠️', 1500); return false; }
@@ -10842,12 +11015,14 @@ function _hireGangMember(botLook, r, c) {
     r, c, ang: 0, walkPhase: 0,
     hp: 80, max_hp: 80,
     look,
+    sourceBotId: sourceBotId == null ? null : String(sourceBotId),
     weapon: weapons[Math.floor(Math.random() * weapons.length)],
     _nextShootAt: 0,
     _threatId: null, _threatR: 0, _threatC: 0, _threatUntil: 0,
     _intR: 0, _intC: 0,
   };
   _myGang.push(m);
+  if(m.sourceBotId)_hiredBotIds.add(m.sourceBotId);
   _saveGang();
   _gangSay(m, 'hire');
   showToast(`🤝 ${gangName} нанят (${_myGang.length}/${GANG_MAX})`, '👊', 2000);
@@ -10855,9 +11030,9 @@ function _hireGangMember(botLook, r, c) {
 }
 function _saveGang() {
   try {
-    const data = _myGang.map(g => ({ name: g.name, look: g.look, weapon: g.weapon, hp: g.hp }));
+    const data = _myGang.map(g => ({ name: g.name, look: g.look, weapon: g.weapon, hp: g.hp, sourceBotId: g.sourceBotId || null }));
     localStorage.setItem('_myGang', JSON.stringify(data));
-    localStorage.setItem('_myGangFallen', JSON.stringify(_gangFallen));
+    localStorage.removeItem('_myGangFallen');
   } catch(e) {}
   _gangRosterUiKey='';syncGangRosterHud();
 }
@@ -10871,21 +11046,59 @@ function _loadGang() {
       const m = {
         id: '_gang_' + (++_gangIdCounter),
         name: g.name || 'Боец', r: 0, c: 0, ang: 0, walkPhase: 0,
-        hp: g.hp || 80, max_hp: 80, look: g.look || {},
+        hp: g.hp || 80, max_hp: 80, look: g.look || {}, sourceBotId: g.sourceBotId == null ? null : String(g.sourceBotId),
         weapon: g.weapon || 'pistol', _nextShootAt: 0,
         _threatId: null, _threatR: 0, _threatC: 0, _threatUntil: 0, _intR: 0, _intC: 0,
       };
       _myGang.push(m);
+      if(m.sourceBotId)_hiredBotIds.add(m.sourceBotId);
     }
-    const fallenRaw=localStorage.getItem('_myGangFallen');
-    const fallen=fallenRaw?JSON.parse(fallenRaw):[];
-    if(Array.isArray(fallen))for(const g of fallen.slice(-GANG_FALLEN_KEEP)){
-      if(g&&g.name)_gangFallen.push({name:String(g.name).slice(0,28),weapon:g.weapon||'pistol',at:+g.at||Date.now()});
-    }
+    localStorage.removeItem('_myGangFallen');
   } catch(e) {}
   syncGangRosterHud();
 }
 _loadGang();
+const _gangRosterHudEl=document.getElementById('gangRosterHud');
+if(_gangRosterHudEl){
+  _gangRosterHudEl.querySelector('.gr-head')?.addEventListener('click',ev=>{
+    ev.stopPropagation();_gangRosterOpen=!_gangRosterOpen;_gangDismissConfirmId=null;_gangRosterUiKey='';syncGangRosterHud();
+  });
+  _gangRosterHudEl.addEventListener('pointerdown',ev=>ev.stopPropagation());
+}
+function _gangSpaceKey(){
+  if(_bankInt)return `bank:${_bankInt.bank?.id||_bankInt.bank?.key||'bank'}:${_bankInt.room||'lobby'}`;
+  if(_buildingInt)return `building:${_buildingInt.r},${_buildingInt.c}:${_buildingInt.type||''}:${_buildingInt.bizId||''}`;
+  return 'world';
+}
+function _dismissGangMember(memberId){
+  const idx=_myGang.findIndex(g=>g&&g.id===memberId);if(idx<0)return false;
+  const g=_myGang[idx];
+  _formerGang.push({
+    id:`_former_${++_gangIdCounter}`,name:g.name,look:Object.assign({},g.look||{}),
+    r:g.r,c:g.c,ang:g.ang||0,walkPhase:0,space:_gangSpaceKey(),sourceBotId:g.sourceBotId||null,
+    returnAt:performance.now()+GANG_RETURN_TO_LAIR_MS
+  });
+  _myGang.splice(idx,1);_gangDismissConfirmId=null;_gangRosterOpen=false;_saveGang();
+  showToast(`${g.name||'Боец'} покинул банду. Скоро вернётся в логово`, '👋', 2600);
+  return true;
+}
+function _updateFormerGang(now){
+  for(let i=_formerGang.length-1;i>=0;i--){
+    const f=_formerGang[i];
+    if(now<(f.returnAt||0))continue;
+    if(f.sourceBotId)_hiredBotIds.delete(String(f.sourceBotId));
+    _formerGang.splice(i,1);
+  }
+}
+// Компактный HP-бар бойца банды рисуется рядом с его именем. Раньше общий
+// drawPerson ставил бар так, будто над бойцом ещё есть стандартное имя,
+// поэтому полоска висела далеко над головой.
+function _drawGangHpBar(g,x,y){
+  if(!g||g.hp<=0)return;const w=25,h=3,k=Math.max(0,Math.min(1,g.hp/(g.max_hp||80)));
+  ctx.save();ctx.fillStyle='rgba(0,0,0,.78)';ctx.fillRect(x-w/2-1,y-1,w+2,h+2);
+  ctx.fillStyle=k>.5?'#55df72':(k>.25?'#e0b448':'#ef5353');ctx.fillRect(x-w/2,y,w*k,h);
+  ctx.restore();
+}
 // Автоспавн убран — нанимай бойцов вручную у бандитов
 function _gangAlertThreat(r, c, id, kind = null, ref = null) {
   const now = performance.now();
@@ -11035,11 +11248,11 @@ function _gangTargetPos(kind, ref) {
 
 function _updateGang(dt) {
   const now = performance.now();
+  _updateFormerGang(now);
   _tickGangChatter(now);
   for (let i = _myGang.length - 1; i >= 0; i--) {
     const m = _myGang[i];
     if (m.hp <= 0) {
-      _recordGangFallen(m,false);
       _myGang.splice(i,1);
       _saveGang();
       continue;
@@ -11819,6 +12032,7 @@ const WEAPON_FX_CFG = {
   tommy_gun:    { mode:'auto', cd:0.12, range:10.0, dmg:24, spread:0.075,bulletSpeed:28, color:'#ffce70', recoil:1.0, shake:0.9, tip:22, gripReach:0.13, foregrip:0.08, shoulderSpread:0.065, shoulderAimSpread:0.008, ammoType:'9mm', magSize:40, reloadMs:2100, falloffStart:0.68, minDamageMul:0.58, twoHanded:true },
   rifle:        { mode:'auto', cd:0.20, range:14.0, dmg:42, spread:0.030,bulletSpeed:34, color:'#ffea80', recoil:2.0, shake:1.8, tip:32, gripReach:0.14, foregrip:0.09, shoulderSpread:0.065, shoulderAimSpread:0.008, ammoType:'rifle', magSize:30, reloadMs:2050, falloffStart:0.76, minDamageMul:0.68, thick:true, twoHanded:true },
   sniper:       { mode:'bolt', cd:1.25, range:20.0, dmg:132,spread:0.004,bulletSpeed:43, color:'#ff5050', recoil:5.0, shake:5.0, tip:44, gripReach:0.14, foregrip:0.10, shoulderSpread:0.065, shoulderAimSpread:0.008, ammoType:'sniper', magSize:5, reloadMs:2650, falloffStart:0.92, minDamageMul:0.88, thick:true, tracer:true, twoHanded:true },
+  taser:        { mode:'single',cd:1.25, range:7.5,  dmg:0,  spread:0.006,bulletSpeed:32, color:'#58ddff', recoil:.45, shake:.7, tip:17, gripReach:0.21, falloffStart:1, minDamageMul:1, tracer:true, twoHanded:false },
   rpg:          { mode:'single',cd:1.65, range:15.0, dmg:160,spread:0.015,bulletSpeed:17, color:'#ff6020', recoil:6.0, shake:7.0, tip:46, gripReach:0.13, foregrip:0.08, shoulderSpread:0.065, shoulderAimSpread:0.008, ammoType:'rocket', magSize:1, reloadMs:1650, falloffStart:1.0, minDamageMul:1.0, thick:true, explosive:true, twoHanded:true },
 };
 function weaponProfile(w) { return WEAPON_FX_CFG[resolveWeapon(w)] || WEAPON_FX_CFG.pistol; }
@@ -11850,6 +12064,12 @@ function weaponForegrip(w) {
 // рисования сцены — таблица должна быть готова. Каждая функция рисует
 // силуэт оружия: ствол вправо, хват в (0,0), масштаб через sc.
 const _FIREARM_DRAW = {
+  taser: (c, sc) => {
+    c.fillStyle='#111a22';c.fillRect(-2*sc,-4*sc,17*sc,7*sc);
+    c.fillStyle='#f1c232';c.fillRect(2*sc,-3*sc,9*sc,2*sc);
+    c.fillStyle='#263745';c.fillRect(0,2*sc,6*sc,8*sc);
+    c.fillStyle='#56ddff';c.fillRect(14*sc,-3*sc,3*sc,4*sc);
+  },
   pistol: (c, sc) => {
     c.fillStyle = '#2a2a30'; c.fillRect(-2*sc, -3*sc, 16*sc, 5*sc);
     c.fillStyle = '#1a1a20'; c.fillRect(0, -5*sc, 13*sc, 2*sc);
@@ -12490,6 +12710,10 @@ setTimeout(_ensureSpawnSafe, 0);
 // Другие игроки (актуальные позиции + цель интерполяции)
 const others = new Map();   // uid -> {x, y, ang, w, name, look, chat,
                             //         tx, ty, tAng, lastT}
+let _onlineWantedBoard = [];
+let _onlineWantedBoardUiSig = '';
+let _onlinePoliceArrest = null;
+let _policeStunnedIn = 0;
 
 // Маркер «в бою с этим игроком» — для мини-карты (красная точка).
 // uid → expiresAt (ms). После TTL сбрасывается обратно в синий.
@@ -12696,6 +12920,7 @@ const PASSABLE = new Set([0, 7, 8, 9, 14, 15, 17, 18]);
 function isBlocked(r, c) {
   const ri = Math.floor(r), ci = Math.floor(c);
   if (ri < 0 || ri >= MAP_ROWS || ci < 0 || ci >= MAP_COLS) return true;
+  if (_isPortContainerSolid(r,c)) return true;
   return !PASSABLE.has(MAP[ri][ci]);
 }
 // Коллизия для МАШИНЫ: в отличие от пешехода, машина НЕ заезжает на песок
@@ -12808,6 +13033,17 @@ let onlineCount = 1;
 // Счётчик подряд неудачных попыток коннекта (для подавления баннера
 // «бот не отвечает» при единичном моргании, и для эскалации сообщения).
 let wsFailStreak = 0;
+// Ровно один таймер переподключения. Без этого несколько вызовов wsConnect()
+// создавали независимые цепочки reconnect, и нагрузка росла со временем.
+let _wsReconnectTimer = null;
+
+function _scheduleWsReconnect(delayMs) {
+  if (_wsReconnectTimer !== null) return;
+  _wsReconnectTimer = setTimeout(() => {
+    _wsReconnectTimer = null;
+    _fetchApiFallback().finally(wsConnect);
+  }, delayMs);
+}
 
 // ── Эмерджентные события ────────────────────────────────────────
 // worldEvent = серверный snap.d.event (boss + guards) ИЛИ null.
@@ -13030,7 +13266,7 @@ let lastPlayerWeapon = new Map();  // other_uid → weapon_key последне�
 // игрок-специфичные поля (звёзды, тюрьма).
 let myWanted  = 0;       // 0..3 звёзды копов у меня
 let myGangs   = 0;       // 0..3 кулачки банд (при 3 — «контракт» открыт)
-let myCash    = 0;       // текущий баланс игрока (синкается из snap.me.cash)
+let myCash    = parseInt(QP.cash) || 0; // в preview может прийти из ?cash=, затем синкается из snap
 let myDiamonds= 0;       // алмазы (snap.me.diamonds)
 let myJailIn  = 0;       // секунд до выхода из тюрьмы (0 = не в тюрьме)
 let myTerrCd  = 0;       // секунд до возможности снова захватить ТЕКУЩУЮ зону (0 = можно)
@@ -13179,6 +13415,36 @@ function handleEventPacket(d) {
           `${sName} завалил ${tName} в зоне инкассатора.`, 2500, 'neutral');
       }
     }
+  } else if (kind === 'police_online_select_reply') {
+    if(!d.ok){showToast(_policeError(d.error),'⚠️',2500);return;}
+    _onlineWantedBoard.forEach(w=>w.selected=String(w.uid)===String(d.target_uid));
+    renderPoliceModal();closePoliceDesk();
+    showEventBanner('📍 ЦЕЛЬ ОТМЕЧЕНА',`${d.name||'Игрок'} в розыске. Координаты обновляются на доске и карте.`,3200,'neutral');
+  } else if (kind === 'police_online_stun_reply') {
+    if(!d.ok){showToast(_policeError(d.error),'⚠️',2500);return;}
+    addShake(2.8);hapticHit();showToast('💫 Игрок оглушён на 5 секунд — надень наручники','👮',2300);
+  } else if (kind === 'police_online_stun') {
+    if(String(d.target_uid)===String(QP.uid))showEventBanner('💫 ТЕБЯ ОГЛУШИЛИ','Полицейский рядом. Через 5 секунд ты снова сможешь двигаться.',3000,'lose');
+  } else if (kind === 'police_online_taser_reply') {
+    if(!d.ok){showToast(_policeError(d.error),'⚠️',2500);return;}
+    addShake(1.8);hapticHit();showToast('⚡ Шокер попал — цель оглушена на 5 секунд','👮',2300);
+  } else if (kind === 'police_online_taser') {
+    if(String(d.target_uid)===String(QP.uid))showEventBanner('⚡ ТЕБЯ ПОРАЗИЛ ШОКЕР','Оглушение на 5 секунд. Полицейский может надеть наручники.',3300,'lose');
+  } else if (kind === 'police_online_cuff_reply') {
+    if(!d.ok){showToast(_policeError(d.error),'⚠️',2500);return;}
+    showEventBanner('🔗 ИГРОК В НАРУЧНИКАХ','Доставь его к участку за 45 секунд. При твоей гибели он освободится.',3900,'win');
+  } else if (kind === 'police_online_cuff') {
+    if(String(d.target_uid)===String(QP.uid))showEventBanner('🔗 ТЫ ЗАДЕРЖАН','Конвой длится не больше 45 секунд. Если коп погибнет или выйдет — наручники снимутся.',4800,'lose');
+  } else if (kind === 'police_online_turnin_reply') {
+    if(!d.ok){showToast(_policeError(d.error),'⚠️',2700);return;}
+    if(typeof d.police_xp==='number')_setPoliceXp(d.police_xp,true);
+    const reward=d.first_reward?`Награда: $${d.cash||0} и ${d.exp||0} XP.`:'Повторный арест: без денежной награды.';
+    showEventBanner('🏅 ОНЛАЙН-ИГРОК СДАН',`${d.target_name||'Преступник'} отправлен в тюрьму. ${reward} +${d.police_xp_gain||75} опыта копа.`,4700,'win');
+  } else if (kind === 'police_xp_reply') {
+    if(d.ok&&d.resigned){_policeState.resetPending=false;_policeState.earnedXp=0;_savePoliceState();}
+    else if(d.ok&&typeof d.police_xp==='number')_setPoliceXp(d.police_xp,true);
+  } else if (kind === 'police_online_turnin') {
+    if(String(d.target_uid)===String(QP.uid))showEventBanner('🚔 ТЕБЯ СДАЛИ В УЧАСТОК','Срок: 30 секунд. Розыск снят после отбытия наказания.',4300,'lose');
   } else if (kind === 'cop_spawned') {
     // Новый коп вышел из-за угла — короткое уведомление по типу.
     if (myWanted >= 1) {
@@ -14368,6 +14634,9 @@ function wsUrl() {
   if (gf > 0 && gf <= 30) params.set('gang_flag', String(gf));
   const gn = (_UP.get('gang_name') || '').toString().slice(0, 16);
   if (gn) params.set('gang_name', gn);
+  // Только локальная демка: позволяет открыть вторую вкладку преступника
+  // (?uid=222&wanted=2) и проверить полный онлайн-арест без базы Telegram.
+  if (_LOCAL_PREVIEW && _UP.get('wanted')) params.set('wanted', String(Math.max(0,Math.min(3,_qInt('wanted',0)))));
   return `${base}/world/sim?${params.toString()}`;
 }
 
@@ -14397,21 +14666,38 @@ function setConnecting(msg) {
 }
 
 function wsConnect() {
+  // Не открываем второй сокет, пока первый ещё подключается или уже работает.
+  if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) return;
+  if (_wsReconnectTimer !== null) {
+    clearTimeout(_wsReconnectTimer);
+    _wsReconnectTimer = null;
+  }
   const url = wsUrl();
   if (!url) {
     setConnecting('⚠️ Сервер недоступен. Переподключаюсь…');
     // Через 6 сек ещё раз тянем coop_api.json — вдруг бот успел стартануть.
-    setTimeout(() => { _fetchApiFallback().then(u => { if (u) wsConnect(); }); }, 6000);
+    _scheduleWsReconnect(6000);
     return;
   }
-  try { ws = new WebSocket(url); } catch(e) { setError('⚠️ Сервер недоступен'); return; }
-  ws.onopen = () => {
+  let socket;
+  try {
+    socket = new WebSocket(url);
+    ws = socket;
+  } catch(e) {
+    ws = null;
+    setError('⚠️ Сервер недоступен');
+    wsFailStreak++;
+    _scheduleWsReconnect(Math.min(15000, 2000 + wsFailStreak * 1500));
+    return;
+  }
+  socket.onopen = () => {
+    if (ws !== socket) return;
     wsConnected = true;
     wsFailStreak = 0;
     setConnecting(null);
     setError(null);
   };
-  ws.onmessage = (ev) => {
+  socket.onmessage = (ev) => {
     let pkt; try { pkt = JSON.parse(ev.data); } catch(e) { return; }
     if (pkt.t === 'hello') {
       const d = pkt.d || {};
@@ -14444,6 +14730,7 @@ function wsConnect() {
       // Точка респавна + список купленных бизнесов — чтобы при выходе
       // из dead-overlay лейбл уже знал «🏥 Госпиталь» или «☕ Кофейня».
       try { ws.send(JSON.stringify({ t: 'respawn_status', d: {} })); } catch(e){}
+      try { ws.send(JSON.stringify(_policeState?.resetPending?{t:'police_resign',d:{}}:{t:'police_xp_sync',d:{xp:Math.max(0,Math.floor(_policeState?.earnedXp||0))}})); } catch(e){}
     } else if (pkt.t === 'shot') {
       // Серверный broadcast выстрела. Рисуем трассер и при попадании —
       // эффект на цели.
@@ -14495,7 +14782,8 @@ function wsConnect() {
         // авторитетно), а сервер эхо-шлёт устаревшую позицию. Без этого
         // исключения коррекция тянула player НАЗАД, автобус — ВПЕРЁД →
         // жёсткая тряска камеры, нарастающая по мере поездки (баг найден 05.07.2026).
-        const _driving = (!!myDrivingCarId && !myIsPassenger) || !!myJetSkiId || _playerSwimmingDeep;
+        const _driving = (!!myDrivingCarId && !myIsPassenger) || !!myJetSkiId ||
+          _playerInWater || Date.now() < _playerWaterAuthorityUntil;
         // В ТЮРЬМЕ позиция клиент-авторитетна (tryMove клампит к двору 7×7,
         // телепорт при аресте — см. обработку jail_in ниже). Сервер держит
         // игрока у центра участка → коррекция тянула бы сквозь здания.
@@ -14546,6 +14834,7 @@ function wsConnect() {
           }
           updateMoneyHud();
         }
+        if(typeof d.me.police_xp==='number'&&typeof _policeState!=='undefined'&&!_policeState.resetPending)_setPoliceXp(Math.max(_policeState.earnedXp||0,d.me.police_xp),true);
         if (typeof d.me.diamonds === 'number') {
           // Алмазы — донатная валюта. За активности в мире не начисляются,
           // поэтому всплывашки «+💎» не показываем — только тихо обновляем
@@ -14591,11 +14880,21 @@ function wsConnect() {
         // даже если hub.html не подсунул правильные параметры в URL.
         if (d.me.look && (d.me.look.skin !== undefined || d.me.look.hair !== undefined)) {
           const srv = d.me.look;
+          const mkKey = l => [l.gender|0, l.skin|0, l.body|0, l.face|0, l.hair|0, l.hat|0].join('.');
+          // На службе серверный образ из редактора не снимает форму. Редактор
+          // отдельно предупреждает игрока, а здесь держим форму до увольнения.
+          if (typeof _policeState !== 'undefined' && _policeState.employed) {
+            const oldLook=_policeState.civilianLook||{};
+            if(mkKey(srv)!==mkKey(oldLook)&&performance.now()>(window._policeLookWarnAt||0)){
+              window._policeLookWarnAt=performance.now()+8000;
+              showToast('👮 Полицейский не может работать без формы — сначала увольтесь','⚠️',3200);
+            }
+            QP.has_look=1;
+          } else {
           // Не перетираем URL-look дефолтными нулями сервера (skin=0,body=0,hair=0 = дефолт)
           const srvIsDefault = !srv.skin && !srv.hair && !srv.hat && !srv.face;
           if (!srvIsDefault || !QP.has_look) {
             const merged = Object.assign({}, QP.look, srv);
-            const mkKey = l => [l.gender|0, l.skin|0, l.body|0, l.face|0, l.hair|0, l.hat|0].join('.');
             if (mkKey(merged) !== mkKey(QP.look)) {
               _spriteCache.clear();
               QP.look = merged;
@@ -14603,6 +14902,7 @@ function wsConnect() {
               try { renderHudAvatar(); } catch (e) {}
             }
             QP.has_look = 1;
+          }
           }
         }
         // ИМЯ НЕ ТРОГАЕМ — берём только из URL (DATA.name в hub).
@@ -14622,7 +14922,10 @@ function wsConnect() {
                 chatT: 0, lastT: performance.now(),
                 hp: o.hp || PVP.max_hp, dead: !!o.dead,
                 wanted: o.wanted || 0, gangs: o.gangs || 0,
-                mode: o.mode || 'pvp', jail_in: o.jail_in || 0 };
+                mode: o.mode || 'pvp', jail_in: o.jail_in || 0,
+                interior: o.interior || null, weapon: o.weapon || 'pistol', police:!!o.police,
+                policeCuffed:!!o.police_cuffed, policeStunnedIn:+o.police_stunned_in||0,
+                policeEscort:o.police_escort||null };
           others.set(o.uid, p);
         } else {
           p.tx = o.x; p.ty = o.y; p.tAng = o.ang || 0; p.w = !!o.w;
@@ -14636,9 +14939,14 @@ function wsConnect() {
           if (typeof o.wanted === 'number') p.wanted = o.wanted;
           if (typeof o.gangs  === 'number') p.gangs  = o.gangs;
           if (o.mode) p.mode = o.mode;
+          p.interior = o.interior || null;
           if (typeof o.jail_in === 'number') p.jail_in = o.jail_in;
           if (o.gang) p.gang = o.gang;
           if (o.weapon) p.weapon = o.weapon;
+          p.police=!!o.police;
+          p.policeCuffed=!!o.police_cuffed;
+          p.policeStunnedIn=+o.police_stunned_in||0;
+          p.policeEscort=o.police_escort||null;
           p.bag = o.bag || 0;
           p.lastT = performance.now();
         }
@@ -14648,6 +14956,23 @@ function wsConnect() {
         if (!seen.has(uid)) others.delete(uid);
       }
       onlineCount = list.length + 1;
+      const nextWantedBoard=Array.isArray(d.wanted_board)?d.wanted_board:[];
+      // Не пересоздаём кнопки модального окна на каждом snap (~13 раз/с).
+      // Иначе DOM-кнопка могла исчезнуть между pointerdown и pointerup,
+      // поэтому обычный человеческий клик отменялся браузером.
+      const nextWantedSig=JSON.stringify(nextWantedBoard.map(w=>[String(w.uid),w.wanted|0,!!w.selected,!!w.detained,!!w.first_reward,String(w.name||'')]));
+      const wantedUiChanged=nextWantedSig!==_onlineWantedBoardUiSig;
+      _onlineWantedBoard=nextWantedBoard;_onlineWantedBoardUiSig=nextWantedSig;
+      if(wantedUiChanged&&typeof _policeModal!=='undefined'&&_policeModal?.classList.contains('show'))renderPoliceModal();
+      if (d.me) {
+        _onlinePoliceArrest = d.me.police_arrest || null;
+        _policeStunnedIn = +d.me.police_stunned_in || 0;
+        // При серверном конвое локальное предсказание выключено: иначе
+        // задержанный визуально убегает, а следующим снапом дёргается назад.
+        if (_onlinePoliceArrest?.role === 'detainee') {
+          player.r = d.me.y; player.c = d.me.x;
+        }
+      }
       const el = document.getElementById('onlineN');
       if (el) el.textContent = onlineCount;
       // ── Эмерджентное событие (инкассатор + 3 полицейских) ────────
@@ -14846,7 +15171,7 @@ function wsConnect() {
       if (_raceBestLapMs) _upsertRaceTopLocal(_raceBestLapMs, _raceBestCar || _raceCarLabel());
     }
   };
-  ws.onerror = () => {
+  socket.onerror = () => {
     // onerror почти всегда летит парой с onclose. Красный баннер показываем
     // только если уже несколько попыток подряд фейлятся — иначе у юзера на
     // ровном месте мигает «бот не отвечает», хотя через 1 сек уже всё ок.
@@ -14854,7 +15179,10 @@ function wsConnect() {
       setError('⚠️ Бот не отвечает — сервер перезапускается');
     }
   };
-  ws.onclose = () => {
+  socket.onclose = () => {
+    // Закрытие старого сокета не должно запускать ещё одну цепочку reconnect.
+    if (ws !== socket) return;
+    ws = null;
     const wasConnected = wsConnected;
     wsConnected = false;
     if (wasConnected) wsFailStreak = 0;  // первый разрыв после успеха — это не серия
@@ -14867,9 +15195,7 @@ function wsConnect() {
     // КЛЮЧЕВОЕ: перед reconnect-ом тянем свежий api из coop_api.json.
     // Если cloudflared перезапустился — у нас в QP.api лежит мёртвый
     // поддомен, и без обновления мы будем стучаться в него вечно.
-    setTimeout(() => {
-      _fetchApiFallback().finally(wsConnect);
-    }, 2000);
+    _scheduleWsReconnect(Math.min(15000, 2000 + wsFailStreak * 1500));
   };
 }
 
@@ -14909,6 +15235,13 @@ function updateZoneBtn() {
 
   // Внутри обычного здания — зона-кнопок мира нет (банк/районы недоступны)
   if (_buildingInt) { _zoneEl.style.display = 'none'; delete _zoneEl.dataset.bankId; delete _zoneEl.dataset.bizId; return; }
+
+  // zoneBtn переиспользуется банками, бизнесами и обычными POI. Каждый кадр
+  // начинаем со скрытого состояния и показываем его только после свежей
+  // проверки расстояния — старое название больше не может «залипнуть».
+  _zoneEl.style.display = 'none';
+  delete _zoneEl.dataset.bankId;
+  delete _zoneEl.dataset.bizId;
 
   // Проверяем близость к банкам (приоритет — своя кнопка через _bankZoneCur)
   let nearBank = null, nearBankD = BANK_INTERACT_R;
@@ -14976,6 +15309,9 @@ function updateZoneBtn() {
     return;
   }
   delete _zoneEl.dataset.bizId;
+  // Ушли от бизнеса: старая кнопка входа должна исчезнуть сразу. Ниже она
+  // снова включится, если рядом действительно найден другой обычный POI.
+  _zoneEl.style.display = 'none';
 
   // Захватываемые POI (рынок/порт/казино/промзона/резиденция) больше НЕ
   // открывают боёвку — они для захвата района. Кнопка остаётся только
@@ -14989,18 +15325,14 @@ function updateZoneBtn() {
     const d2 = dr * dr + dc * dc;
     if (d2 < bestD2) { best = poi; bestD2 = d2; }
   }
-  if (best !== _zoneCur) {
-    _zoneCur = best;
-    if (best) {
-      let label;
-      if (best.special === 'arena')  label = `${best.icon} Войти на «${best.name}»`;
-      else if (best.special === 'firestation') label = `${best.icon} Зайти в «${best.name}»`;
-      else                                label = `${best.icon} Зайти на «${best.name}»`;
-      _zoneEl.textContent = label;
-      _zoneEl.style.display = 'block';
-    } else {
-      _zoneEl.style.display = 'none';
-    }
+  _zoneCur = best;
+  if (best) {
+    let label;
+    if (best.special === 'arena')  label = `${best.icon} Войти на «${best.name}»`;
+    else if (best.special === 'firestation') label = `${best.icon} Зайти в «${best.name}»`;
+    else                                label = `${best.icon} Зайти на «${best.name}»`;
+    _zoneEl.textContent = label;
+    _zoneEl.style.display = 'block';
   }
   // PVP-баннер — показывается всегда когда игрок физически в зоне арены
   const inPvp = inArena(player.r, player.c);
@@ -15020,6 +15352,12 @@ _zoneEl.addEventListener('click', () => {
   if (_zoneEl.dataset.bizId) {
     const biz = BUSINESS_POIS.find(b => b.id === _zoneEl.dataset.bizId);
     if (!biz) return;
+    const liveBiz = _nearestBusinessPoi();
+    if (!liveBiz || liveBiz.id !== biz.id) {
+      delete _zoneEl.dataset.bizId;
+      _zoneEl.style.display = 'none';
+      return;
+    }
     if (myDead) { showToast('💀 Дождись возрождения', '⚠️', 1600); return; }
     if (myDrivingCarId) { showToast('🚗 Сначала выйди из машины', '⚠️', 1600); return; }
     enterBuildingInterior(biz.r, biz.c, 'business', biz.id);
@@ -15580,6 +15918,20 @@ function updateGtaInteractions() {
         _gtaBtn.style.display='block';return;
       }
     }
+    // В участке работа выдаётся только у дежурного за стойкой.
+    // Он нарисован отдельно от гуляющих NPC, поэтому проверяем его точные координаты.
+    if (_buildingInt.type === 'police_st') {
+      const dutyR = 4.5, dutyC = _buildingInt.W / 2 + .5;
+      if (Math.hypot(player.r - dutyR, player.c - dutyC) < 2.7) {
+        _gtaActionKind = 'police_duty'; _gtaActionCarId = null;
+        _gtaBtn.textContent = !_policeState.employed
+          ? '👮 Устроиться в полицию'
+          : (_policeState.missions.length < POLICE_MISSION_MAX
+            ? '📋 Есть работа'
+            : `📋 Ориентировки ${POLICE_MISSION_MAX}/${POLICE_MISSION_MAX}`);
+        _gtaBtn.style.display = 'block'; return;
+      }
+    }
     // Взаимодействие с персоналом — рядом с любым сотрудником (bi.npcs)
     if (_buildingInt.npcs && _buildingInt.npcs.length) {
       const _BTN_BY_TYPE = { hospital:'🏥 Лечиться', police_st:'👮 Поговорить', gym:'💪 Тренировка', job:'💼 Устроиться' };
@@ -15588,7 +15940,7 @@ function updateGtaInteractions() {
         const d = Math.hypot(player.r - n.r, player.c - n.c);
         if (d < nearD) { nearD = d; nearNpc = n; }
       }
-      if (nearNpc) {
+      if (nearNpc && _buildingInt.type !== 'police_st') {
         if (_buildingInt.type === 'job') {
           const _jd=_jobDef(_jobState.job),_jl=_jobRemaining();
           _gtaActionKind = (_jd&&_jl<=0) ? 'job_collect' : 'job_open';
@@ -15605,6 +15957,11 @@ function updateGtaInteractions() {
     // Иначе — кнопок нет
     _gtaBtn.style.display = 'none'; _gtaActionKind = null;
     return;
+  }
+  if(_onlinePoliceArrest?.role==='cop'&&Math.hypot(player.r-JAIL_CENTER_R,player.c-JAIL_CENTER_C)<5.2){
+    _gtaActionKind='police_online_turnin';_gtaActionCarId=_onlinePoliceArrest.target_uid;
+    _gtaBtn.textContent=`🚔 Сдать игрока: ${_onlinePoliceArrest.target_name||'задержанный'}`;
+    _gtaBtn.style.display='block';return;
   }
   const _arrestable=_findArrestablePoliceTarget();
   if(_arrestable){
@@ -15666,6 +16023,14 @@ function updateGtaInteractions() {
     _gtaActionKind = 'jetski_enter';
     _gtaActionCarId = nearJet.id;
     _gtaBtn.textContent = '🛥️ Сесть на гидроцикл';
+    _gtaBtn.style.display = 'block';
+    return;
+  }
+  // Саид постоянно ходит по городу. Встретить и нанять/уволить его можно лично.
+  const saidNpc = NPCS.find(n => n._said && !n.dead);
+  if (saidNpc && Math.hypot(saidNpc.r - player.r, saidNpc.c - player.c) <= GTA_INTERACT_R) {
+    _gtaActionKind = 'said'; _gtaActionCarId = null;
+    _gtaBtn.textContent = _saidState.hired ? '👔 Поговорить с Саидом' : '🤝 Нанять Саида';
     _gtaBtn.style.display = 'block';
     return;
   }
@@ -16081,6 +16446,8 @@ function updateGtaInteractions() {
 _gtaBtn.addEventListener('click', () => {
   if (_gtaActionKind === 'michael') {
     openMichaelMenu();
+  } else if (_gtaActionKind === 'said') {
+    openSaidMenu();
   } else if (_gtaActionKind === 'enter') {
     enterCar(_gtaActionCarId, _gtaActionEnterAs || 'driver');
   } else if (_gtaActionKind === 'refuel') {
@@ -16125,10 +16492,14 @@ _gtaBtn.addEventListener('click', () => {
   } else if (_gtaActionKind === 'bldg_npc') {
     if(_buildingInt&&_buildingInt.type==='police_st')openPoliceDesk();
     else {const _msg = { hospital:'🏥 Лечение скоро будет', gym:'💪 Тренировки скоро', job:'💼 Работа скоро будет' };showToast(_msg[_buildingInt&&_buildingInt.type]||'💬 Скоро будет','ℹ️',2000);}
+  } else if (_gtaActionKind === 'police_duty') {
+    if (_buildingInt && _buildingInt.type === 'police_st') openPoliceDesk();
   } else if (_gtaActionKind === 'police_arrest') {
     _arrestPoliceTarget(_findArrestablePoliceTarget());
   } else if (_gtaActionKind === 'police_turnin') {
     _completePoliceEscort();
+  } else if (_gtaActionKind === 'police_online_turnin') {
+    _sendPoliceOnline('police_online_turnin',_onlinePoliceArrest?.target_uid);
   } else if (_gtaActionKind === 'job_open') {
     openJobOffice();
   } else if (_gtaActionKind === 'job_collect') {
@@ -16172,7 +16543,7 @@ _gtaBtn.addEventListener('click', () => {
       for (const b of (z.bots || [])) {
         if (String(b.id) === String(_gtaActionCarId) && b.alive !== false && !b.dead) {
           if(_policeState.missions.some(m=>String(m.targetId)===String(b.id))){showToast('🚔 Этот бандит в розыске — в банду взять нельзя','⚠️',2400);break;}
-          hired = _hireGangMember(b.look, b.y || player.r, b.x || player.c);
+          hired = _hireGangMember(b.look, b.y || player.r, b.x || player.c, b.id);
           // Оригинал бота остаётся жить на сервере — прячем его на клиенте
           // по id, иначе рядом стоит «клон», который ещё и атакует игрока.
           if (hired) _hiredBotIds.add(String(b.id));
@@ -16447,10 +16818,13 @@ function buyBusinessHere(biz_id) {
     }
   }).catch(e => {
     if (e && e.name === 'AbortError') {
-      showToast('Сервер не отвечает (таймаут 8с)', '⚠️', 2800);
+      showToast('Ответ задержался — проверяю покупку', '⚠️', 2800);
     } else {
-      showToast('Сервер не отвечает', '⚠️', 2500);
+      showToast('Связь прервалась — проверяю покупку', '⚠️', 2500);
     }
+    // POST мог успеть списать деньги и записать собственность до потери
+    // ответа. Всегда сверяемся с сервером, чтобы бизнес не исчез из UI.
+    setTimeout(() => { _bizLastSync = 0; syncMyBusinesses(); }, 350);
   }).finally(() => {
     clearTimeout(timeoutId);
     _bizBuyInProgress = false;
@@ -16605,8 +16979,11 @@ function collectBusinessHere(biz_id) {
     body: JSON.stringify({ biz_id }),
   }).then(r => r.json()).then(j => {
     if (j.ok) {
-      const got = j.collected || 0;
-      myCash = j.cash || myCash;
+      const got = Number(j.collected) || 0;
+      if (Number.isFinite(Number(j.cash))) {
+        myCash = Number(j.cash);
+        QP.cash = myCash;
+      }
       updateMoneyHud();
       if (got > 0) {
         showToast(`💰 +$${got}`, '✅', 1900);
@@ -16619,6 +16996,82 @@ function collectBusinessHere(biz_id) {
       showToast(`Не удалось забрать: ${j.error || 'ошибка'}`, '⚠️', 2500);
     }
   }).catch(() => showToast('Сервер не отвечает', '⚠️', 2200));
+}
+
+let _saidBusy = false;
+async function _saidPost(action) {
+  if (_saidBusy || !QP.api || !QP.uid) return null;
+  _saidBusy = true;
+  try {
+    const r = await fetch(`${QP.api.replace(/\/+$/, '')}/biz/${QP.uid}/said/${action}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'request failed');
+    if (j.said) _saidState = { ..._saidState, ...j.said };
+    if (Number.isFinite(Number(j.cash))) { myCash = Number(j.cash); QP.cash = myCash; updateMoneyHud(); }
+    _bizLastSync = 0;
+    syncMyBusinesses();
+    if (_profileTab === 'biz') renderProfileTab();
+    return j;
+  } catch (e) {
+    const msg = e.message === 'no business' ? 'Сначала купи хотя бы один бизнес'
+      : e.message === 'no cash' ? 'Для зарплаты Саида нужно $500'
+      : 'Не удалось связаться с Саидом';
+    showToast(msg, '⚠️', 2400);
+    return null;
+  } finally { _saidBusy = false; }
+}
+async function saidHire() {
+  const modalOpen = document.getElementById('saidModal')?.style.display === 'flex';
+  const j = await _saidPost('hire');
+  if (j) { showToast('🤝 Саид нанят · первый день −$500', '✅', 2600); if (modalOpen) openSaidMenu(); }
+}
+async function saidFire() {
+  const modalOpen = document.getElementById('saidModal')?.style.display === 'flex';
+  const j = await _saidPost('fire');
+  if (j) { showToast('Саид уволен', '👋', 2000); if (modalOpen) openSaidMenu(); }
+}
+async function saidCollectAll() {
+  if (_saidBusy || !_saidState.hired) return;
+  const modalOpen = document.getElementById('saidModal')?.style.display === 'flex';
+  _saidBusy = true;
+  try {
+    const r = await fetch(`${QP.api.replace(/\/+$/, '')}/biz/${QP.uid}/collect`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ via_said: true })
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'collect failed');
+    const got = Number(j.collected) || 0;
+    if (Number.isFinite(Number(j.cash))) { myCash = Number(j.cash); QP.cash = myCash; updateMoneyHud(); }
+    myBusinesses.forEach(v => { if (v && v.owned) v.pending = 0; });
+    showToast(got > 0 ? `💰 Саид собрал со всех бизнесов: +$${got.toLocaleString('ru')}` : 'В кассах пока пусто', got > 0 ? '✅' : 'ℹ️', 3000);
+    if (got > 0) spawnFloatText(player.r, player.c, '+$' + got, { color:'#7be58a', size:20, life:1800 });
+    _bizLastSync = 0; syncMyBusinesses();
+    if (_profileTab === 'biz') renderProfileTab();
+    if (modalOpen) openSaidMenu();
+  } catch (e) {
+    showToast(e.message === 'said not hired' ? 'Сначала найми Саида' : 'Не удалось собрать кассу', '⚠️', 2400);
+  } finally { _saidBusy = false; }
+}
+
+function openSaidMenu() {
+  let modal = document.getElementById('saidModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'saidModal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:10030;display:none;align-items:center;justify-content:center;background:rgba(3,5,11,.78);backdrop-filter:blur(5px);padding:18px';
+    modal.addEventListener('click', e => { if (e.target === modal) modal.style.display='none'; });
+    document.body.appendChild(modal);
+  }
+  const pending = Array.from(myBusinesses.values()).reduce((s,v)=>s+(v&&v.owned?(Number(v.pending)||0):0),0);
+  const hired = !!_saidState.hired;
+  modal.innerHTML = `<div style="width:min(390px,94vw);border:1px solid #d7ae4c;border-radius:18px;background:linear-gradient(160deg,#171b25,#0b0d13);box-shadow:0 18px 70px #000;padding:20px;color:#fff">
+    <div style="display:flex;align-items:center;gap:13px"><div style="font-size:44px">👔</div><div style="flex:1"><div style="font-size:21px;font-weight:900">Саид</div><div style="font-size:12px;color:#aeb7c7">правая рука · зарплата $500 в день</div></div><button onclick="document.getElementById('saidModal').style.display='none'" style="border:0;background:#2a2e38;color:#fff;border-radius:50%;width:34px;height:34px;font-size:18px">×</button></div>
+    <div style="margin:14px 0;padding:13px;border-radius:12px;background:#111722;color:#ccd5e5;line-height:1.5">${hired ? `Я на связи. Во всех кассах сейчас <b style="color:#7eff9a">$${pending.toLocaleString('ru')}</b>. Скажи — соберу всё.` : 'Доверь мне бизнесы. Одним звонком соберу деньги со всех точек и привезу тебе.'}</div>
+    ${hired ? `<button onclick="saidCollectAll()" style="width:100%;padding:13px;border:0;border-radius:11px;background:#23874c;color:#fff;font-weight:900">💰 Собрать со всех · $${pending.toLocaleString('ru')}</button><button onclick="saidFire()" style="width:100%;margin-top:8px;padding:11px;border:1px solid #743b3b;border-radius:11px;background:#30191d;color:#ffaaaa;font-weight:800">Уволить Саида</button>` : `<button onclick="saidHire()" style="width:100%;padding:13px;border:0;border-radius:11px;background:linear-gradient(#f4cc62,#bd8427);color:#211506;font-weight:900">🤝 Нанять · $500 в день</button>`}
+  </div>`;
+  modal.style.display = 'flex';
 }
 
 let _bizManageBusy = false;
@@ -16684,7 +17137,10 @@ async function upgradeBusinessHere(bizId) {
     showEventBanner(`⬆ Бизнес улучшен до ${j.level} уровня`, `Новый доход: $${(+j.daily_min).toLocaleString('ru')}–$${(+j.daily_max).toLocaleString('ru')}/сутки`, 3500, 'win');
     openBusinessManagement(bizId);
     _bizLastSync = 0; setTimeout(syncMyBusinesses, 500);
-  } catch(e) { showToast('Сервер не отвечает', '⚠️', 2200); }
+  } catch(e) {
+    showToast('Связь прервалась — проверяю улучшение', '⚠️', 2200);
+    setTimeout(() => { _bizLastSync = 0; syncMyBusinesses(); }, 350);
+  }
   finally { _bizManageBusy = false; }
 }
 
@@ -18096,7 +18552,7 @@ async function loadInventoryItems() {
     const j=await r.json(); if(!j.ok||!Array.isArray(j.items))throw new Error('inventory');
     _inventoryItems=j.items;
     _goodName=+j.good_name||0;_lostReturns=+j.lost_returns||0;_returnStreak=+j.return_streak||0;
-    if(location.pathname.includes('/preview/')) {
+    if(_LOCAL_PREVIEW) {
       const gs=_readPreviewGood();_goodName=Math.max(_goodName,gs.good_name);_lostReturns=Math.max(_lostReturns,gs.lost_returns);_returnStreak=Math.max(_returnStreak,gs.return_streak);
       for(const local of _previewFoundItems()) {
         const server=_inventoryItems.find(i=>i.id===local.id);
@@ -18106,7 +18562,7 @@ async function loadInventoryItems() {
     }
     if(j.cash!==undefined)QP.cash=j.cash;
   } catch(e) {
-    if(location.pathname.includes('/preview/')) {
+    if(_LOCAL_PREVIEW) {
       _inventoryItems=_previewFoundItems();const gs=_readPreviewGood();
       _goodName=gs.good_name;_lostReturns=gs.lost_returns;_returnStreak=gs.return_streak;
     }
@@ -18134,7 +18590,7 @@ async function _sellFoundItem(itemId) {
     const j=await r.json();if(!j.ok)throw new Error(j.error||'sell failed');QP.cash=j.cash;myCash=j.cash;_returnStreak=0;
     if(j.caught){caught=true;myWanted=j.wanted;}
   } catch(e) {
-    if(!location.pathname.includes('/preview/')){showToast('Продажа не удалась','❌',1800);return;}
+    if(!_LOCAL_PREVIEW){showToast('Продажа не удалась','❌',1800);return;}
     const saved=_readPreviewFound();if(!(saved[itemId]>0))return;saved[itemId]--;_writePreviewFound(saved);
     QP.cash=(+QP.cash||0)+(+it.sell_price||0);myCash=QP.cash;
     const gs=_readPreviewGood();gs.return_streak=0;_writePreviewGood(gs);_returnStreak=0;
@@ -19074,6 +19530,10 @@ function fire(angle = null) {
   }
   // В машине или в автобусе нельзя стрелять — обе руки на руле / двери закрыты.
   if (myDrivingCarId || myJetSkiId || _playerSwimmingDeep || _inBus) return;
+  if(currentWeapon==='taser'){
+    firePoliceTaser(angle);
+    return;
+  }
   if(currentWeapon==='c4'){
     placeWorldC4();
     return;
@@ -19550,6 +20010,7 @@ const PUNCH_RANGE   = 1.7;    // дистанция в тайлах
 const PUNCH_DAMAGE  = 12;     // урон за удар
 let lastPunchClientT = 0;
 let _punchAnim = null;        // { startAt, ang, type:'punch'|'kick', dmg } | null
+let _policeBatonAnim = null;  // { startAt, ang } — короткий замах полицейской дубинкой
 
 // Поиск ближайшей цели для удара без lock (авто-захват в ближнем бою)
 function _findNearestMeleeTarget(aimAngle = null) {
@@ -20010,18 +20471,41 @@ function updatePvpUI() {
 const _moneyCashEl = document.getElementById('moneyCash');
 const _moneyDiaEl  = document.getElementById('moneyDia');
 function formatMoney(n) {
-  n = Math.max(0, n | 0);
+  n = Math.max(0, Math.trunc(Number(n) || 0));
   if (n >= 1000000) return (n / 1000000).toFixed(1).replace('.0','') + 'M';
   if (n >= 10000)   return (n / 1000).toFixed(0) + 'k';
   return String(n);
 }
+function formatExactMoney(n) {
+  return Math.max(0, Math.trunc(Number(n) || 0)).toLocaleString('ru-RU');
+}
+let _moneyExactVisible = false;
 function updateMoneyHud() {
   if (_moneyCashEl) _moneyCashEl.textContent = formatMoney(myCash);
   if (_moneyDiaEl)  _moneyDiaEl.textContent  = formatMoney(myDiamonds);
   // Деньги в верхнем HUD-баре (аватар+lvl+имя+HP+деньги+время).
   const _hm = document.getElementById('hudMoneyVal');
-  if (_hm) _hm.textContent = formatMoney(myCash);
+  if (_hm) _hm.textContent = _moneyExactVisible ? formatExactMoney(myCash) : formatMoney(myCash);
 }
+const _hudMoneyToggle = document.getElementById('hudMoneyToggle');
+function toggleExactMoney() {
+  _moneyExactVisible = !_moneyExactVisible;
+  updateMoneyHud();
+  if (_hudMoneyToggle) {
+    _hudMoneyToggle.title = _moneyExactVisible
+      ? 'Точный баланс — нажми, чтобы свернуть'
+      : 'Нажми, чтобы показать точный баланс';
+    _hudMoneyToggle.setAttribute('aria-label', _hudMoneyToggle.title);
+  }
+}
+if (_hudMoneyToggle) {
+  _hudMoneyToggle.addEventListener('click', toggleExactMoney);
+  _hudMoneyToggle.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExactMoney(); }
+  });
+}
+// Показываем стартовый тестовый баланс из ?cash= ещё до первого снапшота.
+updateMoneyHud();
 function showCashDelta(amount, kind) {
   if (!amount) return;
   const sign = amount > 0 ? '+' : '';
@@ -20083,7 +20567,7 @@ let _wepPickOpen = false;
 const WEAPON_LABELS = {
   pistol:'пистолет', nagan:'наган', pistol_heavy:'тяж.пистолет', pistol_gold:'золотой',
   shotgun:'дробовик', smg:'ПП', tommy_gun:'томми-ган',
-  rifle:'винтовка', sniper:'снайперка', rpg:'РПГ', c4:'заряд C4',
+  rifle:'винтовка', sniper:'снайперка', taser:'шокер', rpg:'РПГ', c4:'заряд C4',
 };
 function weaponLabel(w) { if (!w) return 'без оружия'; return WEAPON_LABELS[w] || w; }
 function weaponModeLabel(mode) {
@@ -20092,6 +20576,7 @@ function weaponModeLabel(mode) {
 function weaponStatLine(w) {
   if (!w) return 'кулаки · ближний бой';
   if(w==='c4')return 'установка на землю · фитиль 3 сек · смерть до 4 тайлов';
+  if(w==='taser')return 'полицейский · дальность 7.5 · оглушение 5 секунд';
   const p = weaponProfile(w);
   if (resolveWeapon(w) === 'nagan') {
     return `дуэлянт · крит 12% / ×${p.duelCritMul} после ${(p.duelPauseMs/1000).toFixed(1)}с · пробивает 1 цель`;
@@ -20134,6 +20619,11 @@ function renderWeaponHud() {
       if(_reloadBtn)_reloadBtn.disabled=true;
       return;
     }
+    if(currentWeapon==='taser'){
+      if(_wepHudAmmo){_wepHudAmmo.classList.remove('reloading');_wepHudAmmo.textContent='⚡ 5 сек';}
+      if(_reloadBtn)_reloadBtn.disabled=true;
+      return;
+    }
     const st = _weaponAmmoState(currentWeapon);
     const reloading = _isReloadingWeapon(st.id);
     if (_wepHudAmmo) {
@@ -20172,15 +20662,17 @@ function weaponsForPick() {
   // «Без оружия» — всегда первым пунктом
   const unarmed = [{ id: null, name: 'Без оружия', icon: '✋' }];
   if (_localWeaponShowcase) {
-    const allWeapons = Object.keys(WEAPON_FX_CFG).map(id => ({ id, name: weaponLabel(id), count: 1 }));
+    const allWeapons = Object.keys(WEAPON_FX_CFG).filter(id=>id!=='taser').map(id => ({ id, name: weaponLabel(id), count: 1 }));
+    if(_policeCanUseTaser())allWeapons.unshift({id:'taser',name:'шокер',count:1});
     return [...unarmed, {id:'c4',name:'заряд C4',count:Math.max(1,_myC4Count)}, ...allWeapons];
   }
   const guns=(_myWeapons&&_myWeapons.length>0)?_myWeapons:[{id:'pistol',name:'пистолет',count:1}];
-  return _myC4Count>0?[...unarmed,{id:'c4',name:'заряд C4',count:_myC4Count},...guns]:[...unarmed,...guns];
+  const police=_policeCanUseTaser()?[{id:'taser',name:'шокер',count:1}]:[];
+  return _myC4Count>0?[...unarmed,...police,{id:'c4',name:'заряд C4',count:_myC4Count},...guns]:[...unarmed,...police,...guns];
 }
 // Без оружия = currentWeapon === null
 function _isArmed() {
-  return currentWeapon !== null && currentWeapon !== 'none' && currentWeapon !== 'fists';
+  return !_policeBatonAnim && currentWeapon !== null && currentWeapon !== 'none' && currentWeapon !== 'fists';
 }
 
 function renderWeaponPick() {
@@ -20292,7 +20784,7 @@ async function loadMyWeapons() {
     if (!seen.has('pistol')) {
       _myWeapons.unshift({ id: 'pistol', name: 'пистолет', count: 1 });
     }
-    if (!_myWeapons.find(w => w.id === currentWeapon)) {
+    if (currentWeapon!=='taser'&&!_myWeapons.find(w => w.id === currentWeapon)) {
       currentWeapon = _myWeapons[0].id;
     }
     renderWeaponHud();
@@ -20323,8 +20815,16 @@ function sendInput() {
   const sy = _bankInt ? _bankInt.savedR : player.r;
   const inputData = { x: +sx.toFixed(2), y: +sy.toFixed(2),
        ang: +player.ang.toFixed(2), w: _bankInt ? false : !!player.walking,
-       weapon: currentWeapon || 'pistol',
-       bag: (_myBagWeight > 0 && _bankRob && _bankRob.myBag) ? 1 : 0 };
+       weapon: currentWeapon || 'pistol', police:(_policeState&&_policeState.employed)?1:0,
+       bag: (_myBagWeight > 0 && _bankRob && _bankRob.myBag) ? 1 : 0,
+       swimming: _playerInWater ? 1 : 0 };
+  const pe=_policeState&&_policeState.escort;
+  inputData.police_escort=pe&&!pe._inside?{r:+pe.r.toFixed(2),c:+pe.c.toFixed(2),ang:+(pe.ang||0).toFixed(2),name:String(pe.name||'Задержанный').slice(0,32),look:pe.look||{},waiting:!!pe.waiting}:null;
+  // Бизнес-интерьер — отдельное сетевое пространство. Сервер сам проверяет
+  // собственность и решает, общий это экземпляр или закрытый экземпляр владельца.
+  if (_buildingInt && _buildingInt.type === 'business' && _buildingInt.bizId) {
+    inputData.interior = { kind: 'business', biz_id: _buildingInt.bizId };
+  }
   if (_myGang.length > 0 && !_bankInt && !_buildingInt) {
     const _gangFull = !sendInput._gangT || (now - sendInput._gangT > 5000);
     if (_gangFull) sendInput._gangT = now;
@@ -21011,6 +21511,10 @@ function update(dt) {
             if (npc.dead) continue;
             const dd = Math.hypot(npc.r - qc.y, npc.c - qc.x);
             if (dd > 0.75) continue;
+            if (npc._invulnerable) {
+              npc.cryText='Осторожнее за рулём.'; npc.cryUntil=performance.now()+1300;
+              curVx *= 0.35; curVy *= 0.35; break;
+            }
             // Knockback по направлению машины + смерть
             npc.hp = 0;
             npc.dead = true;
@@ -21241,9 +21745,7 @@ function update(dt) {
       // могут не работать (bankShield блокирует серверный статус, lockedTargets
       // пуст, myDrivingCarId завис).
       _bankShieldUntil = 0;
-      // При гибели босса отряд считается потерянным: имена остаются в HUD
-      // зачёркнутыми, а места в активной пятёрке освобождаются.
-      for(const gm of _myGang)_recordGangFallen(gm,false);
+      // При гибели босса отряд считается потерянным и исчезает из HUD.
       _myGang.length=0;_saveGang();
       myDrivingCarId = null;
       myIsPassenger = false;
@@ -21414,7 +21916,7 @@ function update(dt) {
   player.walking = false;
   // Мёртвый игрок не двигается — ждём респауна сервера, иначе появлялся
   // в той же точке где умер (баг: «бегать могу и возрождаюсь там же»).
-  if (myDead) inDx = 0, inDy = 0;
+  if (myDead || _policeStunnedIn > 0 || _onlinePoliceArrest?.role === 'detainee') inDx = 0, inDy = 0;
   if (!myJetSkiId && (Math.abs(inDx) > 0.08 || Math.abs(inDy) > 0.08)) {
     const d = inDx, s = inDy / ISO_Y;
     const dc = (s + d) * 0.5;
@@ -21889,7 +22391,7 @@ function _isoBox(cr, cc, w, h, height, topCol, sideCol, darkCol) {
 }
 
 // ── Корпус корабля + надстройка + контейнеры на палубе ──
-function drawShipHull() {
+function drawShipHull(drawCargo=true) {
   const SHIP_W = (SHIP_C1 - SHIP_C0) / 2;        // полу-ширина в тайлах
   const SHIP_H = (SHIP_R1 - SHIP_R0) / 2;        // полу-длина
   const MID_R  = (SHIP_R0 + SHIP_R1) / 2;
@@ -21936,42 +22438,15 @@ function drawShipHull() {
     ctx.arc(sx, sy, 8 + rise * 12, 0, Math.PI * 2);
     ctx.fill();
   }
-  // 4) Контейнеры на палубе — 2 ряда × 4 штуки + случайные «штабели».
-  //    Реалистичные ISO-контейнеры с маркировкой и логотипами компаний.
-  const CONT_PRESETS = [
-    { col: '#c0392b', logo: 'MAERSK',    code: 'MAEU' },
-    { col: '#2980b9', logo: 'MSC',       code: 'MSCU' },
-    { col: '#f39c12', logo: 'HAPAG',     code: 'HLBU' },
-    { col: '#27ae60', logo: 'EVERGREEN', code: 'EGHU' },
-    { col: '#8e44ad', logo: 'ONE',       code: 'ONEU' },
-    { col: '#d35400', logo: 'COSCO',     code: 'CSNU' },
-    { col: '#34495e', logo: 'CMA-CGM',   code: 'CMAU' },
-  ];
-  for (let ri = 0; ri < 2; ri++) {
-    for (let ci = 0; ci < 4; ci++) {
-      const cr = SHIP_R0 + 4.5 + ri * 1.4;
-      const cc = SHIP_C0 + 6 + ci * 5;
-      if (cr > SHIP_R1 - 1.5) continue;
-      const idx = (ri * 4 + ci + 3) % CONT_PRESETS.length;
-      drawContainer(cr, cc, 1.3, 0.55, 0.95, CONT_PRESETS[idx], (ri * 10 + ci) * 137);
-      // Иногда — двухэтажный штабель
-      if (((ri + ci) & 1) === 0 && ci < 3) {
-        const idx2 = (idx + 2) % CONT_PRESETS.length;
-        drawContainer(cr, cc, 1.3, 0.55, 0.95, CONT_PRESETS[idx2], (ri * 10 + ci) * 213, 0.95);
-      }
-    }
-  }
-  // 5) Контейнеры на пирсе — Майкл «выгружает» их с корабля. Один штабель
-  //    с дверями развёрнутыми к пирсу, рядом — отдельная пара.
-  for (let i = 0; i < 3; i++) {
-    const cr = PIER_R0 + 1 + i * 2.3;
-    const cc = PIER_C0 + 1.5;
-    drawContainer(cr, cc, 1.1, 0.5, 0.85,
-                  CONT_PRESETS[(i + 1) % CONT_PRESETS.length], i * 419);
-  }
-  // Доп. одиночный контейнер у южного края пирса
-  drawContainer(PIER_R1 - 1.2, PIER_C1 - 1.4, 1.1, 0.5, 0.85,
-                CONT_PRESETS[4], 991);
+  // При обычном отдельном вызове сохраняем полный корабль. В основном
+  // рендере груз добавляется по одному объекту ради правильной iso-глубины.
+  if(drawCargo) for(const q of PORT_CONTAINER_LAYOUT) drawPortCargo(q);
+}
+
+function drawPortCargo(q) {
+  drawContainer(q.r,q.c,q.w,q.h,q.height,PORT_CONTAINER_PRESETS[q.presetIndex],q.seed);
+  if(q.stackIndex>=0) drawContainer(q.r,q.c,q.w,q.h,q.height,
+    PORT_CONTAINER_PRESETS[q.stackIndex],q.stackSeed,q.stackLift);
 }
 
 // ── ISO-контейнер: рифлёные борта, двери, логотип компании, серийник ──
@@ -25996,7 +26471,7 @@ const BUSINESS_POIS = [
   { id: 'club',       emoji: '🎰', name: 'Подпольный клуб',    r: 63, c: 53, price:  45000, daily_min: 1600, daily_max: 2200, desc: 'Карты, рулетка, ставки. Доходно, но налоговая чует.' },
   { id: 'warehouse',  emoji: '📦', name: 'Склад',              r: 73, c: 23, price:  70000, daily_min: 2400, daily_max: 3300, desc: 'Большой склад на окраине. Хранение «чувствительного» груза.' },
   { id: 'casino',     emoji: '🎲', name: 'Казино',             r: 13, c: 45, price: 120000, daily_min: 4000, daily_max: 5500, desc: 'Своё казино — мечта каждого. Высокий доход, высокий риск.' },
-  { id: 'port',       emoji: '🚢', name: 'Доля в порту',       r:153, c: 63, price: 200000, daily_min: 6500, daily_max: 9000, desc: 'Контейнеры идут — деньги капают.' },
+  { id: 'port',       emoji: '⚓', name: 'Порт',                r:181, c: 31, price: 200000, daily_min: 6500, daily_max: 9000, desc: 'Доля в порту. Контейнеры идут — деньги капают.' },
 ];
 const BIZ_MAX_LEVEL = 5;
 const BIZ_LEVEL_MULTIPLIERS = [1, 1, 1.35, 1.75, 2.25, 3.0];
@@ -26016,7 +26491,7 @@ const BUSINESS_INTERIORS = {
   club:       { floor:['#251634','#1d102b'], wall:'#14091d', accent:'#a64dff', title:'Подпольный клуб', manager:'Крупье Тони', staff:['Крупье','Игрок','Охранник'], props:['roulette','poker','cashier','neon'] },
   warehouse:  { floor:['#5a5448','#4d483e'], wall:'#34312b', accent:'#e0a84a', title:'Склад', manager:'Кладовщик Карло', staff:['Грузчик','Кладовщик','Водитель'], props:['racks','crates','forklift','pallets'] },
   casino:     { floor:['#4c1828','#401321'], wall:'#210916', accent:'#ffd24b', title:'Казино', manager:'Директор Сальваторе', staff:['Крупье','Игрок','Охранник','Хостес'], props:['roulette','blackjack','slots','cashier'] },
-  port:       { floor:['#4f6068','#45555d'], wall:'#23343c', accent:'#ff9a3c', title:'Портовая контора', manager:'Капитан Риццо', staff:['Докер','Диспетчер','Грузчик'], props:['containers','crates','barrels','radio'] },
+  port:       { floor:['#4f6068','#45555d'], wall:'#23343c', accent:'#ff9a3c', title:'Порт', manager:'Капитан Риццо', staff:['Докер','Диспетчер','Грузчик'], props:['containers','crates','barrels','radio'] },
 };
 // Быстрый поиск бизнеса по тайлу (r,c) — для рендера уникальных зданий.
 const BUSINESS_BY_RC = new Map();
@@ -26443,15 +26918,12 @@ function drawBusinessBuilding(r, c, b) {
       break;
     }
     case 'port': {
-      const { p, wx, wy, H } = _bizBase(r, c, ['#60727b','#263943','#344d57'], 1.0);
-      // Портовая контора: гофрированный металл, диспетчерская и контейнерный козырёк.
-      ctx.strokeStyle='rgba(190,220,230,.28)';ctx.lineWidth=.7;
-      for(let i=1;i<7;i++){ctx.beginPath();ctx.moveTo(p.x+wx*i/7,p.y-H*.82);ctx.lineTo(p.x+wx*i/7,p.y);ctx.stroke();}
-      ctx.fillStyle='#a9d8e7';ctx.fillRect(p.x+wx*.12,p.y-H*.62,wx*.34,H*.26);
-      ctx.strokeStyle='#20323c';ctx.strokeRect(p.x+wx*.12,p.y-H*.62,wx*.34,H*.26);
-      ctx.fillStyle='#d86735';ctx.fillRect(p.x+wx*.56,p.y-H*.42,wx*.36,H*.34);
-      ctx.fillStyle='#f0a25d';ctx.fillRect(p.x+wx*.58,p.y-H*.39,wx*.32,2);
-      _bizSign(p,wx,wy,H,'PORT','#152831','#ffad56');
+      // Силуэт маленького банка, но в серой портовой расцветке.
+      // Смещение держит центр двухтайловой модели точно на POI бизнеса.
+      drawBankBuilding({
+        id:'port_facade', name:'Порт', size:'small',
+        r:r-.5, c:c-.5, portFacade:true,
+      });
       break;
     }
     default:
@@ -26502,6 +26974,8 @@ function drawBusinessBuilding(r, c, b) {
 }
 // Локальный статус бизнесов: biz_id → {owned, pending, blocked_until}
 const myBusinesses = new Map();
+let _saidState = { hired:false, salary:500, hired_at:0, next_salary_at:0, auto_fired:false };
+let _saidAutoFireShown = false;
 let _bizLastSync = 0;
 function syncMyBusinesses() {
   if (!QP.api || !QP.uid) return;
@@ -26511,6 +26985,14 @@ function syncMyBusinesses() {
   fetch(`${QP.api.replace(/\/+$/, '')}/biz/${QP.uid}/list`, { cache: 'no-store' })
     .then(r => r.json())
     .then(j => {
+      if (j.said) {
+        _saidState = { ..._saidState, ...j.said };
+        if (j.said.auto_fired && !_saidAutoFireShown) {
+          _saidAutoFireShown = true;
+          showToast('Саид ушёл: на зарплату не хватило $500', '👋', 3200);
+        }
+        if (!j.said.auto_fired) _saidAutoFireShown = false;
+      }
       // Сохраняем _recentlyBought-ентрисы перед очисткой — если сервер
       // в этом ответе ещё не отдал свежекупленный бизнес (БД не успела
       // зафиксировать INSERT при покупке через LTE), мы не должны его
@@ -26522,8 +27004,12 @@ function syncMyBusinesses() {
       }
       myBusinesses.clear();
       for (const b of (j.businesses || [])) {
-        if (b.bought_at) {
-          myBusinesses.set(b.biz_id, {
+        // API каталога возвращает id+owned, старый API списка —
+        // biz_id+bought_at. Принимаем оба формата, иначе следующая
+        // синхронизация визуально «удаляет» только что купленный бизнес.
+        const id = b.biz_id || b.id;
+        if (id && (b.owned || b.bought_at)) {
+          myBusinesses.set(id, {
             owned: true,
             pending: b.pending || 0,
             status: b.status || 'ok',
@@ -26534,6 +27020,11 @@ function syncMyBusinesses() {
             upgrade_cost: b.upgrade_cost || 0,
           });
         }
+      }
+      if (Number.isFinite(+j.cash)) {
+        myCash = +j.cash;
+        QP.cash = myCash;
+        updateMoneyHud();
       }
       // Возвращаем preserved — даже если сервер их не вернул
       for (const [id, st] of preserved) {
@@ -27610,6 +28101,14 @@ function drawNpc(npc) {
   const _knocked=!!(npc._knockedUntil&&npc._knockedUntil>performance.now());
   drawPerson(p.x, p.y, npc.ang, npc.look, npc.walkPhase, null, null, false, npc.hp, npc.max_hp,
              !!npc.dead||_knocked, _knocked?performance.now():(npc.deadAt||0), !!(npc._fighting && !npc.dead&&!_knocked), false);
+  if (npc._said && !npc.dead) {
+    ctx.save();
+    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='900 11px system-ui, sans-serif';
+    const label='👔 Саид · правая рука', tw=ctx.measureText(label).width+14, y=p.y-57;
+    ctx.fillStyle='rgba(15,20,28,.94)'; ctx.strokeStyle='#d7ae4c'; ctx.lineWidth=1;
+    roundRect(p.x-tw/2,y-8,tw,17,7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#fff3bd'; ctx.fillText(label,p.x,y+.5); ctx.restore();
+  }
   // Вооружённый NPC (контратака) — пистолет в руке + мигающий прицел
   if (npc._fighting && !npc.dead) {
     const wep = npc._fightWeapon || 'pistol';
@@ -30858,9 +31357,12 @@ function renderProfileTab() {
     const stars = '★'.repeat(Math.min(5, myWanted || 0)) + '☆'.repeat(Math.max(0, 5 - (myWanted || 0)));
     const modeCol = myMode === 'pvp' ? '#ff6040' : '#40c080';
     const modeLbl = myMode === 'pvp' ? 'PvP' : 'PvE';
+    const policeCareer=_policeProgress();
+    const workLabel=_policeState.employed?'КОП':((typeof _jobState!=='undefined'&&_jobState.job)?(_jobDef(_jobState.job)?.name||_jobState.job):'Не трудоустроен');
     let html = '<div class="stat-block">';
     html += `<div class="stat-card"><div class="label">Режим</div><div class="val" style="color:${modeCol}">${modeLbl}</div></div>`;
     html += `<div class="stat-card"><div class="label">Уровень</div><div class="val" style="color:#ffd76b">${QP.lvl || 1}</div></div>`;
+    html += `<div class="stat-card"><div class="label">Работа</div><div class="val" style="color:${_policeState.employed?'#67c8ff':'#b8c1ce'}">${workLabel}</div></div>`;
     html += `<div class="stat-card"><div class="label">Розыск</div><div class="val" style="color:#ff4040">${stars}</div></div>`;
     html += `<div class="stat-card"><div class="label">K/D</div><div class="val">${myKills}/${myDeaths} (${kd})</div></div>`;
     html += `<div class="stat-card"><div class="label">Доброе имя</div><div class="val" style="color:#69db91">${_goodName} · ${_goodNameTitle(_goodName)}</div></div>`;
@@ -30871,6 +31373,7 @@ function renderProfileTab() {
     }
     html += `<div class="stat-card"><div class="label">Заказы сегодня</div><div class="val">${myGtaStatus ? myGtaStatus.count_today : 0} / ${myGtaStatus ? myGtaStatus.limit : 2}</div></div>`;
     html += '</div>';
+    html += `<div style="margin-top:12px;padding:13px;border:1px solid #315b86;border-radius:13px;background:linear-gradient(135deg,#101a29,#111722)"><div style="display:flex;align-items:center;justify-content:space-between"><div style="font-weight:900;color:#7dccff">👮 Карьера полиции</div><div style="font-weight:900;color:#fff">Ур. ${policeCareer.level}/5</div></div><div style="display:flex;justify-content:space-between;margin-top:7px;font-size:11px;color:#aebbd0"><span>Всего: ${policeCareer.xp} XP</span><span>${policeCareer.maxed?'МАКСИМАЛЬНОЕ ЗВАНИЕ':`${policeCareer.part}/${POLICE_XP_PER_LEVEL} до уровня ${policeCareer.level+1}`}</span></div><div style="height:9px;background:#172335;border-radius:8px;overflow:hidden;margin:7px 0"><div style="height:100%;width:${policeCareer.pct}%;background:linear-gradient(90deg,#397dff,#67e9ff);box-shadow:0 0 8px #56cfff"></div></div><div style="font-size:11px;color:${policeCareer.level>=POLICE_TASER_LEVEL?'#79f4bb':'#98a8bc'}">${policeCareer.level>=POLICE_TASER_LEVEL?'⚡ Шокер открыт · доступен во время службы':`🔒 Шокер на ${POLICE_TASER_LEVEL} уровне · осталось ${Math.max(0,POLICE_TASER_XP-policeCareer.xp)} XP`}</div></div>`;
     const apartments = _ownedApartmentEntries();
     let ownedBizCount = 0;
     if (myBusinesses && myBusinesses.forEach) myBusinesses.forEach(v => { if (v && v.owned) ownedBizCount++; });
@@ -30888,19 +31391,27 @@ function renderProfileTab() {
     html += '</div>';
     box.innerHTML = html;
   } else if (_profileTab === 'biz') {
+    const ownedStates = Array.from(myBusinesses.values()).filter(v => v && v.owned);
+    const totalPending = ownedStates.reduce((sum, v) => sum + (Number(v.pending) || 0), 0);
+    const saidHired = !!_saidState.hired;
+    const saidHtml = `<div style="padding:12px;margin-bottom:10px;border-radius:13px;border:1px solid ${saidHired?'#397657':'#66552d'};background:${saidHired?'#101d18':'#1d1a12'}">
+      <div style="display:flex;gap:10px;align-items:center"><div style="font-size:30px">👔</div><div style="flex:1"><div style="font-weight:900;color:#fff">Саид · правая рука</div><div style="font-size:11px;color:#aeb8c8">${saidHired?'🟢 нанят':'⚪ не нанят'} · зарплата $500 в день</div></div></div>
+      <div style="font-size:12px;color:#cbd3df;margin:9px 0">${saidHired?`Соберёт всю кассу одним нажатием: <b style="color:#7eff9a">$${totalPending.toLocaleString('ru')}</b>`:'Найми Саида — он собирает деньги сразу со всех бизнесов.'}</div>
+      ${saidHired?`<div style="display:flex;gap:7px"><button onclick="saidCollectAll()" style="flex:1;padding:9px;border:0;border-radius:9px;background:#23874c;color:#fff;font-weight:900">💰 Собрать всё</button><button onclick="saidFire()" style="padding:9px;border:1px solid #743b3b;border-radius:9px;background:#30191d;color:#ffaaaa;font-weight:800">Уволить</button></div>`:`<button onclick="saidHire()" ${ownedStates.length?'':'disabled'} style="width:100%;padding:10px;border:0;border-radius:9px;background:linear-gradient(#f4cc62,#bd8427);font-weight:900;opacity:${ownedStates.length?1:.45}">🤝 Нанять за $500/день</button>`}
+    </div>`;
     if (!myBusinesses || myBusinesses.size === 0) {
-      box.innerHTML = '<div class="empty">Пока нет бизнесов. Купи первый у Майкла!</div>';
+      box.innerHTML = saidHtml + '<div class="empty">Пока нет бизнесов. Сначала купи первый бизнес.</div>';
       return;
     }
     const BIZ_EMOJI = { gas:'⛽', shop:'🏪', bar:'🍺', restaurant:'🍽️', factory:'🏭', port:'🚢', casino:'🎰' };
-    let html = '<div class="items">';
+    let html = saidHtml + '<div class="items">';
     myBusinesses.forEach((val, id) => {
       if (!val.owned) return;
       const poi = (typeof BUSINESS_POIS !== 'undefined') ? BUSINESS_POIS.find(b => b.id === id) : null;
       const name = poi ? poi.name : id;
       const emoji = poi ? (poi.emoji || BIZ_EMOJI[poi.type] || '🏢') : '🏢';
       const pending = val.pending || 0;
-      html += `<div class="item"><div class="icon">${emoji}</div><div class="info"><div class="nm">${name}</div><div class="sub">Доход: $${pending} ${val.working === false ? '🔴 закрыт' : '🟢 работает'}</div></div></div>`;
+      html += `<div class="item"><div class="icon">${emoji}</div><div class="info"><div class="nm">${name}</div><div class="sub">В кассе: $${Number(pending).toLocaleString('ru')} ${val.working === false ? '🔴 закрыт' : '🟢 работает'}</div></div></div>`;
     });
     html += '</div>';
     box.innerHTML = html;
@@ -31487,6 +31998,36 @@ function _drawPunchAnim(px, py) {
   ctx.restore();
 }
 
+// Полицейская дубинка: замах из-за плеча, резкий удар и возврат.
+function _drawPoliceBatonAnim(px, py) {
+  const a = _policeBatonAnim; if (!a) return;
+  const elapsed = performance.now() - a.startAt, total = 470;
+  if (elapsed >= total) { _policeBatonAnim = null; return; }
+  const dx=Math.cos(a.ang),dy=Math.sin(a.ang),rx=(dx-dy)*.5,ry=(dx+dy)*.5*ISO_Y,len=Math.hypot(rx,ry)||1;
+  const sx=rx/len,sy=ry/len,side=sx>=0?1:-1,pxv=-sy*side,pyv=sx*side;
+  let swing;
+  if(elapsed<135)swing=-1.05+elapsed/135*.38;
+  else if(elapsed<245){const t=(elapsed-135)/110;swing=-.67+1.92*(1-Math.pow(1-t,3));}
+  else {const t=(elapsed-245)/(total-245);swing=1.25-.65*Math.sin(t*Math.PI/2);}
+  const shoulderX=px+pxv*TS*.12,shoulderY=py-TS*.48+pyv*TS*.04;
+  const handX=shoulderX+sx*TS*.24+pxv*TS*.04,handY=shoulderY+sy*TS*.24+pyv*TS*.04;
+  const batonAng=Math.atan2(sy,sx)+swing*side,batonLen=TS*.52;
+  const tipX=handX+Math.cos(batonAng)*batonLen,tipY=handY+Math.sin(batonAng)*batonLen;
+  ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
+  if(elapsed>120&&elapsed<285){
+    ctx.strokeStyle='rgba(113,190,255,.42)';ctx.lineWidth=7;
+    ctx.beginPath();ctx.arc(handX,handY,batonLen*.82,batonAng-.62*side,batonAng+.05*side,side<0);ctx.stroke();
+  }
+  const skin=SKINS[(QP.look&&QP.look.skin)||0]||SKINS[0];
+  ctx.strokeStyle=(QP.look&&QP.look.suit)||'#18315c';ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(shoulderX,shoulderY);ctx.lineTo(handX,handY);ctx.stroke();
+  ctx.fillStyle=skin;ctx.strokeStyle='#503521';ctx.lineWidth=1;ctx.beginPath();ctx.arc(handX,handY,5,0,Math.PI*2);ctx.fill();ctx.stroke();
+  ctx.shadowColor='#63b7ff';ctx.shadowBlur=8;ctx.strokeStyle='#18232e';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(handX,handY);ctx.lineTo(tipX,tipY);ctx.stroke();
+  ctx.shadowBlur=0;ctx.strokeStyle='#7e95a7';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(handX,handY);ctx.lineTo(tipX,tipY);ctx.stroke();
+  ctx.fillStyle='#0b1219';ctx.beginPath();ctx.arc(handX,handY,5.5,0,Math.PI*2);ctx.fill();
+  if(elapsed>185&&elapsed<300){const k=1-Math.abs(elapsed-235)/65;ctx.globalAlpha=Math.max(0,k);ctx.fillStyle='#ffe568';ctx.font='900 22px system-ui';ctx.textAlign='center';ctx.fillText('✦',tipX,tipY);}
+  ctx.restore();
+}
+
 // ── Анимация удара ногой ──────────────────────────────────────────
 // Фазы: подъём колена (0–75мс) → резкий выброс (75–160мс) → возврат (160–380мс)
 function _drawKickAnim(px, py, elapsed) {
@@ -31993,7 +32534,7 @@ function spawnWorldC4Explosion(wr,wc){
 function drawPerson(x, y, ang, look, walkPhase, name, chat, isSelf, hp, maxHp, isDead, deadAt, skipArms, skipLegs) {
   // Игрок с оружием получает руки из drawWeaponInHands. Без этого условия
   // Creator-спрайт оставлял две обычные руки, а поверх появлялась третья.
-  if (isSelf && !isDead && myMode !== 'pve' && typeof _isArmed === 'function' && _isArmed()) {
+  if (isSelf && !isDead && ((_policeBatonAnim) || (myMode !== 'pve' && typeof _isArmed === 'function' && _isArmed()))) {
     skipArms = true;
   }
   // Анимация падения: первые 400мс — поворот 0→90° и смещение вниз; дальше
@@ -32035,6 +32576,12 @@ function drawPerson(x, y, ang, look, walkPhase, name, chat, isSelf, hp, maxHp, i
     ctx.drawImage(sprite, Math.round(-sw/2), Math.round(-sh*0.94), sw, sh);
   }
   ctx.restore();
+  if (!isDead && look && look.police) {
+    ctx.save();ctx.translate(x+7,y-45);ctx.fillStyle='#efc84f';ctx.strokeStyle='#684b08';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(0,-5);ctx.lineTo(4,-2);ctx.lineTo(3,4);ctx.lineTo(0,7);ctx.lineTo(-3,4);ctx.lineTo(-4,-2);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.fillStyle='#d9ecff';ctx.font='900 4px system-ui';ctx.textAlign='center';ctx.fillText('П',0,2);ctx.restore();
+  }
+  if (isSelf && !isDead && _policeBatonAnim) _drawPoliceBatonAnim(x, y + bob);
 
   // Верхушка спрайта: фигура нарисована от y до y - sh*0.94. Над ней
   // ещё нужно место для имени / hp-бара / чата.
@@ -32043,7 +32590,8 @@ function drawPerson(x, y, ang, look, walkPhase, name, chat, isSelf, hp, maxHp, i
   // HP-бар поднимаем выше имени на 14px (было 8) — иначе тонкая полоса
   // визуально «перечёркивает» строчные буквы ника.
   const hpY   = nameY - 14;
-  const chatY = nameY - 34;          // чат-баббл ещё выше
+  const policeRankLevel=(isSelf&&typeof _policeState!=='undefined'&&_policeState.employed)?_policeLevel():0;
+  const chatY = nameY - (policeRankLevel?52:34); // у копа чат выше знаков звания
 
   // Имя над головой
   if (name) {
@@ -32054,6 +32602,16 @@ function drawPerson(x, y, ang, look, walkPhase, name, chat, isSelf, hp, maxHp, i
     ctx.fillStyle = isSelf ? '#ffd76b' : '#7be58a';
     ctx.fillText(name, x, nameY);
     ctx.textAlign = 'left';
+  }
+  // Знаки полицейского звания над своим персонажем. Максимум пять орденов.
+  if(policeRankLevel){
+    const rankColors=['#b87333','#c9d1d9','#ffd34e','#65dfff','#db86ff'];
+    const rankColor=rankColors[policeRankLevel-1],marks='✦'.repeat(policeRankLevel),label=`КОП ${policeRankLevel}  ${marks}`;
+    ctx.save();ctx.font='900 9px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
+    const rw=Math.max(54,ctx.measureText(label).width+14),ry=hpY-13;
+    ctx.fillStyle='rgba(5,15,29,.94)';ctx.strokeStyle=rankColor;ctx.lineWidth=1.3;ctx.shadowColor=rankColor;ctx.shadowBlur=5;
+    ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x-rw/2,ry-8,rw,16,7);else ctx.rect(x-rw/2,ry-8,rw,16);ctx.fill();ctx.stroke();
+    ctx.shadowBlur=0;ctx.fillStyle=rankColor;ctx.fillText(label,x,ry+.5);ctx.restore();ctx.textAlign='left';ctx.textBaseline='alphabetic';
   }
   // HP-бар — стилистически один-в-один с demo_isometric (боёвка боссов).
   // Показываем когда жив И (это я сам ИЛИ hp неполный). Свой бар видим
@@ -32370,7 +32928,7 @@ function render() {
     const e=_policeState.escort;
     if(e.r>=r0&&e.r<r1&&e.c>=c0&&e.c<c1)items.push({depth:e.r+e.c+.00055,draw:()=>{
       const p=w2s(e.r,e.c);drawPerson(p.x,p.y,e.ang||0,e.look||{},e.walkPhase||0,`🔗 ${e.name}`,null,false,e.boss?135:85,e.boss?135:85,false,null,false,false);
-      ctx.save();ctx.strokeStyle='#b8c8dc';ctx.lineWidth=1.4;ctx.setLineDash([3,2]);ctx.beginPath();ctx.moveTo(p.x-5,p.y-17);ctx.lineTo(p.x+5,p.y-17);ctx.stroke();ctx.restore();_drawPoliceEscortCry(e,p);
+      ctx.save();ctx.strokeStyle='#b8c8dc';ctx.lineWidth=1.4;ctx.setLineDash([3,2]);ctx.beginPath();ctx.moveTo(p.x-5,p.y-17);ctx.lineTo(p.x+5,p.y-17);ctx.stroke();ctx.restore();_drawPoliceHandcuffs(e,p);_drawPoliceEscortCry(e,p);
     }});
   }
   // Наёмники игрока
@@ -32390,8 +32948,9 @@ function render() {
       ctx.fillStyle = gl;
       ctx.beginPath(); ctx.ellipse(p.x, p.y + 2, 18, 8, 0, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
-      drawPerson(p.x, p.y, g.ang, g.look, g.walkPhase, null, null, false, g.hp, g.max_hp, false, 0);
+      drawPerson(p.x, p.y, g.ang, g.look, g.walkPhase, null, null, false, null, null, false, 0);
       drawWeaponInHands(p.x, p.y, g.ang, g.weapon, 0.88, g._nextShootAt - 900 || 0);
+      _drawGangHpBar(g,p.x,p.y-49);
       ctx.save();
       ctx.font = 'bold 8px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
       ctx.fillStyle = '#4aff4a'; ctx.shadowColor = '#000'; ctx.shadowBlur = 3;
@@ -32403,6 +32962,15 @@ function render() {
       }
       ctx.shadowBlur = 0; ctx.restore();
     })(gm) });
+  }
+  // Уволенный боец две минуты остаётся обычным мирным NPC с тем же скином.
+  // Исходный серверный бандит всё это время скрыт, поэтому двойника нет.
+  for(const fm of _formerGang){
+    if(fm.space!=='world'||fm.r<r0||fm.r>=r1||fm.c<c0||fm.c>=c1)continue;
+    items.push({depth:fm.r+fm.c+.0005,draw:((f)=>()=>{
+      const p=w2s(f.r+.5,f.c+.5);
+      drawPerson(p.x,p.y,f.ang||0,f.look||{},f.walkPhase||0,null,null,false,100,100,false,null,false,false);
+    })(fm)});
   }
   // Пляжники — мирные NPC в купальниках/плавках
   for (const b of beachgoers.values()) {
@@ -32911,10 +33479,16 @@ function render() {
   const SHIP_MID_C = (SHIP_C0 + SHIP_C1) / 2;
   if (SHIP_MID_R >= r0 - 8 && SHIP_MID_R < r1 + 8 &&
       SHIP_MID_C >= c0 - 12 && SHIP_MID_C < c1 + 12) {
-    items.push({ depth: SHIP_R0 + SHIP_C0 - 0.5, draw: () => drawShipHull() });
+    items.push({ depth: SHIP_R0 + SHIP_C0 - 0.5, draw: () => drawShipHull(false) });
     // Кран — depth по СЕВЕРНОЙ половине корабля, чтобы Майкл (нос, r=183)
     // и контейнеры на пирсе НЕ перекрывались стрелой.
     items.push({ depth: (SHIP_R0 + 1) + SHIP_MID_C, draw: () => drawShipCrane() });
+  }
+  // Каждый контейнер — самостоятельный изометрический объект. Глубина по
+  // переднему углу: игрок за контейнером скрывается гранью, перед ним виден.
+  for(const q of PORT_CONTAINER_LAYOUT){
+    if(q.r<r0-2||q.r>=r1+2||q.c<c0-3||q.c>=c1+3)continue;
+    items.push({depth:q.r+q.c+q.h+q.w,draw:()=>drawPortCargo(q)});
   }
   // Пляжный декор — пальмы, зонтики, шезлонги, дорожки, лодки, вышка.
   for (const d of _beachDecor) {
@@ -33060,8 +33634,10 @@ if (d.kind === 'plank_path') {
     // В машине или в автобусе — спрайт игрока не рисуем (виден через
     // крышу/окна); только имя/звёзды над корпусом.
     if (myDrivingCarId || myJetSkiId || _inBus) {
-      const p = w2s(player.r + 0.5, player.c + 0.5);
-      const headY = p.y - TS * (_inBus ? 1.6 : 0.9);
+      // Гидроцикл рисуется из точной центральной координаты без +0.5 тайла.
+      // Имя раньше считалось как у машины и съезжало относительно водителя.
+      const p = myJetSkiId ? w2s(player.r, player.c) : w2s(player.r + 0.5, player.c + 0.5);
+      const headY = p.y - TS * (_inBus ? 1.6 : (myJetSkiId ? 1.05 : 0.9));
       ctx.font = 'bold 12px system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillStyle = 'rgba(0,0,0,.7)';
@@ -33096,7 +33672,7 @@ if (d.kind === 'plank_path') {
     if (_bankRob && _bankRob.myBag) {
       _drawCarryingBag(px, py, { layer:'back', ang:player.ang, walking:player.walking, walkPhase:player.walkPhase });
     }
-    drawPerson(px, py, player.ang, QP.look,
+    drawPerson(px, py, player.ang, _livePlayerLook(),
                player.walking ? player.walkPhase : 0, QP.name, myChat, true,
                myHp, PVP.max_hp, myDead, null,
                !!((_punchAnim && _punchAnim.type !== 'kick') || (myMode !== 'pve' && !myDead && _isArmed() && !_punchAnim)),
@@ -33161,9 +33737,9 @@ if (d.kind === 'plank_path') {
       const p = w2s(o.y + 0.5, o.x + 0.5);
       const phase = (o.w ? (o._walkPhase || 0) : 0);
       const chat = (o.chat && performance.now() - o.chatT < chatDuration(o.chat)) ? o.chat : null;
-      const otherArmed = (o.mode || 'pvp') !== 'pve' && !o.dead;
+      const otherArmed = (o.mode || 'pvp') !== 'pve' && !o.dead && !o.policeCuffed && !(o.policeStunnedIn>0);
       if (o.bag && !o.dead) _drawCarryingBag(p.x, p.y, { layer:'back', ang:o.ang||0, walking:!!o.w, walkPhase:phase });
-      drawPerson(p.x, p.y, o.ang || 0, o.look || {}, phase, o.name, chat, false,
+      drawPerson(p.x, p.y, o.ang || 0, o.police?_policeUniformLook(o.look||{}):(o.look||{}), phase, o.name, chat, false,
                  o.hp, PVP.max_hp, o.dead, 0, otherArmed, false);
       // Оружие в руке другого игрока — если PvP и жив. Сервер пока не
       // шлёт оружие в snapshot.others, поэтому показываем то что прислал
@@ -33179,7 +33755,15 @@ if (d.kind === 'plank_path') {
       drawModeTag(p.x, p.y, o.mode || 'pvp');
       // Таймер «бан N сек» над головой если другой игрок сейчас в тюрьме
       if ((o.jail_in || 0) > 0) drawJailTimer(p.x, p.y, o.jail_in);
+      if(o.policeCuffed){ctx.save();ctx.font='18px "Segoe UI Emoji",system-ui';ctx.textAlign='center';ctx.fillText('🔗',p.x,p.y-67);ctx.restore();}
+      else if(o.policeStunnedIn>0){ctx.save();ctx.font='15px "Segoe UI Emoji",system-ui';ctx.textAlign='center';ctx.fillText('💫',p.x,p.y-65);ctx.restore();}
     } });
+    // Задержанный другого копа видим всем, но он не добавляется в боевые
+    // цели и поэтому не может быть убит или перехвачен чужим игроком.
+    if(o.policeEscort&&typeof o.policeEscort.r==='number'&&typeof o.policeEscort.c==='number'){
+      const pe=o.policeEscort;
+      items.push({depth:pe.r+pe.c+.0007,draw:()=>{const pp=w2s(pe.r+.5,pe.c+.5);drawPerson(pp.x,pp.y,pe.ang||0,pe.look||{},0,`🔗 ${pe.name||'Задержанный'}`,null,false,85,85,false,null,false,false);_drawPoliceHandcuffs(pe,pp);}});
+    }
     // Наёмники другого игрока
     if (o.gang && o.gang.length && !o.dead) {
       for (const gd of o.gang) {
@@ -34975,7 +35559,7 @@ function drawGangAmmoDrops(r0,r1,c0,c1){
   for(const q of gangAmmoDrops.values()){
     if(q.y<r0-3||q.y>r1+3||q.x<c0-3||q.x>c1+3)continue;
     const p=w2s(q.y+.5,q.x+.5),bob=Math.sin(now*.007+q.x)*2;
-    ctx.save();ctx.translate(p.x,p.y-8+bob);ctx.textAlign='center';
+    ctx.save();ctx.translate(p.x,p.y-8+bob);ctx.scale(.5,.5);ctx.textAlign='center';
     ctx.shadowColor='#ffd34e';ctx.shadowBlur=11;
     ctx.fillStyle='#3a3020';ctx.strokeStyle='#ffcf55';ctx.lineWidth=2;
     ctx.beginPath();ctx.roundRect(-15,-9,30,18,4);ctx.fill();ctx.stroke();
@@ -35528,6 +36112,15 @@ function drawMinimap() {
       ctx2.fillText('★', x, y - 7);
       ctx2.textAlign = 'left';
     }
+  }
+  // Выбранная на доске онлайн-цель остаётся на мини-карте даже вне
+  // обычного радиуса отрисовки игроков.
+  const marked=_selectedOnlineWanted();
+  if(_policeState?.employed&&marked){
+    const x=(marked.x+.5)*sx,y=(marked.y+.5)*sy,p=.5+.5*Math.sin(performance.now()*.012);
+    ctx2.strokeStyle='#67d7ff';ctx2.lineWidth=2.2;ctx2.beginPath();ctx2.arc(x,y,8+p*3,0,Math.PI*2);ctx2.stroke();
+    ctx2.fillStyle='#fff';ctx2.font='bold 11px "Segoe UI Emoji",sans-serif';ctx2.textAlign='center';ctx2.fillText('📍',x,y-10);
+    ctx2.textAlign='left';
   }
   // Конвой инкассатора — пульсирующий золотой (boss) и синие (охрана)
   if (worldEvent) {
@@ -36352,7 +36945,9 @@ function _updateBankZoneBtn() {
 
 // Нарисовать здание банка
 function drawBankBuilding(bank) {
+  ctx.save();
   const size = bank.size;
+  const isPortFacade = !!bank.portFacade;
   // Размер здания зависит от типа банка:
   // small=2×2 тайла (TS*1), medium=3×3 (TS*1.5), large=4×4 (TS*2)
   const bankScale = { small: 1.0, medium: 1.5, large: 2.0 }[size];
@@ -36371,7 +36966,9 @@ function drawBankBuilding(bank) {
     medium: { side:'#b8b0a0', front:'#e0dace', roof:'#8898b0' },
     large:  { side:'#a8a098', front:'#d8d2c4', roof:'#607090' },
   };
-  const pal = palettes[size];
+  const pal = isPortFacade
+    ? { side:'#59616a', front:'#858d96', roof:'#444c56' }
+    : palettes[size];
 
   // Тень — ромб по земле
   ctx.fillStyle = 'rgba(0,0,0,.55)';
@@ -36405,6 +37002,24 @@ function drawBankBuilding(bank) {
   ctx.moveTo(p.x, p.y - H + wy); ctx.lineTo(p.x + wx, p.y - H);
   ctx.lineTo(p.x, p.y - H - wy); ctx.lineTo(p.x - wx, p.y - H);
   ctx.closePath(); ctx.fill();
+  // На маленьком сером фасаде портового бизнеса три отдельные заливки
+  // сходятся в дробных координатах Canvas. Тонкая прокраска рёбер закрывает
+  // субпиксельные «иголки»/точки между гранями, не утолщая силуэт.
+  if (isPortFacade) {
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.lineWidth = 1.35;
+    ctx.strokeStyle = pal.side;
+    ctx.beginPath();
+    ctx.moveTo(p.x-wx,p.y);ctx.lineTo(p.x,p.y+wy);ctx.lineTo(p.x,p.y+wy-H);ctx.lineTo(p.x-wx,p.y-H);ctx.closePath();ctx.stroke();
+    ctx.strokeStyle = '#747d87';
+    ctx.beginPath();
+    ctx.moveTo(p.x,p.y+wy);ctx.lineTo(p.x+wx,p.y);ctx.lineTo(p.x+wx,p.y-H);ctx.lineTo(p.x,p.y+wy-H);ctx.closePath();ctx.stroke();
+    ctx.strokeStyle = pal.roof;
+    ctx.beginPath();
+    ctx.moveTo(p.x,p.y-H+wy);ctx.lineTo(p.x+wx,p.y-H);ctx.lineTo(p.x,p.y-H-wy);ctx.lineTo(p.x-wx,p.y-H);ctx.closePath();ctx.stroke();
+    // Низкий металлический парапет — добавляет крыше толщину и объём.
+    ctx.strokeStyle='#2e353d';ctx.lineWidth=2.2;
+    ctx.beginPath();ctx.moveTo(p.x-wx,p.y-H);ctx.lineTo(p.x,p.y-H+wy);ctx.lineTo(p.x+wx,p.y-H);ctx.stroke();
+  }
   // Крыша-фронтон (треугольный выступ)
   ctx.fillStyle = pal.front;
   const pedH = H * 0.08;
@@ -36420,21 +37035,21 @@ function drawBankBuilding(bank) {
   ctx.stroke();
 
   // Колонны на фасаде (правая грань)
-  const colCount = { small: 5, medium: 7, large: 9 }[size];
-  ctx.strokeStyle = 'rgba(140,130,110,.7)'; ctx.lineWidth = 2;
+  const colCount = isPortFacade ? 3 : { small: 5, medium: 7, large: 9 }[size];
+  ctx.strokeStyle = isPortFacade ? 'rgba(155,165,176,.72)' : 'rgba(140,130,110,.7)'; ctx.lineWidth = 2;
   for (let i = 0; i < colCount; i++) {
     const k = (i + 0.5) / colCount;
     const cx = p.x + wx * k;
     const cy = p.y + wy * (1 - k);
     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy - H * 0.85); ctx.stroke();
     // Капитель вверху
-    ctx.fillStyle = 'rgba(200,190,170,.5)';
+    ctx.fillStyle = isPortFacade ? 'rgba(188,198,208,.52)' : 'rgba(200,190,170,.5)';
     ctx.fillRect(cx - 2, cy - H * 0.85, 4, 4);
   }
 
   // Окна — правая грань (высокие, с рамкой и отблеском)
-  const winRows = floors;
-  const winCols = { small: 4, medium: 6, large: 8 }[size];
+  const winRows = isPortFacade ? 2 : floors;
+  const winCols = isPortFacade ? 3 : { small: 4, medium: 6, large: 8 }[size];
   for (let row = 0; row < winRows; row++) {
     for (let col = 0; col < winCols; col++) {
       const k = (col + 0.5) / winCols;
@@ -36442,35 +37057,37 @@ function drawBankBuilding(bank) {
       const wy_ = p.y + wy * (1 - k) - H * (0.10 + row * 0.74 / winRows);
       const lit = ((bank.r * 17 + bank.c * 31 + row * 5 + col * 3) % 5 < 3);
       // Рамка окна
-      ctx.fillStyle = 'rgba(160,150,130,.6)';
-      ctx.fillRect(wx_ - 5, wy_ - 8, 10, 13);
+      const ww=isPortFacade?11:10, wh=isPortFacade?15:13;
+      ctx.fillStyle = isPortFacade ? '#343c45' : 'rgba(160,150,130,.6)';
+      ctx.fillRect(wx_ - ww/2, wy_ - 9, ww, wh);
       // Стекло
       ctx.fillStyle = lit ? '#b8d8f8' : '#1a2030';
       if (lit) { ctx.shadowColor = '#80b8e8'; ctx.shadowBlur = 3; }
-      ctx.fillRect(wx_ - 4, wy_ - 7, 8, 11);
+      ctx.fillRect(wx_ - ww/2 + 1, wy_ - 8, ww-2, wh-2);
       ctx.shadowBlur = 0;
       // Отблеск на стекле
       if (lit) {
         ctx.fillStyle = 'rgba(255,255,255,.35)';
-        ctx.fillRect(wx_ - 4, wy_ - 7, 3, 4);
+        ctx.fillRect(wx_ - ww/2 + 1, wy_ - 8, 3, 5);
       }
       // Переплёт
       ctx.strokeStyle = 'rgba(180,170,150,.5)'; ctx.lineWidth = 0.6;
-      ctx.beginPath(); ctx.moveTo(wx_, wy_-7); ctx.lineTo(wx_, wy_+4);
-      ctx.moveTo(wx_-4, wy_-2); ctx.lineTo(wx_+4, wy_-2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(wx_, wy_-8); ctx.lineTo(wx_, wy_+wh-10);
+      ctx.moveTo(wx_-ww/2+1, wy_-2); ctx.lineTo(wx_+ww/2-1, wy_-2); ctx.stroke();
     }
   }
   // Окна — левая грань
   for (let row = 0; row < winRows; row++) {
-    for (let col = 0; col < 3; col++) {
-      const k = (col + 0.5) / 3;
+    const leftCols=isPortFacade?2:3;
+    for (let col = 0; col < leftCols; col++) {
+      const k = (col + 0.5) / leftCols;
       const wx_ = p.x - wx * k;
       const wy_ = p.y + wy * (1 - k) - H * (0.10 + row * 0.74 / winRows);
       const lit = ((bank.r * 13 + bank.c * 29 + row * 7 + col * 2) % 5 < 2);
-      ctx.fillStyle = 'rgba(130,120,100,.5)';
-      ctx.fillRect(wx_ - 4, wy_ - 7, 8, 11);
+      ctx.fillStyle = isPortFacade ? '#303841' : 'rgba(130,120,100,.5)';
+      ctx.fillRect(wx_ - 5, wy_ - 8, 10, 13);
       ctx.fillStyle = lit ? '#90b0d0' : '#121820';
-      ctx.fillRect(wx_ - 3, wy_ - 6, 6, 9);
+      ctx.fillRect(wx_ - 4, wy_ - 7, 8, 11);
     }
   }
 
@@ -36515,14 +37132,28 @@ function drawBankBuilding(bank) {
   ctx.fillRect(archX - doorW/2 + 2, archY - doorH + 3, 4, doorH * 0.4);
   ctx.fillRect(archX + 2, archY - doorH + 3, 4, doorH * 0.4);
   // Ступени
-  ctx.fillStyle = '#d0c8b0';
+  ctx.fillStyle = isPortFacade ? '#6e7882' : '#d0c8b0';
   ctx.fillRect(archX - doorW/2 - 8, archY, doorW + 16, 5);
-  ctx.fillStyle = '#c8c0a8';
+  ctx.fillStyle = isPortFacade ? '#4c555f' : '#c8c0a8';
   ctx.fillRect(archX - doorW/2 - 5, archY + 5, doorW + 10, 4);
+
+  if (isPortFacade) {
+    // Портовая идентика вместо банковских мелочей: одна читаемая панель
+    // и сигнальный фонарь без россыпи декоративных точек.
+    ctx.fillStyle='#202830';ctx.strokeStyle='#f09a42';ctx.lineWidth=1;
+    ctx.fillRect(archX-doorW/2-3,archY-doorH-17,doorW+6,9);
+    ctx.strokeRect(archX-doorW/2-3+.5,archY-doorH-16.5,doorW+5,8);
+    ctx.font='bold 6px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#ffd3a0';
+    ctx.fillText('PORT • 01',archX,archY-doorH-12.5);
+    const lampA=.72+.28*Math.sin(t*2.3);
+    ctx.shadowColor='#ff9a3c';ctx.shadowBlur=7;ctx.fillStyle=`rgba(255,154,60,${lampA})`;
+    ctx.beginPath();ctx.arc(archX,archY-doorH-22,2.2,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+    ctx.textAlign='left';ctx.textBaseline='alphabetic';
+  }
 
   // ── Уличные банкоматы (ATM-киоски) у входа ──────────────────────────
   // Большой банк (large) — 2 банкомата по обе стороны входа, остальные — 1
-  {
+  if (!isPortFacade) {
     const tNow = performance.now();
     const atmW = 16, atmH = 26;
     const atmSpots = [{ side: 1, dx: doorW/2 + 18 }];
@@ -36592,14 +37223,14 @@ function drawBankBuilding(bank) {
   // Фон вывески — тёмная полоса
   ctx.fillStyle = '#0a0a18';
   ctx.fillRect(signX - sw/2, signY - sh, sw, sh);
-  ctx.strokeStyle = '#c0a840'; ctx.lineWidth = 1.2;
+  ctx.strokeStyle = isPortFacade ? '#aeb8c2' : '#c0a840'; ctx.lineWidth = 1.2;
   ctx.strokeRect(signX - sw/2, signY - sh, sw, sh);
   // Подсветка
-  ctx.shadowColor = '#ffd040'; ctx.shadowBlur = 8;
-  ctx.fillStyle = '#ffd040';
+  ctx.shadowColor = isPortFacade ? '#c7d1db' : '#ffd040'; ctx.shadowBlur = 8;
+  ctx.fillStyle = isPortFacade ? '#e6edf4' : '#ffd040';
   ctx.font = `bold ${size==='large'?10:8}px "Segoe UI", system-ui`;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('🏦 БАНК', signX, signY - sh/2);
+  ctx.fillText(isPortFacade ? '⚓ ПОРТ' : '🏦 БАНК', signX, signY - sh/2);
   ctx.shadowBlur = 0;
   // Название банка (мельче, под иконкой)
   ctx.fillStyle = 'rgba(200,200,180,.8)';
@@ -36625,7 +37256,7 @@ function drawBankBuilding(bank) {
     else ctx.rect(roofPeakX - nameW/2, nameY - nameH/2, nameW, nameH);
     ctx.fill();
     // Рамка цвета по типу банка
-    const tagColor = { small: '#80c0ff', medium: '#c0a040', large: '#ff8040' }[size];
+    const tagColor = isPortFacade ? '#aeb8c2' : { small: '#80c0ff', medium: '#c0a040', large: '#ff8040' }[size];
     ctx.strokeStyle = tagColor; ctx.lineWidth = 1.2;
     ctx.stroke();
     // Текст
@@ -36749,6 +37380,7 @@ function drawBankBuilding(bank) {
   }
 
   } // end if(false) — старый код выше
+  ctx.restore();
 }
 
 // Нарисовать вывеску над банком
@@ -36947,9 +37579,35 @@ Object.assign(_BANK_NPC_LOOKS, {
 // ── БИРЖА ТРУДА (job office) ─────────────────────────────────────
 // Police wanted missions: stealth knockout, cuffs, escort and hand-in.
 const POLICE_MISSION_MAX=3;
+const POLICE_XP_PER_LEVEL=250,POLICE_TASER_LEVEL=5,POLICE_TASER_XP=(POLICE_TASER_LEVEL-1)*POLICE_XP_PER_LEVEL;
 const _policeStoreKey=`mafiozi_police_missions_${QP.uid||'preview'}`;
-let _policeState={employed:false,missions:[],cuffs:0,escort:null,earnedXp:0,seq:0};
+let _policeState={employed:false,missions:[],cuffs:0,escort:null,earnedXp:0,seq:0,civilianLook:null,resetPending:false};
 const _policeModal=document.getElementById('policeModal'),_policeModalBody=document.getElementById('policeModalBody'),_stealthBtn=document.getElementById('stealthBtn');
+const _policeArrestHud=document.createElement('div');
+_policeArrestHud.style.cssText='display:none;position:fixed;z-index:120;left:50%;bottom:105px;transform:translateX(-50%);padding:9px 14px;border-radius:12px;background:rgba(9,18,34,.94);border:1px solid #67b8ff;color:#fff;font:700 13px system-ui;box-shadow:0 6px 24px #0008;pointer-events:none;text-align:center';
+document.body.appendChild(_policeArrestHud);
+function _policeEsc(v){return String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+function _policeError(e){return({not_police:'Сначала устройся в полицию',not_selected:'Сначала отметь цель на доске розыска',not_wanted:'Игрок больше не разыскивается',not_online:'Игрок уже вышел',too_far:'Цель слишком далеко',not_stunned:'Сначала оглуши дубинкой или шокером',already_escorting:'Сначала доставь текущего задержанного',already_cuffed:'Его уже задержал другой коп',interior:'Задержание проводится на улице',no_escort:'Задержанный уже освобождён',not_at_station:'Доставь задержанного к полицейскому участку',taser_locked:'Шокер открывается на 5 уровне копа',cooldown:'Шокер перезаряжается',storage:'Сервер не сохранил арест'})[e]||'Действие сейчас невозможно';}
+function _sendPoliceOnline(t,targetUid){if(!ws||ws.readyState!==1){showToast('Сервер не отвечает','⚠️',2200);return;}ws.send(JSON.stringify({t,d:{target_uid:targetUid||''}}));}
+function _policeLevel(xp=_policeState.earnedXp){return Math.max(1,Math.min(5,1+Math.floor(Math.max(0,+xp||0)/POLICE_XP_PER_LEVEL)));}
+function _policeCanUseTaser(){return !!(_policeState?.employed&&_policeLevel()>=POLICE_TASER_LEVEL);}
+function _policeProgress(){const xp=Math.min(POLICE_TASER_XP,Math.max(0,Math.floor(_policeState.earnedXp||0))),level=_policeLevel(xp),maxed=level>=5,floor=(level-1)*POLICE_XP_PER_LEVEL,next=maxed?POLICE_TASER_XP:level*POLICE_XP_PER_LEVEL;return{xp,level,maxed,floor,next,part:maxed?POLICE_XP_PER_LEVEL:xp-floor,pct:maxed?100:Math.max(0,Math.min(100,(xp-floor)/POLICE_XP_PER_LEVEL*100))};}
+function _setPoliceXp(value,fromServer=false){const old=_policeLevel(),v=Math.min(POLICE_TASER_XP,Math.max(0,Math.floor(+value||0))),current=Math.max(0,Math.floor(_policeState.earnedXp||0));if((fromServer&&v<current)||v===current)return;_policeState.earnedXp=v;_savePoliceState();const level=_policeLevel();if(level>old){showEventBanner('👮 НОВЫЙ УРОВЕНЬ КОПА',`Уровень ${level}${level===POLICE_TASER_LEVEL?' · открыт шокер!':''}`,3800,'win');}renderJobStatus();renderPoliceModal();if(_profileTab==='status')renderProfileTab();renderWeaponHud();if(_wepPickOpen)renderWeaponPick();}
+function _syncPoliceXpReward(xp,missionId){if(!ws||ws.readyState!==1)return;try{ws.send(JSON.stringify({t:'police_npc_reward',d:{xp:Math.max(0,xp|0),mission_id:String(missionId||'')}}));}catch(e){}}
+function _selectedOnlineWanted(){return _onlineWantedBoard.find(x=>x.selected)||null;}
+function _findOnlinePoliceTarget(stunned=false){
+  if(!_policeState.employed||_buildingInt||_bankInt||myDead||_onlinePoliceArrest?.role==='cop')return null;
+  const w=_selectedOnlineWanted();if(!w)return null;const o=others.get(String(w.uid));if(!o||o.dead||o.interior||o.policeCuffed)return null;
+  if(Math.hypot(o.y-player.r,o.x-player.c)>2.15)return null;
+  if(stunned&&!(o.policeStunnedIn>0))return null;
+  return o;
+}
+function _updateOnlineArrestHud(){
+  const a=_onlinePoliceArrest;
+  if(!a){_policeArrestHud.style.display='none';return;}
+  _policeArrestHud.style.display='block';
+  _policeArrestHud.textContent=a.role==='detainee'?`🔗 Тебя ведёт ${a.cop_name||'полицейский'} · освобождение через ${a.left||0}с`:`🚔 ${a.target_name||'Задержанный'} в наручниках · осталось ${a.left||0}с`;
+}
 let _policeStealthTarget=null;
 const _POLICE_CRIMINAL_NAMES=['Кривой Макс','Рыжий Боря','Шрам','Филин','Бык','Лом','Седой','Клык','Гвоздь','Чёрный Гена','Малой','Тихоня'];
 const _POLICE_KNOCKOUT_CRIES=['Эй, ты чего?!','За что?!','Башка…','Подло со спины!','Что происходит?!'];
@@ -36964,8 +37622,44 @@ function _drawPoliceEscortCry(e,p){
   ctx.beginPath();ctx.moveTo(p.x-3,y+9);ctx.lineTo(p.x+1,y+14);ctx.lineTo(p.x+5,y+9);ctx.closePath();ctx.fill();
   ctx.fillStyle='#fff';ctx.fillText(txt,p.x,y+1);ctx.restore();
 }
-function _savePoliceState(){try{localStorage.setItem(_policeStoreKey,JSON.stringify(_policeState));}catch(e){}}
-function _loadPoliceState(){try{const s=JSON.parse(localStorage.getItem(_policeStoreKey)||'null');if(s&&Array.isArray(s.missions)){const escort=s.escort||null;if(escort){escort._turningIn=false;escort._inside=false;}_policeState={employed:!!s.employed,missions:s.missions.slice(0,POLICE_MISSION_MAX),cuffs:Math.max(0,+s.cuffs||0),escort,earnedXp:+s.earnedXp||0,seq:+s.seq||0};}}catch(e){}}
+function _drawPoliceHandcuffs(e,p){
+  if(!e||!p)return;const ang=e.ang||0,dx=Math.cos(ang),dy=Math.sin(ang),rx=(dx-dy)*.5,ry=(dx+dy)*.5*ISO_Y,l=Math.hypot(rx,ry)||1,sx=rx/l,sy=ry/l,pxv=-sy,pyv=sx;
+  const cx=p.x+sx*3,cy=p.y-21+sy*2,spread=5.5;
+  ctx.save();ctx.strokeStyle='#d9e3ec';ctx.lineWidth=2;ctx.shadowColor='#bfe8ff';ctx.shadowBlur=5;
+  for(const s of [-1,1]){ctx.beginPath();ctx.ellipse(cx+pxv*spread*s,cy+pyv*spread*s,4.2,3.1,Math.atan2(pyv,pxv),0,Math.PI*2);ctx.stroke();}
+  ctx.beginPath();ctx.moveTo(cx+pxv*(spread-2),cy+pyv*(spread-2));ctx.lineTo(cx-pxv*(spread-2),cy-pyv*(spread-2));ctx.stroke();
+  ctx.shadowBlur=0;ctx.fillStyle='rgba(12,30,45,.9)';ctx.font='900 7px system-ui';ctx.textAlign='center';ctx.fillText(e.waiting?'🔒 ЖДЁТ КОПА':'🔗 В НАРУЧНИКАХ',p.x,p.y-37);ctx.restore();
+}
+function _policeUniformLook(base){base=base||{};return{gender:base.gender|0,skin:base.skin|0,body:base.body|0,face:base.face|0,hair:base.hair|0,hat:2,suit:'#172f5c',police:true};}
+function _setPoliceLook(look){QP.look=Object.assign({},look||{});_spriteCache?.clear?.();try{getSprite(QP.look);renderHudAvatar();}catch(e){}}
+function _applyPoliceUniform(){if(!_policeState.employed)return;_setPoliceLook(_policeUniformLook(_policeState.civilianLook||QP.look||{}));}
+function _savePoliceState(){try{localStorage.setItem(_policeStoreKey,JSON.stringify(_policeState));localStorage.setItem('mafiozi_police_employed',_policeState.employed?'1':'0');}catch(e){}}
+function _loadPoliceState(){try{const s=JSON.parse(localStorage.getItem(_policeStoreKey)||'null');if(s&&Array.isArray(s.missions)){const escort=s.escort||null;if(escort){escort._turningIn=false;escort._inside=false;escort.waiting=!!escort.waiting;}_policeState={employed:!!s.employed,missions:s.missions.slice(0,POLICE_MISSION_MAX),cuffs:Math.max(0,+s.cuffs||0),escort,earnedXp:Math.min(POLICE_TASER_XP,+s.earnedXp||0),seq:+s.seq||0,civilianLook:s.civilianLook||null,resetPending:!!s.resetPending};}}catch(e){}if(_policeState.employed){if(!_policeState.civilianLook)_policeState.civilianLook=Object.assign({},QP.look||{});_applyPoliceUniform();}_savePoliceState();}
+let _lastPoliceTaserAt=0;
+function _findPoliceTaserTarget(angle){
+  if(!_policeCanUseTaser()||_buildingInt||_bankInt||myDead)return null;
+  const range=WEAPON_FX_CFG.taser.range,dir=typeof angle==='number'?{r:Math.sin(angle),c:Math.cos(angle)}:null;
+  let best=null,bestScore=1e9;
+  const online=_selectedOnlineWanted(),o=online&&others.get(String(online.uid));
+  const candidates=[];
+  if(o&&!o.dead&&!o.interior&&!o.policeCuffed)candidates.push({kind:'online',target:o,r:o.y,c:o.x,uid:o.uid});
+  for(const n of NPCS)if(n._policeCriminal&&!n.dead&&!n._policeCuffed&&_policeMissionForNpc(n))candidates.push({kind:'npc',target:n,r:n.r,c:n.c});
+  for(const q of candidates){const dr=q.r-player.r,dc=q.c-player.c,d=Math.hypot(dr,dc);if(d>range||d<.2)continue;const dot=dir?(dr*dir.r+dc*dir.c)/d:1;if(dot<.82)continue;const score=d+(1-dot)*8;if(score<bestScore){best=q;bestScore=score;}}
+  return best;
+}
+function firePoliceTaser(angle=null){
+  if(!_policeState.employed){showToast('Шокер доступен только копу на службе','👮',2200);return;}
+  if(!_policeCanUseTaser()){showToast(`Шокер откроется на ${POLICE_TASER_LEVEL} уровне копа`,'🔒',2300);return;}
+  const now=performance.now();if(now-_lastPoliceTaserAt<1250)return;
+  const q=_findPoliceTaserTarget(angle);if(!q){showToast(_selectedOnlineWanted()?'Цель вне прицела или дальности':'Отметь онлайн-цель на доске или наведи шокер на преступника','⚡',1900);return;}
+  _lastPoliceTaserAt=now;const a=Math.atan2(q.r-player.r,q.c-player.c);player.ang=a;
+  const md=weaponMuzzleD('taser',.95),sr=player.r+Math.sin(a)*md,sc=player.c+Math.cos(a)*md;
+  spawnBullet(sr,sc,q.r,q.c,{hit:true,fromPlayer:true,weapon:'taser'});spawnMuzzle(sr,sc,a,'taser');
+  _tone({freq:880,freqEnd:520,dur:.055,vol:.06,type:'square'});setTimeout(()=>_tone({freq:220,freqEnd:120,dur:.09,vol:.05,type:'sawtooth'}),45);addShake(.9);
+  if(q.kind==='online'){_sendPoliceOnline('police_online_taser',q.uid);return;}
+  const n=q.target;n._knockedUntil=now+5000;n.idleUntil=n._knockedUntil;n.walkPhase=0;n._fighting=false;n._fightingMelee=false;n.cryText='А-а! Током!';n.cryUntil=now+1600;
+  spawnFloatText(n.r,n.c,'⚡ ОГЛУШЁН 5 СЕК.',{color:'#66e8ff',size:15,life:1700});showToast('⚡ Цель оглушена — надень наручники','👮',2200);
+}
 function _policeMission(id){return _policeState.missions.find(m=>String(m.id)===String(id))||null;}
 function _policeMissionForNpc(n){return n&&_policeState.missions.find(m=>m.status==='hunt'&&String(m.targetId)===String(n._policeTargetId))||null;}
 function _policeSpawnPoint(seed){for(let i=0;i<100;i++){const a=((seed||1)*1.71+i*.83)%6.283,dist=10+(i%11),r=Math.max(2,Math.min(MAP_ROWS-3,player.r+Math.sin(a)*dist)),c=Math.max(2,Math.min(MAP_COLS-3,player.c+Math.cos(a)*dist));if(!inArena(r,c)&&!inLair(r,c)&&npcPassable(r,c))return{r,c};}return{r:Math.max(2,player.r+8),c:Math.max(2,player.c+8)};}
@@ -36986,16 +37680,33 @@ function _acceptPoliceMission(){
 function _joinPoliceService(){
   if(_policeState.employed)return;
   if(typeof _jobState!=='undefined'&&_jobState.job){showToast('Сначала уволься с текущей работы','💼',2400);return;}
-  _policeState.employed=true;_policeState.cuffs=Math.max(3,_policeState.cuffs);_savePoliceState();renderPoliceModal();renderJobStatus();
+  _policeState.civilianLook=Object.assign({},QP.look||{});_policeState.employed=true;_policeState.cuffs=Math.max(3,_policeState.cuffs);_applyPoliceUniform();_savePoliceState();renderJobStatus();closePoliceDesk();
+  document.getElementById('jobModal')?.classList.remove('show');
   showEventBanner('👮 ТЫ ПРИНЯТ В ПОЛИЦИЮ','Статус: КОП · выдано 3 пары наручников. Бери ориентировки у дежурного.',4600,'win');
+}
+function _leavePoliceService(){
+  if(!_policeState.employed)return;
+  const old=Object.assign({},_policeState.civilianLook||QP.look||{});
+  const ids=new Set(_policeState.missions.map(m=>String(m.targetId)));
+  for(let i=NPCS.length-1;i>=0;i--)if(ids.has(String(NPCS[i]._policeTargetId)))NPCS.splice(i,1);
+  _policeState.employed=false;_policeState.missions=[];_policeState.escort=null;_policeState.cuffs=0;_policeState.civilianLook=null;_policeState.earnedXp=0;_policeState.resetPending=true;
+  if(currentWeapon==='taser')currentWeapon='pistol';
+  _setPoliceLook(old);_savePoliceState();renderJobStatus();closePoliceDesk();
+  renderWeaponHud();if(_wepPickOpen)renderWeaponPick();
+  if(ws&&ws.readyState===1)try{ws.send(JSON.stringify({t:'police_resign',d:{}}));}catch(e){}
+  if(_profileTab==='status')renderProfileTab();
+  showEventBanner('👕 ТЫ УВОЛИЛСЯ ИЗ ПОЛИЦИИ','Форма сдана. Полицейское звание и опыт обнулены.',3900,'neutral');
 }
 function renderPoliceModal(){
   if(!_policeModalBody)return;
   if(!_policeState.employed){_policeModalBody.innerHTML='<div class="police-note">Дежурный: «Работа непростая. Лови бандитов живыми, доставляй сюда — получишь деньги и опыт. Устроишься копом?»</div><div class="police-row"><div><div class="police-name">👮 Служба в полиции</div><div class="police-sub">Статус КОП · 3 пары наручников · до 3 ориентировок</div></div></div><div style="display:flex;gap:8px;margin-top:10px"><button class="police-action" data-police-action="join">✅ Согласиться</button><button class="police-action" data-police-action="decline" style="background:#49384f;border-color:#84618c">Нет, спасибо</button></div>';return;}
-  const active=_policeState.missions;let html=`<div class="police-note">👮 Статус: КОП · активно ${active.length}/${POLICE_MISSION_MAX} · наручники: ${_policeState.cuffs}. Подойди к цели со спины и нажми сиреневую кнопку. Оглушение длится 5 секунд.</div>`;
+  const active=_policeState.missions,p=_policeProgress();let html=`<div class="police-note">👮 Статус: КОП · уровень ${p.level} · ${p.xp} XP · активно ${active.length}/${POLICE_MISSION_MAX} · наручники: ${_policeState.cuffs}.</div><div class="police-note"><div style="display:flex;justify-content:space-between;font-weight:900"><span>Карьера полиции</span><span>${p.part}/${POLICE_XP_PER_LEVEL} XP</span></div><div style="height:8px;background:#172335;border-radius:8px;overflow:hidden;margin:7px 0"><div style="height:100%;width:${p.pct}%;background:linear-gradient(90deg,#4aa3ff,#63edff)"></div></div><div style="font-size:11px;color:${_policeCanUseTaser()?'#79f4bb':'#aebbd0'}">${_policeCanUseTaser()?'⚡ Шокер открыт и доступен в выборе оружия':`🔒 Шокер откроется на ${POLICE_TASER_LEVEL} уровне · осталось ${Math.max(0,POLICE_TASER_XP-p.xp)} XP`}</div></div>`;
+  html+='<div class="police-note" style="color:#77c7ff;font-weight:900">📡 ДОСКА РОЗЫСКА · ОНЛАЙН</div>';
+  if(!_onlineWantedBoard.length)html+='<div class="police-note">Сейчас среди онлайн-игроков нет опознанных преступников.</div>';
+  html+=_onlineWantedBoard.map(w=>`<div class="police-row ${w.selected?'boss':''}"><div><div class="police-name">${w.wanted?'⭐'.repeat(w.wanted):'🎯'} ${_policeEsc(w.name)}</div><div class="police-sub">Последний сигнал: ${Math.round(w.y)}, ${Math.round(w.x)} · ${w.detained?'уже задержан':(w.first_reward?'первая поимка: $700':'повторно: без денег')}</div></div><button class="police-action" data-police-action="online_select" data-target-uid="${_policeEsc(w.uid)}" ${w.detained?'disabled':''}>${w.selected?'✓ Отмечен':'📍 Отметить'}</button></div>`).join('');
   if(!active.length)html+='<div class="police-note">Дежурный: «Есть работа. Нужны преступники живыми».</div>';
   html+=active.map(m=>`<div class="police-row ${m.boss?'boss':''}"><div><div class="police-name">${m.boss?'👑':'🎯'} ${m.name}</div><div class="police-sub">${m.status==='cuffed'?'В наручниках · доставь в участок':'Разыскивается'} · $${m.rewardCash} · ${m.rewardXp} XP</div></div><button class="police-action" disabled>${m.status==='cuffed'?'🚓 Конвой':'🔎 Поиск'}</button></div>`).join('');
-  html+=`<button class="police-action" data-police-action="take" ${active.length>=POLICE_MISSION_MAX?'disabled':''}>📋 Взять ориентировку (${active.length}/${POLICE_MISSION_MAX})</button>`;_policeModalBody.innerHTML=html;
+  html+=`<div style="display:flex;gap:8px;align-items:center"><button class="police-action" data-police-action="take" ${active.length>=POLICE_MISSION_MAX?'disabled':''}>📋 Взять ориентировку (${active.length}/${POLICE_MISSION_MAX})</button><button class="police-action" data-police-action="leave" style="background:#572b32;border-color:#a6535e">Сдать форму</button></div>`;_policeModalBody.innerHTML=html;
 }
 function openPoliceDesk(){renderPoliceModal();_policeModal?.classList.add('show');}
 function closePoliceDesk(){_policeModal?.classList.remove('show');}
@@ -37004,21 +37715,23 @@ function _findPoliceStealthTarget(){
   for(const n of NPCS){if(!n._policeCriminal||n.dead||n._policeCuffed||(n._knockedUntil||0)>now||!_policeMissionForNpc(n))continue;const dr=player.r-n.r,dc=player.c-n.c,d=Math.hypot(dr,dc);if(d>=bestD)continue;const dot=(Math.sin(n.ang||0)*dr+Math.cos(n.ang||0)*dc)/(d||1);if(dot<-.28){best=n;bestD=d;}}
   return best;
 }
-function _updatePoliceStealthButton(){_policeStealthTarget=_findPoliceStealthTarget();_stealthBtn?.classList.toggle('show',!!_policeStealthTarget);}
-function _knockoutPoliceTarget(){const n=_findPoliceStealthTarget();if(!n)return;const now=performance.now();n._knockedUntil=now+5000;n.idleUntil=n._knockedUntil;n.walkPhase=0;n._fighting=false;n._fightingMelee=false;n.hp=Math.max(1,(n.hp||n.max_hp)-8);n.cryText=_policePick(_POLICE_KNOCKOUT_CRIES);n.cryUntil=now+1700;player.ang=Math.atan2(n.r-player.r,n.c-player.c);addShake(1.8);hapticHit();spawnFloatText(n.r,n.c,'ОГЛУШЁН 5 СЕК.',{color:'#dc8cff',size:14,life:1600});showToast('💫 Цель вырублена — успей надеть наручники','🥷',2200);}
-function _findArrestablePoliceTarget(){if(_policeState.escort)return null;const now=performance.now();let best=null,bestD=2;for(const n of NPCS){if(!n._policeCriminal||n.dead||n._policeCuffed||!(n._knockedUntil>now))continue;const d=Math.hypot(n.r-player.r,n.c-player.c);if(d<bestD){best=n;bestD=d;}}return best;}
+function _updatePoliceStealthButton(){_policeStealthTarget=_findOnlinePoliceTarget(false)||_findPoliceStealthTarget();_stealthBtn?.classList.toggle('show',!!_policeStealthTarget);}
+function _knockoutPoliceTarget(){const online=_findOnlinePoliceTarget(false);if(online){player.ang=Math.atan2(online.y-player.r,online.x-player.c);_policeBatonAnim={startAt:performance.now(),ang:player.ang};_sendPoliceOnline('police_online_stun',online.uid);return;}const n=_findPoliceStealthTarget();if(!n)return;const now=performance.now();player.ang=Math.atan2(n.r-player.r,n.c-player.c);_policeBatonAnim={startAt:now,ang:player.ang};n._knockedUntil=now+5000;n.idleUntil=n._knockedUntil;n.walkPhase=0;n._fighting=false;n._fightingMelee=false;n.hp=Math.max(1,(n.hp||n.max_hp)-8);n.cryText=_policePick(_POLICE_KNOCKOUT_CRIES);n.cryUntil=now+1700;setTimeout(()=>{addShake(2.8);hapticHit();spawnFloatText(n.r,n.c,'УДАР ДУБИНКОЙ',{color:'#77c7ff',size:13,life:900});},205);spawnFloatText(n.r,n.c,'ОГЛУШЁН 5 СЕК.',{color:'#dc8cff',size:14,life:1600});showToast('💫 Цель оглушена — успей надеть наручники','👮',2200);}
+function _findArrestablePoliceTarget(){const online=_findOnlinePoliceTarget(true);if(online)return online;if(_policeState.escort)return null;const now=performance.now();let best=null,bestD=2;for(const n of NPCS){if(!n._policeCriminal||n.dead||n._policeCuffed||!(n._knockedUntil>now))continue;const d=Math.hypot(n.r-player.r,n.c-player.c);if(d<bestD){best=n;bestD=d;}}return best;}
 function _arrestPoliceTarget(n){
+  if(n&&n.uid){_sendPoliceOnline('police_online_cuff',n.uid);return;}
   if(_policeState.escort){showToast('🚔 Сначала доставь текущего задержанного','⚠️',2200);return;}
   if(!n||_policeState.cuffs<=0)return;const m=_policeMissionForNpc(n);if(!m)return;_policeState.cuffs--;m.status='cuffed';n._policeCuffed=true;const now=performance.now();_policeState.escort={missionId:m.id,targetId:m.targetId,name:m.name,boss:m.boss,look:m.look,r:n.r,c:n.c,ang:n.ang||0,cryText:_policePick(_POLICE_ARREST_CRIES),cryUntil:now+2600,_nextCryAt:now+6500};const ix=NPCS.indexOf(n);if(ix>=0)NPCS.splice(ix,1);_savePoliceState();renderJobStatus();showEventBanner('🔗 ПРЕСТУПНИК АРЕСТОВАН',`${m.name}: «${_policeState.escort.cryText}» · доставь его в участок.`,4200,'win');
 }
 function _tickPoliceEscort(dt){
   const e=_policeState.escort;if(!e)return;
-  if(myDead){const m=_policeMission(e.missionId);if(m)m.status='hunt';_policeState.cuffs++;_policeState.escort=null;_savePoliceState();setTimeout(_ensurePoliceTargets,900);showToast('🚨 Задержанный сбежал. Наручники вернуты','🚔',2600);return;}
+  if(myDead){if(!e.waiting){e.waiting=true;e.waitR=e.r;e.waitC=e.c;e.walkPhase=0;e.cryText='Буду ждать здесь…';e.cryUntil=performance.now()+2200;_savePoliceState();showToast(`🔗 ${e.name} остался ждать на месте твоей гибели`,'🚔',2800);}return;}
+  if(e.waiting){const backD=Math.hypot(player.r-e.r,player.c-e.c);if(backD>2.3){e.walkPhase=0;return;}e.waiting=false;e.cryText='Вернулся, начальник?';e.cryUntil=performance.now()+1900;_savePoliceState();}
   const inside=_buildingInt&&_buildingInt.type==='police_st';
   if(inside&&!e._inside){e.r=player.r+.7;e.c=player.c+.7;e._inside=true;}
   if(!inside)e._inside=false;
   const now=performance.now();if(!e._turningIn&&now>(e._nextCryAt||0)){e.cryText=_policePick(_POLICE_ESCORT_CRIES);e.cryUntil=now+2300;e._nextCryAt=now+7500+Math.random()*6500;}
-  let tr=player.r+Math.sin(player.ang+Math.PI)*1.1,tc=player.c+Math.cos(player.ang+Math.PI)*1.1,speed=inside?3.4:4.3;
+  let tr=player.r+Math.sin(player.ang+Math.PI)*.68,tc=player.c+Math.cos(player.ang+Math.PI)*.68,speed=inside?5.2:6.0;
   if(e._turningIn){tr=6.5;tc=(_buildingInt?.W||18)-5+.5;speed=5.4;}
   const dr=tr-e.r,dc=tc-e.c,d=Math.hypot(dr,dc);
   if(d>.15){const sp=Math.min(d,speed*dt);e.r+=dr/d*sp;e.c+=dc/d*sp;e.ang=Math.atan2(dr,dc);e.walkPhase=(e.walkPhase||0)+dt*9;}else e.walkPhase=0;
@@ -37026,12 +37739,12 @@ function _tickPoliceEscort(dt){
 }
 function _completePoliceEscort(){const e=_policeState.escort;if(!e||e._turningIn)return;e._turningIn=true;e._turningInAt=performance.now();_savePoliceState();showToast('👮 Конвоир принимает задержанного…','🚔',1800);}
 function _finishPoliceEscortReward(){
-  const e=_policeState.escort;if(!e)return;const m=_policeMission(e.missionId);if(!m)return;const cash=m.rewardCash|0,xp=m.rewardXp|0;myCash+=cash;QP.cash=myCash;QP.exp=(+QP.exp||0)+xp;_policeState.earnedXp+=xp;_policeState.cuffs=Math.min(3,_policeState.cuffs+1);_policeState.missions=_policeState.missions.filter(x=>x.id!==m.id);_policeState.escort=null;_savePoliceState();updateMoneyHud();renderPoliceModal();renderJobStatus();
+  const e=_policeState.escort;if(!e)return;const m=_policeMission(e.missionId);if(!m)return;const cash=m.rewardCash|0,xp=m.rewardXp|0,nextPoliceXp=(_policeState.earnedXp||0)+xp;myCash+=cash;QP.cash=myCash;QP.exp=(+QP.exp||0)+xp;_policeState.cuffs=Math.min(3,_policeState.cuffs+1);_policeState.missions=_policeState.missions.filter(x=>x.id!==m.id);_policeState.escort=null;_savePoliceState();_setPoliceXp(nextPoliceXp);_syncPoliceXpReward(xp,m.id);updateMoneyHud();renderPoliceModal();renderJobStatus();if(_profileTab==='status')renderProfileTab();if(_wepPickOpen)renderWeaponPick();
   spawnFloatText(player.r,player.c,`+$${cash}  +${xp} XP`,{color:'#7dffad',size:19,life:2300});showEventBanner('🏅 ПРЕСТУПНИК СДАН',`${m.name}: награда $${cash} и ${xp} опыта.`,4300,'win');pushFeedEvent('🚔',`${QP.name||'Игрок'} доставил в участок: ${m.name}`,{accent:'#6bb3ff'});
 }
-function _tickPoliceMissions(now){for(const m of _policeState.missions){if(m.status!=='hunt')continue;const n=NPCS.find(x=>x._policeTargetId===m.targetId);if(n&&n.dead&&now-(n.deadAt||now)>1800){const i=NPCS.indexOf(n);if(i>=0)NPCS.splice(i,1);showToast('⚠️ Преступник нужен живым — цель сменила место','🚔',2300);_spawnPoliceTarget(m);}else if(!n)_spawnPoliceTarget(m);}}
+function _tickPoliceMissions(now){_updateOnlineArrestHud();for(const m of [..._policeState.missions]){if(m.status!=='hunt')continue;const n=NPCS.find(x=>x._policeTargetId===m.targetId);if(n&&n.dead&&now-(n.deadAt||now)>900){const i=NPCS.indexOf(n);if(i>=0)NPCS.splice(i,1);_policeState.missions=_policeState.missions.filter(x=>x.id!==m.id);_savePoliceState();renderPoliceModal();renderJobStatus();showEventBanner('☠️ ПРЕСТУПНИК ПОГИБ',`${m.name} погиб. Ориентировка вычеркнута.`,3900,'lose');showToast(`${m.name}: преступник погиб`,'☠️',2800);}else if(!n)_spawnPoliceTarget(m);}}
 document.getElementById('policeModalClose')?.addEventListener('click',closePoliceDesk);
-_policeModal?.addEventListener('click',e=>{if(e.target===_policeModal)closePoliceDesk();const a=e.target.closest('[data-police-action]')?.dataset.policeAction;if(a==='take'&&!e.target.disabled)_acceptPoliceMission();else if(a==='join')_joinPoliceService();else if(a==='decline')closePoliceDesk();});
+_policeModal?.addEventListener('click',e=>{if(e.target===_policeModal){closePoliceDesk();return;}const b=e.target.closest('[data-police-action]');if(!b||b.disabled)return;e.preventDefault();const a=b.dataset.policeAction;if(a==='take')_acceptPoliceMission();else if(a==='online_select')_sendPoliceOnline('police_online_select',b.dataset.targetUid);else if(a==='join')_joinPoliceService();else if(a==='leave')_leavePoliceService();else if(a==='decline')closePoliceDesk();});
 _stealthBtn?.addEventListener('pointerdown',e=>{e.preventDefault();_knockoutPoliceTarget();});
 _loadPoliceState();setTimeout(_ensurePoliceTargets,1200);
 
@@ -37084,7 +37797,7 @@ function renderJobStatus(){
   const nm=document.getElementById('jobStatusName'),sub=document.getElementById('jobStatusSub'),tm=document.getElementById('jobStatusTimer');
   if(!nm||!sub||!tm)return;
   const title=_jobStatusHud?.querySelector('.js-title span');
-  if(_policeState.employed){if(title)title.textContent='👮 Служба';_jobStatusHud&&_jobStatusHud.classList.add('ready');nm.textContent='КОП';tm.textContent='НА СЛУЖБЕ';sub.textContent=`Наручники ${_policeState.cuffs}/3 · ориентировки ${_policeState.missions.length}/3`;return;}
+  if(_policeState.employed){const p=_policeProgress();if(title)title.textContent='👮 Служба';_jobStatusHud&&_jobStatusHud.classList.add('ready');nm.textContent='КОП';tm.textContent=`УР. ${p.level}`;sub.textContent=`Опыт ${p.xp} · наручники ${_policeState.cuffs}/3 · ориентировки ${_policeState.missions.length}/3${_policeCanUseTaser()?' · ⚡ шокер':''}`;return;}
   if(title)title.textContent='💼 Работа';
   const def=_jobDef(_jobState.job),left=_jobRemaining(),ready=!!def&&left<=0;
   _jobStatusHud&&_jobStatusHud.classList.toggle('ready',ready);
@@ -37732,6 +38445,11 @@ function _drawPoliceStationInterior(bi) {
     ctx.fillStyle = fill; ctx.fill();
     ctx.strokeStyle = '#404848'; ctx.lineWidth = .3; ctx.stroke();
   }
+  // Герб участка, вмонтированный в пол центрального коридора.
+  {const p=w2s(9.7,W/2),rw=hx*1.28,rh=hy*1.28;ctx.save();ctx.globalAlpha=.9;ctx.fillStyle='#203e69';ctx.strokeStyle='#89b4e5';ctx.lineWidth=2;
+   ctx.beginPath();ctx.moveTo(p.x,p.y-rh);ctx.lineTo(p.x+rw,p.y);ctx.lineTo(p.x,p.y+rh);ctx.lineTo(p.x-rw,p.y);ctx.closePath();ctx.fill();ctx.stroke();
+   ctx.fillStyle='#e5c45f';ctx.font='900 15px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('★',p.x,p.y-3);
+   ctx.fillStyle='#dbeaff';ctx.font='900 6px system-ui';ctx.fillText('ПОЛИЦИЯ',p.x,p.y+9);ctx.restore();}
 
   // Освещение — люминесцентные трубки (вдоль коридора)
   const flick = 0.85 + 0.15 * Math.sin(now * 0.003);
@@ -37803,6 +38521,7 @@ function _drawPoliceStationInterior(bi) {
         const rh = barH * frac;
         ctx.beginPath(); ctx.moveTo(tl.x, tl.y - rh); ctx.lineTo(bl.x, bl.y - rh); ctx.stroke();
       }
+      ctx.fillStyle='#9fb1c0';ctx.font='900 6px system-ui';ctx.textAlign='center';ctx.fillText(`КАМЕРА ${Math.round(cr/3.5)+1}`,(tl.x+bl.x)/2,(tl.y+bl.y)/2-barH-4);
       // Койка внутри камеры
       const bp = w2s(cr + 1, W - 2);
       ctx.fillStyle = '#3a3a40';
@@ -37984,6 +38703,15 @@ function _drawPoliceStationInterior(bi) {
     const p = w2s(4 + .5, W / 2 + .5);
     const copLook = { gender: 0, skin: 1, body: 1, face: 2, hair: 1, hat: 5, suit: '#1c2c55' };
     drawPerson(p.x, p.y, Math.PI * .5, copLook, 0, 'Дежурный', null, false, 100, 100, false, null, false, false);
+    if (_policeState.employed && _policeState.missions.length < POLICE_MISSION_MAX) {
+      const label = 'ЕСТЬ РАБОТА';
+      ctx.save(); ctx.font = '900 9px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const lw = ctx.measureText(label).width + 14, ly = p.y - 49;
+      ctx.fillStyle = 'rgba(10,70,31,.94)'; ctx.strokeStyle = '#54f184'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(p.x - lw / 2, ly - 9, lw, 18, 6); else ctx.rect(p.x - lw / 2, ly - 9, lw, 18); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#8dffad'; ctx.shadowColor = '#23d95b'; ctx.shadowBlur = 5; ctx.fillText(label, p.x, ly + .5);
+      ctx.restore();
+    }
   }});
 
   // ── NPC Конвоир (у камер) ──
@@ -38011,7 +38739,7 @@ function _drawPoliceStationInterior(bi) {
     items.push({d:_policeState.escort.r+_policeState.escort.c+.45,fn:()=>{
       const e=_policeState.escort,p=w2s(e.r+.5,e.c+.5);
       drawPerson(p.x,p.y,e.ang||0,e.look||{},e.walkPhase||0,`🔗 ${e.name}`,null,false,e.boss?135:85,e.boss?135:85,false,null,false,false);
-      ctx.save();ctx.strokeStyle='#c8d4e8';ctx.lineWidth=1.5;ctx.setLineDash([3,2]);ctx.beginPath();ctx.moveTo(p.x-5,p.y-18);ctx.lineTo(p.x+5,p.y-18);ctx.stroke();ctx.restore();_drawPoliceEscortCry(e,p);
+      ctx.save();ctx.strokeStyle='#c8d4e8';ctx.lineWidth=1.5;ctx.setLineDash([3,2]);ctx.beginPath();ctx.moveTo(p.x-5,p.y-18);ctx.lineTo(p.x+5,p.y-18);ctx.stroke();ctx.restore();_drawPoliceHandcuffs(e,p);_drawPoliceEscortCry(e,p);
     }});
   }
   items.push({ d: player.r + player.c + .5, fn: () => {
@@ -38559,7 +39287,7 @@ function _updateInteriorNpcs(bi, dt) {
 function _pushInteriorNpcs(bi, items) {
   if (bi.npcs) {
     for (const n of bi.npcs) {
-      items.push({ d: n.r + n.c + .45, fn: ((nn) => () => {
+      items.push({ d: n.r + n.c + .45, person: true, fn: ((nn) => () => {
         const p = w2s(nn.r + .5, nn.c + .5);
         drawPerson(p.x, p.y, nn.ang, nn.look, nn.walking ? nn.walkPhase : 0,
           nn.name, null, false, 100, 100, false, null, false, false);
@@ -38567,7 +39295,7 @@ function _pushInteriorNpcs(bi, items) {
     }
   }
   for (const gm of _myGang) {
-    items.push({ d: gm.r + gm.c + .46, fn: ((g) => () => {
+    items.push({ d: gm.r + gm.c + .46, person: true, fn: ((g) => () => {
       const p = w2s(g.r + .5, g.c + .5);
       ctx.save();
       const gl = ctx.createRadialGradient(p.x, p.y + 2, 1, p.x, p.y + 2, 14);
@@ -38576,8 +39304,9 @@ function _pushInteriorNpcs(bi, items) {
       ctx.fillStyle = gl;
       ctx.beginPath(); ctx.ellipse(p.x, p.y + 2, 14, 6, 0, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
-      drawPerson(p.x, p.y, g.ang, g.look, g.walkPhase, null, null, false, g.hp, g.max_hp, false, 0);
+      drawPerson(p.x, p.y, g.ang, g.look, g.walkPhase, null, null, false, null, null, false, 0);
       drawWeaponInHands(p.x, p.y, g.ang, g.weapon, 0.85, 0);
+      _drawGangHpBar(g,p.x,p.y-42);
       ctx.save(); ctx.font = 'bold 7px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
       ctx.fillStyle = '#4aff4a'; ctx.shadowColor = '#000'; ctx.shadowBlur = 2;
       ctx.fillText(`👊 ${g.name}`, p.x, p.y - 32);
@@ -38588,6 +39317,14 @@ function _pushInteriorNpcs(bi, items) {
       }
       ctx.shadowBlur = 0; ctx.restore();
     })(gm) });
+  }
+  const currentSpace=_gangSpaceKey();
+  for(const fm of _formerGang){
+    if(fm.space!==currentSpace)continue;
+    items.push({d:fm.r+fm.c+.45,person:true,fn:((f)=>()=>{
+      const p=w2s(f.r+.5,f.c+.5);
+      drawPerson(p.x,p.y,f.ang||0,f.look||{},0,null,null,false,100,100,false,null,false,false);
+    })(fm)});
   }
 }
 
@@ -38617,7 +39354,10 @@ function _drawBusinessInterior(bi) {
     items.push({d:r+.01,fn:()=>_bizIsoBox(r+.5,.18,.35,1,2.6,cfg.wall,'#1b202a',cfg.wall)});
     items.push({d:r+W+.01,fn:()=>_bizIsoBox(r+.5,W-.18,.35,1,2.6,cfg.wall,cfg.wall,'#161b23')});
   }
-  const box=(kind,r,c,w=2,d=1,h=1,top=cfg.accent)=>items.push({d:r+c,fn:()=>_bizIsoBox(r,c,w,d,h,top,'#343c48','#242a33',kind)});
+  // Любой крупный предмет бизнеса — мебель. Его опорная координата не
+  // учитывает реальную высоту/ширину, поэтому обычный depth-sort мог целиком
+  // закрыть персонажа. Мебель рисуем до героя во всех бизнес-интерьерах.
+  const box=(kind,r,c,w=2,d=1,h=1,top=cfg.accent)=>items.push({d:r+c,furniture:true,fn:()=>_bizIsoBox(r,c,w,d,h,top,'#343c48','#242a33',kind)});
   const table=(r,c,top='#805a35',label='')=>{box(label,r,c,2.4,1.4,.65,top);box('',r-.2,c-1.7,.55,.55,.45,'#3b2c25');box('',r-.2,c+1.7,.55,.55,.45,'#3b2c25');};
   // Общая стойка и касса. Управляющий стоит за ней.
   box('КАССА',2.9,W/2,6.2,1.15,1.05,cfg.accent);
@@ -38635,8 +39375,48 @@ function _drawBusinessInterior(bi) {
     case 'port': box('КОНТЕЙНЕР',4.7,3.2,4,2,2.2,'#b34b36');box('КОНТЕЙНЕР',4.7,14.2,4,2,2.2,'#347a9e');box('ГРУЗ',8,5,3,2,1.35,'#9b6a38');box('ДИСПЕТЧЕР',8,13,3,1.5,1.45,'#3d596c');break;
   }
   _pushInteriorNpcs(bi,items);
-  items.push({d:player.r+player.c+.5,fn:()=>{const p=w2s(player.r+.5,player.c+.5);drawPerson(p.x,p.y,player.ang,QP.look||{},player.walkPhase,'Игрок',null,true,myHp,PVP.max_hp,false,null,false,myDead);}});
-  items.sort((a,b)=>a.d-b.d);for(const it of items)it.fn();
+  // Игроки общего экземпляра этого бизнеса. Сервер не присылает сюда
+  // владельцев из закрытых экземпляров и игроков из других зданий.
+  for(const [,o] of others){
+    if(!o.interior||o.interior.kind!=='business'||o.interior.biz_id!==bi.bizId)continue;
+    items.push({d:o.y+o.x+.49,person:true,fn:((other)=>()=>{
+      const p=w2s(other.y+.5,other.x+.5);
+      const phase=other.w?(other._walkPhase||0):0;
+      const chat=(other.chat&&performance.now()-other.chatT<chatDuration(other.chat))?other.chat:null;
+      const armed=(other.mode||'pvp')!=='pve'&&!other.dead;
+      drawPerson(p.x,p.y,other.ang||0,other.police?_policeUniformLook(other.look||{}):(other.look||{}),phase,other.name,chat,false,
+        other.hp,PVP.max_hp,other.dead,0,armed,false);
+      if(armed){
+        const weapon=other.weapon||lastPlayerWeapon.get(String(other.uid))||'pistol';
+        drawWeaponInHands(p.x,p.y,other.ang||0,weapon,.85,lastPlayerShotAt.get(String(other.uid))||0);
+      }
+      drawModeTag(p.x,p.y,other.mode||'pvp');
+    })(o)});
+  }
+  items.push({d:player.r+player.c+.5,hero:true,person:true,fn:()=>{
+    const p=w2s(player.r+.5,player.c+.5);
+    drawPerson(p.x,p.y,player.ang,QP.look||{},player.walkPhase,'Игрок',null,true,myHp,PVP.max_hp,false,null,false,myDead);
+    // У вооружённого игрока drawPerson намеренно не рисует обычные руки:
+    // руки и сам ствол добавляет этот общий оружейный рендер.
+    if(!myDead&&myMode!=='pve'&&_isArmed()){
+      drawWeaponInHands(p.x,p.y,player.ang,currentWeapon,.9,lastShotClientT);
+    }
+    if(!myDead&&_punchAnim)_drawPunchAnim(p.x,p.y);
+  }});
+  // Крупный декор рисуется перед самым дальним человеком: так ни игрок,
+  // ни управляющий, ни сотрудники не исчезают целиком за стойкой/стеллажом.
+  const firstPersonDepth=items.reduce((d,it)=>it.person?Math.min(d,it.d):d,Infinity);
+  const businessDepth=(it)=>it.furniture?Math.min(it.d,firstPersonDepth-.01):it.d;
+  items.sort((a,b)=>businessDepth(a)-businessDepth(b));for(const it of items)it.fn();
+  // Бизнес использует отдельный ранний render-return, поэтому боевые FX
+  // нужно дорисовывать здесь, как в обычных зданиях и банковском интерьере.
+  drawAimLaser();
+  drawSmokePuffs();
+  drawBullets();
+  drawMuzzles();
+  drawShockwaves();
+  drawImpacts();
+  drawFloatTexts();
   // Выход и верхняя карточка статуса.
   const ep=w2s(H-.25,W/2);ctx.save();ctx.textAlign='center';ctx.font='900 10px system-ui';ctx.fillStyle='#69ff8d';ctx.shadowColor='#000';ctx.shadowBlur=4;ctx.fillText('ВЫХОД',ep.x,ep.y-4);ctx.restore();
   const biz=BUSINESS_POIS.find(b=>b.id===bi.bizId),own=myBusinesses.get(bi.bizId),lvl=own&&own.owned?_bizLevel(own):0;
@@ -41285,8 +42065,9 @@ function drawBankInteriorScene() {
       gl.addColorStop(0,'rgba(60,255,60,.15)'); gl.addColorStop(1,'rgba(0,0,0,0)');
       ctx.fillStyle=gl; ctx.beginPath(); ctx.ellipse(p.x,p.y+2,14,6,0,0,Math.PI*2); ctx.fill();
       ctx.restore();
-      drawPerson(p.x,p.y,g.ang,g.look,g.walkPhase,null,null,false,g.hp,g.max_hp,false,0);
+      drawPerson(p.x,p.y,g.ang,g.look,g.walkPhase,null,null,false,null,null,false,0);
       drawWeaponInHands(p.x,p.y,g.ang,g.weapon,0.85,0);
+      _drawGangHpBar(g,p.x,p.y-42);
       ctx.save(); ctx.font='bold 7px system-ui'; ctx.textAlign='center'; ctx.textBaseline='bottom';
       ctx.fillStyle='#4aff4a'; ctx.shadowColor='#000'; ctx.shadowBlur=2;
       ctx.fillText(`👊 ${g.name}`,p.x,p.y-32);
@@ -41296,6 +42077,14 @@ function drawBankInteriorScene() {
       }
       ctx.shadowBlur=0; ctx.restore();
     })(gm)});
+  }
+  const currentGangSpace=_gangSpaceKey();
+  for(const fm of _formerGang){
+    if(fm.space!==currentGangSpace)continue;
+    items.push({d:fm.r+fm.c+.03,fn:((f)=>()=>{
+      const p=w2s(f.r+.5,f.c+.5);
+      drawPerson(p.x,p.y,f.ang||0,f.look||{},0,null,null,false,100,100,false,null,false,false);
+    })(fm)});
   }
   // Игрок
   items.push({d:player.r+player.c+.05,fn:()=>{
@@ -42813,7 +43602,9 @@ function chatDuration(text) {
     buildPanel();
     const wait=setInterval(async()=>{
       if(!ready())return;clearInterval(wait);await load();
-      requestAnimationFrame(function loop(){try{overlay();drawMini();}catch(_){}requestAnimationFrame(loop);});
+      // Скрытый редактор не имеет права рисовать поверх обычной игры и
+      // интерьеров. Цикл нужен только после явного включения через F8.
+      requestAnimationFrame(function loop(){try{if(active){overlay();drawMini();}}catch(_){}requestAnimationFrame(loop);});
       if(!LOCAL)return;
       window.addEventListener('keydown',e=>{
         if(e.key==='F8'){e.preventDefault();toggle();}
@@ -43561,7 +44352,7 @@ function chatDuration(text) {
     buildPanel();
     const wait=setInterval(async()=>{
       if(!ready())return;clearInterval(wait);await load();
-      requestAnimationFrame(function loop(){try{drawDistrictDecorLayer();overlay();drawMini();}catch(_){}requestAnimationFrame(loop);});
+      requestAnimationFrame(function loop(){try{if(active){drawDistrictDecorLayer();overlay();drawMini();}}catch(_){}requestAnimationFrame(loop);});
       if(!LOCAL)return;
       window.addEventListener('keydown',e=>{
         if(e.key==='F8'){e.preventDefault();toggle();}
@@ -44465,7 +45256,7 @@ function chatDuration(text) {
     buildPanel();
     const wait=setInterval(async()=>{
       if(!ready())return;clearInterval(wait);await load();
-      requestAnimationFrame(function loop(){try{drawDistrictDecorLayer();overlay();drawMini();}catch(_){}requestAnimationFrame(loop);});
+      requestAnimationFrame(function loop(){try{if(active){drawDistrictDecorLayer();overlay();drawMini();}}catch(_){}requestAnimationFrame(loop);});
       if(!LOCAL)return;
       window.addEventListener('keydown',e=>{
         if(e.key==='F8'){e.preventDefault();toggle();}
@@ -45210,7 +46001,7 @@ function chatDuration(text) {
     buildPanel();
     const wait=setInterval(async()=>{
       if(!ready())return;clearInterval(wait);await load();
-      requestAnimationFrame(function loop(){try{drawDistrictDecorLayer();overlay();drawMini();}catch(_){}requestAnimationFrame(loop);});
+      requestAnimationFrame(function loop(){try{if(active){drawDistrictDecorLayer();overlay();drawMini();}}catch(_){}requestAnimationFrame(loop);});
       if(!LOCAL)return;
       window.addEventListener('keydown',e=>{
         if(e.key==='F8'){e.preventDefault();toggle();}
@@ -45937,7 +46728,7 @@ function chatDuration(text) {
     buildPanel();
     const wait=setInterval(async()=>{
       if(!ready())return;clearInterval(wait);await load();
-      requestAnimationFrame(function loop(){try{drawDistrictDecorLayer();overlay();drawMini();}catch(_){}requestAnimationFrame(loop);});
+      requestAnimationFrame(function loop(){try{if(active){drawDistrictDecorLayer();overlay();drawMini();}}catch(_){}requestAnimationFrame(loop);});
       if(!LOCAL)return;
       window.addEventListener('keydown',e=>{
         if(e.key==='F8'){e.preventDefault();toggle();}
