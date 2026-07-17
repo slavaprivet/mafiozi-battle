@@ -639,6 +639,10 @@ body.in-pvp #robActionBtn { top: 152px; }
 #jobStatusHud .js-state{color:#f2f6fb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #jobStatusHud .js-sub{color:#93a4b8;font-size:9px;margin-top:2px}
 #jobStatusHud.ready{border-color:#58dd82;box-shadow:0 0 12px rgba(70,210,110,.24)}
+#jobStatusHud.police-open{pointer-events:auto;cursor:pointer;transition:transform .12s ease,box-shadow .12s ease}
+#jobStatusHud.police-open:hover{box-shadow:0 0 18px rgba(70,210,110,.34)}
+#jobStatusHud.police-open:active{transform:scale(.97)}
+#jobStatusHud.police-open:focus-visible{outline:2px solid #8fd1ff;outline-offset:2px}
 #jobModal{display:none;position:fixed;inset:0;z-index:120;background:rgba(2,5,10,.76);align-items:center;justify-content:center;padding:16px}
 #jobModal.show{display:flex}
 #jobModal .job-card{width:min(430px,94vw);max-height:82vh;overflow:auto;border-radius:14px;padding:15px;background:linear-gradient(155deg,#172333,#0b111b);border:1px solid #3d78a8;box-shadow:0 20px 60px rgba(0,0,0,.72);color:#eaf4ff;font:700 12px system-ui,sans-serif}
@@ -2241,7 +2245,7 @@ function enterJetSki(id) {
   const j=_jetSkiById(id);
   if (!j || j.driver || myDrivingCarId || _inBus || myDead) return;
   if (Math.hypot(j.r-player.r,j.c-player.c)>3) return;
-  if (_bankRob && _bankRob.myBag && typeof dropVaultBag === 'function') dropVaultBag();
+  if (((_bankRob && _bankRob.myBag) || _policeEvidenceBag) && typeof dropVaultBag === 'function') dropVaultBag();
   myJetSkiId=j.id; j.driver=true; j.parked=false; j.returning=false;
   j.abandonedAt=0; _jetExitRequested=false;
   player.r=j.r; player.c=j.c; player.ang=j.ang;
@@ -4914,11 +4918,17 @@ function applyQuestCarsSnapshot(arr) {
       // x/y/vx/vy. Иначе из-за лага между моими gta_drive (15 Гц) и snap
       // машина «откатывается» в старую позицию и разгон не идёт.
       const isMyDrive = (myDrivingCarId === c.id && !myIsPassenger);
-      if (!isMyDrive) {
+      const locallyParked = (prev._locallyParkedUntil || 0) > performance.now();
+      // После высадки сервер может успеть прислать ещё один старый snapshot,
+      // где водитель всё ещё указан, а координаты отстают от последнего кадра.
+      // Не принимаем такое эхо: иначе оставленная машина прыгает назад и для
+      // игрока выглядит пропавшей. Snapshot с driver_uid=null уже подтверждает
+      // парковку, поэтому его координаты можно безопасно принять.
+      const serverConfirmedParked = !c.driver_uid;
+      if (!isMyDrive && (!locallyParked || serverConfirmedParked)) {
         prev.tx = c.x; prev.ty = c.y; prev.tAng = c.ang;
         prev.vx = c.vx; prev.vy = c.vy;
       }
-      const locallyParked = (prev._locallyParkedUntil || 0) > performance.now();
       // После локального выхода старый snapshot может ещё присылать прежнего
       // водителя или временно не присылать машину вовсе. Пока действует
       // парковочная защита, машина остаётся свободной на месте высадки.
@@ -4934,6 +4944,7 @@ function applyQuestCarsSnapshot(arr) {
       prev.max_hp     = c.max_hp;
       prev.wrecked    = !!c.wrecked;
       if (c.civilian !== undefined) prev.civilian = !!c.civilian;
+      if (c.police_patrol !== undefined) prev.police_patrol = !!c.police_patrol;
     } else {
       questCars.set(c.id, {
         id:   c.id,
@@ -4950,6 +4961,7 @@ function applyQuestCarsSnapshot(arr) {
         max_hp:     c.max_hp,
         wrecked:    !!c.wrecked,
         civilian:   !!c.civilian,
+        police_patrol: !!c.police_patrol,
       });
     }
   }
@@ -10717,6 +10729,21 @@ function drawActiveBuildingEntryMarker() {
   ctx.shadowBlur = 0; ctx.fillStyle = '#fff5c8'; ctx.fillText(label,p.x,markerY-9.5);
   ctx.restore();
 }
+
+function tryTapActiveBuildingEntryMarker(x, y) {
+  if (_gtaActionKind !== 'building_enter') return false;
+  const target = _currentBuildingEntryTarget();
+  if (!target) return false;
+  const pulse = (Math.sin(performance.now() * 0.007) + 1) * 0.5;
+  const p = w2s(target.r, target.c);
+  const markerY = p.y - (target.radius > 2 ? 154 : 112) - pulse * 7;
+  ctx.save();
+  ctx.font = '900 12px system-ui, sans-serif';
+  const width = ctx.measureText('ВОЙТИ СЮДА').width + 38;
+  ctx.restore();
+  if (x < p.x - width / 2 || x > p.x + width / 2 || y < markerY - 30 || y > markerY + 22) return false;
+  return activateCurrentBuildingEntry();
+}
 async function loadApartmentState() {
   if (_apartmentStateLoaded || !QP.api || !QP.uid) return;
   _apartmentStateLoaded = true;
@@ -11322,8 +11349,9 @@ function _updateGang(dt) {
       m.targetKind = null; m.targetRef = null; m.targetId = null;
     }
     if (!m.targetKind) {
-      // Приказ/защита босса важнее самостоятельного поиска ближайшего врага.
-      const found = _resolveGangAlertTarget(m) || _findGangCompanionTarget(m);
+      // Банда не начинает бой самостоятельно. Цель появляется только после
+      // выстрела игрока или после попадания врага по игроку (_gangAlertThreat).
+      const found = _resolveGangAlertTarget(m);
       if (found) {
         m.targetKind = found.kind;
         m.targetRef  = found.ref;
@@ -11365,7 +11393,9 @@ function _updateGang(dt) {
     } else if (m.targetKind === 'street_npc') {
       hitNpc(m.targetRef, dirY, dirX, m.weapon, dmg);
     } else if (m.targetKind === 'aggro_bot') {
-      try { ws && ws.send(JSON.stringify({ t: 'aggro_shoot', d: { target: m.targetRef.id, weapon: m.weapon } })); } catch(e) {}
+      try { ws && ws.send(JSON.stringify({ t: 'aggro_shoot', d: {
+        target: m.targetRef.id, weapon: m.weapon, member: i,
+      } })); } catch(e) {}
     } else if (m.targetKind === 'world_cop') {
       try { ws && ws.send(JSON.stringify({ t: 'cop_shoot', d: { target: m.targetRef.id, weapon: m.weapon } })); } catch(e) {}
     } else if (m.targetKind === 'convoy') {
@@ -11522,6 +11552,9 @@ function updateCars(dt) {
     // Маршрут обновляем и для дальнего LOD: иначе за экраном машина снова
     // продолжала бы старый прямой курс и возвращалась уже застрявшей.
     _updateCarRouteDirection(car);
+    const spikeHit=!car.model?.police&&_policeSpikeAt(car.r,car.c);
+    if(spikeHit&&now>=(car._spikeAgainAt||0)){car._spikeAgainAt=now+9000;car._spikedUntil=now+7000;car._hornText='ШИНЫ!';car._hornUntil=now+1800;spawnFloatText(car.r,car.c,'🛞 ШИНЫ ПРОБИТЫ',{color:'#8fd5ff',size:12,life:1100});}
+    if(now<(car._spikedUntil||0)){car.braking=true;continue;}
     // П8 LOD: машины дальше 32 тайлов — двигаем позицию, но пропускаем
     // физику застревания/столкновений. Экономит ~30% CPU на большой карте.
     const _lodDist = Math.hypot(car.r - player.r, car.c - player.c);
@@ -11943,6 +11976,10 @@ function _bankShield() { return !!_bankInt || !!_buildingInt || performance.now(
 let _localHpHurtAt = 0;
 // Применить локальный урон: вычесть HP, отметить время, проверить смерть.
 function _hurtLocal(dmg, by) {
+  if(typeof _policeHasLevel==='function'&&_policeHasLevel(3)){
+    const raw=Math.max(0,dmg|0);dmg=Math.max(1,Math.ceil(raw*.7));
+    const now=performance.now();if(now-_policeVestToastAt>1400){_policeVestToastAt=now;spawnFloatText(player.r,player.c,`🦺 БРОНЯ −${raw-dmg}`,{color:'#79c8ff',size:12,life:850});}
+  }
   myHp = Math.max(0, myHp - (dmg | 0));
   _localHpHurtAt = performance.now();
   if (myHp <= 0 && !myDead) {
@@ -13443,8 +13480,33 @@ function handleEventPacket(d) {
   } else if (kind === 'police_xp_reply') {
     if(d.ok&&d.resigned){_policeState.resetPending=false;_policeState.earnedXp=0;_savePoliceState();}
     else if(d.ok&&typeof d.police_xp==='number')_setPoliceXp(d.police_xp,true);
+  } else if (kind === 'police_patrol_reply') {
+    if(!d.ok){showToast(_policeError(d.error),'⚠️',2500);return;}
+    showEventBanner('🚓 ПАТРУЛЬНАЯ МАШИНА ГОТОВА',d.existing?'Твоя машина уже отмечена на карте.':'Круизер доставлен рядом. Подойди и садись за руль.',3600,'win');
+  } else if (kind === 'police_spikes_reply') {
+    if(!d.ok){showToast(_policeError(d.error),'⚠️',2500);return;}
+    showToast('🛞 Шипы разложены на 45 секунд','👮',2400);
+  } else if (kind === 'police_spikes_deployed') {
+    _addPoliceSpikeStrip(d);
+  } else if (kind === 'police_backup_reply') {
+    if(!d.ok){showToast(_policeError(d.error),'⚠️',2500);return;}
+    _activatePoliceBackup(d);
   } else if (kind === 'police_online_turnin') {
     if(String(d.target_uid)===String(QP.uid))showEventBanner('🚔 ТЕБЯ СДАЛИ В УЧАСТОК','Срок: 30 секунд. Розыск снят после отбытия наказания.',4300,'lose');
+  } else if (kind === 'police_bank_bag_pickup_reply') {
+    if(!d.ok){const failed=_vaultDroppedBags.find(b=>String(b.id)===String(d.bag_id));if(failed)failed._policePickupPending=false;showToast(_policeError(d.reason),'⚠️',2400);return;}
+    _policeEvidenceBag={id:d.bag_id,bank_id:d.bank_id,value:+d.value||0};
+    _myBagWeight=Math.max(1,+d.value||1);
+    _vaultDroppedBags=_vaultDroppedBags.filter(b=>String(b.id)!==String(d.bag_id));
+    showEventBanner('💼 УЛИКА ИЗЪЯТА',`Отнеси мешок в полицейский участок. Награда за возврат: $${(+d.value||0).toLocaleString('ru')}.`,3900,'win');
+  } else if (kind === 'police_bank_bag_turnin_reply') {
+    if(!d.ok){showToast(_policeError(d.reason),'⚠️',2500);return;}
+    _policeEvidenceBag=null;_myBagWeight=0;
+    const saved=Number(d.cash);myCash=Number.isFinite(saved)?saved:myCash+(+d.reward||0);QP.cash=myCash;updateMoneyHud();
+    spawnFloatText(player.r,player.c,`+$${d.reward||0}`,{color:'#65e9ff',size:19,life:1900});
+    showEventBanner('🏅 УЛИКА СДАНА',`Мешок возвращён в участок. Награда: $${(+d.reward||0).toLocaleString('ru')}.`,4200,'win');
+  } else if (kind === 'bank_rob_start_reply' && !d.ok && d.reason === 'police_on_duty') {
+    showToast('👮 Коп на службе не может взламывать хранилище','🚫',2500);
   } else if (kind === 'cop_spawned') {
     // Новый коп вышел из-за угла — короткое уведомление по типу.
     if (myWanted >= 1) {
@@ -13914,7 +13976,16 @@ function handleEventPacket(d) {
         myCash = parseInt(d.cash) || 0;
         updateMoneyHud();
       }
-      const place = d.place === 'apartment' ? '🏠 Деньги спрятаны в штаб-квартире! Мешок убран.' : '🏆 Ограбление завершено!';
+      if (d.place === 'apartment' && d.apt_key && _myApartments[d.apt_key]) {
+        const apt = _myApartments[d.apt_key];
+        const delivered = Math.max(1, parseInt(d.bags) || 1);
+        apt.stolen_bags = d.stolen_bags !== undefined
+          ? Math.max(0, parseInt(d.stolen_bags) || 0)
+          : Math.max(0, parseInt(apt.stolen_bags) || 0) + delivered;
+      }
+      const place = d.place === 'apartment'
+        ? '✅ Кража прошла успешно! Мешок доставлен в твою квартиру.'
+        : '✅ Кража прошла успешно!';
       showToast(`${place} +$${payout.toLocaleString('ru')} (${d.bags || 1} меш.)`, '💰', 5000);
       try { hapticHit && hapticHit(); } catch(e) {}
       _bankRob = null;
@@ -14860,7 +14931,7 @@ function wsConnect() {
             viewZoom = 1.0;
           }
           // Мешок падает на землю при смерти
-          if (_myBagWeight > 0 && _bankRob && _bankRob.myBag) { dropVaultBag(); }
+          if (_myBagWeight > 0 && ((_bankRob && _bankRob.myBag) || _policeEvidenceBag)) { dropVaultBag(); }
         } else if (wasDead && !myDead) {
           // Респаун — сбрасываем ВСЕ блокирующие флаги.
           myDeathBy = '';
@@ -14967,6 +15038,9 @@ function wsConnect() {
       if (d.me) {
         _onlinePoliceArrest = d.me.police_arrest || null;
         _policeStunnedIn = +d.me.police_stunned_in || 0;
+        _policeEvidenceBag = d.me.police_evidence_bag || null;
+        if(_policeEvidenceBag)_myBagWeight=Math.max(1,+_policeEvidenceBag.value||1);
+        else if(!(_bankRob&&_bankRob.myBag))_myBagWeight=0;
         // При серверном конвое локальное предсказание выключено: иначе
         // задержанный визуально убегает, а следующим снапом дёргается назад.
         if (_onlinePoliceArrest?.role === 'detainee') {
@@ -15213,7 +15287,7 @@ function updateZoneBtn() {
     // Дверь хранилища — у северной стены лобби, по центру
     const nearVault = player.r < 3.5 && Math.abs(player.c - int.W/2) < 4.5;
     if (int.phase==='lobby') {
-      label = nearVault ? '🔓 Взломать хранилище' : null;
+      label = nearVault ? (_policeState.employed?'👮 На службе: взлом запрещён':'🔓 Взломать хранилище') : null;
     } else if (int.phase==='cracking') {
       label = `🔒 Взлом ${(int.crackProg*100).toFixed(0)}%`;
     } else if (int.room === 'vault' && !int.myBag) {
@@ -15375,6 +15449,10 @@ _zoneEl.addEventListener('click', () => {
     if (_bankInt && _bankInt.bank.id === bank.id) {
       const int = _bankInt;
       if (int.phase==='lobby') {
+        if(_policeState.employed){
+          showToast('👮 Полицейский на службе не может взламывать хранилище','🚫',2600);
+          return;
+        }
         int.phase='cracking'; int._crackStartedAt=performance.now();
         int.alarmTriggered=true;
         int.panicAt=performance.now(); // все NPC сразу паникуют и бегут из банка
@@ -15958,6 +16036,36 @@ function updateGtaInteractions() {
     _gtaBtn.style.display = 'none'; _gtaActionKind = null;
     return;
   }
+  // Внутри банка мировые взаимодействия (машины, автобус, NPC города)
+  // недоступны. Иначе их координаты могут случайно совпасть с координатами
+  // интерьера и перекрыть повторный подбор брошенного мешка в лобби.
+  if (_bankInt) {
+    _handbrakeBtn.style.display = 'none';
+    if (_bankInt.room === 'lobby' && !_bankInt.myBag && Array.isArray(_bankInt._lobbyBags)) {
+      let nearestBag = null, nearestBagDist = 2.0;
+      for (const bag of _bankInt._lobbyBags) {
+        if (bag.taken) continue;
+        const dist = Math.hypot(player.r - bag.r, player.c - bag.c);
+        if (dist < nearestBagDist) { nearestBag = bag; nearestBagDist = dist; }
+      }
+      if (nearestBag) {
+        _gtaActionKind = 'lobby_bag_pickup';
+        _gtaActionCarId = nearestBag.id;
+        _gtaBtn.textContent = '💼 Поднять мешок';
+        _gtaBtn.style.display = 'block';
+        return;
+      }
+    }
+    _gtaBtn.style.display = 'none';
+    _gtaActionKind = null;
+    _gtaActionCarId = null;
+    return;
+  }
+  if(_policeState.employed&&_policeEvidenceBag&&Math.hypot(player.r-JAIL_CENTER_R,player.c-JAIL_CENTER_C)<5.2){
+    _gtaActionKind='police_bag_turnin';_gtaActionCarId=_policeEvidenceBag.id;
+    _gtaBtn.textContent=`🏅 Сдать мешок полиции (+$${(+_policeEvidenceBag.value||0).toLocaleString('ru')})`;
+    _gtaBtn.style.display='block';return;
+  }
   if(_onlinePoliceArrest?.role==='cop'&&Math.hypot(player.r-JAIL_CENTER_R,player.c-JAIL_CENTER_C)<5.2){
     _gtaActionKind='police_online_turnin';_gtaActionCarId=_onlinePoliceArrest.target_uid;
     _gtaBtn.textContent=`🚔 Сдать игрока: ${_onlinePoliceArrest.target_name||'задержанный'}`;
@@ -16010,13 +16118,13 @@ function updateGtaInteractions() {
   // На ходу не подсесть — двери закрыты, и это спасает от подножек.
   if (BUS.state === 'stopped') {
     const dbusR = BUS.r - player.r, dbusC = BUS.c - player.c;
-    if (Math.hypot(dbusR, dbusC) <= 3.0) {
-      _gtaActionKind = 'bus_enter';
-      _gtaActionCarId = null;
-      _gtaBtn.textContent = '🚌 Сесть в автобус';
-      _gtaBtn.style.display = 'block';
-      return;
-    }
+      if (Math.hypot(dbusR, dbusC) <= 3.0) {
+        _gtaActionKind = 'bus_enter';
+        _gtaActionCarId = null;
+        _gtaBtn.textContent = '🚌 Сесть в автобус';
+        _gtaBtn.style.display = 'block';
+        return;
+      }
   }
   const nearJet = _nearestJetSki();
   if (nearJet && !myDead && !myDrivingCarId && !_inBus) {
@@ -16175,7 +16283,8 @@ function updateGtaInteractions() {
       _gtaBtn.textContent = isApartmentOwned(nearBldR, nearBldC)
         ? '🏠 Войти в свою квартиру'
         : '🏠 Войти в здание';
-      _gtaBtn.style.display = 'block';
+      // Вход выполняется тапом по жёлтой метке над обычным домом.
+      _gtaBtn.style.display = 'none';
       const gKey = nearBldR + ',' + nearBldC;
       const gOnCd = _graffitiCd[gKey] && Date.now() < _graffitiCd[gKey];
       if (_robBtn && !gOnCd && _sprayCans > 0) {
@@ -16250,24 +16359,8 @@ function updateGtaInteractions() {
       return;
     }
   }
-  // Мешок в лобби банка — кнопка «Поднять»
-  if (_bankInt && _bankInt.room === 'lobby' && !_bankInt.myBag && _bankInt._lobbyBags && _bankInt._lobbyBags.length) {
-    let nlb = null, nlbD = 2.0;
-    for (const lb of _bankInt._lobbyBags) {
-      if (lb.taken) continue;
-      const d = Math.hypot(player.r - lb.r, player.c - lb.c);
-      if (d < nlbD) { nlbD = d; nlb = lb; }
-    }
-    if (nlb) {
-      _gtaActionKind = 'lobby_bag_pickup';
-      _gtaActionCarId = nlb.id;
-      _gtaBtn.textContent = '💼 Поднять мешок';
-      _gtaBtn.style.display = 'block';
-      return;
-    }
-  }
   // Брошенный мешок на земле — кнопка «Поднять» когда рядом и руки пусты.
-  if ((!_bankRob || !_bankRob.myBag) && _vaultDroppedBags.length) {
+  if ((!_bankRob || !_bankRob.myBag) && !_policeEvidenceBag && _vaultDroppedBags.length) {
     let nb = null, nbD = 2.0;
     for (const bag of _vaultDroppedBags) {
       const d = Math.hypot(player.r - bag.r, player.c - bag.c);
@@ -16276,7 +16369,7 @@ function updateGtaInteractions() {
     if (nb) {
       _gtaActionKind = 'bag_pickup';
       _gtaActionCarId = nb.id;
-      _gtaBtn.textContent = '💼 Поднять мешок';
+      _gtaBtn.textContent = _policeState.employed ? '👮 Изъять мешок-улику' : '💼 Поднять мешок';
       _gtaBtn.style.display = 'block';
       return;
     }
@@ -16366,16 +16459,17 @@ function updateGtaInteractions() {
     }
   }
   if (nearestQc) {
-    const mdef = QUEST_CAR_MODELS[nearestQc.model] || { label: nearestQc.model };
+    const mdef = QUEST_CAR_MODELS[nearestQc.model] || resolveCarModel(nearestQc.model) || { label: nearestQc.model };
     _gtaActionKind = 'enter';
     _gtaActionCarId = nearestQc.id;
     _gtaActionEnterAs = nearestKind;
     const isBike = !!mdef.is_bike;
     const icon   = isBike ? '🏍' : '🚗';
     const verb   = isBike ? 'на' : 'в';
+    const carLabel=nearestQc.police_patrol?'патрульную машину':(mdef.label||mdef.name||nearestQc.model);
     _gtaBtn.textContent = (nearestKind === 'passenger')
-      ? `${icon} Сесть пассажиром (${mdef.label})`
-      : `${icon} Сесть ${verb} ${mdef.label}`;
+      ? `${icon} Сесть пассажиром (${carLabel})`
+      : `${icon} Сесть ${verb} ${carLabel}`;
     _gtaBtn.style.display = 'block';
     return;
   }
@@ -16443,6 +16537,15 @@ function updateGtaInteractions() {
   _gtaBtn.style.display = 'none';
 }
 
+function activateCurrentBuildingEntry() {
+  if (_gtaActionKind !== 'building_enter' || typeof _gtaActionCarId !== 'string') return false;
+  const parts = _gtaActionCarId.split(',');
+  const br = Number(parts[0]), bc = Number(parts[1]), btype = parts[2] || null;
+  if (!Number.isFinite(br) || !Number.isFinite(bc)) return false;
+  enterBuildingInterior(br, bc, btype);
+  return true;
+}
+
 _gtaBtn.addEventListener('click', () => {
   if (_gtaActionKind === 'michael') {
     openMichaelMenu();
@@ -16500,6 +16603,9 @@ _gtaBtn.addEventListener('click', () => {
     _completePoliceEscort();
   } else if (_gtaActionKind === 'police_online_turnin') {
     _sendPoliceOnline('police_online_turnin',_onlinePoliceArrest?.target_uid);
+  } else if (_gtaActionKind === 'police_bag_turnin') {
+    if(ws&&ws.readyState===1)ws.send(JSON.stringify({t:'police_bank_bag_turnin',d:{bag_id:_policeEvidenceBag&&_policeEvidenceBag.id}}));
+    else showToast('Сервер не отвечает','⚠️',2000);
   } else if (_gtaActionKind === 'job_open') {
     openJobOffice();
   } else if (_gtaActionKind === 'job_collect') {
@@ -16517,7 +16623,13 @@ _gtaBtn.addEventListener('click', () => {
   } else if (_gtaActionKind === 'lobby_bag_pickup') {
     if (_bankInt && _bankInt._lobbyBags) {
       const lb = _bankInt._lobbyBags.find(b => b.id === _gtaActionCarId && !b.taken);
-      if (lb) { lb.taken = true; _bankInt.myBag = { id: lb.id, value: _bankInt.bank.reward_per_bag || 500 }; showToast('💼 Мешок подобран', '💰', 1200); }
+      if (lb) {
+        lb.taken = true;
+        _bankInt.myBag = { id: lb.id, value: _bankInt.bank.reward_per_bag || 500 };
+        _myBagWeight = 1;
+        showToast('💼 Мешок подобран', '💰', 1200);
+        if (typeof updateZoneBtn === 'function') updateZoneBtn();
+      }
     }
   } else if (_gtaActionKind === 'bag_pickup') {
     pickupDroppedBag(_gtaActionCarId);
@@ -16528,9 +16640,7 @@ _gtaBtn.addEventListener('click', () => {
   } else if (_gtaActionKind === 'biz_deliver') {
     deliverBagsToBusinesses();
   } else if (_gtaActionKind === 'building_enter') {
-    const parts = _gtaActionCarId.split(',');
-    const br = +parts[0], bc = +parts[1], btype = parts[2] || null;
-    enterBuildingInterior(br, bc, btype);
+    activateCurrentBuildingEntry();
   } else if (_gtaActionKind === 'apt_buy') {
     buyCurrentApartment();
   } else if (_gtaActionKind === 'apt_bag_deliver') {
@@ -16624,14 +16734,14 @@ if (_dropBagBtn) {
         showToast('💼 Мешок брошен на пол', '⚠️', 1400);
       }
       if (typeof updateZoneBtn === 'function') updateZoneBtn();
-    } else if (_bankRob && _bankRob.myBag) {
+    } else if ((_bankRob && _bankRob.myBag) || _policeEvidenceBag) {
       dropVaultBag();
     }
   });
 }
 function _updateDropBagBtn() {
   if (!_dropBagBtn) return;
-  const carrying = !!((_bankInt && _bankInt.myBag) || (_bankRob && _bankRob.myBag));
+  const carrying = !!((_bankInt && _bankInt.myBag) || (_bankRob && _bankRob.myBag) || _policeEvidenceBag);
   _dropBagBtn.style.display = (carrying && !myDead) ? 'block' : 'none';
 }
 
@@ -19497,7 +19607,7 @@ function fire(angle = null) {
     return;
   }
   if (myDead) return;
-  if (_myBagWeight > 0 && _bankRob && _bankRob.myBag) { showToast('🎒 С мешком нельзя стрелять', '⚠️', 1400); return; }
+  if (_myBagWeight > 0 && ((_bankRob && _bankRob.myBag) || _policeEvidenceBag)) { showToast('🎒 С мешком нельзя стрелять', '⚠️', 1400); return; }
   // ── ТЮРЬМА: стрелять НЕЛЬЗЯ (только кулаки) ────────────────────────
   // Раньше блок был привязан к _meInJail (jailed И внутри радиуса клетки).
   // Если игрок «в тюрьме» (myJailIn>0), но физически вне клетки, запрет не
@@ -20816,7 +20926,7 @@ function sendInput() {
   const inputData = { x: +sx.toFixed(2), y: +sy.toFixed(2),
        ang: +player.ang.toFixed(2), w: _bankInt ? false : !!player.walking,
        weapon: currentWeapon || 'pistol', police:(_policeState&&_policeState.employed)?1:0,
-       bag: (_myBagWeight > 0 && _bankRob && _bankRob.myBag) ? 1 : 0,
+       bag: (_myBagWeight > 0 && ((_bankRob && _bankRob.myBag) || _policeEvidenceBag)) ? 1 : 0,
        swimming: _playerInWater ? 1 : 0 };
   const pe=_policeState&&_policeState.escort;
   inputData.police_escort=pe&&!pe._inside?{r:+pe.r.toFixed(2),c:+pe.c.toFixed(2),ang:+(pe.ang||0).toFixed(2),name:String(pe.name||'Задержанный').slice(0,32),look:pe.look||{},waiting:!!pe.waiting}:null;
@@ -20847,7 +20957,7 @@ function sendChat(text) {
 }
 function sendShoot(ang) {
   if (!ws || ws.readyState !== 1) return;
-  if (_myBagWeight > 0 && _bankRob && _bankRob.myBag) { showToast('🎒 С мешком нельзя стрелять', '⚠️', 1400); return; }
+  if (_myBagWeight > 0 && ((_bankRob && _bankRob.myBag) || _policeEvidenceBag)) { showToast('🎒 С мешком нельзя стрелять', '⚠️', 1400); return; }
   try { ws.send(JSON.stringify({ t: 'shoot', d: { ang: +ang.toFixed(3) } })); } catch(e) {}
 }
 function sendCaptureTry() {
@@ -21180,6 +21290,9 @@ function update(dt) {
       // Текущая скорость по локальному состоянию qc
       let curVx = qc.vx || 0, curVy = qc.vy || 0;
       let curSpeed = Math.hypot(curVx, curVy);
+      const spikeHit=!qc.police_patrol&&_policeSpikeAt(qc.y,qc.x);
+      if(spikeHit&&performance.now()>=(qc._spikeAgainAt||0)){qc._spikeAgainAt=performance.now()+9000;qc._spikedUntil=performance.now()+7000;curVx*=.08;curVy*=.08;addShake(3);showEventBanner('🛞 ШИНЫ ПРОБИТЫ','Машина попала на полицейские шипы и потеряла скорость.',2600,'lose');}
+      if(performance.now()<(qc._spikedUntil||0)){const cap=2.2,sp=Math.hypot(curVx,curVy);if(sp>cap){curVx*=cap/sp;curVy*=cap/sp;}}
       // Если игрок попросил выйти — игнорируем стик, тормозим до 0
       const wantingExit = _exitRequested;
       let throttle = 0, steer = 0;
@@ -28119,7 +28232,7 @@ function drawNpc(npc) {
     ctx.save();ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='bold 10px system-ui';
     const label=m&&m.boss?'👑 БОСС · РОЗЫСК':'🚔 РОЗЫСК';const tw=ctx.measureText(label).width+12;
     ctx.fillStyle='rgba(55,20,65,.94)';ctx.strokeStyle='#d47cff';ctx.lineWidth=1;roundRect(p.x-tw/2,p.y-65+bob,tw,17,7);ctx.fill();ctx.stroke();ctx.fillStyle='#fff';ctx.fillText(label,p.x,p.y-56.5+bob);
-    if(_knocked){ctx.font='16px system-ui';ctx.fillText('⭐  ⭐  ⭐',p.x,p.y-39+bob);}
+    if(_knocked)_drawPoliceStunStars({x:p.x,y:p.y+bob},String(npc._policeTargetId||'').length);
     ctx.restore();
   }
   // Свежий труп — даём показаться предсмертному крику (cryUntil) ещё ~700мс
@@ -28951,6 +29064,7 @@ function drawQuestCar(qc) {
   if (!m) return;
   // Непрерывный угол — плавный поворот без 4-snap
   const isMine    = String(qc.owner_uid) === String(QP.uid);
+  const isPolicePatrol=!!qc.police_patrol;
   const drivenByMe= myDrivingCarId === qc.id;
   const drivenByOther = qc.driver_uid && qc.driver_uid !== String(QP.uid);
   const cp = w2s(qc.y + 0.5, qc.x + 0.5);
@@ -28993,9 +29107,10 @@ function drawQuestCar(qc) {
   // / красный (за рулём другой игрок).
   ctx.save();
   ctx.fillStyle = drivenByOther ? 'rgba(255,80,80,.30)'
+                : isPolicePatrol? 'rgba(70,155,255,.38)'
                 : isMine        ? 'rgba(255,215,80,.42)'
                                 : 'rgba(120,180,255,.28)';
-  ctx.shadowColor = isMine ? '#ffd76b' : (drivenByOther ? '#ff5050' : '#6cb4ff');
+  ctx.shadowColor = isPolicePatrol?'#55b7ff':(isMine ? '#ffd76b' : (drivenByOther ? '#ff5050' : '#6cb4ff'));
   ctx.shadowBlur  = 18;
   ctx.beginPath();
   ctx.ellipse(cp.x, cp.y + 4, TS * 0.55, TS * 0.55 * ISO_Y, 0, 0, Math.PI * 2);
@@ -29186,13 +29301,13 @@ function drawQuestCar(qc) {
     const bob = Math.sin(t) * 4;
     ctx.font = 'bold 22px system-ui, "Segoe UI Emoji", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#ffd76b';
+    ctx.fillStyle = isPolicePatrol?'#6fd1ff':'#ffd76b';
     ctx.shadowColor = '#000'; ctx.shadowBlur = 6;
-    ctx.fillText('🎯', cp.x, cp.y - TS * 1.4 + bob);
+    ctx.fillText(isPolicePatrol?'🚓':'🎯', cp.x, cp.y - TS * 1.4 + bob);
     ctx.shadowBlur = 0;
     ctx.font = 'bold 11px system-ui, sans-serif';
-    ctx.fillStyle = '#ffd76b';
-    ctx.fillText(m.label, cp.x, cp.y - TS * 1.7 + bob);
+    ctx.fillStyle = isPolicePatrol?'#8bddff':'#ffd76b';
+    ctx.fillText(isPolicePatrol?'Патрульная машина':(m.label||m.name||qc.model), cp.x, cp.y - TS * 1.7 + bob);
   }
   ctx.textAlign = 'left';
 }
@@ -29427,6 +29542,9 @@ function drawHitTargetMarker() {
       if (!myOwnedBiz.includes(b.id)) continue;
       _drawEdgeArrowToWorld(b.r, b.c, b.emoji || '🏠', '#5dd55d');
     }
+  }
+  if(_policeEvidenceBag&&_myBagWeight>0){
+    _drawEdgeArrowToWorld(JAIL_CENTER_R,JAIL_CENTER_C,'👮','#65dfff');
   }
 }
 
@@ -31358,7 +31476,7 @@ function renderProfileTab() {
     const modeCol = myMode === 'pvp' ? '#ff6040' : '#40c080';
     const modeLbl = myMode === 'pvp' ? 'PvP' : 'PvE';
     const policeCareer=_policeProgress();
-    const workLabel=_policeState.employed?'КОП':((typeof _jobState!=='undefined'&&_jobState.job)?(_jobDef(_jobState.job)?.name||_jobState.job):'Не трудоустроен');
+    const workLabel=_policeState.employed?_policeRank():((typeof _jobState!=='undefined'&&_jobState.job)?(_jobDef(_jobState.job)?.name||_jobState.job):'Не трудоустроен');
     let html = '<div class="stat-block">';
     html += `<div class="stat-card"><div class="label">Режим</div><div class="val" style="color:${modeCol}">${modeLbl}</div></div>`;
     html += `<div class="stat-card"><div class="label">Уровень</div><div class="val" style="color:#ffd76b">${QP.lvl || 1}</div></div>`;
@@ -31373,7 +31491,7 @@ function renderProfileTab() {
     }
     html += `<div class="stat-card"><div class="label">Заказы сегодня</div><div class="val">${myGtaStatus ? myGtaStatus.count_today : 0} / ${myGtaStatus ? myGtaStatus.limit : 2}</div></div>`;
     html += '</div>';
-    html += `<div style="margin-top:12px;padding:13px;border:1px solid #315b86;border-radius:13px;background:linear-gradient(135deg,#101a29,#111722)"><div style="display:flex;align-items:center;justify-content:space-between"><div style="font-weight:900;color:#7dccff">👮 Карьера полиции</div><div style="font-weight:900;color:#fff">Ур. ${policeCareer.level}/5</div></div><div style="display:flex;justify-content:space-between;margin-top:7px;font-size:11px;color:#aebbd0"><span>Всего: ${policeCareer.xp} XP</span><span>${policeCareer.maxed?'МАКСИМАЛЬНОЕ ЗВАНИЕ':`${policeCareer.part}/${POLICE_XP_PER_LEVEL} до уровня ${policeCareer.level+1}`}</span></div><div style="height:9px;background:#172335;border-radius:8px;overflow:hidden;margin:7px 0"><div style="height:100%;width:${policeCareer.pct}%;background:linear-gradient(90deg,#397dff,#67e9ff);box-shadow:0 0 8px #56cfff"></div></div><div style="font-size:11px;color:${policeCareer.level>=POLICE_TASER_LEVEL?'#79f4bb':'#98a8bc'}">${policeCareer.level>=POLICE_TASER_LEVEL?'⚡ Шокер открыт · доступен во время службы':`🔒 Шокер на ${POLICE_TASER_LEVEL} уровне · осталось ${Math.max(0,POLICE_TASER_XP-policeCareer.xp)} XP`}</div></div>`;
+    html += `<div style="margin-top:12px;padding:13px;border:1px solid #315b86;border-radius:13px;background:linear-gradient(135deg,#101a29,#111722)"><div style="display:flex;align-items:center;justify-content:space-between"><div style="font-weight:900;color:#7dccff">👮 ${policeCareer.rank}</div><div style="font-weight:900;color:#fff">Ур. ${policeCareer.level}/5</div></div><div style="display:flex;justify-content:space-between;margin-top:7px;font-size:11px;color:#aebbd0"><span>Всего: ${policeCareer.xp} XP</span><span>${policeCareer.maxed?'МАКСИМАЛЬНОЕ ЗВАНИЕ':`${policeCareer.part}/${policeCareer.need} XP до звания «${policeCareer.nextRank}»`}</span></div><div style="height:9px;background:#172335;border-radius:8px;overflow:hidden;margin:7px 0"><div style="height:100%;width:${policeCareer.pct}%;background:linear-gradient(90deg,#397dff,#67e9ff);box-shadow:0 0 8px #56cfff"></div></div><div style="font-size:11px;color:${policeCareer.level>=POLICE_TASER_LEVEL?'#79f4bb':'#98a8bc'}">${policeCareer.level>=POLICE_TASER_LEVEL?'⚡ Шокер открыт · доступен во время службы':`🔒 Шокер на ${POLICE_TASER_LEVEL} уровне · осталось ${Math.max(0,POLICE_TASER_XP-policeCareer.xp)} XP`}</div></div>`;
     const apartments = _ownedApartmentEntries();
     let ownedBizCount = 0;
     if (myBusinesses && myBusinesses.forEach) myBusinesses.forEach(v => { if (v && v.owned) ownedBizCount++; });
@@ -32606,7 +32724,7 @@ function drawPerson(x, y, ang, look, walkPhase, name, chat, isSelf, hp, maxHp, i
   // Знаки полицейского звания над своим персонажем. Максимум пять орденов.
   if(policeRankLevel){
     const rankColors=['#b87333','#c9d1d9','#ffd34e','#65dfff','#db86ff'];
-    const rankColor=rankColors[policeRankLevel-1],marks='✦'.repeat(policeRankLevel),label=`КОП ${policeRankLevel}  ${marks}`;
+    const rankColor=rankColors[policeRankLevel-1],marks='✦'.repeat(policeRankLevel),label=`${_policeRank(policeRankLevel).toUpperCase()}  ${marks}`;
     ctx.save();ctx.font='900 9px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
     const rw=Math.max(54,ctx.measureText(label).width+14),ry=hpY-13;
     ctx.fillStyle='rgba(5,15,29,.94)';ctx.strokeStyle=rankColor;ctx.lineWidth=1.3;ctx.shadowColor=rankColor;ctx.shadowBlur=5;
@@ -32928,8 +33046,11 @@ function render() {
     const e=_policeState.escort;
     if(e.r>=r0&&e.r<r1&&e.c>=c0&&e.c<c1)items.push({depth:e.r+e.c+.00055,draw:()=>{
       const p=w2s(e.r,e.c);drawPerson(p.x,p.y,e.ang||0,e.look||{},e.walkPhase||0,`🔗 ${e.name}`,null,false,e.boss?135:85,e.boss?135:85,false,null,false,false);
-      ctx.save();ctx.strokeStyle='#b8c8dc';ctx.lineWidth=1.4;ctx.setLineDash([3,2]);ctx.beginPath();ctx.moveTo(p.x-5,p.y-17);ctx.lineTo(p.x+5,p.y-17);ctx.stroke();ctx.restore();_drawPoliceHandcuffs(e,p);_drawPoliceEscortCry(e,p);
+      _drawPoliceHandcuffs(e,p);_drawPoliceEscortCry(e,p);
     }});
+  }
+  for(const u of _policeBackupUnits){
+    if(u.r>=r0&&u.r<r1&&u.c>=c0&&u.c<c1)items.push({depth:u.r+u.c+.00058,draw:()=>_drawPoliceBackup(u)});
   }
   // Наёмники игрока
   for (const gm of _myGang) {
@@ -33022,6 +33143,9 @@ function render() {
       if (Math.hypot(dr, dc) < 12) g.ang = Math.atan2(dr, dc);
       items.push({ depth: g.y + g.x + 0.0006, draw: () => drawMichaelGuard(g) });
     }
+  }
+  for(const s of _policeSpikeStrips){
+    if(s.r>=r0&&s.r<r1&&s.c>=c0&&s.c<c1)items.push({depth:s.r+s.c+.0002,draw:()=>_drawPoliceSpikeStrip(s)});
   }
   // Машины (движущиеся). Уничтоженные — рисуем обугленный остов с
   // пламенем (или дымом, если потушены пожарными).
@@ -33669,7 +33793,7 @@ if (d.kind === 'plank_path') {
       py -= Math.sin(player.ang) * k;
     }
     const myChat = (_localChat && performance.now() - _localChatT < chatDuration(_localChat)) ? _localChat : null;
-    if (_bankRob && _bankRob.myBag) {
+    if ((_bankRob && _bankRob.myBag) || _policeEvidenceBag) {
       _drawCarryingBag(px, py, { layer:'back', ang:player.ang, walking:player.walking, walkPhase:player.walkPhase });
     }
     drawPerson(px, py, player.ang, _livePlayerLook(),
@@ -33677,6 +33801,8 @@ if (d.kind === 'plank_path') {
                myHp, PVP.max_hp, myDead, null,
                !!((_punchAnim && _punchAnim.type !== 'kick') || (myMode !== 'pve' && !myDead && _isArmed() && !_punchAnim)),
                !!(_punchAnim && _punchAnim.type === 'kick'));
+    if(_policeStunnedIn>0&&!myDead)_drawPoliceStunStars({x:px,y:py},String(QP.uid||'').length);
+    if(_onlinePoliceArrest?.role==='detainee'&&!myDead)_drawPoliceHandcuffs({ang:player.ang}, {x:px,y:py});
     if (_playerInWater) {
       ctx.save();ctx.strokeStyle='rgba(190,235,245,.72)';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(px,py+2,18,6,0,0,Math.PI*2);ctx.stroke();ctx.restore();
     }
@@ -33689,7 +33815,7 @@ if (d.kind === 'plank_path') {
     drawModeTag(px, py, myMode || 'pvp');
     // Несём мешок по городу — ТА ЖЕ анимация что в банке (мешок на верёвке
     // через плечо + покачивание при ходьбе), а не просто эмодзи над головой.
-    if (_bankRob && _bankRob.myBag) {
+    if ((_bankRob && _bankRob.myBag) || _policeEvidenceBag) {
       _drawCarryingBag(px, py, { layer:'strap', ang:player.ang, walking:player.walking, walkPhase:player.walkPhase });
     }
     // Рендер упавших мешков на земле (мини 3D-мешок с пульсирующим свечением)
@@ -33755,8 +33881,8 @@ if (d.kind === 'plank_path') {
       drawModeTag(p.x, p.y, o.mode || 'pvp');
       // Таймер «бан N сек» над головой если другой игрок сейчас в тюрьме
       if ((o.jail_in || 0) > 0) drawJailTimer(p.x, p.y, o.jail_in);
-      if(o.policeCuffed){ctx.save();ctx.font='18px "Segoe UI Emoji",system-ui';ctx.textAlign='center';ctx.fillText('🔗',p.x,p.y-67);ctx.restore();}
-      else if(o.policeStunnedIn>0){ctx.save();ctx.font='15px "Segoe UI Emoji",system-ui';ctx.textAlign='center';ctx.fillText('💫',p.x,p.y-65);ctx.restore();}
+      if(o.policeCuffed)_drawPoliceHandcuffs({ang:o.ang||0},{x:p.x,y:p.y});
+      else if(o.policeStunnedIn>0)_drawPoliceStunStars(p,String(o.uid||'').length);
     } });
     // Задержанный другого копа видим всем, но он не добавляется в боевые
     // цели и поэтому не может быть убит или перехвачен чужим игроком.
@@ -34655,6 +34781,7 @@ canvas.addEventListener('pointerdown', (e) => {
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
+  if (tryTapActiveBuildingEntryMarker(x, y)) return;
   tryTapLock(x, y);
 }, { passive: true });
 
@@ -36431,6 +36558,7 @@ function _getBankVanZone(bank) {
 // Начать ограбление банка
 function startBankRobbery(bank) {
   if (_bankRob) { showToast('🏦 Ограбление уже идёт', 'ℹ️', 1600); return; }
+  if (_policeState.employed) { showToast('👮 Сначала уволься из полиции — коп не может грабить банк', '🚫', 2600); return; }
   if (myDead) return;
   const crackTotal = { small: 10, medium: 15, large: 20 }[bank.size] || 15;
   _bankRob = {
@@ -36488,6 +36616,15 @@ function pickupDroppedBag(bagId) {
   if (idx < 0) return;
   const bag = _vaultDroppedBags[idx];
   if (Math.hypot(player.r - bag.r, player.c - bag.c) > 2.5) return;
+  if(_policeState.employed){
+    if(_policeEvidenceBag){showToast('💼 Сначала сдай уже изъятый мешок','⚠️',1900);return;}
+    if(bag._policePickupPending)return;
+    if(!ws||ws.readyState!==1){showToast('Сервер не отвечает','⚠️',1900);return;}
+    bag._policePickupPending=true;
+    ws.send(JSON.stringify({t:'police_bank_bag_pickup',d:{bag_id:String(bag.id)}}));
+    showToast('👮 Изъятие улики…','💼',1200);
+    return;
+  }
   // Восстанавливаем _bankRob если он успел сброситься (мешок всё ещё на земле).
   if (!_bankRob) {
     _bankRob = { bank: (BANKS.find(b => b.id === bag.bankId) || { id: bag.bankId, reward_per_bag: bag.value }),
@@ -36510,26 +36647,30 @@ function pickupDroppedBag(bagId) {
 
 // Бросить мешок (снять с плеча) — мешок остаётся на земле
 function dropVaultBag() {
-  if (!_bankRob || !_bankRob.myBag) return;
-  const bag = _bankRob.myBag;
+  const policeBag=_policeEvidenceBag;
+  if ((!_bankRob || !_bankRob.myBag) && !policeBag) return;
+  const bag = policeBag || _bankRob.myBag;
+  const bankId=policeBag?policeBag.bank_id:(_bankRob.bank ? _bankRob.bank.id : null);
+  const worldBagId='bag_'+String(QP.uid||'p')+'_'+Date.now();
   _vaultDroppedBags.push({
-    id: bag.id || ('bag_' + Date.now()),
+    id: worldBagId,
     r: player.r, c: player.c,
     value: bag.value || 0,
-    bankId: _bankRob.bank ? _bankRob.bank.id : null,
+    bankId,
     droppedAt: performance.now()
   });
-  _bankRob.myBag = null;
+  if(policeBag)_policeEvidenceBag=null;
+  else _bankRob.myBag = null;
   _myBagWeight = 0;
   showToast('💼 Мешок брошен', '⚠️', 1800);
-  try { ws && ws.send(JSON.stringify({ t: 'bank_bag_drop', d: { bank_id: _bankRob && _bankRob.bank ? _bankRob.bank.id : null, r: player.r, c: player.c } })); } catch(e) {}
+  try { ws && ws.send(JSON.stringify({ t: 'bank_bag_drop', d: { bank_id: bankId, bag_id:worldBagId, r: player.r, c: player.c } })); } catch(e) {}
   if (typeof _updateBankZoneBtn === 'function') _updateBankZoneBtn();
 }
 
 // При успешной посадке мешок не телепортируется и не исчезает вместе со
 // скрытым спрайтом игрока: он остаётся ровно у двери, откуда игрок сел.
 function _dropCarriedBagForVehicleEntry() {
-  if (_myBagWeight > 0 && _bankRob && _bankRob.myBag) dropVaultBag();
+  if (_myBagWeight > 0 && ((_bankRob && _bankRob.myBag) || _policeEvidenceBag)) dropVaultBag();
 }
 
 const BAG_TRUNK_INTERACT_R = 1.65;
@@ -37579,20 +37720,36 @@ Object.assign(_BANK_NPC_LOOKS, {
 // ── БИРЖА ТРУДА (job office) ─────────────────────────────────────
 // Police wanted missions: stealth knockout, cuffs, escort and hand-in.
 const POLICE_MISSION_MAX=3;
-const POLICE_XP_PER_LEVEL=250,POLICE_TASER_LEVEL=5,POLICE_TASER_XP=(POLICE_TASER_LEVEL-1)*POLICE_XP_PER_LEVEL;
+const POLICE_LEVELS=Object.freeze([
+  {level:1,rank:'Дежурный',xp:0,perk:'Дубинка, наручники и возврат улик'},
+  {level:2,rank:'Офицер',xp:300,perk:'Полицейская рация: частые координаты целей'},
+  {level:3,rank:'Сержант',xp:800,perk:'Бронежилет и патрульная машина'},
+  {level:4,rank:'Лейтенант',xp:1600,perk:'Шипы для машин и вызов подкрепления'},
+  {level:5,rank:'Капитан',xp:2800,perk:'Шокер и ориентировки на боссов мафии'}
+]);
+const POLICE_TASER_LEVEL=5,POLICE_TASER_XP=POLICE_LEVELS[POLICE_TASER_LEVEL-1].xp;
 const _policeStoreKey=`mafiozi_police_missions_${QP.uid||'preview'}`;
 let _policeState={employed:false,missions:[],cuffs:0,escort:null,earnedXp:0,seq:0,civilianLook:null,resetPending:false};
+let _policeEvidenceBag=null; // серверная улика: {id,bank_id,value}
+const _policeMissionIntel=new Map();
+const _policeSpikeStrips=[];
+const _policeBackupUnits=[];
+let _policeServiceRefreshAt=0,_policeSupportTickAt=0,_policeVestToastAt=0;
+function _isCarryingPoliceEvidence(){return !!(_policeState?.employed&&_policeEvidenceBag);}
 const _policeModal=document.getElementById('policeModal'),_policeModalBody=document.getElementById('policeModalBody'),_stealthBtn=document.getElementById('stealthBtn');
+let _policeModalView='desk';
 const _policeArrestHud=document.createElement('div');
 _policeArrestHud.style.cssText='display:none;position:fixed;z-index:120;left:50%;bottom:105px;transform:translateX(-50%);padding:9px 14px;border-radius:12px;background:rgba(9,18,34,.94);border:1px solid #67b8ff;color:#fff;font:700 13px system-ui;box-shadow:0 6px 24px #0008;pointer-events:none;text-align:center';
 document.body.appendChild(_policeArrestHud);
 function _policeEsc(v){return String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
-function _policeError(e){return({not_police:'Сначала устройся в полицию',not_selected:'Сначала отметь цель на доске розыска',not_wanted:'Игрок больше не разыскивается',not_online:'Игрок уже вышел',too_far:'Цель слишком далеко',not_stunned:'Сначала оглуши дубинкой или шокером',already_escorting:'Сначала доставь текущего задержанного',already_cuffed:'Его уже задержал другой коп',interior:'Задержание проводится на улице',no_escort:'Задержанный уже освобождён',not_at_station:'Доставь задержанного к полицейскому участку',taser_locked:'Шокер открывается на 5 уровне копа',cooldown:'Шокер перезаряжается',storage:'Сервер не сохранил арест'})[e]||'Действие сейчас невозможно';}
+function _policeError(e){return({not_police:'Сначала устройся в полицию',level_locked:'Эта способность откроется с новым званием',not_selected:'Сначала отметь цель на доске розыска',not_wanted:'Игрок больше не разыскивается',not_online:'Игрок уже вышел',too_far:'Цель слишком далеко',not_stunned:'Сначала оглуши дубинкой или шокером',already_escorting:'Сначала доставь текущего задержанного',already_cuffed:'Его уже задержал другой коп',already_spawned:'Твоя патрульная машина уже ожидает на улице',already_driving:'Сначала выйди из машины',interior:'Способность применяется только на улице',no_escort:'Задержанный уже освобождён',not_at_station:'Доставь улику к полицейскому участку',taser_locked:'Шокер открывается на 5 уровне копа',cooldown:'Способность ещё перезаряжается',storage:'Сервер не сохранил арест',hands_full:'Ты уже несёшь один мешок-улику',gone:'Объект уже недоступен',no_evidence:'У тебя нет мешка-улики',dead:'Дождись возрождения',db_error:'Не удалось выполнить действие'})[e]||'Действие сейчас невозможно';}
 function _sendPoliceOnline(t,targetUid){if(!ws||ws.readyState!==1){showToast('Сервер не отвечает','⚠️',2200);return;}ws.send(JSON.stringify({t,d:{target_uid:targetUid||''}}));}
-function _policeLevel(xp=_policeState.earnedXp){return Math.max(1,Math.min(5,1+Math.floor(Math.max(0,+xp||0)/POLICE_XP_PER_LEVEL)));}
+function _policeLevel(xp=_policeState.earnedXp){xp=Math.max(0,+xp||0);let level=1;for(const step of POLICE_LEVELS)if(xp>=step.xp)level=step.level;return level;}
+function _policeRank(level=_policeLevel()){return POLICE_LEVELS[Math.max(1,Math.min(5,+level||1))-1].rank;}
+function _policeHasLevel(level){return !!(_policeState?.employed&&_policeLevel()>=level);}
 function _policeCanUseTaser(){return !!(_policeState?.employed&&_policeLevel()>=POLICE_TASER_LEVEL);}
-function _policeProgress(){const xp=Math.min(POLICE_TASER_XP,Math.max(0,Math.floor(_policeState.earnedXp||0))),level=_policeLevel(xp),maxed=level>=5,floor=(level-1)*POLICE_XP_PER_LEVEL,next=maxed?POLICE_TASER_XP:level*POLICE_XP_PER_LEVEL;return{xp,level,maxed,floor,next,part:maxed?POLICE_XP_PER_LEVEL:xp-floor,pct:maxed?100:Math.max(0,Math.min(100,(xp-floor)/POLICE_XP_PER_LEVEL*100))};}
-function _setPoliceXp(value,fromServer=false){const old=_policeLevel(),v=Math.min(POLICE_TASER_XP,Math.max(0,Math.floor(+value||0))),current=Math.max(0,Math.floor(_policeState.earnedXp||0));if((fromServer&&v<current)||v===current)return;_policeState.earnedXp=v;_savePoliceState();const level=_policeLevel();if(level>old){showEventBanner('👮 НОВЫЙ УРОВЕНЬ КОПА',`Уровень ${level}${level===POLICE_TASER_LEVEL?' · открыт шокер!':''}`,3800,'win');}renderJobStatus();renderPoliceModal();if(_profileTab==='status')renderProfileTab();renderWeaponHud();if(_wepPickOpen)renderWeaponPick();}
+function _policeProgress(){const xp=Math.min(POLICE_TASER_XP,Math.max(0,Math.floor(_policeState.earnedXp||0))),level=_policeLevel(xp),maxed=level>=POLICE_LEVELS.length,current=POLICE_LEVELS[level-1],nextStep=maxed?current:POLICE_LEVELS[level],need=maxed?0:nextStep.xp-current.xp,part=maxed?0:xp-current.xp;return{xp,level,rank:current.rank,nextRank:maxed?'':nextStep.rank,maxed,floor:current.xp,next:nextStep.xp,need,part,pct:maxed?100:Math.max(0,Math.min(100,part/need*100))};}
+function _setPoliceXp(value,fromServer=false){const old=_policeLevel(),v=Math.min(POLICE_TASER_XP,Math.max(0,Math.floor(+value||0))),current=Math.max(0,Math.floor(_policeState.earnedXp||0));if((fromServer&&v<current)||v===current)return;_policeState.earnedXp=v;_savePoliceState();const level=_policeLevel();if(level>old){showEventBanner('👮 НОВОЕ ЗВАНИЕ',`${_policeRank(level)} · уровень ${level}${level===POLICE_TASER_LEVEL?' · открыт шокер!':''}`,4200,'win');}renderJobStatus();renderPoliceModal();if(_profileTab==='status')renderProfileTab();renderWeaponHud();if(_wepPickOpen)renderWeaponPick();}
 function _syncPoliceXpReward(xp,missionId){if(!ws||ws.readyState!==1)return;try{ws.send(JSON.stringify({t:'police_npc_reward',d:{xp:Math.max(0,xp|0),mission_id:String(missionId||'')}}));}catch(e){}}
 function _selectedOnlineWanted(){return _onlineWantedBoard.find(x=>x.selected)||null;}
 function _findOnlinePoliceTarget(stunned=false){
@@ -37611,30 +37768,45 @@ function _updateOnlineArrestHud(){
 let _policeStealthTarget=null;
 const _POLICE_CRIMINAL_NAMES=['Кривой Макс','Рыжий Боря','Шрам','Филин','Бык','Лом','Седой','Клык','Гвоздь','Чёрный Гена','Малой','Тихоня'];
 const _POLICE_KNOCKOUT_CRIES=['Эй, ты чего?!','За что?!','Башка…','Подло со спины!','Что происходит?!'];
-const _POLICE_ARREST_CRIES=['За что меня?!','Я ни в чём не виноват!','Отпусти, начальник!','Это ошибка!','Да вы знаете, кто я?!','Наручники сними!','Я всё объясню!'];
-const _POLICE_ESCORT_CRIES=['Куда ты меня ведёшь?','Я адвоката требую!','Это подстава!','За что, говорю?!','Я молчать буду!','Начальник, договоримся?','Мне нечего сказать!','Вы ещё пожалеете!'];
+const _POLICE_ARREST_CRIES=['За что меня?!','Я ни в чём не виноват!','Отпустите меня!','Это ошибка!','Да вы знаете, кто я?!','Снимите наручники!','Я всё объясню!','Позовите адвоката!','Вы не имеете права!','Меня подставили!'];
+const _POLICE_ESCORT_CRIES=['Куда вы меня ведёте?','Отпустите!','Это ошибка!','Я требую адвоката!','Это подстава!','Я ничего не сделал!','Снимите наручники!','Вы не имеете права!','Начальник, договоримся?','Меня подставили!','Я буду жаловаться!','Вы ошиблись человеком!','Мне нечего сказать!','Вы ещё пожалеете!'];
 function _policePick(a){return a[(Math.random()*a.length)|0];}
+function _policePickDifferent(a,previous=''){
+  if(!a?.length)return'';if(a.length===1)return a[0];let next=previous;
+  for(let i=0;i<5&&next===previous;i++)next=_policePick(a);
+  return next===previous?a[(a.indexOf(previous)+1+a.length)%a.length]:next;
+}
 function _drawPoliceEscortCry(e,p){
-  if(!e||!p||performance.now()>+e.cryUntil)return;const txt=e.cryText||'За что?!',y=p.y-49;
-  ctx.save();ctx.font='bold 10px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';const w=ctx.measureText(txt).width+14;
+  if(!e||!p||performance.now()>+e.cryUntil)return;const txt=e.cryText||'За что?!',y=p.y-73+Math.sin(performance.now()*.008)*1.2;
+  ctx.save();ctx.font='bold 11px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';const w=ctx.measureText(txt).width+18;
   ctx.fillStyle='rgba(82,28,36,.94)';ctx.strokeStyle='#ef8a9a';ctx.lineWidth=1;
   ctx.beginPath();if(ctx.roundRect)ctx.roundRect(p.x-w/2,y-9,w,18,5);else ctx.rect(p.x-w/2,y-9,w,18);ctx.fill();ctx.stroke();
   ctx.beginPath();ctx.moveTo(p.x-3,y+9);ctx.lineTo(p.x+1,y+14);ctx.lineTo(p.x+5,y+9);ctx.closePath();ctx.fill();
   ctx.fillStyle='#fff';ctx.fillText(txt,p.x,y+1);ctx.restore();
 }
 function _drawPoliceHandcuffs(e,p){
-  if(!e||!p)return;const ang=e.ang||0,dx=Math.cos(ang),dy=Math.sin(ang),rx=(dx-dy)*.5,ry=(dx+dy)*.5*ISO_Y,l=Math.hypot(rx,ry)||1,sx=rx/l,sy=ry/l,pxv=-sy,pyv=sx;
-  const cx=p.x+sx*3,cy=p.y-21+sy*2,spread=5.5;
-  ctx.save();ctx.strokeStyle='#d9e3ec';ctx.lineWidth=2;ctx.shadowColor='#bfe8ff';ctx.shadowBlur=5;
-  for(const s of [-1,1]){ctx.beginPath();ctx.ellipse(cx+pxv*spread*s,cy+pyv*spread*s,4.2,3.1,Math.atan2(pyv,pxv),0,Math.PI*2);ctx.stroke();}
-  ctx.beginPath();ctx.moveTo(cx+pxv*(spread-2),cy+pyv*(spread-2));ctx.lineTo(cx-pxv*(spread-2),cy-pyv*(spread-2));ctx.stroke();
-  ctx.shadowBlur=0;ctx.fillStyle='rgba(12,30,45,.9)';ctx.font='900 7px system-ui';ctx.textAlign='center';ctx.fillText(e.waiting?'🔒 ЖДЁТ КОПА':'🔗 В НАРУЧНИКАХ',p.x,p.y-37);ctx.restore();
+  if(!e||!p)return;
+  // Запястья сведены за поясницей. Раньше кольца висели на груди и
+  // выглядели отдельной иконкой, а не надетыми наручниками.
+  const ang=e.ang||0,sideX=Math.cos(ang)*5.2,sideY=Math.sin(ang)*2.6;
+  const cx=p.x-Math.sin(ang)*2.2,cy=p.y-15+Math.cos(ang)*1.4;
+  const a={x:cx-sideX,y:cy-sideY},b={x:cx+sideX,y:cy+sideY};
+  ctx.save();ctx.strokeStyle='#dce9f2';ctx.lineWidth=1.8;ctx.shadowColor='#bfe8ff';ctx.shadowBlur=3;
+  for(const q of [a,b]){ctx.beginPath();ctx.ellipse(q.x,q.y,3.3,2.2,ang,0,Math.PI*2);ctx.stroke();}
+  ctx.beginPath();ctx.moveTo(a.x+sideX*.35,a.y+sideY*.35);ctx.lineTo(b.x-sideX*.35,b.y-sideY*.35);ctx.stroke();
+  ctx.shadowBlur=0;ctx.fillStyle='rgba(12,30,45,.92)';ctx.font='900 7px system-ui';ctx.textAlign='center';ctx.fillText(e.waiting?'🔒 ЖДЁТ КОПА':'НАРУЧНИКИ',p.x,p.y-39);ctx.restore();
+}
+function _drawPoliceStunStars(p,seed=0){
+  if(!p)return;const now=performance.now(),t=now*.005+(+seed||0),cy=p.y-54;
+  ctx.save();ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='11px "Segoe UI Emoji",system-ui';
+  for(let i=0;i<3;i++){const a=t+i*Math.PI*2/3,x=p.x+Math.cos(a)*10,y=cy+Math.sin(a)*3;ctx.globalAlpha=.72+.28*Math.sin(t*1.7+i);ctx.fillText('⭐',x,y);}
+  ctx.restore();
 }
 function _policeUniformLook(base){base=base||{};return{gender:base.gender|0,skin:base.skin|0,body:base.body|0,face:base.face|0,hair:base.hair|0,hat:2,suit:'#172f5c',police:true};}
 function _setPoliceLook(look){QP.look=Object.assign({},look||{});_spriteCache?.clear?.();try{getSprite(QP.look);renderHudAvatar();}catch(e){}}
 function _applyPoliceUniform(){if(!_policeState.employed)return;_setPoliceLook(_policeUniformLook(_policeState.civilianLook||QP.look||{}));}
 function _savePoliceState(){try{localStorage.setItem(_policeStoreKey,JSON.stringify(_policeState));localStorage.setItem('mafiozi_police_employed',_policeState.employed?'1':'0');}catch(e){}}
-function _loadPoliceState(){try{const s=JSON.parse(localStorage.getItem(_policeStoreKey)||'null');if(s&&Array.isArray(s.missions)){const escort=s.escort||null;if(escort){escort._turningIn=false;escort._inside=false;escort.waiting=!!escort.waiting;}_policeState={employed:!!s.employed,missions:s.missions.slice(0,POLICE_MISSION_MAX),cuffs:Math.max(0,+s.cuffs||0),escort,earnedXp:Math.min(POLICE_TASER_XP,+s.earnedXp||0),seq:+s.seq||0,civilianLook:s.civilianLook||null,resetPending:!!s.resetPending};}}catch(e){}if(_policeState.employed){if(!_policeState.civilianLook)_policeState.civilianLook=Object.assign({},QP.look||{});_applyPoliceUniform();}_savePoliceState();}
+function _loadPoliceState(){try{const s=JSON.parse(localStorage.getItem(_policeStoreKey)||'null');if(s&&Array.isArray(s.missions)){const escort=s.escort||null;if(escort){const now=performance.now();escort._turningIn=false;escort._inside=false;escort.waiting=!!escort.waiting;escort.cryText=_policePickDifferent(_POLICE_ESCORT_CRIES,escort.cryText);escort.cryUntil=now+1900;escort._nextCryAt=now+2600+Math.random()*900;}_policeState={employed:!!s.employed,missions:s.missions.slice(0,POLICE_MISSION_MAX),cuffs:Math.max(0,+s.cuffs||0),escort,earnedXp:Math.min(POLICE_TASER_XP,+s.earnedXp||0),seq:+s.seq||0,civilianLook:s.civilianLook||null,resetPending:!!s.resetPending};}}catch(e){}if(_policeState.employed){if(!_policeState.civilianLook)_policeState.civilianLook=Object.assign({},QP.look||{});_applyPoliceUniform();}_savePoliceState();}
 let _lastPoliceTaserAt=0;
 function _findPoliceTaserTarget(angle){
   if(!_policeCanUseTaser()||_buildingInt||_bankInt||myDead)return null;
@@ -37662,34 +37834,79 @@ function firePoliceTaser(angle=null){
 }
 function _policeMission(id){return _policeState.missions.find(m=>String(m.id)===String(id))||null;}
 function _policeMissionForNpc(n){return n&&_policeState.missions.find(m=>m.status==='hunt'&&String(m.targetId)===String(n._policeTargetId))||null;}
+function _policeMissionIntelStatus(m,n){
+  if(!n)return'Разыскивается · местоположение уточняется';
+  const now=performance.now(),radio=_policeHasLevel(2),interval=radio?2000:9000;
+  let intel=_policeMissionIntel.get(String(m.id));
+  if(!intel||now>=intel.nextAt){intel={r:n.r,c:n.c,nextAt:now+interval};_policeMissionIntel.set(String(m.id),intel);}
+  const distance=Math.max(1,Math.round(Math.hypot(intel.r-player.r,intel.c-player.c)));
+  return `${radio?'📻 Рация':'Последняя сводка'} · район ${Math.round(intel.r)}, ${Math.round(intel.c)} · примерно ${distance} кл. от тебя`;
+}
+function _sendPoliceAbility(t){
+  if(!ws||ws.readyState!==1){showToast('Сервер не отвечает','⚠️',2200);return;}
+  ws.send(JSON.stringify({t,d:{}}));
+}
+function _policeAbilityPanel(){
+  const level=_policeLevel(),button=(need,action,label)=>`<button class="police-action" data-police-action="${action}" ${level<need?'disabled':''}>${level<need?'🔒 ':''}${label}</button>`;
+  return `<div class="police-note" style="color:#77c7ff;font-weight:900;margin-top:12px">СНАРЯЖЕНИЕ И ПОДДЕРЖКА</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">${button(3,'patrol','🚓 Патрульная машина')}${button(4,'spikes','🛞 Разложить шипы')}${button(4,'backup','📻 Вызвать подкрепление')}</div><div class="police-note">${level>=2?'📻 Рация активна: координаты обновляются каждые 2 секунды.':'🔒 Рация откроется на 2 уровне.'} ${level>=3?'🦺 Бронежилет снижает входящий урон на 30%.':'🔒 Бронежилет откроется на 3 уровне.'}</div>`;
+}
+function _addPoliceSpikeStrip(d){
+  const id=String(d.id||`spikes_${Date.now()}`);if(_policeSpikeStrips.some(s=>s.id===id))return;
+  _policeSpikeStrips.push({id,r:+d.y||player.r,c:+d.x||player.c,ang:+d.ang||0,copUid:String(d.cop_uid||''),until:performance.now()+Math.max(5,+d.life_s||45)*1000});
+}
+function _policeSpikeAt(r,c){const now=performance.now();return _policeSpikeStrips.find(s=>s.until>now&&Math.hypot(s.r-r,s.c-c)<1.05)||null;}
+function _activatePoliceBackup(d){
+  const now=performance.now();_policeBackupUnits.length=0;
+  for(let i=0;i<2;i++){const side=i?1:-1;_policeBackupUnits.push({id:`backup_${now}_${i}`,r:player.r+1.2,c:player.c+side*.9,ang:player.ang,walkPhase:i*2.2,hp:100,max_hp:100,shotAt:now+700+i*350,until:now+Math.max(15,+d.life_s||45)*1000,look:{gender:0,skin:i,body:2,face:i+1,hair:1,hat:2,suit:'#172f5c',police:true}});}
+  showEventBanner('📻 ПОДКРЕПЛЕНИЕ В ПУТИ','Два офицера будут прикрывать тебя 45 секунд и не станут добивать цель.',3600,'win');
+}
+function _tickPoliceSupport(now){
+  const dt=Math.min(.08,Math.max(0,(now-(_policeSupportTickAt||now))/1000));_policeSupportTickAt=now;
+  for(let i=_policeSpikeStrips.length-1;i>=0;i--)if(_policeSpikeStrips[i].until<=now)_policeSpikeStrips.splice(i,1);
+  for(let i=_policeBackupUnits.length-1;i>=0;i--){const u=_policeBackupUnits[i];if(!_policeState.employed||u.until<=now){_policeBackupUnits.splice(i,1);continue;}
+    let target=null,best=12;for(const n of NPCS){if(!n._policeCriminal||n.dead||n._policeCuffed)continue;const d=Math.hypot(n.r-u.r,n.c-u.c);if(d<best){best=d;target=n;}}
+    const slot=i?_policeBackupUnits.length*.18:-.75,tr=target&&best<8?target.r-Math.sin(target.ang||0)*3:player.r+Math.sin(player.ang+Math.PI)*1.35,tc=target&&best<8?target.c-Math.cos(target.ang||0)*3:player.c+Math.cos(player.ang+Math.PI)*1.35+slot;
+    const dr=tr-u.r,dc=tc-u.c,dist=Math.hypot(dr,dc);if(dist>.18){const step=Math.min(dist,4.2*dt),nr=u.r+dr/dist*step,nc=u.c+dc/dist*step;if(npcPassable(nr,nc)){u.r=nr;u.c=nc;}u.ang=Math.atan2(dr,dc);u.walkPhase+=dt*8;}else u.walkPhase=0;
+    if(target&&best<7&&now>=u.shotAt&&target.hp>1){u.shotAt=now+1050+Math.random()*450;u.ang=Math.atan2(target.r-u.r,target.c-u.c);const dmg=Math.min(target.hp-1,target.boss?7:10);target.hp=Math.max(1,target.hp-dmg);spawnMuzzle(u.r,u.c,u.ang,'pistol');spawnBullet(u.r,u.c,target.r,target.c,{hit:true,fromPlayer:false,weapon:'pistol'});spawnFloatText(target.r,target.c,`−${dmg} ПОДКРЕПЛЕНИЕ`,{color:'#76c9ff',size:11,life:800});}
+  }
+  if(_policeModalView==='service'&&_policeModal?.classList.contains('show')&&now>=_policeServiceRefreshAt){_policeServiceRefreshAt=now+(_policeHasLevel(2)?2000:9000);renderPoliceModal();}
+}
+function _drawPoliceBackup(u){const p=w2s(u.r,u.c);drawPerson(p.x,p.y,u.ang||0,u.look||{},u.walkPhase||0,'👮 Подкрепление',null,false,u.hp,u.max_hp,false,null,false,false);}
+function _drawPoliceSpikeStrip(s){
+  const p=w2s(s.r,s.c),a=s.ang||0,dx=Math.cos(a)*18,dy=Math.sin(a)*9;
+  ctx.save();ctx.strokeStyle='#d8e2ea';ctx.lineWidth=4;ctx.shadowColor='#7ec8ff';ctx.shadowBlur=7;ctx.beginPath();ctx.moveTo(p.x-dx,p.y-dy);ctx.lineTo(p.x+dx,p.y+dy);ctx.stroke();ctx.shadowBlur=0;ctx.strokeStyle='#202831';ctx.lineWidth=1.2;
+  for(let i=-4;i<=4;i++){const k=i/4,x=p.x+dx*k,y=p.y+dy*k;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+Math.sin(a)*5,y-Math.cos(a)*8);ctx.stroke();}ctx.restore();
+}
 function _policeSpawnPoint(seed){for(let i=0;i<100;i++){const a=((seed||1)*1.71+i*.83)%6.283,dist=10+(i%11),r=Math.max(2,Math.min(MAP_ROWS-3,player.r+Math.sin(a)*dist)),c=Math.max(2,Math.min(MAP_COLS-3,player.c+Math.cos(a)*dist));if(!inArena(r,c)&&!inLair(r,c)&&npcPassable(r,c))return{r,c};}return{r:Math.max(2,player.r+8),c:Math.max(2,player.c+8)};}
 function _spawnPoliceTarget(m){
   if(!m||m.status!=='hunt'||NPCS.some(n=>n._policeTargetId===m.targetId&&!n.dead))return;
   const p=_policeSpawnPoint(m.seed||m.id),arc=NPC_ARCHETYPES.bandit||{speedRange:[.7,1.1],panicMult:0,phrases:['Чего надо?'],look:{}};
-  const n={r:p.r,c:p.c,tr:p.r,tc:p.c,speed:m.boss?1.15:.88,ang:Math.random()*Math.PI*2,walkPhase:0,idleUntil:0,hp:m.boss?135:85,max_hp:m.boss?135:85,dead:false,look:m.look,_arcKey:'bandit',_arc:arc,_relation:0,_policeCriminal:true,_policeTargetId:m.targetId,name:m.name,cryText:m.boss?'Я тут главный!':'Не подходи!',cryUntil:performance.now()+1700};
+  const n={r:p.r,c:p.c,tr:p.r,tc:p.c,speed:m.boss?1.2:.88,ang:Math.random()*Math.PI*2,walkPhase:0,idleUntil:0,hp:m.boss?220:85,max_hp:m.boss?220:85,dead:false,look:m.look,_arcKey:'bandit',_arc:arc,_relation:0,_policeCriminal:true,_policeTargetId:m.targetId,name:m.name,cryText:m.boss?'Я тут главный!':'Не подходи!',cryUntil:performance.now()+1700};
   _initNpcEmotions(n);NPCS.push(n);m.spawnR=p.r;m.spawnC=p.c;_savePoliceState();
 }
 function _ensurePoliceTargets(){for(const m of _policeState.missions)_spawnPoliceTarget(m);}
-function _acceptPoliceMission(){
+function _acceptPoliceMission(forceBoss=false){
   if(!_policeState.employed){showToast('Сначала устройся на службу в участке','👮',2200);return;}
+  if(forceBoss&&!_policeHasLevel(5)){showToast('Ориентировки на боссов открываются на 5 уровне','🔒',2400);return;}
   if(_policeState.missions.length>=POLICE_MISSION_MAX){showToast('📋 Можно вести максимум 3 ориентировки','⚠️',2200);return;}
-  const boss=Math.random()<.22,id=++_policeState.seq,targetId=`police_criminal_${QP.uid||'p'}_${Date.now()}_${id}`,name=boss?`Босс «${_POLICE_CRIMINAL_NAMES[(Math.random()*_POLICE_CRIMINAL_NAMES.length)|0]}»`:_POLICE_CRIMINAL_NAMES[(Math.random()*_POLICE_CRIMINAL_NAMES.length)|0];
+  const boss=!!forceBoss,id=++_policeState.seq,targetId=`police_criminal_${QP.uid||'p'}_${Date.now()}_${id}`,name=boss?`Босс «${_POLICE_CRIMINAL_NAMES[(Math.random()*_POLICE_CRIMINAL_NAMES.length)|0]}»`:_POLICE_CRIMINAL_NAMES[(Math.random()*_POLICE_CRIMINAL_NAMES.length)|0];
   const look={gender:0,skin:(Math.random()*5)|0,body:boss?4:((Math.random()*3)|0),face:(Math.random()*4)|0,hair:(Math.random()*5)|0,hat:boss?3:((Math.random()*4)|0),suit:boss?'#552047':'#392841'};
-  _policeState.missions.push({id,targetId,name,boss,status:'hunt',rewardCash:boss?1800:550,rewardXp:boss?180:65,look,seed:Date.now()%9973});_savePoliceState();_ensurePoliceTargets();renderPoliceModal();renderJobStatus();showEventBanner('🚔 НОВАЯ ОРИЕНТИРОВКА',`${name}. Выруби со спины, надень наручники и доставь в участок.`,4400,'neutral');
+  _policeState.missions.push({id,targetId,name,boss,status:'hunt',rewardCash:boss?2500:550,rewardXp:boss?300:65,look,seed:Date.now()%9973});_savePoliceState();_ensurePoliceTargets();renderPoliceModal();renderJobStatus();showEventBanner(boss?'👑 СПЕЦИАЛЬНАЯ ОРИЕНТИРОВКА':'🚔 НОВАЯ ОРИЕНТИРОВКА',`${name}. Выруби, надень наручники и доставь в участок живым.`,4600,boss?'win':'neutral');
 }
 function _joinPoliceService(){
   if(_policeState.employed)return;
   if(typeof _jobState!=='undefined'&&_jobState.job){showToast('Сначала уволься с текущей работы','💼',2400);return;}
   _policeState.civilianLook=Object.assign({},QP.look||{});_policeState.employed=true;_policeState.cuffs=Math.max(3,_policeState.cuffs);_applyPoliceUniform();_savePoliceState();renderJobStatus();closePoliceDesk();
   document.getElementById('jobModal')?.classList.remove('show');
-  showEventBanner('👮 ТЫ ПРИНЯТ В ПОЛИЦИЮ','Статус: КОП · выдано 3 пары наручников. Бери ориентировки у дежурного.',4600,'win');
+  showEventBanner('👮 ТЫ ПРИНЯТ В ПОЛИЦИЮ','Звание «Дежурный», уровень 1: дубинка с оглушением, 3 пары наручников и возврат банковских улик.',5000,'win');
 }
 function _leavePoliceService(){
   if(!_policeState.employed)return;
+  if(_policeEvidenceBag){showToast('💼 Сначала сдай или брось мешок-улику','⚠️',2400);return;}
   const old=Object.assign({},_policeState.civilianLook||QP.look||{});
   const ids=new Set(_policeState.missions.map(m=>String(m.targetId)));
   for(let i=NPCS.length-1;i>=0;i--)if(ids.has(String(NPCS[i]._policeTargetId)))NPCS.splice(i,1);
-  _policeState.employed=false;_policeState.missions=[];_policeState.escort=null;_policeState.cuffs=0;_policeState.civilianLook=null;_policeState.earnedXp=0;_policeState.resetPending=true;
+  _policeState.employed=false;_policeState.missions=[];_policeState.escort=null;_policeState.cuffs=0;_policeState.civilianLook=null;_policeState.earnedXp=0;_policeState.resetPending=true;_policeBackupUnits.length=0;_policeMissionIntel.clear();
   if(currentWeapon==='taser')currentWeapon='pistol';
   _setPoliceLook(old);_savePoliceState();renderJobStatus();closePoliceDesk();
   renderWeaponHud();if(_wepPickOpen)renderWeaponPick();
@@ -37699,16 +37916,29 @@ function _leavePoliceService(){
 }
 function renderPoliceModal(){
   if(!_policeModalBody)return;
-  if(!_policeState.employed){_policeModalBody.innerHTML='<div class="police-note">Дежурный: «Работа непростая. Лови бандитов живыми, доставляй сюда — получишь деньги и опыт. Устроишься копом?»</div><div class="police-row"><div><div class="police-name">👮 Служба в полиции</div><div class="police-sub">Статус КОП · 3 пары наручников · до 3 ориентировок</div></div></div><div style="display:flex;gap:8px;margin-top:10px"><button class="police-action" data-police-action="join">✅ Согласиться</button><button class="police-action" data-police-action="decline" style="background:#49384f;border-color:#84618c">Нет, спасибо</button></div>';return;}
-  const active=_policeState.missions,p=_policeProgress();let html=`<div class="police-note">👮 Статус: КОП · уровень ${p.level} · ${p.xp} XP · активно ${active.length}/${POLICE_MISSION_MAX} · наручники: ${_policeState.cuffs}.</div><div class="police-note"><div style="display:flex;justify-content:space-between;font-weight:900"><span>Карьера полиции</span><span>${p.part}/${POLICE_XP_PER_LEVEL} XP</span></div><div style="height:8px;background:#172335;border-radius:8px;overflow:hidden;margin:7px 0"><div style="height:100%;width:${p.pct}%;background:linear-gradient(90deg,#4aa3ff,#63edff)"></div></div><div style="font-size:11px;color:${_policeCanUseTaser()?'#79f4bb':'#aebbd0'}">${_policeCanUseTaser()?'⚡ Шокер открыт и доступен в выборе оружия':`🔒 Шокер откроется на ${POLICE_TASER_LEVEL} уровне · осталось ${Math.max(0,POLICE_TASER_XP-p.xp)} XP`}</div></div>`;
+  const modalTitle=_policeModal?.querySelector('.police-head span');
+  if(modalTitle)modalTitle.textContent=_policeModalView==='service'?'👮 Цели на службе':'👮 Ориентировки участка';
+  if(!_policeState.employed){_policeModalBody.innerHTML='<div class="police-note">Дежурный: «Работа непростая. Лови бандитов живыми, доставляй сюда — получишь деньги и опыт. Устроишься копом?»</div><div class="police-row"><div><div class="police-name">👮 Служба в полиции · уровень 1</div><div class="police-sub">Дубинка с оглушением · 3 пары наручников · изъятие банковских мешков · до 3 ориентировок</div></div></div><div style="display:flex;gap:8px;margin-top:10px"><button class="police-action" data-police-action="join">✅ Согласиться</button><button class="police-action" data-police-action="decline" style="background:#49384f;border-color:#84618c">Нет, спасибо</button></div>';return;}
+  const active=_policeState.missions,p=_policeProgress();
+  if(_policeModalView==='service'){
+    let html=`<div class="police-note">📋 Твои активные ориентировки: ${active.length}/${POLICE_MISSION_MAX}. Цель нужно оглушить, заковать в наручники и доставить живой в участок.</div>`;
+    if(!active.length)html+='<div class="police-note">Сейчас целей нет. Новую ориентировку можно взять у дежурного в полицейском участке.</div>';
+    html+=active.map(m=>{const n=NPCS.find(x=>String(x._policeTargetId)===String(m.targetId)&&!x.dead),escorted=_policeState.escort&&String(_policeState.escort.missionId)===String(m.id);let status,button;if(escorted||m.status==='cuffed'){status='В наручниках · доставь в участок';button='🚓 Конвой';}else{status=_policeMissionIntelStatus(m,n);button='🔎 Найти';}return `<div class="police-row ${m.boss?'boss':''}"><div><div class="police-name">${m.boss?'👑':'🎯'} ${_policeEsc(m.name)}</div><div class="police-sub">${status} · награда $${m.rewardCash} и ${m.rewardXp} XP</div></div><button class="police-action" disabled>${button}</button></div>`;}).join('');
+    const online=_selectedOnlineWanted();
+    if(online)html+=`<div class="police-note" style="color:#77c7ff;font-weight:900">📡 ОТМЕЧЕННАЯ ОНЛАЙН-ЦЕЛЬ</div><div class="police-row boss"><div><div class="police-name">${online.wanted?'⭐'.repeat(online.wanted):'🎯'} ${_policeEsc(online.name)}</div><div class="police-sub">Последний сигнал: ${Math.round(online.y)}, ${Math.round(online.x)} · ${online.detained?'уже задержан':'найди и арестуй'}</div></div><button class="police-action" disabled>📍 Отмечена</button></div>`;
+    html+=_policeAbilityPanel();_policeModalBody.innerHTML=html;return;
+  }
+  let html=`<div class="police-note">👮 Звание: ${p.rank} · уровень ${p.level} · ${p.xp} XP · активно ${active.length}/${POLICE_MISSION_MAX} · наручники: ${_policeState.cuffs}.</div><div class="police-note">🦯 База: дубинка оглушает на 5 секунд · 🔗 оглушённого можно заковать · 💼 найденный мешок сдаётся здесь за его полную стоимость.</div><div class="police-note"><div style="display:flex;justify-content:space-between;font-weight:900"><span>${p.maxed?'Высшее звание':`До звания «${p.nextRank}»`}</span><span>${p.maxed?'МАКСИМУМ':`${p.part}/${p.need} XP`}</span></div><div style="height:8px;background:#172335;border-radius:8px;overflow:hidden;margin:7px 0"><div style="height:100%;width:${p.pct}%;background:linear-gradient(90deg,#4aa3ff,#63edff)"></div></div><div style="font-size:11px;color:${_policeCanUseTaser()?'#79f4bb':'#aebbd0'}">${_policeCanUseTaser()?'⚡ Шокер открыт и доступен в выборе оружия':`🔒 Шокер откроется на ${POLICE_TASER_LEVEL} уровне · осталось ${Math.max(0,POLICE_TASER_XP-p.xp)} XP`}</div></div>`;
+  html+=`<div class="police-note" style="padding:9px;border:1px solid rgba(110,160,225,.22);border-radius:9px"><div style="color:#77c7ff;font-weight:900;margin-bottom:5px">ЗВАНИЯ ПОЛИЦИИ</div>${POLICE_LEVELS.map(s=>`<div style="padding:3px 0;color:${s.level===p.level?'#fff':'#8fa4bd'}"><div style="display:flex;justify-content:space-between"><span>${s.level===p.level?'▶':'·'} ${s.level} ур. — ${s.rank}</span><span>${s.xp} XP</span></div><div style="font-size:9px;margin-left:12px;color:${s.level<=p.level?'#79d9ff':'#71839a'}">${s.perk}</div></div>`).join('')}</div>`;
   html+='<div class="police-note" style="color:#77c7ff;font-weight:900">📡 ДОСКА РОЗЫСКА · ОНЛАЙН</div>';
   if(!_onlineWantedBoard.length)html+='<div class="police-note">Сейчас среди онлайн-игроков нет опознанных преступников.</div>';
   html+=_onlineWantedBoard.map(w=>`<div class="police-row ${w.selected?'boss':''}"><div><div class="police-name">${w.wanted?'⭐'.repeat(w.wanted):'🎯'} ${_policeEsc(w.name)}</div><div class="police-sub">Последний сигнал: ${Math.round(w.y)}, ${Math.round(w.x)} · ${w.detained?'уже задержан':(w.first_reward?'первая поимка: $700':'повторно: без денег')}</div></div><button class="police-action" data-police-action="online_select" data-target-uid="${_policeEsc(w.uid)}" ${w.detained?'disabled':''}>${w.selected?'✓ Отмечен':'📍 Отметить'}</button></div>`).join('');
   if(!active.length)html+='<div class="police-note">Дежурный: «Есть работа. Нужны преступники живыми».</div>';
   html+=active.map(m=>`<div class="police-row ${m.boss?'boss':''}"><div><div class="police-name">${m.boss?'👑':'🎯'} ${m.name}</div><div class="police-sub">${m.status==='cuffed'?'В наручниках · доставь в участок':'Разыскивается'} · $${m.rewardCash} · ${m.rewardXp} XP</div></div><button class="police-action" disabled>${m.status==='cuffed'?'🚓 Конвой':'🔎 Поиск'}</button></div>`).join('');
-  html+=`<div style="display:flex;gap:8px;align-items:center"><button class="police-action" data-police-action="take" ${active.length>=POLICE_MISSION_MAX?'disabled':''}>📋 Взять ориентировку (${active.length}/${POLICE_MISSION_MAX})</button><button class="police-action" data-police-action="leave" style="background:#572b32;border-color:#a6535e">Сдать форму</button></div>`;_policeModalBody.innerHTML=html;
+  html+=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="police-action" data-police-action="take" ${active.length>=POLICE_MISSION_MAX?'disabled':''}>📋 Обычная ориентировка (${active.length}/${POLICE_MISSION_MAX})</button><button class="police-action" data-police-action="boss" ${active.length>=POLICE_MISSION_MAX||p.level<5?'disabled':''}>${p.level<5?'🔒':'👑'} Босс мафии</button><button class="police-action" data-police-action="leave" style="background:#572b32;border-color:#a6535e">Сдать форму</button></div>`;_policeModalBody.innerHTML=html;
 }
-function openPoliceDesk(){renderPoliceModal();_policeModal?.classList.add('show');}
+function openPoliceDesk(){_policeModalView='desk';renderPoliceModal();_policeModal?.classList.add('show');}
+function openPoliceServiceBoard(){if(!_policeState.employed)return;_policeModalView='service';renderPoliceModal();_policeModal?.classList.add('show');}
 function closePoliceDesk(){_policeModal?.classList.remove('show');}
 function _findPoliceStealthTarget(){
   if(!_policeState.employed||_buildingInt||_bankInt||myDrivingCarId||myDead||_policeState.escort||_policeState.cuffs<=0)return null;let best=null,bestD=1.7,now=performance.now();
@@ -37721,7 +37951,7 @@ function _findArrestablePoliceTarget(){const online=_findOnlinePoliceTarget(true
 function _arrestPoliceTarget(n){
   if(n&&n.uid){_sendPoliceOnline('police_online_cuff',n.uid);return;}
   if(_policeState.escort){showToast('🚔 Сначала доставь текущего задержанного','⚠️',2200);return;}
-  if(!n||_policeState.cuffs<=0)return;const m=_policeMissionForNpc(n);if(!m)return;_policeState.cuffs--;m.status='cuffed';n._policeCuffed=true;const now=performance.now();_policeState.escort={missionId:m.id,targetId:m.targetId,name:m.name,boss:m.boss,look:m.look,r:n.r,c:n.c,ang:n.ang||0,cryText:_policePick(_POLICE_ARREST_CRIES),cryUntil:now+2600,_nextCryAt:now+6500};const ix=NPCS.indexOf(n);if(ix>=0)NPCS.splice(ix,1);_savePoliceState();renderJobStatus();showEventBanner('🔗 ПРЕСТУПНИК АРЕСТОВАН',`${m.name}: «${_policeState.escort.cryText}» · доставь его в участок.`,4200,'win');
+  if(!n||_policeState.cuffs<=0)return;const m=_policeMissionForNpc(n);if(!m)return;_policeState.cuffs--;m.status='cuffed';n._policeCuffed=true;const now=performance.now();_policeState.escort={missionId:m.id,targetId:m.targetId,name:m.name,boss:m.boss,look:m.look,r:n.r,c:n.c,ang:n.ang||0,cryText:_policePickDifferent(_POLICE_ARREST_CRIES),cryUntil:now+2100,_nextCryAt:now+2800+Math.random()*800};const ix=NPCS.indexOf(n);if(ix>=0)NPCS.splice(ix,1);_savePoliceState();renderJobStatus();showEventBanner('🔗 ПРЕСТУПНИК АРЕСТОВАН',`${m.name}: «${_policeState.escort.cryText}» · доставь его в участок.`,4200,'win');
 }
 function _tickPoliceEscort(dt){
   const e=_policeState.escort;if(!e)return;
@@ -37730,7 +37960,7 @@ function _tickPoliceEscort(dt){
   const inside=_buildingInt&&_buildingInt.type==='police_st';
   if(inside&&!e._inside){e.r=player.r+.7;e.c=player.c+.7;e._inside=true;}
   if(!inside)e._inside=false;
-  const now=performance.now();if(!e._turningIn&&now>(e._nextCryAt||0)){e.cryText=_policePick(_POLICE_ESCORT_CRIES);e.cryUntil=now+2300;e._nextCryAt=now+7500+Math.random()*6500;}
+  const now=performance.now();if(!e._turningIn&&now>(e._nextCryAt||0)){e.cryText=_policePickDifferent(_POLICE_ESCORT_CRIES,e.cryText);e.cryUntil=now+1700+Math.random()*500;e._nextCryAt=now+2700+Math.random()*2100;}
   let tr=player.r+Math.sin(player.ang+Math.PI)*.68,tc=player.c+Math.cos(player.ang+Math.PI)*.68,speed=inside?5.2:6.0;
   if(e._turningIn){tr=6.5;tc=(_buildingInt?.W||18)-5+.5;speed=5.4;}
   const dr=tr-e.r,dc=tc-e.c,d=Math.hypot(dr,dc);
@@ -37742,9 +37972,9 @@ function _finishPoliceEscortReward(){
   const e=_policeState.escort;if(!e)return;const m=_policeMission(e.missionId);if(!m)return;const cash=m.rewardCash|0,xp=m.rewardXp|0,nextPoliceXp=(_policeState.earnedXp||0)+xp;myCash+=cash;QP.cash=myCash;QP.exp=(+QP.exp||0)+xp;_policeState.cuffs=Math.min(3,_policeState.cuffs+1);_policeState.missions=_policeState.missions.filter(x=>x.id!==m.id);_policeState.escort=null;_savePoliceState();_setPoliceXp(nextPoliceXp);_syncPoliceXpReward(xp,m.id);updateMoneyHud();renderPoliceModal();renderJobStatus();if(_profileTab==='status')renderProfileTab();if(_wepPickOpen)renderWeaponPick();
   spawnFloatText(player.r,player.c,`+$${cash}  +${xp} XP`,{color:'#7dffad',size:19,life:2300});showEventBanner('🏅 ПРЕСТУПНИК СДАН',`${m.name}: награда $${cash} и ${xp} опыта.`,4300,'win');pushFeedEvent('🚔',`${QP.name||'Игрок'} доставил в участок: ${m.name}`,{accent:'#6bb3ff'});
 }
-function _tickPoliceMissions(now){_updateOnlineArrestHud();for(const m of [..._policeState.missions]){if(m.status!=='hunt')continue;const n=NPCS.find(x=>x._policeTargetId===m.targetId);if(n&&n.dead&&now-(n.deadAt||now)>900){const i=NPCS.indexOf(n);if(i>=0)NPCS.splice(i,1);_policeState.missions=_policeState.missions.filter(x=>x.id!==m.id);_savePoliceState();renderPoliceModal();renderJobStatus();showEventBanner('☠️ ПРЕСТУПНИК ПОГИБ',`${m.name} погиб. Ориентировка вычеркнута.`,3900,'lose');showToast(`${m.name}: преступник погиб`,'☠️',2800);}else if(!n)_spawnPoliceTarget(m);}}
+function _tickPoliceMissions(now){_updateOnlineArrestHud();_tickPoliceSupport(now);for(const m of [..._policeState.missions]){if(m.status!=='hunt')continue;const n=NPCS.find(x=>x._policeTargetId===m.targetId);if(n&&n.dead&&now-(n.deadAt||now)>900){const i=NPCS.indexOf(n);if(i>=0)NPCS.splice(i,1);_policeState.missions=_policeState.missions.filter(x=>x.id!==m.id);_policeMissionIntel.delete(String(m.id));_savePoliceState();renderPoliceModal();renderJobStatus();showEventBanner('☠️ ПРЕСТУПНИК ПОГИБ',`${m.name} погиб. Ориентировка вычеркнута.`,3900,'lose');showToast(`${m.name}: преступник погиб`,'☠️',2800);}else if(!n)_spawnPoliceTarget(m);}}
 document.getElementById('policeModalClose')?.addEventListener('click',closePoliceDesk);
-_policeModal?.addEventListener('click',e=>{if(e.target===_policeModal){closePoliceDesk();return;}const b=e.target.closest('[data-police-action]');if(!b||b.disabled)return;e.preventDefault();const a=b.dataset.policeAction;if(a==='take')_acceptPoliceMission();else if(a==='online_select')_sendPoliceOnline('police_online_select',b.dataset.targetUid);else if(a==='join')_joinPoliceService();else if(a==='leave')_leavePoliceService();else if(a==='decline')closePoliceDesk();});
+_policeModal?.addEventListener('click',e=>{if(e.target===_policeModal){closePoliceDesk();return;}const b=e.target.closest('[data-police-action]');if(!b||b.disabled)return;e.preventDefault();const a=b.dataset.policeAction;if(a==='take')_acceptPoliceMission(false);else if(a==='boss')_acceptPoliceMission(true);else if(a==='patrol')_sendPoliceAbility('police_patrol_spawn');else if(a==='spikes')_sendPoliceAbility('police_spikes');else if(a==='backup')_sendPoliceAbility('police_backup');else if(a==='online_select')_sendPoliceOnline('police_online_select',b.dataset.targetUid);else if(a==='join')_joinPoliceService();else if(a==='leave')_leavePoliceService();else if(a==='decline')closePoliceDesk();});
 _stealthBtn?.addEventListener('pointerdown',e=>{e.preventDefault();_knockoutPoliceTarget();});
 _loadPoliceState();setTimeout(_ensurePoliceTargets,1200);
 
@@ -37797,7 +38027,8 @@ function renderJobStatus(){
   const nm=document.getElementById('jobStatusName'),sub=document.getElementById('jobStatusSub'),tm=document.getElementById('jobStatusTimer');
   if(!nm||!sub||!tm)return;
   const title=_jobStatusHud?.querySelector('.js-title span');
-  if(_policeState.employed){const p=_policeProgress();if(title)title.textContent='👮 Служба';_jobStatusHud&&_jobStatusHud.classList.add('ready');nm.textContent='КОП';tm.textContent=`УР. ${p.level}`;sub.textContent=`Опыт ${p.xp} · наручники ${_policeState.cuffs}/3 · ориентировки ${_policeState.missions.length}/3${_policeCanUseTaser()?' · ⚡ шокер':''}`;return;}
+  if(_policeState.employed){const p=_policeProgress();if(title)title.textContent='👮 Служба';if(_jobStatusHud){_jobStatusHud.classList.add('ready','police-open');_jobStatusHud.tabIndex=0;_jobStatusHud.setAttribute('role','button');_jobStatusHud.setAttribute('aria-label','Открыть цели на службе');_jobStatusHud.title='Нажми, чтобы посмотреть цели';}nm.textContent=p.rank;tm.textContent=`УР. ${p.level}`;sub.textContent=_policeEvidenceBag?`💼 Улика $${(+_policeEvidenceBag.value||0).toLocaleString('ru')} · неси в участок`:`Опыт ${p.xp} · наручники ${_policeState.cuffs}/3 · ориентировки ${_policeState.missions.length}/3${_policeCanUseTaser()?' · ⚡ шокер':''}`;return;}
+  if(_jobStatusHud){_jobStatusHud.classList.remove('police-open');_jobStatusHud.removeAttribute('tabindex');_jobStatusHud.removeAttribute('role');_jobStatusHud.removeAttribute('title');_jobStatusHud.setAttribute('aria-label','Статус работы');}
   if(title)title.textContent='💼 Работа';
   const def=_jobDef(_jobState.job),left=_jobRemaining(),ready=!!def&&left<=0;
   _jobStatusHud&&_jobStatusHud.classList.toggle('ready',ready);
@@ -37805,9 +38036,11 @@ function renderJobStatus(){
   nm.textContent=def.name;tm.textContent=ready?'ГОТОВО':_jobTime(left);
   sub.textContent=ready?'Зарплата ждёт у менеджера':'Смена идёт · вернись после таймера';
 }
+_jobStatusHud?.addEventListener('click',()=>{if(_policeState.employed)openPoliceServiceBoard();});
+_jobStatusHud?.addEventListener('keydown',e=>{if(!_policeState.employed||(e.key!=='Enter'&&e.key!==' '))return;e.preventDefault();openPoliceServiceBoard();});
 function renderJobModal(){
   if(!_jobModalBody)return;
-  if(_policeState.employed){_jobModalBody.innerHTML='<div class="job-note">Ты уже служишь в полиции. Статус: КОП. Ориентировки выдаёт дежурный в полицейском участке.</div>';return;}
+  if(_policeState.employed){_jobModalBody.innerHTML=`<div class="job-note">Ты уже служишь в полиции. Звание: ${_policeRank()}. Ориентировки выдаёт дежурный в полицейском участке.</div>`;return;}
   const def=_jobDef(_jobState.job),left=_jobRemaining();
   if(def){
     const ready=left<=0;
@@ -38739,7 +38972,7 @@ function _drawPoliceStationInterior(bi) {
     items.push({d:_policeState.escort.r+_policeState.escort.c+.45,fn:()=>{
       const e=_policeState.escort,p=w2s(e.r+.5,e.c+.5);
       drawPerson(p.x,p.y,e.ang||0,e.look||{},e.walkPhase||0,`🔗 ${e.name}`,null,false,e.boss?135:85,e.boss?135:85,false,null,false,false);
-      ctx.save();ctx.strokeStyle='#c8d4e8';ctx.lineWidth=1.5;ctx.setLineDash([3,2]);ctx.beginPath();ctx.moveTo(p.x-5,p.y-18);ctx.lineTo(p.x+5,p.y-18);ctx.stroke();ctx.restore();_drawPoliceHandcuffs(e,p);_drawPoliceEscortCry(e,p);
+      _drawPoliceHandcuffs(e,p);_drawPoliceEscortCry(e,p);
     }});
   }
   items.push({ d: player.r + player.c + .5, fn: () => {
@@ -39596,14 +39829,21 @@ function drawBuildingInterior() {
     const txt = info
       ? `🏠 Твоя квартира · ${_apartmentCounterLabel()}`
       : `🏠 ${apartmentDistrictMarket(bi.r, bi.c).label}: $${apartmentPrice(bi.r, bi.c).toLocaleString('ru')} · ${_apartmentCounterLabel()}`;
-    const tw = ctx.measureText(txt).width + 18;
+    const stat = info ? `💼 Украдено мешков: ${Math.max(0, parseInt(info.stolen_bags) || 0).toLocaleString('ru')}` : '';
+    const tw = Math.max(ctx.measureText(txt).width, stat ? ctx.measureText(stat).width : 0) + 18;
+    const boxY = p.y - isoH(2.0), boxH = info ? 40 : 22;
     ctx.fillStyle = 'rgba(0,0,0,.55)';
     ctx.strokeStyle = info ? 'rgba(130,255,160,.7)' : 'rgba(255,215,107,.7)';
     ctx.lineWidth = 1;
-    ctx.fillRect(p.x - tw / 2, p.y - isoH(2.0), tw, 22);
-    ctx.strokeRect(p.x - tw / 2, p.y - isoH(2.0), tw, 22);
+    ctx.fillRect(p.x - tw / 2, boxY, tw, boxH);
+    ctx.strokeRect(p.x - tw / 2, boxY, tw, boxH);
     ctx.fillStyle = info ? '#9dffb0' : '#ffd76b';
-    ctx.fillText(txt, p.x, p.y - isoH(2.0) + 11);
+    ctx.fillText(txt, p.x, boxY + 11);
+    if (stat) {
+      ctx.font = 'bold 11px Arial';
+      ctx.fillStyle = '#ffd76b';
+      ctx.fillText(stat, p.x, boxY + 29);
+    }
     ctx.restore();
   }});
 
