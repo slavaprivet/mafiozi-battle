@@ -7505,7 +7505,9 @@ function _ensureAmbientGangPopulation() {
       const spanR=Math.max(4,d.r1-d.r0-4),spanC=Math.max(4,d.c1-d.c0-4),seed=(di+1)*137+slot*61;
       for(let tries=0;tries<80;tries++){
         const r=d.r0+2+((seed+tries*17)%spanR)+.5,c=d.c0+2+((seed*3+tries*29)%spanC)+.5;
-        if(npcPassable(r,c)&&Math.hypot(r-player.r,c-player.c)>5){pos={r,c};break;}
+        // initNpcs() runs before the lexical player object is initialized.
+        // Spawn validity must therefore depend only on the map at this stage.
+        if(npcPassable(r,c)){pos={r,c};break;}
       }
       if(!pos)continue;
       const owner=districtOwners[d.id]||{},family=owner.mafiaFamily||owner.mafia_family||(di%2?'moretti':'bellini'),arc=NPC_ARCHETYPES.bandit||NPC_ARCHETYPES.worker;
