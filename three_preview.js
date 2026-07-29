@@ -24,7 +24,8 @@ if (rendererParams.get('render') === '3d' && rendererConfig.threeEnabled !== fal
       const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
       // Render above CSS resolution even on desktop DPR=1; this removes the
       // soft upscaling visible in the in-app browser and on Telegram tablets.
-      const renderPixelRatio=Math.min(2,Math.max(1.65,devicePixelRatio||1));
+      // Native-ish resolution avoids rendering 2.7x as many pixels on a DPR=1 display.
+      const renderPixelRatio=Math.min(1.25,Math.max(1,devicePixelRatio||1));
       renderer.setPixelRatio(renderPixelRatio);
       renderer.setSize(size.W, size.H, false);
       renderer.shadowMap.enabled = true;
@@ -1107,7 +1108,7 @@ if (rendererParams.get('render') === '3d' && rendererConfig.threeEnabled !== fal
         // auxiliary world snapshots, raycasts and shadow-map refreshes back off;
         // movement, aiming, shooting and the authoritative Canvas simulation
         // continue to run every frame unchanged.
-        const lowFps=measuredFps<24,dynamicCadence=lowFps?70:45,occlusionCadence=lowFps?240:125,shadowCadence=lowFps?420:220;
+        const lowFps=measuredFps<40,dynamicCadence=lowFps?85:50,occlusionCadence=lowFps?300:150,shadowCadence=lowFps?700:320;
         updateAtmosphere(t,lowFps);
         renderer.domElement.dataset.performanceTier=lowFps?'cadence':'full';
         renderer.domElement.dataset.shadowCadence=String(shadowCadence);
