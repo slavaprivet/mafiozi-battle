@@ -1050,7 +1050,6 @@ if (rendererParams.get('render') === '3d' && rendererConfig.threeEnabled !== fal
         const safe=add(new THREE.BoxGeometry(3.3,3.8,2.6),steel,cx+W*.34,1.9,cz-H*.3);outline(safe);const portrait=add(new THREE.PlaneGeometry(4.2,3.1),new THREE.MeshBasicMaterial({color:0x8d704f}),cx,4.2,(.48-originR)*WORLD_SCALE);portrait.rotation.x=0;
         const warm=new THREE.PointLight(0xffc579,20,30,2);warm.position.set(cx,6.4,cz);warm.layers.set(1);interiorGroup.add(warm);
       };
-      stage.classList.add('three-mode');
       renderer.domElement.dataset.worldBounds=`${envSnapshot?.mapCols||80}x${envSnapshot?.mapRows||200}`;
       window.MafioziLoading?.set(89, 'Заселяем улицы и готовим первый кадр…');
       let lastW=size.W,lastH=size.H,lastT=performance.now(),walkPhase=0,lampAnchor='',fpsAt=performance.now(),fpsFrames=0,measuredFps=60,lastShadowAt=0,lastOcclusionAt=0,dynamicAt=0,dynamicState=null,nearbyActionAt=0,nearbyActionState=null,customGangHqAt=0,cameraZoomMode='world',worldZoom=1,playerFloorElevation=0,playerVisualSig='',fadedMaterials=[],firstFramePresented=false;
@@ -1227,7 +1226,7 @@ if (rendererParams.get('render') === '3d' && rendererConfig.threeEnabled !== fal
         if(t-lastShadowAt>shadowCadence){renderer.shadowMap.needsUpdate=true;lastShadowAt=t;}
         if(lowFps){renderer.setRenderTarget(null);renderer.render(scene,camera);}
         else{renderer.setRenderTarget(postTarget);renderer.render(scene,camera);renderer.setRenderTarget(null);renderer.render(postScene,postCamera);}
-        if(!firstFramePresented){firstFramePresented=true;window.MafioziLoading?.complete('Город готов');}
+        if(!firstFramePresented){firstFramePresented=true;stage.classList.add('three-mode');window.MafioziLoading?.complete('Город готов');}
         requestAnimationFrame(animate);
       };
       requestAnimationFrame(animate);
