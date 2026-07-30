@@ -24136,9 +24136,14 @@ function _spendWeaponRound() {
     else return false;
   }
   if (st.slot.mag <= 0) {
+    // Empty magazine plus reserve means reload; a dry click is only correct
+    // when both the magazine and reserve are empty.
+    if (st.reserve > 0) {
+      reloadCurrentWeapon(false);
+      return false;
+    }
     try { _weaponDryFireSound(st.id); } catch(e) {}
-    reloadCurrentWeapon(false);
-    if (st.reserve <= 0 && performance.now() - _emptyAmmoToastAt > 1800) {
+    if (performance.now() - _emptyAmmoToastAt > 1800) {
       _emptyAmmoToastAt = performance.now();
       showToast('Боезапас закончился — купи патроны у Витька', '⚠️', 1800);
     }
@@ -57598,6 +57603,6 @@ function chatDuration(text) {
 })();
 </script>
 
-<script type="module" src="three_preview.js?v=3d134"></script>
+<script type="module" src="three_preview.js?v=3d135"></script>
 </body>
 </html>
