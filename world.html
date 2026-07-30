@@ -20046,7 +20046,10 @@ function updateGtaInteractions() {
   document.body.classList.toggle('near-establishment-focus',!!nearbyEstablishment);
   // Приближение только сообщает 3D-рендереру, что доступно «E Действие».
   // Карточку входа/налёта создаёт исключительно явный E или клик по зданию.
-  if(!nearbyEstablishment&&_businessActionSelection)_closeBusinessActionCard(false);
+  // Специальные здания (Burj Mafia, больница, спортзал, участок, биржа)
+  // используют ту же карточку, но не входят в список коммерческих заведений.
+  // Не закрываем их карточку в тот же кадр после явного короткого E.
+  if(!nearbyEstablishment&&_businessActionSelection&&_businessActionSelection.kind!=='building')_closeBusinessActionCard(false);
   delete _gtaBtn.dataset.establishmentAction;
   if(_robBtn)delete _robBtn.dataset.establishmentAction;
   if(_businessActionSelection)_syncBusinessActionCard();
