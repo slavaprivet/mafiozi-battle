@@ -53486,6 +53486,8 @@ window.Mafiozi3DBridge = Object.freeze({
     const src=_buildingInt||_bankInt||null;
     if(!src)return null;
     const casino=src.bizId==='major_casino';
+    const apartmentKey=_buildingInt&&!src.type?(_apartmentOwnedKey(src.r,src.c)||src.apartmentKey||''):'';
+    const apartmentInfo=apartmentKey?(_myApartments[apartmentKey]||{}):{};
     const casinoLayout=casino?{
       walls:MAJOR_CASINO_WALLS.map(w=>({r0:+w.r0,c0:+w.c0,r1:+w.r1,c1:+w.c1,kind:w.kind||'',lowerOnly:!!w.lowerOnly})),
       props:MAJOR_CASINO_STATIC_BLOCKERS.filter(p=>_casinoPropAlive(p.id)).map(p=>({id:p.id,r:+p.r,c:+p.c,w:+p.w,d:+p.d,color:p.color||null})),
@@ -53494,6 +53496,7 @@ window.Mafiozi3DBridge = Object.freeze({
     return {
       kind:_buildingInt?'building':'bank',type:src.type||(_bankInt?'bank':'generic'),bizId:src.bizId||null,room:src.room||(_bankInt?'lobby':'main'),
       width:+src.W||16,height:+src.H||12,seed:+src.seed||0,
+      apartment:!src.type?{key:apartmentKey,owned:!!_myApartments[apartmentKey],district:apartmentDistrictMarket(src.r,src.c)?.label||'Городская квартира',levels:{repair:+apartmentInfo.repair_level||0,safe:+apartmentInfo.safe_level||0,weaponRack:+apartmentInfo.weapon_rack_level||0,cameras:+apartmentInfo.cameras_level||0,garage:+apartmentInfo.garage_level||0}}:null,
       playerElevation:casino?_casinoVisualElevation(src,player.r,player.c):0,
       layout:casinoLayout,
       npcs:(src.npcs||[]).filter(Boolean).slice(0,40).map((n,i)=>{const id=String(n.id??i),death=_threeNpcDeathState(n,`interior:${src.bizId||src.type||'room'}:${id}`);return {id,r:+n.r||0,c:+n.c||0,ang:+n.ang||0,walking:!death.dead&&!!n.walking,walkPhase:+n.walkPhase||0,role:n.role||n.type||'civilian',name:n.name||'',hp:death.dead?0:(Number.isFinite(+n.hp)?+n.hp:(+n.max_hp||+n.maxHp||60)),maxHp:Math.max(1,+n.max_hp||+n.maxHp||60),dead:death.dead,deadAt:death.deadAt};}),
@@ -57493,6 +57496,6 @@ function chatDuration(text) {
 })();
 </script>
 
-<script type="module" src="three_preview.js?v=3d124"></script>
+<script type="module" src="three_preview.js?v=3d125"></script>
 </body>
 </html>
