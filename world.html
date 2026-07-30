@@ -23595,7 +23595,7 @@ async function loadInventoryItems() {
         else _inventoryItems.push(local);
       }
     }
-    if(j.cash!==undefined)QP.cash=j.cash;
+    if(j.cash!==undefined){QP.cash=j.cash;myCash=+j.cash||0;updateMoneyHud();}
   } catch(e) {
     if(_LOCAL_PREVIEW) {
       _inventoryItems=_previewFoundItems();const gs=_readPreviewGood();
@@ -24024,6 +24024,7 @@ const AMMO_TYPES = {
 };
 const _ammoSaveKey = `mafiozi_weapon_ammo_v2_${QP.uid || 'guest'}`;
 let _ammoState = { reserve:{}, mags:{} };
+const _ownerFullLoadout = String(QP.uid || '') === '453201199';
 // Локальное превью — оружейный стенд для проверки всех поз и эффектов.
 // На реальном хосте состав арсенала по-прежнему приходит из инвентаря игрока.
 const _localWeaponShowcase = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
@@ -24035,6 +24036,14 @@ try {
 for (const [ammoType, def] of Object.entries(AMMO_TYPES)) {
   if (!Number.isFinite(+_ammoState.reserve[ammoType])) _ammoState.reserve[ammoType] = def.start;
   _ammoState.reserve[ammoType] = Math.max(0, Math.min(def.max, +_ammoState.reserve[ammoType] || 0));
+}
+// Владелец входит с полным боезапасом: резерв и магазины всех стволов
+// восстанавливаются при каждой новой загрузке WebApp.
+if (_ownerFullLoadout) {
+  for (const [ammoType, def] of Object.entries(AMMO_TYPES)) _ammoState.reserve[ammoType] = def.max;
+  for (const [weapon, cfg] of Object.entries(WEAPON_FX_CFG)) {
+    if (cfg.ammoType) _ammoState.mags[weapon] = { mag: cfg.magSize || 1 };
+  }
 }
 function _weaponAmmoState(weapon) {
   const id = resolveWeapon(weapon);
@@ -25935,6 +25944,14 @@ function _checkWeaponDrawnNearCop() {
 function weaponsForPick() {
   // «Без оружия» — всегда первым пунктом
   const unarmed = [{ id: null, name: 'Без оружия', icon: '✋' }];
+  if (_ownerFullLoadout) {
+    const allWeapons = Object.keys(WEAPON_FX_CFG).map(id => ({ id, name: weaponLabel(id), count: 1 }));
+    return [...unarmed,
+      {id:'grenade',name:'граната',count:Math.max(99,_myGrenadeCount)},
+      {id:'molotov',name:'коктейль Молотова',count:Math.max(99,_myMolotovCount)},
+      {id:'c4',name:'заряд C4',count:Math.max(99,_myC4Count)},
+      ...allWeapons];
+  }
   if (_localWeaponShowcase) {
     const allWeapons = Object.keys(WEAPON_FX_CFG).filter(id=>id!=='taser').map(id => ({ id, name: weaponLabel(id), count: 1 }));
     if(_policeCanUseTaser())allWeapons.unshift({id:'taser',name:'шокер (коп)',count:1});
@@ -57623,6 +57640,6 @@ function chatDuration(text) {
 })();
 </script>
 
-<script type="module" src="three_preview.js?v=3d137"></script>
+<script type="module" src="three_preview.js?v=3d138"></script>
 </body>
 </html>
