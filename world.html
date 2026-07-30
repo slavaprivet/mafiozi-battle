@@ -2296,7 +2296,8 @@ window.MafioziLoading = (() => {
     }, 240);
   };
   tipTimer = setInterval(() => showTip(tipIndex + 1), 4600);
-  const isThree = new URLSearchParams(location.search).get('render') !== 'canvas';
+  const bootParams=new URLSearchParams(location.search);
+  const isThree = bootParams.get('force3d')==='1'||bootParams.get('render') !== 'canvas';
   const set = (next, label) => {
     if (finished) return;
     value = Math.max(value, Math.min(99, Math.round(Number(next) || value)));
@@ -2331,7 +2332,7 @@ window.MafioziLoading.set(15, 'Читаем карту и районы…');
 const _UP = new URLSearchParams(location.search);
 // 3D is the production renderer. Preserve an explicit Canvas rollback, but
 // canonicalize old/plain links so every gameplay subsystem sees render=3d.
-if(!_UP.has('render')){
+if(_UP.get('force3d')==='1'||!_UP.has('render')){
   _UP.set('render','3d');
   try{const canonical=new URL(location.href);canonical.searchParams.set('render','3d');history.replaceState(history.state,'',canonical.href);}catch(_){}
 }
@@ -57586,6 +57587,6 @@ function chatDuration(text) {
 })();
 </script>
 
-<script type="module" src="three_preview.js?v=3d129"></script>
+<script type="module" src="three_preview.js?v=3d130"></script>
 </body>
 </html>
