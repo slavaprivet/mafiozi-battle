@@ -12588,7 +12588,7 @@ function selectVehicleFromCanvasTap(x, y, hitRadius = 48) {
   return true;
 }
 
-function activateNearbyVehicleFrom3D() {
+function activateNearbyVehicleFrom3D(preferredId='') {
   if (_buildingInt || _bankInt || myDead) return {ok:false,reason:'unavailable'};
   if (_threeVehicleEntrySequence) return {ok:true,kind:'vehicle_entering'};
   if(_LOCAL_PREVIEW&&_UP.has('previewdrive')&&!window.__threePreviewDrivePlaced){const demo=CARS.find(car=>car?.model&&!['cop_cruiser','paddyvan','swat_truck'].includes(car.model?.name||''));if(demo){demo.r=player.r+1.15;demo.c=player.c+.15;demo.vr=0;demo.vc=0;demo.parked=false;window.__threePreviewDrivePlaced=true;}}
@@ -12598,15 +12598,24 @@ function activateNearbyVehicleFrom3D() {
     if (_gtaActionKind === 'exit') {_gtaBtn.click();return {ok:true,kind:'vehicle_exit'};}
     return {ok:false,reason:'driving'};
   }
-  let best=null,bestD=Math.max(GTA_INTERACT_R+.15,2.85);
+  let best=null,bestD=Math.max(GTA_INTERACT_R+.15,3.25);
+  const lockedId=String(preferredId||'');
+  if(lockedId.startsWith('quest_')){
+    const id=lockedId.slice(6),car=questCars.get(id),d=car?Math.hypot(+car.y-player.r,+car.x-player.c):Infinity;
+    if(car&&!car.wrecked&&Number.isFinite(d)&&d<4.5){bestD=d;best={kind:'quest',id};}
+  }else if(lockedId){
+    const car=CARS.find(q=>q&&_threeVehicleEntityId(q)===lockedId),d=car?Math.hypot(+car.r-player.r,+car.c-player.c):Infinity;
+    if(car&&car.model&&!car._wrecked&&Number.isFinite(d)&&d<4.5){bestD=d;best={kind:'traffic',car};}
+  }
+  const preferredMatched=!!best;
   for(const car of questCars.values()){
     if(!car||car.wrecked||!Number.isFinite(+car.x)||!Number.isFinite(+car.y))continue;
-    const d=Math.hypot(+car.y-player.r,+car.x-player.c);if(d<bestD){bestD=d;best={kind:'quest',id:String(car.id)};}
+    const d=Math.hypot(+car.y-player.r,+car.x-player.c);if(!preferredMatched&&d<bestD){bestD=d;best={kind:'quest',id:String(car.id)};}
   }
   for(const car of CARS){
     if(!car||!car.model||car._wrecked||!Number.isFinite(+car.r)||!Number.isFinite(+car.c))continue;
     const modelName=car.model?.name||'';if(['cop_cruiser','paddyvan','swat_truck'].includes(modelName))continue;
-    const d=Math.hypot(+car.r-player.r,+car.c-player.c);if(d<bestD){bestD=d;best={kind:'traffic',car};}
+    const d=Math.hypot(+car.r-player.r,+car.c-player.c);if(!preferredMatched&&d<bestD){bestD=d;best={kind:'traffic',car};}
   }
   if(!best)return {ok:false,reason:'none'};
   _selectedVehicleEntry=best;_selectedBuildingEntry=null;
@@ -12619,7 +12628,7 @@ function activateNearbyVehicleFrom3D() {
 
 function getNearbyVehicleInteractionFor3D() {
   if (_buildingInt || _bankInt || myDead || myDrivingCarId || _threeVehicleEntrySequence) return null;
-  let best=null,bestD=Math.max(GTA_INTERACT_R+.15,2.85);
+  let best=null,bestD=Math.max(GTA_INTERACT_R+.15,3.25);
   for(const car of questCars.values()){
     if(!car||car.wrecked||!Number.isFinite(+car.x)||!Number.isFinite(+car.y))continue;
     const d=Math.hypot(+car.y-player.r,+car.x-player.c);if(d<bestD){bestD=d;best={id:`quest_${car.id}`,kind:'enter',r:+car.y,c:+car.x,distance:d};}
@@ -53572,7 +53581,7 @@ window.Mafiozi3DBridge = Object.freeze({
   selectBuilding(r,c,screenX,screenY) { return selectBuildingFrom3D(+r,+c,+screenX,+screenY); },
   getNearbyBuildingInteraction() { return _nearbyBuildingInteractionFor3D(); },
   getNearbyVehicleInteraction() { return getNearbyVehicleInteractionFor3D(); },
-  activateNearbyVehicle() { return activateNearbyVehicleFrom3D(); },
+  activateNearbyVehicle(vehicleId) { return activateNearbyVehicleFrom3D(vehicleId); },
   toggleNearbyBuildingActions(screenX,screenY) { return toggleNearbyBuildingActionsFrom3D(+screenX,+screenY); },
   closeBuildingActions() { _closeBusinessActionCard(); return true; },
   updateDistrictEntry() { _updateDistrictBanner(); },
@@ -57603,6 +57612,6 @@ function chatDuration(text) {
 })();
 </script>
 
-<script type="module" src="three_preview.js?v=3d135"></script>
+<script type="module" src="three_preview.js?v=3d136"></script>
 </body>
 </html>
