@@ -5702,6 +5702,7 @@ let _lastDistCaptureTryAt = 0;
 let _districtMissionHudHidden = true;
 let _districtMissionUiKey = '';
 let _districtHqPresenceKey = '';
+let _districtScoutMissionDid = '';
 const DISTRICT_BY_ID = new Map(DISTRICTS.map(d => [d.id, d]));
 function districtAt(r, c) {
   for (const d of DISTRICTS) {
@@ -17803,6 +17804,7 @@ function handleEventPacket(d) {
   } else if (kind === 'district_operation_expired') {
     if (String(d.by_uid) === String(QP.uid)) {
       _districtNodeDisable=null;
+      if(_districtScoutMissionDid===String(d.did||''))_districtScoutMissionDid='';
       _districtMissionHudHidden = true; _districtMissionUiKey = '';
       showEventBanner('⌛ Операция провалена', 'Время вышло. Разведку придётся начинать заново.', 3500, 'lose');
     }
@@ -17812,7 +17814,11 @@ function handleEventPacket(d) {
         const m = Math.ceil((d.wait_s || 0) / 60);
         showToast(`⏳ Этот район ты недавно брал. Жди ещё ~${m} мин.`, 3500);
       } else if (d.reason === 'police_forbidden') {
+        if(_districtScoutMissionDid===String(d.did||''))_districtScoutMissionDid='';
         showToast('👮 Захват районов — дело мафии. Сначала сдай форму.',3500);
+      } else if (d.reason === 'mafia_only') {
+        if(_districtScoutMissionDid===String(d.did||''))_districtScoutMissionDid='';
+        showToast('🏴 Для захвата района сначала вступи в семью мафии.',3500);
       } else if (d.reason === 'must_reenter') {
         showToast('🚶 Отойди от штаба и вернись, чтобы снова брать район.', 3500);
       } else if (d.reason === 'operation_busy') {
@@ -17827,6 +17833,7 @@ function handleEventPacket(d) {
   } else if (kind === 'district_capture_cancelled') {
     if (String(d.by_uid) === String(QP.uid)) {
       _districtNodeDisable=null;
+      if(_districtScoutMissionDid===String(d.did||''))_districtScoutMissionDid='';
       _districtMissionHudHidden = true; _districtMissionUiKey = '';
       const reasons = { left_hq:'Ты ушёл от штаба.', killed:'Тебя убили.',
         jailed:'Тебя приняли копы.', disconnected:'Разрыв связи.',
@@ -17840,6 +17847,7 @@ function handleEventPacket(d) {
     const tickMin = Math.round(((d.income_tick_s|0) || 120) / 60);
     pushFeedEvent('🏴', `${d.by_name||'Игрок'} взял контроль над районом «${d.name||d.did}»`, {accent:d.color||'#ffd76b'});
     if (me) {
+      if(_districtScoutMissionDid===String(d.did||''))_districtScoutMissionDid='';
       _districtMissionHudHidden = true; _districtMissionUiKey = '';
       _districtRepAdd(18+_hqLvl('mafia','safe')*2,'район признал твою силу');
       showEventBanner(`${d.icon} ${d.name} — твой район!`,
@@ -26229,6 +26237,7 @@ function _myActiveDistrictOperation(){
 function _myDistrictMissionCount(){
   let count=0;
   for(const op of districtCaptures.values())if(String(op&&op.byId)===String(QP.uid))count++;
+  if(_districtScoutMissionDid&&!Array.from(districtCaptures.values()).some(op=>String(op&&op.byId)===String(QP.uid)))count++;
   return count;
 }
 function _myOwnedDistricts(){
@@ -26285,7 +26294,7 @@ function _openOwnedDistrictInfo(){
   document.getElementById('districtInfoCard').innerHTML=`<button id="districtInfoClose">✕ Закрыть</button><h2>🏴 Мои захваченные районы</h2><div style="margin-top:5px;color:#aebbd0">Контроль длится 30 минут. Первое начисление начинается после серверной задержки.</div><div class="di-grid">${cards}</div><div class="police-note" style="border-color:#8a4d58;background:#251419"><b style="color:#ff9c9c">Контроль пропадёт:</b> когда истечёт таймер. После этого босс снова подчинит район, и его можно будет захватить заново. Итоговая сумма рассчётная и зависит от оставшихся серверных тиков.</div>`;
   ov.classList.add('show');return true;
 }
-function _hasDistrictMission(){return !!(_myDistrictObjective||_myActiveDistrictOperation());}
+function _hasDistrictMission(){return !!(_districtScoutMissionDid||_myDistrictObjective||_myActiveDistrictOperation());}
 function _activeMissionCount(){
   return _myDistrictMissionCount()+
     (myBoxStatus?.active?1:0)+
@@ -26312,8 +26321,8 @@ function _renderMissions(){
     cards.push(`<article class="mission-item active"><h3>🚗 Заказ Майкла</h3><p class="mission-route">${_missionEsc(mdef.label)}</p><p>${gta.state==='driven'?'Доставь машину в порт':'Найди отмеченную машину и угони её'}</p><p>Награда: <b style="color:#86eba2">+$${gta.reward|0}</b></p><button type="button" data-mission-action="gta-route">🧭 Показать маршрут</button></article>`);
   }
   const district=_myActiveDistrictOperation();
-  if(_myDistrictObjective||district){
-    const did=_myDistrictObjective?.did||district?.did||'';
+  if(_districtScoutMissionDid||_myDistrictObjective||district){
+    const did=_myDistrictObjective?.did||district?.did||_districtScoutMissionDid||'';
     const d=DISTRICTS.find(x=>x.id===did);
     const phase=String(_myDistrictObjective?.phase||district?.op?.phase||'операция идёт').replaceAll('_',' ');
     cards.push(`<article class="mission-item active"><h3>🏴 Захват района${d?`: ${_missionEsc(d.name)}`:''}</h3><p>Этап: ${_missionEsc(phase)}</p><p>Метка задания останется на карте, пока операция не завершена.</p><button type="button" data-mission-action="district-route">🗺️ Показать цель</button></article>`);
@@ -26435,16 +26444,17 @@ function updateDistrictCapture() {
   _myDistrictObjective = null;
   if (myDead || myMode === 'pve' || _policeState?.employed) { _cancelDistrictNodeDisable(); return; }
   const active=_myActiveDistrictOperation();
-  const d = active?DISTRICT_BY_ID.get(active.did):districtAt(player.r, player.c);
+  const d = active?DISTRICT_BY_ID.get(active.did):(_districtScoutMissionDid?DISTRICT_BY_ID.get(_districtScoutMissionDid):districtAt(player.r, player.c));
   if (!d || !d.capturable) { _cancelDistrictNodeDisable(); return; }
   const own = districtOwners[d.id];
-  if (own) { _cancelDistrictNodeDisable(); return; }  // контролируемый район нельзя атаковать до конца таймера
+  if (own) { if(_districtScoutMissionDid===d.id)_districtScoutMissionDid=''; _cancelDistrictNodeDisable(); return; }  // контролируемый район нельзя атаковать до конца таймера
   const op = active?active.op:districtCaptures.get(d.id);
   let point = null, phase = 'boss_patrol', label = 'Убить босса района', icon = '👹';
-  if (!op) {
-    // Снимок сервера может прийти на кадр позже. Не оставляем игрока без
-    // объяснения: ведём к районной разведточке, пока операция синхронизируется.
-    point=d.intel; phase='boss_patrol'; label='Найти главаря района'; icon='🔎';
+  const sharedPatrolWaiting=op&&(!op.byId)&&(op.phase==='boss_patrol'||op.phase==='dossier')&&_districtScoutMissionDid!==d.id;
+  if (!op||sharedPatrolWaiting) {
+    // Операция начинается именно на видимом круге штаба. После запроса сервер
+    // создаёт/подтверждает патруль главаря, а локальная миссия не исчезает между snapshot-ами.
+    point=d.hq; phase='briefing'; label='Начать захват района'; icon='🏴';
   } else {
     if(op.phase==='boss_patrol'){
       const bots=Object.values(aggroZones).flatMap(z=>z&&Array.isArray(z.bots)?z.bots:[]);
@@ -26487,7 +26497,7 @@ function updateDistrictCapture() {
   const dr = player.r - point.r, dc = player.c - point.c;
   const nearObjective = dr * dr + dc * dc <= DIST_ACTION_RAD * DIST_ACTION_RAD;
   // Вход в границы района сам по себе не является началом операции.
-  // До взятия досье показываем HUD миссии только внутри стартового круга.
+  // Первое действие доступно строго внутри видимого круга штаба.
   if (!op && !nearObjective) {
     _cancelDistrictNodeDisable();
     return;
@@ -26533,6 +26543,13 @@ function updateDistrictCapture() {
   const now = performance.now();
   if (now - _lastDistCaptureTryAt < 1200) return;
   _lastDistCaptureTryAt = now;
+  if(phase==='briefing'){
+    const firstStart=_districtScoutMissionDid!==d.id;
+    _districtScoutMissionDid=d.id;
+    _districtMissionHudHidden=false;
+    _districtMissionUiKey='';
+    if(firstStart)showEventBanner('🏴 ЗАХВАТ РАЙОНА НАЧАТ',`Найди главаря района «${d.name}», уничтожь охрану и забери досье.`,4200,'neutral');
+  }
   sendDistrictCaptureTry(d.id);
 }
 
