@@ -2,7 +2,7 @@
 // fallback. The central flag can disable 3D without removing this module.
 const rendererParams = new URLSearchParams(location.search);
 const rendererConfig = window.MAFIOZI_RENDERER_CONFIG || {};
-if (rendererParams.get('render') === '3d' && rendererConfig.threeEnabled !== false) {
+if (rendererParams.get('render') !== 'canvas' && rendererConfig.threeEnabled !== false) {
   (async () => {
     const stage = document.getElementById('stage');
     try {
@@ -1454,6 +1454,7 @@ transformed.z+=cos(mfzWindTime*.82+mfzPhase*1.31+position.z*.42)*mfzGust*mfzWeig
         requestAnimationFrame(animate);
       };
       requestAnimationFrame(animate);
+      renderer.domElement.dataset.rendererDefault='3d-unless-explicit-canvas';
       console.info('[ThreePreview] procedural 3D city enabled');
     } catch (error) {
       stage.classList.remove('three-mode');
