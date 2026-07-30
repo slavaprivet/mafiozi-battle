@@ -12491,7 +12491,7 @@ function selectBuildingFrom3D(r,c,screenX=null,screenY=null) {
   const nearest=(items,maxDist)=>items.reduce((best,item)=>{const d=Math.hypot(+item.r-r,+item.c-c);return d<maxDist&&(!best||d<best.d)?{item,d}:best;},null)?.item||null;
   const biz=nearest(BUSINESS_POIS,7.5);
   if(biz){
-    const near=_businessInteractionDistance(biz)<=3.5;
+    const near=_businessInteractionDistance(biz)<=BUSINESS_INTERACTION_RADIUS;
     _selectedBuildingEntry=null;_selectedVehicleEntry=null;
     if(near)_openBusinessActionCard('business',biz,anchor);else showToast(`Подойди ближе: ${biz.name}`,'📍',1800);
     return {ok:true,kind:'business',id:biz.id,name:biz.name,near};
@@ -12521,7 +12521,7 @@ function selectBuildingFrom3D(r,c,screenX=null,screenY=null) {
 function _nearbyBuildingInteractionFor3D() {
   if (_buildingInt || _bankInt || myDrivingCarId || myDead) return null;
   let best=null,bestD=Infinity;
-  for(const biz of BUSINESS_POIS){const d=_businessInteractionDistance(biz);if(d<=3.5&&d<bestD){const a=_businessInteractionAnchor(biz);best={kind:'business',id:String(biz.id),r:+biz.r,c:+biz.c,entryR:a.r,entryC:a.c,name:biz.name||'Бизнес',distance:d};bestD=d;}}
+  for(const biz of BUSINESS_POIS){const d=_businessInteractionDistance(biz);if(d<=BUSINESS_INTERACTION_RADIUS&&d<bestD){const a=_businessInteractionAnchor(biz);best={kind:'business',id:String(biz.id),r:+biz.r,c:+biz.c,entryR:a.r,entryC:a.c,name:biz.name||'Бизнес',distance:d};bestD=d;}}
   for(const poi of POI){if(!MAJOR_OBJECT_IDS.has(poi.id))continue;const d=Math.hypot(player.r-poi.r,player.c-poi.c);if(d<=4.2&&d<bestD){best={kind:'major',id:String(poi.id),r:+poi.r,c:+poi.c,name:poi.name||poi.label||'Здание',distance:d};bestD=d;}}
   const pr=Math.floor(player.r),pc=Math.floor(player.c);
   for(let r=Math.max(1,pr-4);r<=Math.min(MAP_ROWS-2,pr+4);r++)for(let c=Math.max(1,pc-4);c<=Math.min(MAP_COLS-2,pc+4);c++){
@@ -12592,7 +12592,7 @@ function selectBuildingFromCanvasTap(x, y) {
     if(nearestEntry&&(nearestEntry.kind!=='business'||nearestEntry.poi.id!==biz.id))continue;
     const p=w2s(biz.r+.5,biz.c+.5);
     if(Math.abs(x-p.x)>72||y<p.y-150||y>p.y+38)continue;
-    if(_businessInteractionDistance(biz)>3.5){
+    if(_businessInteractionDistance(biz)>BUSINESS_INTERACTION_RADIUS){
       showToast(`Подойди ближе: ${biz.name}`,'📍',1800);return true;
     }
     _selectedBuildingEntry=null;_selectedVehicleEntry=null;
@@ -18650,7 +18650,7 @@ function _nearestWorldEntryCandidate(){
   let best=null;
   const take=(kind,poi,d,max)=>{if(d<=max&&(!best||d<best.d-.04))best={kind,poi,d};};
   for(const biz of BUSINESS_POIS){
-    take('business',biz,_businessInteractionDistance(biz),3.5);
+    take('business',biz,_businessInteractionDistance(biz),BUSINESS_INTERACTION_RADIUS);
   }
   const major=_nearestMajorObject(4.2);
   if(major)take('major',major,Math.hypot(player.r-(major.r+.5),player.c-(major.c+.5)),4.2);
@@ -19424,8 +19424,8 @@ function _closeBusinessActionCard(dismiss=true){
 function _nearbyEstablishmentForActions(){
   const entry=_nearestWorldEntryCandidate();
   if(entry?.kind==='apartment')return null;
-  let best=null,bestD=3.25;
-  for(const biz of BUSINESS_POIS){const d=_businessInteractionDistance(biz);if(d<bestD){best={kind:'business',poi:biz};bestD=d;}}
+  let best=null,bestD=BUSINESS_INTERACTION_RADIUS;
+  for(const biz of BUSINESS_POIS){const d=_businessInteractionDistance(biz);if(d<=bestD){best={kind:'business',poi:biz};bestD=d;}}
   const major=_nearestMajorObject(4.2);if(major){const d=Math.hypot(player.r-major.r,player.c-major.c);if(!best||d<bestD)best={kind:'major',poi:major};}
   return best;
 }
@@ -19462,7 +19462,7 @@ function _majorRaidActionLabel(poi){
 function _syncBusinessActionCard(){
   const sel=_businessActionSelection;if(!sel)return;
   const poi=sel.kind==='business'?BUSINESS_POIS.find(b=>b.id===sel.id):sel.kind==='major'?POI.find(p=>p.id===sel.id):sel.kind==='building'?{id:sel.id,r:sel.r,c:sel.c,name:sel.name||'Здание',icon:'🏢'}:null;
-  const maxDist=sel.kind==='major'?4.2:sel.kind==='building'?(sel.type==='mafia_hq'?4.2:3.5):3.5;
+  const maxDist=sel.kind==='major'?4.2:sel.kind==='building'?(sel.type==='mafia_hq'?4.2:3.5):BUSINESS_INTERACTION_RADIUS;
   const interactionDistance=poi?(sel.kind==='business'?_businessInteractionDistance(poi):Math.hypot(player.r-poi.r,player.c-poi.c)):Infinity;
   if(!poi||_buildingInt||_bankInt||interactionDistance>maxDist){_closeBusinessActionCard(false);return;}
   const actions=[];
@@ -32157,6 +32157,9 @@ BUSINESS_POIS.forEach(b => BUSINESS_BY_RC.set(b.r + ',' + b.c, b));
 // Единая геометрия взаимодействия для 2D и 3D. Координаты BUSINESS_POIS
 // обозначают тайл здания, а не место, где обязан стоять игрок. У фасада есть
 // центр и вход с южной стороны; берём расстояние до ближайшей из этих точек.
+// Один общий радиус обязателен для подсказки, карточки и фактического действия:
+// иначе подсказка E видна, но только что открытая карточка закрывается тем же кадром.
+const BUSINESS_INTERACTION_RADIUS = 3.5;
 function _businessInteractionAnchor(b) {
   return { r: +b.r + 1.45, c: +b.c + .5 };
 }
