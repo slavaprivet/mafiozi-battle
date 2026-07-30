@@ -816,7 +816,7 @@ body:not(.in-building-interior) #robActionBtn[data-establishment-action="1"] { d
 #leftCommandHud{
   --hud-gold:#d7ad55;--hud-gold-hi:#ffe1a0;--hud-ink:#080b10;--hud-wine:#4b1119;
   position:absolute;left:10px;top:calc(env(safe-area-inset-top, 6px) + 6px);z-index:18;
-  width:min(232px,calc(100vw - 20px));display:grid;grid-template-columns:1fr 1fr;gap:6px;
+  width:min(270px,calc(100vw - 20px));display:grid;grid-template-columns:1fr 1fr;gap:7px;
   padding:7px;border:1px solid rgba(215,173,85,.58);border-radius:4px;
   background:linear-gradient(145deg,rgba(35,24,22,.97),rgba(8,11,16,.96) 42%,rgba(18,20,27,.96));
   box-shadow:0 14px 34px rgba(0,0,0,.58),inset 0 1px rgba(255,231,171,.11),inset 0 0 0 3px rgba(0,0,0,.24);
@@ -838,17 +838,23 @@ body:not(.in-building-interior) #robActionBtn[data-establishment-action="1"] { d
   box-shadow:inset 3px 0 #8e2632,inset 0 0 22px #0009;
 }
 #leftCommandHud #hudPlayer::after{content:"DOSSIER";position:absolute;right:7px;top:6px;color:#8d7446;font:900 6px/1 system-ui;letter-spacing:1.5px}
-#leftCommandHud #hudPlayer .hud-ava{width:58px;height:58px;padding:2px;border-radius:2px;background:linear-gradient(145deg,#ead18e,#6d5127);box-shadow:0 0 0 2px #0b0907,0 4px 10px #000}
-#leftCommandHud #hudPlayer #hudAvatar{width:54px;height:54px;border:0;border-radius:1px;background:#141414;image-rendering:auto;cursor:pointer}
-#leftCommandHud #hudPlayer .hud-lvl{right:-5px;bottom:-5px;top:auto;min-width:20px;height:20px;border:1px solid #f1d68a;border-radius:2px;background:#651824;color:#fff0c7;line-height:18px;box-shadow:0 2px 6px #000}
-#leftCommandHud #hudPlayer .hud-info{flex:1;justify-content:center;gap:5px}
-#leftCommandHud #hudPlayer .hud-name{max-width:128px;color:#fff1c8;font-size:12px;text-transform:uppercase;letter-spacing:.55px;text-shadow:0 1px 2px #000}
-#leftCommandHud #hudPlayer .hp-row{gap:5px}
-#leftCommandHud #hudPlayer .hp-row .label{color:#bca979;font-size:7px;letter-spacing:1px}
-#leftCommandHud #hpBarBig{height:7px;border-radius:1px;border-color:#4d4134;background:#090b0d}
-#leftCommandHud #hpBarFill{border-radius:0;background:linear-gradient(90deg,#8a1828,#db4850 70%,#f08a73);box-shadow:0 0 6px #d22b3d88}
-#leftCommandHud #hudPlayer .hp-nums{font-size:8px;color:#d8c7a5}
-#leftCommandHud #hudPlayer .stat-row{gap:8px;color:#d3c29e;font-size:9px}
+#leftCommandHud #hudPlayer .hud-ava{width:68px;height:68px;padding:2px;border-radius:2px;background:linear-gradient(145deg,#f3d98f,#705124);box-shadow:0 0 0 2px #0b0907,0 4px 12px #000}
+#leftCommandHud #hudPlayer #hudAvatar{width:64px;height:64px;border:0;border-radius:1px;background:#141414;image-rendering:pixelated;cursor:pointer}
+#leftCommandHud #hudPlayer .hud-lvl{right:-5px;bottom:-5px;top:auto;min-width:23px;height:23px;border:1px solid #f1d68a;border-radius:2px;background:#651824;color:#fff0c7;font-size:11px;line-height:21px;box-shadow:0 2px 6px #000}
+#leftCommandHud #hudPlayer .hud-info{flex:1;justify-content:center;gap:7px}
+#leftCommandHud #hudPlayer .hud-name{max-width:154px;color:#fff1c8;font-size:14px;text-transform:uppercase;letter-spacing:.65px;text-shadow:0 2px 2px #000;line-height:1.1}
+#leftCommandHud #hudPlayer .hp-row{display:grid;grid-template-columns:1fr auto;gap:4px 7px;align-items:center}
+#leftCommandHud #hudPlayer .hp-row .label{color:#f0d392;font-size:9px;letter-spacing:.75px;text-shadow:0 1px 2px #000}
+#leftCommandHud #hpBarBig{grid-column:1/-1;grid-row:2;height:13px;border:1px solid #776044;border-radius:2px;background:#07090c;box-shadow:inset 0 2px 4px #000,0 0 0 1px #000;overflow:hidden}
+#leftCommandHud #hudPlayer .hp-nums{grid-column:2;grid-row:1}
+#leftCommandHud #hpBarBig::after{content:"";position:absolute;inset:1px;background:linear-gradient(180deg,#ffffff2b,transparent 46%,#00000028);pointer-events:none}
+#leftCommandHud #hpBarFill{border-radius:1px;background:linear-gradient(90deg,#861523 0%,#d93643 62%,#ff7068 100%);box-shadow:0 0 9px #e6314299,inset 0 1px #ffb0a866}
+#leftCommandHud #hpBarFill.low{background:linear-gradient(90deg,#9b5d12,#e6a627,#ffd56b)}
+#leftCommandHud #hpBarFill.crit{background:linear-gradient(90deg,#76101a,#e21e2d,#ff5a54);animation:hudCriticalHp .65s ease-in-out infinite alternate}
+@keyframes hudCriticalHp{to{filter:brightness(1.38);box-shadow:0 0 14px #ff2435}}
+#leftCommandHud #hudPlayer .hp-nums{font-size:11px;font-weight:900;color:#fff1db;font-variant-numeric:tabular-nums;text-shadow:0 1px 2px #000}
+#leftCommandHud #hudPlayer .hp-nums #hpMaxVal{color:#a99c88}
+#leftCommandHud #hudPlayer .stat-row{gap:10px;color:#d3c29e;font-size:11px}
 #leftCommandHud #hudPlayer .stat-money{border:0;border-radius:2px;background:#171710;color:#e5c66f;padding:2px 5px}
 #leftCommandHud #modeHud,#leftCommandHud #missionHudBtn{
   position:relative!important;inset:auto!important;width:100%;min-height:31px;margin:0;padding:5px 7px;justify-content:center;
@@ -880,7 +886,7 @@ body:not(.in-building-interior) #robActionBtn[data-establishment-action="1"] { d
 .mission-item h3{color:#f0d79f;text-transform:uppercase;letter-spacing:.3px}
 .mission-item p{color:#aaa69d}.mission-item .mission-route{color:#77c997}
 .mission-item button{border-radius:2px;border-color:#c29b52;background:linear-gradient(180deg,#8f672b,#563713);color:#fff0c3;text-transform:uppercase;letter-spacing:.35px}
-@media(max-width:680px){#leftCommandHud{left:6px;top:calc(env(safe-area-inset-top, 3px) + 3px);width:min(210px,55vw);padding:5px;gap:4px}#leftCommandHud::before{font-size:6px}#leftCommandHud #hudPlayer{padding:6px;gap:7px}#leftCommandHud #hudPlayer .hud-ava{width:50px;height:50px}#leftCommandHud #hudPlayer #hudAvatar{width:46px;height:46px}#leftCommandHud #gangRosterHud,#leftCommandHud #jobStatusHud{padding:6px 7px}}
+@media(max-width:680px){#leftCommandHud{left:6px;top:calc(env(safe-area-inset-top, 3px) + 3px);width:min(244px,62vw);padding:5px;gap:4px}#leftCommandHud::before{font-size:6px}#leftCommandHud #hudPlayer{padding:6px;gap:7px}#leftCommandHud #hudPlayer .hud-ava{width:58px;height:58px}#leftCommandHud #hudPlayer #hudAvatar{width:54px;height:54px}#leftCommandHud #hudPlayer .hud-name{font-size:12px}#leftCommandHud #hudPlayer .hp-row{gap:5px}#leftCommandHud #hpBarBig{min-width:62px;height:11px}#leftCommandHud #hudPlayer .hp-nums{font-size:9px}#leftCommandHud #gangRosterHud,#leftCommandHud #jobStatusHud{padding:6px 7px}}
 #policeModal{display:none;position:fixed;inset:0;z-index:121;background:rgba(3,5,10,.8);align-items:center;justify-content:center;padding:15px}
 #policeModal.show{display:flex}
 #policeModal .police-card{width:min(560px,96vw);max-height:88vh;overflow:auto;border-radius:15px;padding:15px;background:linear-gradient(155deg,#18243b,#0a101d);border:1px solid #507cc4;box-shadow:0 22px 65px rgba(0,0,0,.75);color:#edf5ff;font:700 12px system-ui,sans-serif}
@@ -2048,13 +2054,13 @@ body:not(.in-building-interior) #robActionBtn[data-establishment-action="1"] { d
   <aside id="leftCommandHud" aria-label="Игровое досье и задания"></aside>
   <div id="hudPlayer">
     <div class="hud-ava">
-      <canvas id="hudAvatar" width="54" height="54"></canvas>
+      <canvas id="hudAvatar" width="64" height="64"></canvas>
       <span class="hud-lvl" id="hudLvl">1</span>
     </div>
     <div class="hud-info">
       <div class="hud-name" id="hudName">Игрок</div>
       <div class="hp-row">
-        <span class="label">HP</span>
+        <span class="label">ЗДОРОВЬЕ</span>
         <div id="hpBarBig"><div id="hpBarFill"></div></div>
         <span class="hp-nums">
           <span id="hpVal">100</span><span style="color:#5a6478">/</span><span id="hpMaxVal">100</span>
@@ -37968,7 +37974,7 @@ function renderHudAvatar() {
     // Перс рисуется в НИЖНЕЙ части спрайта (bbox по y≈86..197, x≈37..73).
     // Берём голову+плечи квадратной областью и вписываем в квадратный аватар.
     const sx = 30, sy = 86, sw = 50, sh = 52;
-    g.imageSmoothingEnabled = true;
+    g.imageSmoothingEnabled = false;
     g.drawImage(sp, sx, sy, sw, sh, 2, 1, cv.width-4, cv.height-3);
     const shade=g.createLinearGradient(0,0,cv.width,0);shade.addColorStop(0,'rgba(0,0,0,.28)');shade.addColorStop(.55,'rgba(0,0,0,0)');shade.addColorStop(1,'rgba(0,0,0,.18)');
     g.fillStyle=shade;g.fillRect(0,0,cv.width,cv.height);
@@ -57496,6 +57502,6 @@ function chatDuration(text) {
 })();
 </script>
 
-<script type="module" src="three_preview.js?v=3d125"></script>
+<script type="module" src="three_preview.js?v=3d126"></script>
 </body>
 </html>
