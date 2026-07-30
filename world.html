@@ -811,6 +811,76 @@ body:not(.in-building-interior) #robActionBtn[data-establishment-action="1"] { d
 #jobModal .job-action{border:1px solid #4e9bd6;border-radius:8px;background:#245f8a;color:#fff;padding:7px 9px;font:800 10px system-ui;cursor:pointer}
 #jobModal .job-action.danger{border-color:#b64b55;background:#762d35}.job-action.pay{border-color:#58d37c;background:#207642}
 #jobModal .job-action:disabled{opacity:.45;cursor:default}
+
+/* 2026 left command HUD — one coherent noir dossier instead of floating boxes. */
+#leftCommandHud{
+  --hud-gold:#d7ad55;--hud-gold-hi:#ffe1a0;--hud-ink:#080b10;--hud-wine:#4b1119;
+  position:absolute;left:10px;top:calc(env(safe-area-inset-top, 6px) + 6px);z-index:18;
+  width:min(232px,calc(100vw - 20px));display:grid;grid-template-columns:1fr 1fr;gap:6px;
+  padding:7px;border:1px solid rgba(215,173,85,.58);border-radius:4px;
+  background:linear-gradient(145deg,rgba(35,24,22,.97),rgba(8,11,16,.96) 42%,rgba(18,20,27,.96));
+  box-shadow:0 14px 34px rgba(0,0,0,.58),inset 0 1px rgba(255,231,171,.11),inset 0 0 0 3px rgba(0,0,0,.24);
+  font-family:"Arial Narrow","Segoe UI",system-ui,sans-serif;pointer-events:auto;
+}
+#leftCommandHud::before{content:"CITY DOSSIER  •  1931";grid-column:1/-1;color:#8f7950;font:800 7px/1 system-ui;letter-spacing:1.7px;padding:1px 2px 0}
+#leftCommandHud::after{content:"";position:absolute;left:10px;right:10px;top:24px;height:1px;background:linear-gradient(90deg,transparent,#d7ad5577,transparent);pointer-events:none}
+#leftCommandHud #btnHome,#leftCommandHud #btnNews{
+  position:relative!important;inset:auto!important;width:100%;min-width:0;height:32px;margin:0;padding:0 8px;
+  border-radius:2px;border:1px solid #685735;color:#f5e7c4;background:linear-gradient(180deg,#312c28,#171719);
+  box-shadow:inset 0 1px rgba(255,255,255,.08),0 2px 5px #0008;font:900 10px/30px system-ui;letter-spacing:.25px;
+}
+#leftCommandHud #btnNews{color:#20160b;border-color:#caa55d;background:linear-gradient(180deg,#f1d695,#b8893e)}
+#leftCommandHud #btnHome:hover,#leftCommandHud #btnNews:hover{filter:brightness(1.1)}
+#leftCommandHud #hudPlayer{
+  position:relative!important;inset:auto!important;grid-column:1/-1;display:flex!important;width:auto;min-width:0;max-width:none;
+  gap:10px;margin:0;padding:8px;border-radius:3px;border:1px solid rgba(160,125,60,.5);
+  background:radial-gradient(circle at 17% 30%,rgba(126,41,30,.28),transparent 32%),linear-gradient(105deg,#171315,#0a0d12 66%,#18130f);
+  box-shadow:inset 3px 0 #8e2632,inset 0 0 22px #0009;
+}
+#leftCommandHud #hudPlayer::after{content:"DOSSIER";position:absolute;right:7px;top:6px;color:#8d7446;font:900 6px/1 system-ui;letter-spacing:1.5px}
+#leftCommandHud #hudPlayer .hud-ava{width:58px;height:58px;padding:2px;border-radius:2px;background:linear-gradient(145deg,#ead18e,#6d5127);box-shadow:0 0 0 2px #0b0907,0 4px 10px #000}
+#leftCommandHud #hudPlayer #hudAvatar{width:54px;height:54px;border:0;border-radius:1px;background:#141414;image-rendering:auto;cursor:pointer}
+#leftCommandHud #hudPlayer .hud-lvl{right:-5px;bottom:-5px;top:auto;min-width:20px;height:20px;border:1px solid #f1d68a;border-radius:2px;background:#651824;color:#fff0c7;line-height:18px;box-shadow:0 2px 6px #000}
+#leftCommandHud #hudPlayer .hud-info{flex:1;justify-content:center;gap:5px}
+#leftCommandHud #hudPlayer .hud-name{max-width:128px;color:#fff1c8;font-size:12px;text-transform:uppercase;letter-spacing:.55px;text-shadow:0 1px 2px #000}
+#leftCommandHud #hudPlayer .hp-row{gap:5px}
+#leftCommandHud #hudPlayer .hp-row .label{color:#bca979;font-size:7px;letter-spacing:1px}
+#leftCommandHud #hpBarBig{height:7px;border-radius:1px;border-color:#4d4134;background:#090b0d}
+#leftCommandHud #hpBarFill{border-radius:0;background:linear-gradient(90deg,#8a1828,#db4850 70%,#f08a73);box-shadow:0 0 6px #d22b3d88}
+#leftCommandHud #hudPlayer .hp-nums{font-size:8px;color:#d8c7a5}
+#leftCommandHud #hudPlayer .stat-row{gap:8px;color:#d3c29e;font-size:9px}
+#leftCommandHud #hudPlayer .stat-money{border:0;border-radius:2px;background:#171710;color:#e5c66f;padding:2px 5px}
+#leftCommandHud #modeHud,#leftCommandHud #missionHudBtn{
+  position:relative!important;inset:auto!important;width:100%;min-height:31px;margin:0;padding:5px 7px;justify-content:center;
+  border-radius:2px;border:1px solid #594b36;background:linear-gradient(180deg,#26252a,#111318);color:#dfd3bb;
+  box-shadow:inset 0 1px #ffffff0b;font:900 9px/1 system-ui;letter-spacing:.35px;text-align:center;
+}
+#leftCommandHud #modeHud{display:flex;align-items:center;cursor:pointer}
+#leftCommandHud #modeHud .sw{display:block;margin-left:5px;color:#a88e5c;font-size:7px;text-transform:uppercase}
+#leftCommandHud #modeHud.pvp{border-color:#8f2934;color:#ffb1ab;background:linear-gradient(180deg,#42141b,#1b1115)}
+#leftCommandHud #modeHud.pve{border-color:#3c745f;color:#b9ead5}
+#leftCommandHud #missionHudBtn.active{border-color:#d7ad55;color:#ffe6a0;box-shadow:inset 0 -2px #a67824,0 0 10px #d7ad5528}
+#leftCommandHud #missionHudBtn .mission-count{border-radius:2px;background:#8d2230;color:#fff3d3}
+#leftCommandHud #gangRosterHud,#leftCommandHud #jobStatusHud{
+  position:relative!important;inset:auto!important;grid-column:1/-1;width:auto;max-width:none;margin:0;padding:8px 9px;border-radius:3px;
+  background:linear-gradient(110deg,rgba(21,24,29,.98),rgba(9,11,15,.98));border:1px solid rgba(113,96,66,.65);
+  box-shadow:inset 3px 0 #6d1c28,0 3px 9px #0007;font-size:9px;
+}
+#leftCommandHud #gangRosterHud .gr-head,#leftCommandHud #jobStatusHud .js-title{color:#e8d7af;text-transform:uppercase;letter-spacing:.45px}
+#leftCommandHud #gangRosterHud .gr-count{border:1px solid #397151;border-radius:2px;background:#13271d;color:#8beaaf}
+#leftCommandHud #gangRosterList{margin-top:6px;padding-top:5px;border-top:1px solid #6f5d3838;max-height:126px}
+#leftCommandHud #gangRosterList .gr-empty,#leftCommandHud #jobStatusHud .js-sub{color:#827d75;font-style:normal;font-size:8px}
+#leftCommandHud #jobStatusHud{border-color:rgba(87,113,125,.64);box-shadow:inset 3px 0 #315f72,0 3px 9px #0007}
+#leftCommandHud #jobStatusHud.ready{border-color:#5baa75;box-shadow:inset 3px 0 #3aa363,0 0 12px #46d26e26}
+.missions-card{border-radius:4px;border-color:#b8934f;background:linear-gradient(145deg,#20191a,#090c11 58%,#17191e);box-shadow:0 24px 80px #000,inset 0 0 0 3px #0008}
+.missions-head{border-bottom-color:#8f703b;background:linear-gradient(90deg,#4b151d,#191216 48%,#0e1116);color:#ffe1a0;text-transform:uppercase;letter-spacing:1px}
+.missions-close{border-radius:2px;border-color:#8d7140;background:#211b18;color:#e8cf99}
+.mission-item{position:relative;border-radius:3px;border-color:#4e473c;background:linear-gradient(105deg,#211e20,#11151a);box-shadow:inset 3px 0 #514839}
+.mission-item.active{border-color:#a98440;box-shadow:inset 4px 0 #b32735,0 5px 16px #0007}
+.mission-item h3{color:#f0d79f;text-transform:uppercase;letter-spacing:.3px}
+.mission-item p{color:#aaa69d}.mission-item .mission-route{color:#77c997}
+.mission-item button{border-radius:2px;border-color:#c29b52;background:linear-gradient(180deg,#8f672b,#563713);color:#fff0c3;text-transform:uppercase;letter-spacing:.35px}
+@media(max-width:680px){#leftCommandHud{left:6px;top:calc(env(safe-area-inset-top, 3px) + 3px);width:min(210px,55vw);padding:5px;gap:4px}#leftCommandHud::before{font-size:6px}#leftCommandHud #hudPlayer{padding:6px;gap:7px}#leftCommandHud #hudPlayer .hud-ava{width:50px;height:50px}#leftCommandHud #hudPlayer #hudAvatar{width:46px;height:46px}#leftCommandHud #gangRosterHud,#leftCommandHud #jobStatusHud{padding:6px 7px}}
 #policeModal{display:none;position:fixed;inset:0;z-index:121;background:rgba(3,5,10,.8);align-items:center;justify-content:center;padding:15px}
 #policeModal.show{display:flex}
 #policeModal .police-card{width:min(560px,96vw);max-height:88vh;overflow:auto;border-radius:15px;padding:15px;background:linear-gradient(155deg,#18243b,#0a101d);border:1px solid #507cc4;box-shadow:0 22px 65px rgba(0,0,0,.75);color:#edf5ff;font:700 12px system-ui,sans-serif}
@@ -1975,9 +2045,10 @@ body:not(.in-building-interior) #robActionBtn[data-establishment-action="1"] { d
   <div id="errorBanner"></div>
   <div id="toast"></div>
 
+  <aside id="leftCommandHud" aria-label="Игровое досье и задания"></aside>
   <div id="hudPlayer">
     <div class="hud-ava">
-      <canvas id="hudAvatar" width="44" height="44"></canvas>
+      <canvas id="hudAvatar" width="54" height="54"></canvas>
       <span class="hud-lvl" id="hudLvl">1</span>
     </div>
     <div class="hud-info">
@@ -37889,15 +37960,28 @@ function renderHudAvatar() {
   if (!cv) return;
   const g = cv.getContext('2d');
   g.clearRect(0, 0, cv.width, cv.height);
+  const portraitBg=g.createRadialGradient(cv.width*.48,cv.height*.3,2,cv.width*.5,cv.height*.5,cv.width*.72);
+  portraitBg.addColorStop(0,'#5a3330');portraitBg.addColorStop(.48,'#262329');portraitBg.addColorStop(1,'#090b0e');
+  g.fillStyle=portraitBg;g.fillRect(0,0,cv.width,cv.height);
   try {
     const sp = getSprite(_livePlayerLook());
     // Перс рисуется в НИЖНЕЙ части спрайта (bbox по y≈86..197, x≈37..73).
     // Берём голову+плечи квадратной областью и вписываем в квадратный аватар.
     const sx = 30, sy = 86, sw = 50, sh = 52;
-    g.imageSmoothingEnabled = false;
-    g.drawImage(sp, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
+    g.imageSmoothingEnabled = true;
+    g.drawImage(sp, sx, sy, sw, sh, 2, 1, cv.width-4, cv.height-3);
+    const shade=g.createLinearGradient(0,0,cv.width,0);shade.addColorStop(0,'rgba(0,0,0,.28)');shade.addColorStop(.55,'rgba(0,0,0,0)');shade.addColorStop(1,'rgba(0,0,0,.18)');
+    g.fillStyle=shade;g.fillRect(0,0,cv.width,cv.height);
   } catch (e) {}
 }
+function mountLeftCommandHud(){
+  const dock=document.getElementById('leftCommandHud');if(!dock||dock.dataset.mounted)return;
+  dock.dataset.mounted='1';
+  for(const id of ['btnHome','btnNews','hudPlayer','modeHud','missionHudBtn','gangRosterHud','jobStatusHud']){
+    const node=document.getElementById(id);if(node)dock.appendChild(node);
+  }
+}
+try { mountLeftCommandHud(); } catch (e) {}
 function initHudIdentity() {
   const nm = document.getElementById('hudName');
   if (nm) nm.textContent = QP.name || 'Игрок';
