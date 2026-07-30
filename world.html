@@ -53483,6 +53483,17 @@ window.MAFIOZI_RENDERER_CONFIG = Object.freeze({
 // owns gameplay state: movement, ammo, role rules, damage and networking stay
 // in this authoritative world simulation.
 const _threeVehicleIds=new WeakMap();let _threeVehicleIdSeq=0;
+const _threeNpcIds=new WeakMap();let _threeNpcIdSeq=0;
+function _threeNpcEntityId(npc,index=0){
+  const explicit=npc?.id??npc?.uid??npc?.serverId;
+  if(explicit!==undefined&&explicit!==null&&String(explicit)!=='')return `npc_${String(explicit)}`;
+  if(npc&&typeof npc==='object'){
+    let stable=_threeNpcIds.get(npc);
+    if(!stable){stable=`local_npc_${++_threeNpcIdSeq}`;_threeNpcIds.set(npc,stable);}
+    return stable;
+  }
+  return `fallback_npc_${index}`;
+}
 function _threeVehicleEntityId(vehicle){
   const explicit=vehicle?.id??vehicle?._id;
   if(explicit!==undefined&&explicit!==null&&String(explicit)!=='')return `vehicle_${String(explicit)}`;
@@ -53796,8 +53807,8 @@ window.Mafiozi3DBridge = Object.freeze({
       npcSource=[...combat,...npcSource];
     }
     const npcPriority=x=>{const role=String(x?.role||x?._arcKey||'').toLowerCase();if(x?.gang||x?._gang||x?.gangId||x?.gang_id||role.includes('gang')||role.includes('boss')||role.includes('district_')||role.includes('occupier'))return 0;if(x?.police||role.includes('police')||role.includes('cop')||role.includes('guard'))return 1;return 2;};
-    const npcs=npcSource.filter(x=>x&&!x._ambientGang&&near(+(x.r??x.y)||0,+(x.c??x.x)||0)).sort((a,b)=>npcPriority(a)-npcPriority(b)).slice(0,72).map((x,i)=>{const id=String(x.id??x.uid??i),death=_threeNpcDeathState(x,id),role=String(x.role||x._arcKey||'civilian'),roleKey=role.toLowerCase(),gang=!!(x.gang||x._gang||x.gangId||x.gang_id||roleKey.includes('gang')||roleKey.includes('boss')||roleKey.includes('district_')||roleKey.includes('occupier')),police=!!(x.police||roleKey==='police'||roleKey==='cop'||roleKey.includes('police'));return {
-      id,r:+(x.r??x.y)||0,c:+(x.c??x.x)||0,ang:+x.ang||0,walking:!death.dead&&(x.walking!==undefined?!!x.walking:(Math.abs(+x.walkPhase||0)>.05&&Math.hypot((Number.isFinite(+x.tr)?+x.tr:+(x.r??x.y)||0)-(+((x.r??x.y)||0)),(Number.isFinite(+x.tc)?+x.tc:+(x.c??x.x)||0)-(+((x.c??x.x)||0)))>.08)),walkPhase:+x.walkPhase||0,
+    const npcs=npcSource.filter(x=>x&&!x._ambientGang&&near(+(x.r??x.y)||0,+(x.c??x.x)||0)).sort((a,b)=>npcPriority(a)-npcPriority(b)).slice(0,72).map((x,i)=>{const id=_threeNpcEntityId(x,i),death=_threeNpcDeathState(x,id),role=String(x.role||x._arcKey||'civilian'),roleKey=role.toLowerCase(),gang=!!(x.gang||x._gang||x.gangId||x.gang_id||roleKey.includes('gang')||roleKey.includes('boss')||roleKey.includes('district_')||roleKey.includes('occupier')),police=!!(x.police||roleKey==='police'||roleKey==='cop'||roleKey.includes('police')),r=+(x.r??x.y)||0,c=+(x.c??x.x)||0,targetR=Number.isFinite(+x.tr)?+x.tr:r,targetC=Number.isFinite(+x.tc)?+x.tc:c,targetMoving=Math.hypot(targetR-r,targetC-c)>.06;return {
+      id,r,c,ang:+x.ang||0,walking:!death.dead&&(!!x.walking||targetMoving),walkPhase:+x.walkPhase||0,speed:+x.speed||0,
       elevation:_buildingInt?.bizId==='major_casino'?_casinoVisualElevation(_buildingInt,+(x.r??x.y)||0,+(x.c??x.x)||0):0,
       role,behavior:x.behavior||'',sourceId:x.sourceId||'',hireable:!!x.hireable,look:x.look||null,name:x.name||'',speech:(+x.cryUntil||0)>performance.now()?String(x.cryText||'').slice(0,54):'',hp:Number.isFinite(+x.hp)?Math.max(0,+x.hp):Math.max(1,+x.max_hp||+x.maxHp||60),maxHp:Math.max(1,+x.max_hp||+x.maxHp||60),
       level:gang?Math.max(1,+x.level||+x.lvl||+x.rank||1):null,family:x.family||x.mafiaFamily||x.gangFamily||x.gangName||x.faction||'',faction:x.faction||x.gangFaction||'',
@@ -53846,7 +53857,7 @@ window.Mafiozi3DBridge = Object.freeze({
       for(let i=0;i<(typeof BUS_STOPS!=='undefined'?BUS_STOPS:[]).length;i++){
         const stop=BUS_STOPS[i];addObject('bus_stop',`bus_stop_${i}`,stop.r,stop.c,stop.name||`Остановка ${i+1}`,'#62b8ff',{maxRadius:4});
       }
-      if(typeof BRIGADIR_POS!=='undefined')addObject('brigadir','brigadir',BRIGADIR_POS.r+.5,BRIGADIR_POS.c+.5,'Бригадир','#ffd45b',{maxRadius:5});
+      if(typeof BRIGADIR_POS!=='undefined'){const moving=!BRIGADIR_AI.paused&&performance.now()>=BRIGADIR_AI.idleUntil&&Math.hypot(BRIGADIR_AI.tgtR-BRIGADIR_POS.r,BRIGADIR_AI.tgtC-BRIGADIR_POS.c)>=.18;addObject('brigadir','brigadir',BRIGADIR_POS.r+.5,BRIGADIR_POS.c+.5,'Бригадир','#ffd45b',{keepSource:true,maxRadius:5,ang:+BRIGADIR_AI.ang||0,walking:moving,walkPhase:+BRIGADIR_AI.walkPhase||0});}
       for(const bag of (typeof _vaultDroppedBags!=='undefined'?_vaultDroppedBags:[]))addObject('money_bag',`bag_${bag.id}`,bag.r,bag.c,'Мешок с деньгами','#f0bd4f',{value:+bag.value||0,maxRadius:4});
       for(let i=0;i<(typeof PETS!=='undefined'?PETS:[]).length;i++){
         const pet=PETS[i];if(!pet)continue;const petMoving=Math.hypot((+pet.tr||pet.r)-pet.r,(+pet.tc||pet.c)-pet.c)>.2,petThreat=Math.hypot(player.r-pet.r,player.c-pet.c)<3.4||cars.some(car=>Math.hypot((+car.r||0)-pet.r,(+car.c||0)-pet.c)<2.8&&!car.parked),petIdleSeed=(i*17+Math.floor(performance.now()/1000))%19;addObject('pet',pet.id||`city_pet_fallback_${i}`,pet.r,pet.c,pet.cryUntil>performance.now()?pet.cryText:'',pet._color||'#a9825c',{keepSource:true,petKind:pet.kind||'dog',ang:+pet.ang||0,walking:petMoving,speed:+pet.speed||1,walkPhase:+pet.walkPhase||0,alerted:petThreat,sitting:pet.kind==='cat'&&!petMoving&&!petThreat&&petIdleSeed<6});
@@ -57612,6 +57623,6 @@ function chatDuration(text) {
 })();
 </script>
 
-<script type="module" src="three_preview.js?v=3d136"></script>
+<script type="module" src="three_preview.js?v=3d137"></script>
 </body>
 </html>
