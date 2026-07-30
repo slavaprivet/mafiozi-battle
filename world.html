@@ -887,6 +887,44 @@ body:not(.in-building-interior) #robActionBtn[data-establishment-action="1"] { d
 .mission-item p{color:#aaa69d}.mission-item .mission-route{color:#77c997}
 .mission-item button{border-radius:2px;border-color:#c29b52;background:linear-gradient(180deg,#8f672b,#563713);color:#fff0c3;text-transform:uppercase;letter-spacing:.35px}
 @media(max-width:680px){#leftCommandHud{left:6px;top:calc(env(safe-area-inset-top, 3px) + 3px);width:min(244px,62vw);padding:5px;gap:4px}#leftCommandHud::before{font-size:6px}#leftCommandHud #hudPlayer{padding:6px;gap:7px}#leftCommandHud #hudPlayer .hud-ava{width:58px;height:58px}#leftCommandHud #hudPlayer #hudAvatar{width:54px;height:54px}#leftCommandHud #hudPlayer .hud-name{font-size:12px}#leftCommandHud #hudPlayer .hp-row{gap:5px}#leftCommandHud #hpBarBig{min-width:62px;height:11px}#leftCommandHud #hudPlayer .hp-nums{font-size:9px}#leftCommandHud #gangRosterHud,#leftCommandHud #jobStatusHud{padding:6px 7px}}
+
+/* Cinematic polish pass: layered glass, leather, brass and clearer hierarchy. */
+#leftCommandHud{
+  padding:9px;gap:8px;border-radius:14px;border-color:rgba(229,190,103,.64);
+  background:linear-gradient(155deg,rgba(47,31,29,.94),rgba(10,13,18,.96) 38%,rgba(16,19,25,.94));
+  box-shadow:0 18px 55px rgba(0,0,0,.68),0 0 0 1px rgba(0,0,0,.8),inset 0 1px rgba(255,234,181,.18),inset 0 -28px 46px rgba(0,0,0,.2);
+  backdrop-filter:blur(10px) saturate(1.15);-webkit-backdrop-filter:blur(10px) saturate(1.15);
+}
+#leftCommandHud::before{content:"MAFIOZI  /  ЛИЧНОЕ ДЕЛО";padding:2px 4px 3px;color:#c5a66a;font:900 8px/1 system-ui;letter-spacing:1.45px;text-shadow:0 1px #000}
+#leftCommandHud::after{left:13px;right:13px;top:28px;height:2px;background:linear-gradient(90deg,#8b2634,#e0b963 45%,transparent);box-shadow:0 1px #000}
+#leftCommandHud #btnHome,#leftCommandHud #btnNews{height:36px;border-radius:8px;font-size:11px;line-height:34px;transition:transform .12s ease,filter .12s ease,box-shadow .12s ease}
+#leftCommandHud #btnHome{background:linear-gradient(180deg,rgba(65,59,55,.96),rgba(23,24,28,.98));border-color:#76664c}
+#leftCommandHud #btnNews{background:linear-gradient(180deg,#ffe5a2,#c79440);border-color:#f0cc78;box-shadow:inset 0 1px #fff3ca,0 4px 12px #0007}
+#leftCommandHud #btnHome:active,#leftCommandHud #btnNews:active{transform:translateY(1px) scale(.985)}
+#leftCommandHud #hudPlayer{padding:10px;gap:12px;border-radius:11px;border-color:rgba(218,175,88,.48);background:radial-gradient(circle at 15% 30%,rgba(154,48,45,.34),transparent 33%),linear-gradient(115deg,rgba(39,24,25,.98),rgba(9,12,17,.98) 58%,rgba(28,24,20,.98));box-shadow:inset 4px 0 #a62b3b,inset 0 1px #ffffff0b,0 7px 17px #0008}
+#leftCommandHud #hudPlayer::after{content:"ПРОФИЛЬ";right:10px;top:9px;color:#aa8950;font-size:7px;letter-spacing:1.35px}
+#leftCommandHud #hudPlayer .hud-ava{border-radius:8px;background:linear-gradient(145deg,#f5dfa0,#8d672d 56%,#4c3219);box-shadow:0 0 0 2px #17100a,0 0 0 3px #bc9349,0 7px 18px #000}
+#leftCommandHud #hudPlayer #hudAvatar{border-radius:6px}
+#leftCommandHud #hudPlayer .hud-lvl{border-radius:7px;background:linear-gradient(180deg,#9b2939,#52131c);box-shadow:0 3px 8px #000,0 0 0 2px #120b09}
+#leftCommandHud #hudPlayer .hud-name{font-family:Georgia,"Times New Roman",serif;font-size:15px;letter-spacing:.45px;color:#fff0c8}
+#leftCommandHud #hpBarBig{height:14px;border-radius:7px;border-color:#8f7247;background:#08090c;padding:2px;box-sizing:border-box}
+#leftCommandHud #hpBarFill{border-radius:4px}
+#leftCommandHud #hudPlayer .hp-row .label{font-size:10px;font-weight:1000;color:#e8c978}
+#leftCommandHud #hudPlayer .hp-nums{font-size:12px}
+#leftCommandHud #hudPlayer .stat-row{padding-top:1px;border-top:1px solid rgba(207,171,91,.16)}
+#leftCommandHud #hudPlayer .stat-money{padding:3px 7px;border:1px solid rgba(194,155,71,.26);border-radius:6px;background:linear-gradient(180deg,#252116,#12120e);color:#f0cf73}
+#leftCommandHud #modeHud,#leftCommandHud #missionHudBtn{min-height:36px;border-radius:8px;font-size:10px;background:linear-gradient(180deg,rgba(48,48,54,.96),rgba(16,18,23,.98));border-color:#665942;transition:transform .12s ease,filter .12s ease}
+#leftCommandHud #modeHud:hover,#leftCommandHud #missionHudBtn:hover{filter:brightness(1.13)}
+#leftCommandHud #modeHud.pvp{background:linear-gradient(180deg,#5c1923,#251116);border-color:#c14855;box-shadow:inset 0 1px #ff9a9a22}
+#leftCommandHud #missionHudBtn.active{background:linear-gradient(180deg,#59451f,#241b0f);box-shadow:inset 0 -3px #c8942e,0 0 14px #d7ad5538}
+#leftCommandHud #gangRosterHud,#leftCommandHud #jobStatusHud{padding:10px 11px;border-radius:10px;border-color:rgba(135,114,77,.56);background:linear-gradient(120deg,rgba(32,34,39,.98),rgba(10,13,17,.98));box-shadow:inset 4px 0 #7f2430,inset 0 1px #ffffff0a,0 6px 14px #0007}
+#leftCommandHud #jobStatusHud{box-shadow:inset 4px 0 #39748a,inset 0 1px #ffffff0a,0 6px 14px #0007}
+#leftCommandHud #gangRosterHud .gr-head,#leftCommandHud #jobStatusHud .js-title{font-size:10px;color:#f0ddb1;letter-spacing:.6px}
+#leftCommandHud #gangRosterHud .gr-count{padding:2px 7px;border-radius:6px}
+#leftCommandHud #gangRosterList .gr-row{min-height:22px;padding:2px 4px;border-radius:5px}
+#leftCommandHud #jobStatusHud .js-state{margin-top:5px;color:#f3eee2;font-size:10px}
+#leftCommandHud #jobStatusHud .js-sub{margin-top:4px;color:#9f9b91;font-size:9px;line-height:1.3}
+@media(max-width:680px){#leftCommandHud{padding:6px;gap:5px;border-radius:10px}#leftCommandHud::after{top:24px}#leftCommandHud #btnHome,#leftCommandHud #btnNews{height:33px;line-height:31px}#leftCommandHud #hudPlayer{padding:7px;gap:8px;border-radius:8px}#leftCommandHud #hudPlayer .hud-name{font-size:13px}#leftCommandHud #hudPlayer .hp-row .label{font-size:8px}#leftCommandHud #modeHud,#leftCommandHud #missionHudBtn{min-height:32px}#leftCommandHud #gangRosterHud,#leftCommandHud #jobStatusHud{padding:7px 8px;border-radius:8px}}
 #policeModal{display:none;position:fixed;inset:0;z-index:121;background:rgba(3,5,10,.8);align-items:center;justify-content:center;padding:15px}
 #policeModal.show{display:flex}
 #policeModal .police-card{width:min(560px,96vw);max-height:88vh;overflow:auto;border-radius:15px;padding:15px;background:linear-gradient(155deg,#18243b,#0a101d);border:1px solid #507cc4;box-shadow:0 22px 65px rgba(0,0,0,.75);color:#edf5ff;font:700 12px system-ui,sans-serif}
