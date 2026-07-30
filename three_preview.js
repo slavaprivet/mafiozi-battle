@@ -614,9 +614,14 @@ transformed.z+=cos(mfzWindTime*.82+mfzPhase*1.31+position.z*.42)*mfzGust*mfzWeig
         [-25,23,13,14,13,4,'CLUB'],[-9,23,12,13,17,0,'BANK'],[10,23,14,14,14,2,'MARKET'],[27,23,11,13,18,1,''],
       ];
       const styleIndexes={poor:1,downtown:0,nightlife:4,rich:3,countryside:2,industrial:1,coast:2,chinatown_poor:1,chinatown_market:3,chinatown_neon:4,chinatown_rich:0,chinatown_docks:1};
-      const defsFromSnapshot=snapshot=>(snapshot?.blocks||[]).flatMap(b=>(b.buildingParts?.length?b.buildingParts:(b.building?[b.building]:[])).map((q,partIndex)=>{
+      const defsFromSnapshot=snapshot=>(snapshot?.blocks||[]).flatMap(b=>(b.buildingParts?.length?b.buildingParts:(b.building?[b.building]:[])).flatMap((q,partIndex)=>{
         const candidates=[...(snapshot.pois||[]),...(snapshot.landmarks?.mafiaHq?[snapshot.landmarks.mafiaHq]:[])],nearPoi=candidates.map(p=>({p,d:Math.hypot((+p.r||0)-q.r,(+p.c||0)-q.c)})).filter(x=>x.d<6.2).sort((a,b)=>a.d-b.d)[0]?.p||null,architecturalKind=partIndex===0?nearPoi?.id||null:null;
-        return [(q.c-originC)*WORLD_SCALE,(q.r-originR)*WORLD_SCALE,q.w*WORLD_SCALE,q.d*WORLD_SCALE,q.height,styleIndexes[b.styleId]??0,(nearPoi?.name||nearPoi?.label||'').toString().slice(0,14).toUpperCase(),b.styleId||'downtown',{r:q.r,c:q.c,w:q.w,d:q.d,minR:q.minR,maxR:q.maxR,minC:q.minC,maxC:q.maxC,tiles:q.tiles,primary:partIndex===0,architecturalKind}];
+        // GRAND CASINO has its own complete exterior below. The city streamer
+        // used to build a procedural tower on the same footprint first, which
+        // looked like an unrelated building jammed against the casino.
+        const ownsCasinoTile=nearPoi?.id==='casino'&&+q.minR<=+nearPoi.r&&+q.maxR>=+nearPoi.r&&+q.minC<=+nearPoi.c&&+q.maxC>=+nearPoi.c;
+        if(ownsCasinoTile)return [];
+        return [[(q.c-originC)*WORLD_SCALE,(q.r-originR)*WORLD_SCALE,q.w*WORLD_SCALE,q.d*WORLD_SCALE,q.height,styleIndexes[b.styleId]??0,(nearPoi?.name||nearPoi?.label||'').toString().slice(0,14).toUpperCase(),b.styleId||'downtown',{r:q.r,c:q.c,w:q.w,d:q.d,minR:q.minR,maxR:q.maxR,minC:q.minC,maxC:q.maxC,tiles:q.tiles,primary:partIndex===0,architecturalKind}]];
       }));
       const buildingDefs=worldSnapshot ? defsFromSnapshot(worldSnapshot) : fallbackBuildingDefs;
       const initialBuildingCount=buildingDefs.length;
