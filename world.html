@@ -53533,6 +53533,17 @@ function _threeNpcDeathState(entity,id){
   }
   return {dead:true,deadAt};
 }
+// The 3D renderer must only animate recoil/muzzle flash after gameplay really
+// accepted a shot. fire() intentionally returns early for an empty magazine,
+// reload, cooldown and role/zone locks, so compare the authoritative shot
+// clocks instead of blindly returning true from the bridge.
+function _threeBridgeFireAccepted(angle) {
+  const firearmShotBefore = lastShotClientT;
+  const taserShotBefore = typeof _lastPoliceTaserAt === 'number' ? _lastPoliceTaserAt : 0;
+  fire(Number.isFinite(angle) ? angle : null);
+  return lastShotClientT !== firearmShotBefore ||
+    (typeof _lastPoliceTaserAt === 'number' && _lastPoliceTaserAt !== taserShotBefore);
+}
 window.Mafiozi3DBridge = Object.freeze({
   version: 1,
   getPlayerState() {
@@ -53843,8 +53854,7 @@ window.Mafiozi3DBridge = Object.freeze({
   },
   fire(angle) {
     if (myDead || myMode === 'pve' || !_isArmed()) return false;
-    fire(Number.isFinite(angle) ? angle : null);
-    return true;
+    return _threeBridgeFireAccepted(angle);
   },
   fireAtGangNpc(sourceId) {
     if(myDead||myMode==='pve'||!_isArmed())return false;
@@ -53852,8 +53862,9 @@ window.Mafiozi3DBridge = Object.freeze({
     const bot=found.bot,dist=Math.hypot(player.r-(+bot.y||0),player.c-(+bot.x||0));
     if(dist>(weaponProfile(currentWeapon).range||8)+.4)return false;
     _threeForcedGangShotId=String(bot.id);_threeForcedGangShotUntil=performance.now()+180;
-    fire(Math.atan2((+bot.y||0)-player.r,(+bot.x||0)-player.c));
-    return true;
+    const accepted=_threeBridgeFireAccepted(Math.atan2((+bot.y||0)-player.r,(+bot.x||0)-player.c));
+    if(!accepted){_threeForcedGangShotId=null;_threeForcedGangShotUntil=0;}
+    return accepted;
   },
   selectGangNpc(sourceId) { return selectGangNpcFrom3D(sourceId); },
   openBrigadirActions() { return openBrigadirActionCardFrom3D(); },
@@ -57587,6 +57598,6 @@ function chatDuration(text) {
 })();
 </script>
 
-<script type="module" src="three_preview.js?v=3d133"></script>
+<script type="module" src="three_preview.js?v=3d134"></script>
 </body>
 </html>
