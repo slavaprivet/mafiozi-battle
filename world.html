@@ -16494,6 +16494,9 @@ function handleEventPacket(d) {
     }
   } else if (kind === 'civilian_hijack_reply') {
     if (d.ok) {
+      if (_pendingHijackLocalId) questCars.delete(_pendingHijackLocalId);
+      _pendingHijackLocalId = null;
+      _pendingHijackSourceCar = null;
       // Сервер создал нам quest-car-civilian. Сразу садимся за руль —
       // сервер уже поставил driver_uid. Локальный snapshot questCars
       // догонит через 1 кадр, поэтому пока создаём болванку.
@@ -16537,6 +16540,11 @@ function handleEventPacket(d) {
       }
       if (bestIdx >= 0) CARS.splice(bestIdx, 1);
     } else {
+      if (_pendingHijackLocalId) questCars.delete(_pendingHijackLocalId);
+      if (myDrivingCarId === _pendingHijackLocalId) myDrivingCarId = null;
+      _pendingHijackLocalId = null;
+      if (_pendingHijackSourceCar) _pendingHijackSourceCar._hidden = false;
+      _pendingHijackSourceCar = null;
       // Сервер не подтвердил — возвращаем NPC-машине нормальное состояние,
       // иначе она навсегда останется «замороженной» с _hijackPending.
       for (const c of CARS) {
@@ -22005,15 +22013,32 @@ function _completeHijack(car) {
     showToast('🌐 Сбой отправки — пробуй ещё', '⚠️', 2000);
     return;
   }
+  const localId=`local_hijack_${Date.now().toString(36)}`;
+  _pendingHijackLocalId=localId;
+  _pendingHijackSourceCar=car;
+  car._hidden=true;
+  questCars.set(localId,{
+    id:localId,model:_pendingHijackModel||'sedan',_lockedModel:_pendingHijackModel||'sedan',
+    paint:_pendingHijackPaint,owner_uid:String(QP.uid),driver_uid:String(QP.uid),passenger_uids:[],
+    x:+car.c,y:+car.r,ang:Number.isFinite(+car.ang)?+car.ang:Math.atan2(+car.dirDy||0,+car.dirDx||1),
+    vx:0,vy:0,hp:220,max_hp:220,state:'driven',wrecked:false,civilian:true,
+    _pendingServerHijack:true,
+  });
+  _dropCarriedBagForVehicleEntry();
+  myDrivingCarId=localId;myIsPassenger=false;_exitRequested=false;
+  player.r=+car.r;player.c=+car.c;
   playEnterCarAnim(car.r, car.c);
   hapticHit();
   // Failsafe-toast: если за 2.5с не приехало ни ok ни reject —
   // пользователь видит что что-то пошло не так (раньше была тишина).
-  const _hijackStartCarId = myDrivingCarId;
   setTimeout(() => {
-    if (myDrivingCarId && myDrivingCarId !== _hijackStartCarId) return;
+    if (_pendingHijackLocalId !== localId) return;
     if (!car._hijackPending) return;   // уже ответили (ok или reject)
     car._hijackPending = 0;
+    car._hidden=false;
+    questCars.delete(localId);
+    if(myDrivingCarId===localId)myDrivingCarId=null;
+    _pendingHijackLocalId=null;_pendingHijackSourceCar=null;
     showToast('❌ Сервер не ответил — попробуй ещё', '⚠️', 2200);
   }, 2500);
 }
@@ -22554,6 +22579,8 @@ let _handbrakeActive = false;   // ручной тормоз — удержив�
 // (сервер может прислать другую модель; мы её игнорируем для своей civ-тачки).
 let _pendingHijackModel = null;
 let _pendingHijackPaint = null;
+let _pendingHijackLocalId = null;
+let _pendingHijackSourceCar = null;
 // Единый локальный переход «машина припаркована». Раньше он выполнялся
 // только при выходе из уже стоящей машины. Выход на ходу шёл через update(),
 // обнулял myDrivingCarId без grace-защиты, и ближайший snapshot успевал
@@ -26888,7 +26915,7 @@ function update(dt) {
       // Шлём серверу инпут позиции (15 Гц, синк с обычным input rate)
       if (!_lastDriveSentAt) _lastDriveSentAt = 0;
       const nowMs = performance.now();
-      if (nowMs - _lastDriveSentAt > 66) {   // ~15 Hz
+      if (!qc._pendingServerHijack && nowMs - _lastDriveSentAt > 66) {   // ~15 Hz
         _lastDriveSentAt = nowMs;
         try {
           ws && ws.send(JSON.stringify({ t: 'gta_drive', d: {
