@@ -51121,6 +51121,14 @@ const MAJOR_CASINO_STATIC_BLOCKERS = [
   {id:'security',r:13,c:40,w:5.2,d:2.1,color:'#30243a'},
 ];
 
+// Чисто визуальные предметы GRAND CASINO. Они намеренно не входят в
+// MAJOR_CASINO_STATIC_BLOCKERS: интерьер становится богаче, но маршруты,
+// перестрелки и серверная логика налёта остаются без изменений.
+const MAJOR_CASINO_VISUAL_PROPS = [
+  {id:'billiard_0',r:6.2,c:3.75,w:3.5,d:1.95,color:'#1d6949',elevation:1.8,visualOnly:true},
+  {id:'billiard_1',r:10.45,c:3.75,w:3.5,d:1.95,color:'#176040',elevation:1.8,visualOnly:true},
+];
+
 // Физика мебели резиденции повторяет реальные размеры отрисованных предметов.
 // Небольшой запас не позволяет герою заехать ногами на столешницу/диван, но
 // центральная ковровая дорожка и проходы между комнатами остаются свободными.
@@ -51468,10 +51476,42 @@ function _drawCasinoPartition(wall) {
   ctx.restore();
 }
 
+function _drawCasinoBilliardTable(r,c,elevation=0) {
+  ctx.save();
+  if(elevation)ctx.translate(0,-isoH(elevation));
+  _bizIsoBox(r,c,3.5,1.95,.82,'#196344','#5b2f22','#341b16');
+  const center=w2s(r,c);
+  // Золотая внутренняя рамка сукна.
+  const corners=[[r-.67,c-1.38],[r-.67,c+1.38],[r+.67,c+1.38],[r+.67,c-1.38]].map(([rr,cc])=>w2s(rr,cc));
+  ctx.strokeStyle='#d8ae4b';ctx.lineWidth=2;
+  ctx.beginPath();corners.forEach((p,i)=>i?ctx.lineTo(p.x,p.y-isoH(.84)):ctx.moveTo(p.x,p.y-isoH(.84)));ctx.closePath();ctx.stroke();
+  // Шары и треугольник собраны в читаемую игровую позицию.
+  const ballColors=['#f3d44d','#d84a45','#f1eee3','#406ed0','#b3439b','#ef8a32','#2f2f36'];
+  for(let i=0;i<10;i++){
+    const row=Math.floor((Math.sqrt(8*i+1)-1)/2),first=row*(row+1)/2,col=i-first;
+    const bp=w2s(r-.18+row*.16,c-.35+(col-row/2)*.19);
+    ctx.fillStyle=ballColors[i%ballColors.length];ctx.strokeStyle='rgba(15,18,20,.8)';ctx.lineWidth=.8;
+    ctx.beginPath();ctx.arc(bp.x,bp.y-isoH(.91),2.35,0,Math.PI*2);ctx.fill();ctx.stroke();
+  }
+  const cue=w2s(r+.12,c+.62),white=w2s(r+.1,c+.5);
+  ctx.fillStyle='#f5f0df';ctx.beginPath();ctx.arc(white.x,white.y-isoH(.92),2.55,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#e3bd73';ctx.lineWidth=2.1;ctx.beginPath();ctx.moveTo(cue.x-28,cue.y-isoH(1.02)-10);ctx.lineTo(cue.x+30,cue.y-isoH(1.02)+10);ctx.stroke();
+  // Низкий трёхсекционный светильник над столом.
+  ctx.strokeStyle='#b78c32';ctx.lineWidth=1.4;
+  for(const dx of [-18,0,18]){
+    ctx.beginPath();ctx.moveTo(center.x+dx,center.y-isoH(2.45));ctx.lineTo(center.x+dx,center.y-isoH(1.72));ctx.stroke();
+    ctx.fillStyle='#235c43';ctx.beginPath();ctx.moveTo(center.x+dx-8,center.y-isoH(1.72));ctx.lineTo(center.x+dx+8,center.y-isoH(1.72));ctx.lineTo(center.x+dx+5,center.y-isoH(1.5));ctx.lineTo(center.x+dx-5,center.y-isoH(1.5));ctx.closePath();ctx.fill();
+    ctx.fillStyle='rgba(255,222,133,.72)';ctx.beginPath();ctx.ellipse(center.x+dx,center.y-isoH(1.46),8,3,0,0,Math.PI*2);ctx.fill();
+  }
+  ctx.restore();
+}
+
 function _drawCasinoUpperGallery() {
   ctx.save();
   ctx.globalAlpha*=_casinoUpperGalleryAlpha();
   _bizIsoBox(8.4,3.8,6.7,10.8,1.78,'#5b1737','#24101c','#160912');
+  _drawCasinoBilliardTable(6.2,3.75,1.8);
+  _drawCasinoBilliardTable(10.45,3.75,1.8);
   const playerUpstairs=_casinoVisualElevation(_buildingInt,player.r,player.c)>1.55;
   if(playerUpstairs){
     // Когда герой наверху, подсвечиваем именно границу поднятого пола:
@@ -51504,7 +51544,7 @@ function _drawCasinoUpperGallery() {
   const a=w2s(13.7,.7),b=w2s(13.7,6.9);
   ctx.beginPath();ctx.moveTo(a.x,a.y-isoH(3.15));ctx.lineTo(b.x,b.y-isoH(3.15));ctx.stroke();
   ctx.fillStyle='#ffe397';ctx.font='900 9px system-ui';ctx.textAlign='center';
-  const t=w2s(5,3.8);ctx.fillText('VIP-БАЛКОН · 2 ЭТАЖ',t.x,t.y-isoH(3.1));
+  const t=w2s(5,3.8);ctx.fillText('VIP-БИЛЬЯРД · 2 ЭТАЖ',t.x,t.y-isoH(3.1));
   ctx.restore();
   ctx.restore();
 }
@@ -56132,7 +56172,11 @@ window.Mafiozi3DBridge = Object.freeze({
     const apartmentInfo=apartmentKey?(_myApartments[apartmentKey]||{}):{};
     const casinoLayout=casino?{
       walls:MAJOR_CASINO_WALLS.map(w=>({r0:+w.r0,c0:+w.c0,r1:+w.r1,c1:+w.c1,kind:w.kind||'',lowerOnly:!!w.lowerOnly})),
-      props:MAJOR_CASINO_STATIC_BLOCKERS.filter(p=>_casinoPropAlive(p.id)).map(p=>({id:p.id,r:+p.r,c:+p.c,w:+p.w,d:+p.d,color:p.color||null})),
+      props:[
+        ...MAJOR_CASINO_STATIC_BLOCKERS.filter(p=>_casinoPropAlive(p.id)),
+        ...MAJOR_CASINO_VISUAL_PROPS,
+      ].map(p=>({id:p.id,r:+p.r,c:+p.c,w:+p.w,d:+p.d,color:p.color||null,
+        elevation:+p.elevation||0,visualOnly:!!p.visualOnly})),
       safes:(_majorRaidLocal?.safes||[]).map((s,i)=>({id:String(s.id??i),r:+s.r,c:+s.c,opened:!!s.opened})),
     }:null;
     const bankState=_bankInt?{
@@ -60416,6 +60460,6 @@ function chatDuration(text) {
 })();
 </script>
 
-<script type="module" src="three_preview.js?v=3d233"></script>
+<script type="module" src="three_preview.js?v=3d234"></script>
 </body>
 </html>
