@@ -1,4 +1,5 @@
-<!DOCTYPE html><!-- v234: one-piece southern junkyard preserves housing, and every interior exits back through its real entrance. -->
+<!DOCTYPE html><!-- v235: nearest-distance E interactions cover every 3D NPC and building, with readable Brigadir dialogue. -->
+<!-- v234: one-piece southern junkyard preserves housing, and every interior exits back through its real entrance. -->
 <!-- v232: ambulance depots and patient-side parking validate the full body so normal recovery never needs a watchdog teleport. -->
 <!-- v231: service vehicles validate their full body against buildings; active hose trucks stay visible with their water stream. -->
 <!-- v224: tow trucks drive the full road route and never teleport to a wreck. -->
@@ -274,9 +275,9 @@ body:not(.in-building-interior).near-establishment-focus #robActionBtn,
 body:not(.in-building-interior) #zoneBtn[data-establishment-action="1"],
 body:not(.in-building-interior) #gtaActionBtn[data-establishment-action="1"],
 body:not(.in-building-interior) #robActionBtn[data-establishment-action="1"] { display:none !important; }
-#businessActionCard{--bac-accent:#d9aa45;position:fixed;z-index:58;width:min(326px,84vw);padding:0;border:1px solid rgba(218,174,80,.72);border-radius:4px;background:linear-gradient(155deg,rgba(23,25,29,.985),rgba(6,8,12,.99) 62%,rgba(31,18,12,.99));box-shadow:0 20px 55px rgba(0,0,0,.78),0 0 0 1px rgba(0,0,0,.82),inset 0 1px rgba(255,235,179,.08);color:#f3ead7;font:700 11px/1.2 system-ui;display:none;transform:translate(-50%,-100%);overflow:hidden;clip-path:polygon(0 0,calc(100% - 13px) 0,100% 13px,100% 100%,13px 100%,0 calc(100% - 13px))}
-#businessActionCard::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.23;background:repeating-linear-gradient(125deg,transparent 0 7px,rgba(255,255,255,.018) 8px 9px),radial-gradient(circle at 84% 14%,rgba(211,156,52,.22),transparent 31%)}
-#businessActionCard.show{display:block;animation:bacReveal .15s ease-out both}@keyframes bacReveal{from{opacity:0;transform:translate(-50%,calc(-100% + 9px)) scale(.97)}to{opacity:1;transform:translate(-50%,-100%) scale(1)}}
+#businessActionCard,#npcActionCard{--bac-accent:#d9aa45;position:fixed;z-index:58;width:min(326px,84vw);padding:0;border:1px solid rgba(218,174,80,.72);border-radius:4px;background:linear-gradient(155deg,rgba(23,25,29,.985),rgba(6,8,12,.99) 62%,rgba(31,18,12,.99));box-shadow:0 20px 55px rgba(0,0,0,.78),0 0 0 1px rgba(0,0,0,.82),inset 0 1px rgba(255,235,179,.08);color:#f3ead7;font:700 11px/1.2 system-ui;display:none;transform:translate(-50%,-100%);overflow:hidden;clip-path:polygon(0 0,calc(100% - 13px) 0,100% 13px,100% 100%,13px 100%,0 calc(100% - 13px))}
+#businessActionCard::before,#npcActionCard::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.23;background:repeating-linear-gradient(125deg,transparent 0 7px,rgba(255,255,255,.018) 8px 9px),radial-gradient(circle at 84% 14%,rgba(211,156,52,.22),transparent 31%)}
+#businessActionCard.show,#npcActionCard.show{display:block;animation:bacReveal .15s ease-out both}@keyframes bacReveal{from{opacity:0;transform:translate(-50%,calc(-100% + 9px)) scale(.97)}to{opacity:1;transform:translate(-50%,-100%) scale(1)}}
 .bac-top{position:relative;display:flex;align-items:center;justify-content:space-between;padding:9px 10px 7px 13px;border-bottom:1px solid rgba(214,173,78,.24)}.bac-eyebrow{color:#c89d4d;font:900 8px/1 system-ui;letter-spacing:2.1px;text-transform:uppercase}.bac-close{position:relative;width:25px;height:25px;border:1px solid rgba(197,167,105,.38);border-radius:50%;background:rgba(255,255,255,.025);color:transparent;cursor:pointer}.bac-close::before,.bac-close::after{content:"";position:absolute;left:7px;top:11px;width:9px;height:1px;background:#d8c9aa;transform:rotate(45deg)}.bac-close::after{transform:rotate(-45deg)}.bac-close:hover{border-color:#e3bd65;background:rgba(220,174,79,.12)}
 .bac-head{position:relative;display:flex;align-items:center;gap:10px;padding:9px 13px 11px}.bac-seal{position:relative;display:grid;place-items:center;width:34px;height:34px;flex:0 0 34px;border:1px solid #bd8f3d;background:linear-gradient(145deg,#2a2115,#0e1117);transform:rotate(45deg);box-shadow:inset 0 0 0 3px #0c0e12}.bac-seal::before{content:"";width:10px;height:10px;border:2px solid #e1bb68;border-radius:1px;box-shadow:5px 5px 0 -3px #e1bb68}.bac-title{min-width:0}.bac-title strong{display:block;color:#fff3d5;font:800 18px/1.05 Georgia,serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bac-title small{display:block;margin-top:4px;color:#7f8995;font:800 8px/1 system-ui;letter-spacing:1.15px;text-transform:uppercase}
 .bac-actions{position:relative;display:grid;gap:1px;border-top:1px solid rgba(214,173,78,.18);background:rgba(205,165,81,.1)}.bac-btn{--tone:#a5b0bb;position:relative;display:grid;grid-template-columns:38px 1fr 17px;align-items:center;gap:10px;width:100%;min-height:54px;padding:7px 11px;border:0;border-left:3px solid var(--tone);border-radius:0;background:linear-gradient(90deg,color-mix(in srgb,var(--tone) 12%,#11151b),#10141a 52%,#0b0e13);color:#f8f1e2;text-align:left;cursor:pointer;transition:filter .14s ease,transform .14s ease}.bac-btn:hover,.bac-btn:focus-visible{filter:brightness(1.22);transform:translateX(2px);outline:none}.bac-btn:active{transform:translateX(3px) scale(.992)}.bac-btn.peace{--tone:#55ae79}.bac-btn.buy{--tone:#d3a442}.bac-btn.raid{--tone:#d94a50}.bac-copy{min-width:0}.bac-copy strong{display:block;font:900 12px/1.15 system-ui}.bac-copy small{display:block;margin-top:4px;color:#8994a2;font:700 9px/1.15 system-ui;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bac-chevron{color:var(--tone);font:400 22px/1 Georgia,serif;text-align:center}.bac-glyph{position:relative;display:block;width:30px;height:30px;border:1px solid color-mix(in srgb,var(--tone) 68%,#202630);background:color-mix(in srgb,var(--tone) 11%,#0c1015);box-shadow:inset 0 0 0 3px #10141a}.bac-glyph.door::before{content:"";position:absolute;left:9px;top:6px;width:10px;height:17px;border:2px solid var(--tone);border-bottom:0}.bac-glyph.door::after{content:"";position:absolute;left:16px;top:14px;width:3px;height:3px;border-radius:50%;background:var(--tone)}.bac-glyph.case::before{content:"";position:absolute;left:6px;top:11px;width:16px;height:11px;border:2px solid var(--tone);border-radius:2px}.bac-glyph.case::after{content:"";position:absolute;left:11px;top:7px;width:8px;height:6px;border:2px solid var(--tone);border-bottom:0}.bac-glyph.raid::before{content:"";position:absolute;left:7px;top:7px;width:14px;height:14px;border:2px solid var(--tone);border-radius:50%;box-shadow:inset 0 0 0 4px #10141a}.bac-glyph.raid::after{content:"";position:absolute;left:14px;top:3px;width:2px;height:24px;background:var(--tone);box-shadow:0 0 8px color-mix(in srgb,var(--tone) 80%,transparent)}
@@ -21133,9 +21134,80 @@ function _businessActionCopy(source,tone,raw,poi){
   if(_gtaActionKind==='biz_foreign_info')return {title:'Изучить владельца',detail:'После налёта бизнес можно отжать',glyph:'case'};
   return {title:'Действие с объектом',detail:String(raw||'').replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu,'').replace(/\s+/g,' ').trim(),glyph:'case'};
 }
+const NPC_INTERACTION_RADIUS_3D=2.65;
+let _npcActionSelection=null;
+const _npcActionCard=document.createElement('div');
+_npcActionCard.id='npcActionCard';document.body.appendChild(_npcActionCard);
+function _npcActionEsc(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+function _npcActionRoleLabel(role,name=''){
+  const key=String(role||'').toLowerCase();
+  if(name==='Майкл'||key.includes('quest'))return 'Контакт · задания';
+  if(key.includes('police')||key==='cop')return 'Сотрудник полиции';
+  if(key.includes('medic'))return 'Медицинская служба';
+  if(key.includes('guard'))return 'Охрана';
+  if(key.includes('gang')||key.includes('boss'))return 'Представитель группировки';
+  if(key.includes('worker')||key.includes('mechanic'))return 'Работник города';
+  return 'Житель города';
+}
+function _npcActionSpecial(selection){
+  if(!selection)return '';
+  const id=String(selection.id||''),name=String(selection.name||'');
+  if(id==='brigadir'||name==='Бригадир')return 'brigadir';
+  if(id==='npc_michael_dealer'||name==='Майкл')return 'michael';
+  const said=typeof NPCS!=='undefined'?NPCS.find(n=>n?._said&&!n.dead):null;
+  if(said&&(id===String(_threeNpcEntityId(said))||name==='Саид'))return 'said';
+  return '';
+}
+function _npcActionLivePosition(selection){
+  const special=_npcActionSpecial(selection);
+  if(special==='brigadir')return {r:+BRIGADIR_POS.r+.5,c:+BRIGADIR_POS.c+.5};
+  if(special==='michael')return {r:+MICHAEL_POS.r,c:+MICHAEL_POS.c};
+  if(special==='said'){
+    const said=NPCS.find(n=>n?._said&&!n.dead);if(said)return {r:+said.r,c:+said.c};
+  }
+  const live=typeof NPCS!=='undefined'?NPCS.find(n=>n&&!n.dead&&String(_threeNpcEntityId(n))===String(selection.id||'')):null;
+  return live?{r:+live.r,c:+live.c}:{r:+selection.r,c:+selection.c};
+}
+function _closeNpcActionCard(){_npcActionSelection=null;_npcActionCard.classList.remove('show');}
+function _syncNpcActionCard(){
+  const sel=_npcActionSelection;if(!sel)return;
+  const pos=_npcActionLivePosition(sel),distance=Math.hypot(player.r-pos.r,player.c-pos.c);
+  if(_buildingInt||_bankInt||!Number.isFinite(distance)||distance>NPC_INTERACTION_RADIUS_3D+.25){_closeNpcActionCard();return;}
+  sel.r=pos.r;sel.c=pos.c;
+}
+function openNpcActionCardFrom3D(raw,screenX=null,screenY=null){
+  const selection={
+    id:String(raw?.id||''),name:String(raw?.name||'Житель'),role:String(raw?.role||'civilian'),
+    r:+raw?.r,c:+raw?.c,
+  };
+  const pos=_npcActionLivePosition(selection),distance=Math.hypot(player.r-pos.r,player.c-pos.c);
+  if(_buildingInt||_bankInt||!selection.id||!Number.isFinite(distance)||distance>NPC_INTERACTION_RADIUS_3D){showToast('Подойди ближе к NPC','👣',1600);return {ok:false,reason:'far'};}
+  selection.r=pos.r;selection.c=pos.c;
+  const special=_npcActionSpecial(selection);
+  if(special==='brigadir'){_closeBusinessActionCard(false);_closeNpcActionCard();return openBrigadirActionCardFrom3D();}
+  _closeBusinessActionCard(false);_npcActionSelection=selection;
+  const roleLabel=_npcActionRoleLabel(selection.role,selection.name),mission=special==='michael'||special==='said';
+  _npcActionCard.innerHTML=`<div class="bac-top"><span class="bac-eyebrow">Досье персонажа</span><button class="bac-close" aria-label="Закрыть"></button></div><div class="bac-head"><span class="bac-seal" aria-hidden="true"></span><span class="bac-title"><strong>${_npcActionEsc(selection.name)}</strong><small>${_npcActionEsc(roleLabel)}</small></span></div><div class="bac-actions">${mission?`<button class="bac-btn peace" data-npc-action="mission"><span class="bac-glyph case" aria-hidden="true"></span><span class="bac-copy"><strong>Задания и разговор</strong><small>Открыть доступные поручения персонажа</small></span><span class="bac-chevron" aria-hidden="true">›</span></button>`:''}<button class="bac-btn peace" data-npc-action="talk"><span class="bac-glyph case" aria-hidden="true"></span><span class="bac-copy"><strong>Поговорить</strong><small>Диалоги добавим следующим этапом</small></span><span class="bac-chevron" aria-hidden="true">›</span></button><button class="bac-btn buy" data-npc-action="actions"><span class="bac-glyph case" aria-hidden="true"></span><span class="bac-copy"><strong>Действия</strong><small>Здесь появятся действия для этого NPC</small></span><span class="bac-chevron" aria-hidden="true">›</span></button></div>`;
+  const x=Number.isFinite(+screenX)?+screenX:innerWidth*.5,y=Number.isFinite(+screenY)?+screenY:innerHeight*.58,w=Math.min(326,innerWidth*.84),margin=12;
+  _npcActionCard.style.left=`${Math.max(w/2+margin,Math.min(innerWidth-w/2-margin,x))}px`;
+  _npcActionCard.style.top=`${Math.max(220,Math.min(innerHeight-20,y))}px`;
+  _npcActionCard.classList.add('show');
+  document.documentElement.dataset.npcActionCard=`open:${selection.id}:${special||'generic'}`;
+  return {ok:true,kind:'npc',id:selection.id,special:special||'generic'};
+}
+_npcActionCard.addEventListener('click',event=>{
+  event.stopPropagation();
+  if(event.target.closest('.bac-close')){_closeNpcActionCard();return;}
+  const button=event.target.closest('[data-npc-action]');if(!button||!_npcActionSelection)return;
+  const action=button.dataset.npcAction,special=_npcActionSpecial(_npcActionSelection),name=_npcActionSelection.name;
+  if(action==='mission'&&special==='michael'){_closeNpcActionCard();openMichaelMenu();return;}
+  if(action==='mission'&&special==='said'){_closeNpcActionCard();openSaidMenu();return;}
+  showToast(action==='talk'?`${name}: диалоги появятся в следующем обновлении`:`Действия для «${name}» добавим следующим этапом`,action==='talk'?'💬':'📋',2200);
+});
 function openBrigadirActionCardFrom3D() {
-  const distance=Math.hypot(BRIGADIR_POS.r-player.r,BRIGADIR_POS.c-player.c);
-  if(distance>2.4){showToast('Подойди ближе к Бригадиру','👣',1700);return {ok:false,reason:'far'};}
+  const distance=Math.hypot(BRIGADIR_POS.r+.5-player.r,BRIGADIR_POS.c+.5-player.c);
+  if(distance>NPC_INTERACTION_RADIUS_3D){showToast('Подойди ближе к Бригадиру','👣',1700);return {ok:false,reason:'far'};}
+  _closeBusinessActionCard(false);_closeNpcActionCard();
   let modal=document.getElementById('brigadirActionModal');
   if(!modal){modal=document.createElement('div');modal.id='brigadirActionModal';modal.style.cssText='position:fixed;inset:0;z-index:10055;display:none;align-items:center;justify-content:center;background:rgba(4,5,8,.68);backdrop-filter:blur(5px);padding:18px';modal.addEventListener('click',e=>{if(e.target===modal)modal.style.display='none';});document.body.appendChild(modal);}
   const active=_myHitContractActive,reward=_myBrigadirReward,pending=_pendingBrigadirOffer;
@@ -21176,6 +21248,7 @@ function _syncBusinessActionCard(){
   _businessActionCard.classList.add('show');
 }
 function _openBusinessActionCard(kind,poi,pointerAnchor=null){
+  _closeNpcActionCard();
   _businessActionDismissedId='';
   _businessActionPointerAnchor=pointerAnchor;_businessActionSelection={kind,id:poi.id||`${poi.r},${poi.c}`,r:poi.r,c:poi.c,type:poi.type||null,name:poi.name||poi.label||'Здание'};_businessActionSignature='';
   updateGtaInteractions();_syncBusinessActionCard();
@@ -21742,6 +21815,7 @@ function _showGangHireAction(bot) {
 }
 
 function updateGtaInteractions() {
+  _syncNpcActionCard();
   document.body.classList.remove('near-major-establishment');
   const nearbyEstablishment=_nearbyEstablishmentForActions();
   document.body.classList.toggle('near-establishment-focus',!!nearbyEstablishment);
@@ -56135,6 +56209,7 @@ window.Mafiozi3DBridge = Object.freeze({
   getNearbyVehicleInteraction() { return getNearbyVehicleInteractionFor3D(); },
   activateNearbyVehicle(vehicleId) { return activateNearbyVehicleFrom3D(vehicleId); },
   toggleNearbyBuildingActions(screenX,screenY) { return toggleNearbyBuildingActionsFrom3D(+screenX,+screenY); },
+  openNpcActions(npc,screenX,screenY) { return openNpcActionCardFrom3D(npc,+screenX,+screenY); },
   interactBank() {
     const int=_bankInt;if(!int)return {ok:false,reason:'not-bank'};
     if(int.room==='vault'&&!int.myBag){
@@ -56149,7 +56224,7 @@ window.Mafiozi3DBridge = Object.freeze({
     if(nearVault&&int.phase==='lobby'){_zoneEl.dataset.bankId=int.bank.id;_zoneEl.click();return {ok:true,kind:'vault-crack'};}
     return {ok:false,reason:int.phase==='cracking'?'cracking':'nothing-nearby'};
   },
-  closeBuildingActions() { _closeBusinessActionCard(); return true; },
+  closeBuildingActions() { _closeBusinessActionCard();_closeNpcActionCard();return true; },
   updateDistrictEntry() { _updateDistrictBanner(); },
   collisionProbe(r,c) { const rr=+r,cc=+c;return {r:rr,c:cc,blocked:Number.isFinite(rr)&&Number.isFinite(cc)?isBlockedPed(rr,cc):true,tile:Number.isFinite(rr)&&Number.isFinite(cc)?MAP[Math.floor(rr)]?.[Math.floor(cc)]??null:null}; },
   getEnvironmentState() {
@@ -60460,6 +60535,6 @@ function chatDuration(text) {
 })();
 </script>
 
-<script type="module" src="three_preview.js?v=3d234"></script>
+<script type="module" src="three_preview.js?v=3d235"></script>
 </body>
 </html>
