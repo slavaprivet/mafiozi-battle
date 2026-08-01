@@ -1,4 +1,7 @@
-<!DOCTYPE html>
+<!DOCTYPE html><!-- v233: Steam/desktop 3D startup streams the same full-quality city in bounded idle slices to keep input responsive. -->
+<!-- v232: ambulance depots and patient-side parking validate the full body so normal recovery never needs a watchdog teleport. -->
+<!-- v231: service vehicles validate their full body against buildings; active hose trucks stay visible with their water stream. -->
+<!-- v224: tow trucks drive the full road route and never teleport to a wreck. -->
 <!-- 3D sync v201: NPC role, name, HP and speech panels enlarged for gameplay readability. -->
 <!-- 3D sync v200: injured residents limp by default; only genuinely downed or leg-disabled NPCs crawl, at a deliberately slow pace. -->
 <!-- 3D sync v199: loading stays masked until the full frame, vehicle shots lock to the clicked mesh, and collapsed wrecks burn with textured pooled flames. -->
@@ -9,6 +12,7 @@
 <!-- 3D sync v195: bounded vehicle explosions, hold-E entry, bounded pets, and speed-aware NPC gait. -->
 <!-- 3D sync v193: collision props and vehicle effects are instanced/shared; explosion and wreck lights are bounded after a five-car stress test. -->
 <!-- 3D sync v191: vehicle hits use bounded NPC reactions; chain explosions are staggered to prevent shot-time frame stalls. -->
+<!-- 3D sync v226: the junkyard landmark is rebuilt by sector streaming after the player travels into its cleared six-lot area. -->
 <!-- 3D sync v190: ordinary buildings use stable glass, brick, limestone, concrete, art-deco and industrial architecture families without changing collisions. -->
 <html lang="ru">
 <head>
@@ -5125,6 +5129,15 @@ function buildMap() {
       MAP[p.r][p.c] = 1;
     }
   }
+  // The coastal junkyard owns the whole 20x20 super-block. Preserve its two
+  // crossing roads for service vehicles, but demolish the four generic towers
+  // (including the blue waterfront buildings) and turn every inner lot into
+  // one continuous hard-standing scrapyard.
+  for(let r=80;r<=109;r++)for(let c=60;c<=79;c++){
+    if(r<=0||r>=MAP_ROWS-1||c<=0||c>=MAP_COLS-1)continue;
+    const onRoadR=(r%BLOCK)<=3,onRoadC=(c%BLOCK)<=3;
+    MAP[r][c]=(onRoadR||onRoadC)?0:9;
+  }
   // Освобождаем «площадь» вокруг захватываемых POI 7×7 — чтобы было где
   // вести перестрелки за район. Сносим соседние здания внутри квартала,
   // убираем весь декор (деревья/бочки/ящики/мусорки/фонари/машины),
@@ -5603,9 +5616,13 @@ const POI = [
   // Больница — северо-восточный квартал, на отдельном здании-квартале
   // (не на спавне). Серверный респаун рядом на дороге (см. HOSPITAL_X/Y).
   { id: 'hospital',    r: 26, c: 46, icon: '🏥', name: 'Больница',     minLvl: 1, special: 'hospital' },
+  { id: 'hospital_east', r: 46, c: 126, icon: '🏥', name: 'Больница Ист-Сайда', minLvl: 1, special: 'hospital' },
   // Пожарная часть — отсюда выезжают пожарки на взорванные машины.
   // Координаты должны совпадать с FIRE_STATION_R/C (см. ниже).
   { id: 'firestation', r: 56, c: 26, icon: '🚒', name: 'Пожарная часть', minLvl: 1, special: 'firestation' },
+  // Городская свалка — конечная точка эвакуаторов. Это служебный объект
+  // внутри Промзоны, а не захватываемая территория.
+  { id: 'junkyard', r: 86, c: 66, icon: '🏗️', name: 'Городская свалка', minLvl: 1, special: 'junkyard' },
   // Отделение полиции — координаты совпадают с серверной тюрьмой
   // (JAIL_X=76, JAIL_Y=76). При 3★ копы пакуют в наручники и везут сюда.
   { id: 'police',      r: 76, c: 76, icon: '🚔', name: 'Участок',      minLvl: 1, special: 'jail'  },
@@ -6364,7 +6381,7 @@ function _interpBeachgoers(dt) {
     }
     if (b.dead) {
       // Тело остаётся минуту, затем житель снова включается в серверный поток.
-      if (performance.now() - b.deadAt > 60000) { b.dead=false;b.hp=b.max_hp||60; }
+      if (performance.now() - b.deadAt > CORPSE_AUTO_REMOVE_MS) { b.dead=false;b.hp=b.max_hp||60; }
       else continue;
     }
     b.x += (b.tx - b.x) * Math.min(1, dt * 8);
@@ -7501,10 +7518,11 @@ function hitCityCop(cop, dirY, dirX, damage) {
     _capArr(impacts, _MAX_IMPACTS);
     impacts.push({ r: cop.y, c: cop.x, parts });
     // Труп — рисуем как мёртвого NPC (cityCops сразу удаляются из массива)
-    NPCS.push({ r: cop.y, c: cop.x, tr: cop.y, tc: cop.x, speed: 0,
+    NPCS.push({ id: cop.id + '_corpse', r: cop.y, c: cop.x, tr: cop.y, tc: cop.x, speed: 0,
       ang: cop.ang || 0, walkPhase: 0, idleUntil: 0, hp: 0, max_hp: 100,
       dead: true, deadAt: performance.now(), _severMask:+cop._severMask||0,
-      look: { gender: 0, skin: 2, body: 4, face: 1, hair: 1, hat: 3 } });
+      role: 'police', kind: 'police', isPolice: true,
+      look: Object.assign({}, cop.look || { gender: 0, skin: 2, body: 8, face: 1, hair: 1, hat: 3 }) });
     _alertNearbyCops('kill');
   }
   try {
@@ -7763,7 +7781,7 @@ function _npcAdvanceRoute(npc,dt,speed,passFn=npcPassable) {
   return true;
 }
 const RESIDENTS_INDOORS=[],RESIDENT_RESPAWN_BACKLOG=[];
-let _residentBuildingDoorsCache=null,_residentRespawnSeed=9000;
+let _residentBuildingDoorsCache=null,_residentRespawnSeed=9000,_residentInvisibleSpawnCount=0;
 function _isRespawnableResident(npc) {
   return !!npc&&!npc._said&&!npc._invulnerable&&!npc._guard&&!npc._cashier&&
     !npc._policeCriminal&&!npc._clientOfBiz;
@@ -7803,6 +7821,20 @@ function _residentBuildingDoors() {
       if(second){second.id=`door_${r}_${c}_1`;doors.push(second);}
     }
   }
+  // Include authored entrances that may sit outside a generic MAP=1 footprint,
+  // so residents can emerge from casinos, shops and major public buildings.
+  const addAuthoredDoor=(id,anchor,kind)=>{
+    if(!anchor||!_npcBodyPassable(anchor.r,anchor.c))return;
+    const existing=doors.find(d=>Math.hypot(d.r-anchor.r,d.c-anchor.c)<.7);
+    if(existing){existing.sourceId=id;existing.sourceKind=kind;existing.authored=true;return;}
+    doors.push({id:`door_${kind}_${id}`,r:anchor.r,c:anchor.c,sourceId:id,sourceKind:kind,authored:true});
+  };
+  try{
+    if(typeof BUSINESS_POIS!=='undefined'&&typeof _businessInteractionAnchor==='function')for(const biz of BUSINESS_POIS)addAuthoredDoor(biz.id,_businessInteractionAnchor(biz),'business');
+    if(typeof POI!=='undefined'&&typeof MAJOR_OBJECT_IDS!=='undefined'&&typeof _majorInteractionAnchor==='function')for(const poi of POI)if(MAJOR_OBJECT_IDS.has(poi.id))addAuthoredDoor(poi.id,_majorInteractionAnchor(poi),'major');
+  }catch(_){/* generic residential doors remain a complete fallback */}
+  document.documentElement.dataset.residentSpawnDoors=String(doors.length);
+  document.documentElement.dataset.residentAuthoredSpawnDoors=String(doors.filter(d=>d.authored).length);
   _residentBuildingDoorsCache=doors;
   return doors;
 }
@@ -7839,7 +7871,9 @@ function _residentEnterBuilding(npc,now,door=npc._residentDoor,respawn=false) {
 function _scheduleResidentRespawn(deadNpc,now) {
   const door=_pickResidentRespawnDoor();if(!door)return false;
   const fresh=spawnNpc(++_residentRespawnSeed,{cityOnly:true});if(!fresh)return false;
-  if(deadNpc?.look&&!deadNpc._beach)fresh.look={...deadNpc.look};
+  // A respawn is a new citizen, not the old corpse recycled behind a door.
+  // Keep the population/archetype balance but generate a fresh face, hair and outfit.
+  fresh._appearanceGeneration=(+deadNpc?._appearanceGeneration||0)+1;
   fresh._arcKey=deadNpc?._arcKey||fresh._arcKey;fresh._arc=NPC_ARCHETYPES[fresh._arcKey]||fresh._arc;
   return _residentEnterBuilding(fresh,now,door,true);
 }
@@ -7854,10 +7888,12 @@ function _updateResidentsIndoors(now) {
     if(!door||!_npcBodyPassable(door.r,door.c)){
       const safer=_pickResidentRespawnDoor();if(!safer){n._residentInsideUntil=now+1200;continue;}n._residentDoor=safer;
     }
+    const wasRespawn=!!n._residentRespawn;
     const exit=n._residentDoor;n.r=exit.r;n.c=exit.c;n.tr=exit.r;n.tc=exit.c;
     n._residentIndoors=false;n._residentRespawn=false;n._residentInsideUntil=0;
     n._buildingVisitCooldownUntil=now+18000+Math.random()*26000;n.idleUntil=now+150+Math.random()*350;
     RESIDENTS_INDOORS.splice(i,1);pickNpcWaypoint(n);NPCS.push(n);
+    if(wasRespawn&&n._residentDoor){_residentInvisibleSpawnCount++;document.documentElement.dataset.residentInvisibleSpawns=String(_residentInvisibleSpawnCount);document.documentElement.dataset.lastResidentSpawnSource=`${n._residentDoor.sourceKind||'building'}:${n._residentDoor.sourceId||n._residentDoor.id||'door'}`;}
   }
 }
 function pickNpcWaypoint(npc) {
@@ -7896,6 +7932,8 @@ function pickNpcWaypoint(npc) {
 }
 const TARGET_NPC_COUNT = 96;       // плотность старого 2D-города на расширенной карте
 const NPC_RESPAWN_MIN_DIST = 22;   // не спаунить ближе этого к игроку
+const CORPSE_AUTO_REMOVE_MS = 180000;
+let _corpseTimeoutCount=0;
 let _nextNpcRespawnAt = 0;
 let _gameMinutes = 12 * 60;        // 12:00 — нужно до initNpcs (TDZ fix)
 
@@ -8408,10 +8446,16 @@ function maintainNpcPopulation(now) {
   // (иначе _guard NPC копятся в NPCS навсегда → утечка → лаги)
   for (let i = NPCS.length - 1; i >= 0; i--) {
     const n = NPCS[i];
-    if (n.dead && n.deadAt && (now-n.deadAt>60000||(n._evacuated&&now-n.deadAt>4500))) {
+    _repairAmbulancePatientState(n,now);
+    const incidentAt=n._medicalDowned?n._medicalDownedAt:n.deadAt;
+    const delivered=!!n._ambulanceDeliveredAt&&(!incidentAt||n._ambulanceDeliveredAt>=incidentAt);
+    const timedOut=n.dead&&n.deadAt&&!n._ambulanceInTransit&&!n._evacuated&&now-n.deadAt>CORPSE_AUTO_REMOVE_MS;
+    if (delivered || (n.dead && timedOut)) {
+      if(timedOut){n._corpseExpired=true;_corpseTimeoutCount++;document.documentElement.dataset.corpseTimeoutRemovals=String(_corpseTimeoutCount);document.documentElement.dataset.lastCorpseRemoval='timeout-180s';if(typeof _cancelAmbulanceCallForPatient==='function')_cancelAmbulanceCallForPatient(n);}
+      else document.documentElement.dataset.lastCorpseRemoval='hospital-delivery';
       const respawn=_isRespawnableResident(n);
       NPCS.splice(i, 1);
-      if(respawn&&!_scheduleResidentRespawn(n,now))RESIDENT_RESPAWN_BACKLOG.push({look:n.look,_arcKey:n._arcKey,_beach:n._beach});
+      if(respawn&&!_scheduleResidentRespawn(n,now))RESIDENT_RESPAWN_BACKLOG.push({_arcKey:n._arcKey,_beach:n._beach,_appearanceGeneration:(+n._appearanceGeneration||0)+1});
     } else if (n._guard && n._hostileUntil && now > n._hostileUntil + 5000) {
       NPCS.splice(i, 1);
     }
@@ -8438,7 +8482,10 @@ function maintainNpcPopulation(now) {
       if (Math.hypot(dr, dc) < NPC_RESPAWN_MIN_DIST) continue;
       placed = n; break;
     }
-    if (placed) { pickNpcWaypoint(placed); NPCS.push(placed); }
+    if (placed) {
+      const door=_pickResidentRespawnDoor();
+      if(!door||!_residentEnterBuilding(placed,now,door,true)){pickNpcWaypoint(placed);NPCS.push(placed);}
+    }
   }
 }
 
@@ -8452,7 +8499,9 @@ const POLICE_REPORT_RADIUS = 5.5;   // на этом расстоянии NPC «
 // wanted-системе тоже работают (см. tick_cops в mafiozi_bot.py).
 // А ниже — фоновые патрули копов + скорая на трупы + пожарные на пожары.
 const HOSPITAL_R     = 26, HOSPITAL_C     = 46;   // POI 'hospital'
+const HOSPITAL_EAST_R = 46, HOSPITAL_EAST_C = 126; // POI 'hospital_east'
 const FIRE_STATION_R = 56, FIRE_STATION_C = 26;   // свободный квартал
+const JUNKYARD_R     = 86, JUNKYARD_C     = 66;   // POI 'junkyard'
 
 // Патрульные копы в городе. Ходят как NPC, считаются «видимыми копами»
 // для witness-цепочки (_copInRadius). Не стреляют — на агрессию реагирует
@@ -8524,6 +8573,8 @@ function spawnCityCop() {
       weapon: 'pistol',
       hp: 100, max_hp: 100,
       alive: true,
+      role: 'police', isPolice: true,
+      look: { gender: 0, skin: 2, body: 8, face: 1, hair: 1, hat: 3 },
       speed: 1.0 + Math.random() * 0.5,
       _wayUntil: 0,
     };
@@ -8805,10 +8856,20 @@ function updateCityCops(dt) {
 const serviceVehicles = [];
 let _svcVehId = 0;
 let _playerEmergencyPatient=null;
+const AMBULANCES_PER_HOSPITAL=3,AMBULANCE_FLEET_SIZE=6,AMBULANCE_RESPONSE_SPEED=8.6;
+const FIRETRUCK_FLEET_SIZE=3,FIRETRUCK_RESPONSE_SPEED=7.4;
+const TOW_FLEET_SIZE=3,TOW_RESPONSE_SPEED=6.6;
+const AMBULANCE_ROUTE_RETRY_MS=900,AMBULANCE_ROUTE_GRACE_MS=5200;
+const AMBULANCE_DEPLOY_PARKING_TOLERANCE=1.6,AMBULANCE_DEPLOY_MAX_PATIENT_DISTANCE=7.25;
+let _ambulanceDeliveryCount=0;
+let _ambulanceWatchdogCount=0;
+let _ambulanceHospitalRecoveryCount=0;
+let _hospitalAmbulanceBaysCache=null;
+let _fireTruckBaysCache=null,_towTruckBaysCache=null;
 // Пожарка остаётся на дороге, а очаг нередко находится на тротуаре/газоне.
 // 4.5 тайла не хватало до ближайшей законной точки остановки, из-за чего
 // машина приезжала и стояла без воды. Длина штатного рукава покрывает 8 тайлов.
-const FIRETRUCK_HOSE_RANGE = 8.0;
+const FIRETRUCK_HOSE_RANGE = 5.25;
 
 // Обычный трафик и серверные/сюжетные машины исторически используют разные
 // флаги разрушения. Все системы (посадка, пожарные, эвакуатор и 3D-мост)
@@ -8851,7 +8912,10 @@ function _vehicleRoadPassable(r, c) {
   if (inArena(ri, ci)) return false;
   if (inLair(ri, ci)) return false;    // копы/техника не въезжают в логово
   if (!MAP[ri]) return false;
-  return MAP[ri][ci] === 0;
+  // 19 — проезжая часть большого моста через городской канал. Без неё
+  // восточная больница оказывалась в отдельном дорожном графе: скорая могла
+  // забрать пациента, но не могла физически вернуться через мост.
+  return MAP[ri][ci] === 0 || MAP[ri][ci] === 19;
 }
 function _vehicleOffroadPassable(r, c) {
   const ri = Math.floor(r), ci = Math.floor(c);
@@ -8860,19 +8924,47 @@ function _vehicleOffroadPassable(r, c) {
   if (inLair(ri, ci)) return false;    // транспорт не въезжает в логово
   if (!MAP[ri]) return false;
   const t = MAP[ri][ci];
-  return (t === 0 || t === 9 || t === 8);
+  return (t === 0 || t === 9 || t === 8 || t === 19);
+}
+
+// The centre can remain on asphalt while a long emergency vehicle clips a
+// neighbouring facade. Driving, depot and work parking validate the complete
+// visible body against buildings/water; ordinary traffic remains non-blocking.
+function _serviceVehicleFootprintClear(v, r, c, ang = null) {
+  if (!v || !['ambulance','firetruck','tow','police','taxi'].includes(v.kind)) return true;
+  const heading = Number.isFinite(+ang) ? +ang : (Number.isFinite(+v.ang) ? +v.ang : 0);
+  const halfLength = v.kind === 'firetruck' ? 1.22 : v.kind === 'tow' ? 1.16 : v.kind === 'ambulance' ? 1.04 : .98;
+  const halfWidth = v.kind === 'firetruck' ? .58 : v.kind === 'tow' ? .54 : .5;
+  const forwardR = Math.sin(heading), forwardC = Math.cos(heading);
+  const sideR = Math.cos(heading), sideC = -Math.sin(heading);
+  const samples = [[0,0],[halfLength,0],[-halfLength,0],[0,halfWidth],[0,-halfWidth],
+    [halfLength*.9,halfWidth*.9],[halfLength*.9,-halfWidth*.9],[-halfLength*.9,halfWidth*.9],[-halfLength*.9,-halfWidth*.9]];
+  for (const [forward, side] of samples) {
+    const sampleR = r + forwardR * forward + sideR * side;
+    const sampleC = c + forwardC * forward + sideC * side;
+    if (_serviceVehicleBodyPointBlocked(sampleR, sampleC)) return false;
+  }
+  return true;
+}
+
+function _serviceVehicleBodyPointBlocked(r,c){
+  const ri=Math.floor(r),ci=Math.floor(c);
+  if(ri<0||ri>=MAP_ROWS||ci<0||ci>=MAP_COLS)return true;
+  if(_isPortContainerSolid(r,c)||_isThreeWholeBuildingBlocked(r,c))return true;
+  const tile=MAP[ri]?.[ci];
+  return tile===1||tile===16;
 }
 
 // Ближайший дорожный тайл (тип 0) к точке (r,c) в радиусе до 12.
 function _nearestRoadTile(r, c, maxRadius = 12) {
   const ri = Math.floor(r), ci = Math.floor(c);
-  if (MAP[ri] && MAP[ri][ci] === 0) return { r: ri, c: ci };
+  if (_vehicleRoadPassable(ri+.5,ci+.5)) return { r: ri, c: ci };
   for (let radius = 1; radius <= maxRadius; radius++) {
     for (let dr = -radius; dr <= radius; dr++) {
       for (let dc = -radius; dc <= radius; dc++) {
         if (Math.abs(dr) !== radius && Math.abs(dc) !== radius) continue;
         const rr = ri + dr, cc = ci + dc;
-        if (MAP[rr] && MAP[rr][cc] === 0) return { r: rr, c: cc };
+        if (_vehicleRoadPassable(rr+.5,cc+.5)) return { r: rr, c: cc };
       }
     }
   }
@@ -8903,8 +8995,7 @@ function _bfsRoadPath(startR, startC, goalR, goalC, searchRadius = 12) {
     for (const [dr, dc] of dirs) {
       const nr = r + dr, nc = c + dc;
       if (nr < 1 || nr >= MAP_ROWS - 1 || nc < 1 || nc >= MAP_COLS - 1) continue;
-      if (!MAP[nr] || MAP[nr][nc] !== 0) continue;
-      if (inArena(nr, nc)) continue;
+      if (!_vehicleRoadPassable(nr+.5,nc+.5)) continue;
       const nk = nr * COLS + nc;
       if (cameFrom.has(nk)) continue;
       cameFrom.set(nk, k);
@@ -9038,7 +9129,32 @@ function _vehicleStep(v, dt) {
       return false;
     }
     // Впереди — другая машина? Тормозим (пробка), не въезжаем в неё.
-    const blocker = _vehicleBlockedByCar(v, ny, nx);
+    // Emergency ambulances keep their route through ordinary traffic. Road and
+    // building collision checks above still apply, so this cannot cut through
+    // houses; only cars stop being hard blockers.
+    // Весь спецтранспорт имеет абсолютный приоритет перед обычным трафиком.
+    // Проверка дорожной маски уже выполнена выше, поэтому сквозь здания,
+    // воду и закрытые зоны машины службы по-прежнему не проходят.
+    const nextAng = Math.atan2(dr, dc);
+    let safeAng=nextAng;
+    if(['firetruck','tow'].includes(v.kind)){
+      const oldAng=Number.isFinite(+v.ang)?+v.ang:nextAng;
+      const turnDelta=Math.atan2(Math.sin(nextAng-oldAng),Math.cos(nextAng-oldAng));
+      const turnLimit=Math.max(.04,Math.min(.22,dt*3.4));
+      safeAng=oldAng+Math.max(-turnLimit,Math.min(turnLimit,turnDelta));
+      if(!_serviceVehicleFootprintClear(v,ny,nx,safeAng)){
+        if(_serviceVehicleFootprintClear(v,ny,nx,oldAng))safeAng=oldAng;
+        else {
+          // At a tight road corner the nose cannot translate until the long
+          // body has turned. Rotate in place through collision-safe angles;
+          // the following frame can then advance along the same road path.
+          if(_serviceVehicleFootprintClear(v,v.y,v.x,safeAng))v.ang=safeAng;
+          v._bodyBlockedSince||=performance.now();return false;
+        }
+      }
+      v._bodyBlockedSince=0;
+    }
+    const blocker = ['ambulance','firetruck','tow','police','taxi'].includes(v.kind)?null:_vehicleBlockedByCar(v, ny, nx);
     if (blocker) {
       v._blockedSince ||= performance.now();
       if (blocker.type === 'traffic' && v.state === 'go_to_scene') {
@@ -9047,13 +9163,13 @@ function _vehicleStep(v, dt) {
       // Экстренная машина не должна навсегда исчезать в плотной пробке.
       // После короткого ожидания сирена получает приоритет и проезжает.
       if (performance.now() - v._blockedSince < 1200) {
-        v.ang = Math.atan2(dr, dc);
+        v.ang = nextAng;
         return false;
       }
     }
     v._blockedSince = 0;
     v.x = nx; v.y = ny;
-    v.ang = Math.atan2(dr, dc);
+    v.ang = safeAng;
     return false;
   }
   // Путь закончился — считаем что прибыли (стоим у ближайшего к цели
@@ -9065,12 +9181,100 @@ function _vehicleStep(v, dt) {
 // Гаражные «двери» — ближайшие дорожные тайлы от больницы/пожарки
 // (POI на здании, машина не может стартовать прямо на нём).
 function _hospitalDoor() {
-  const d = _nearestRoadTile(HOSPITAL_R, HOSPITAL_C);
-  return d ? { r: d.r + 0.5, c: d.c + 0.5 } : { r: HOSPITAL_R, c: HOSPITAL_C };
+  return _hospitalDoorAt(HOSPITAL_R,HOSPITAL_C);
+}
+function _hospitalDoorAt(hospitalR,hospitalC) {
+  const d = _nearestRoadTile(hospitalR, hospitalC);
+  return d ? { r: d.r + 0.5, c: d.c + 0.5 } : { r: hospitalR, c: hospitalC };
+}
+function _hospitalAmbulanceBays(){
+  if(_hospitalAmbulanceBaysCache)return _hospitalAmbulanceBaysCache;
+  const hospitals=[{id:'central',r:HOSPITAL_R,c:HOSPITAL_C},{id:'east',r:HOSPITAL_EAST_R,c:HOSPITAL_EAST_C}],bays=[];
+  for(const hospital of hospitals){
+    const door=_hospitalDoorAt(hospital.r,hospital.c),candidates=[];
+    for(let dr=-7;dr<=7;dr++)for(let dc=-7;dc<=7;dc++){
+      const r=Math.floor(door.r)+dr+.5,c=Math.floor(door.c)+dc+.5;
+      if(_vehicleRoadPassable(r,c)&&_serviceVehicleFootprintClear({kind:'ambulance',ang:0},r,c,0))candidates.push({r,c,d:Math.hypot(r-door.r,c-door.c)});
+    }
+    candidates.sort((a,b)=>a.d-b.d||a.r-b.r||a.c-b.c);
+    let added=0;for(const spot of candidates){if(bays.filter(b=>b.hospitalId===hospital.id).every(b=>Math.hypot(b.r-spot.r,b.c-spot.c)>=1.8)){bays.push({r:spot.r,c:spot.c,hospitalId:hospital.id});added++;}if(added>=AMBULANCES_PER_HOSPITAL)break;}
+    while(added<AMBULANCES_PER_HOSPITAL){bays.push({r:door.r,c:door.c,hospitalId:hospital.id});added++;}
+  }
+  _hospitalAmbulanceBaysCache=bays;return bays;
+}
+function _ensureAmbulanceFleet(){
+  const bays=_hospitalAmbulanceBays();
+  const live=serviceVehicles.filter(v=>v?.kind==='ambulance'&&v.state!=='done');
+  const occupied=new Set(live.map(v=>+v.fleetSlot||0));
+  for(let slot=0;slot<AMBULANCE_FLEET_SIZE;slot++){
+    if(occupied.has(slot))continue;
+    const bay=bays[slot]||bays[0],v={id:'amb_'+(++_svcVehId),kind:'ambulance',x:bay.c,y:bay.r,ang:0,
+      speed:0,state:'ambulance_parked',workUntil:0,payload:{},homeR:bay.r,homeC:bay.c,
+      fleetSlot:slot,hospitalId:bay.hospitalId,path:[],pathIdx:0,finalTarget:null,_lastMoveT:performance.now()};
+    serviceVehicles.push(v);
+  }
+  return serviceVehicles.filter(v=>v?.kind==='ambulance'&&v.state!=='done');
 }
 function _fireStationDoor() {
   const d = _nearestRoadTile(FIRE_STATION_R, FIRE_STATION_C);
   return d ? { r: d.r + 0.5, c: d.c + 0.5 } : { r: FIRE_STATION_R, c: FIRE_STATION_C };
+}
+
+function _serviceDepotBays(originR,originC,count,kind){
+  const door=_nearestRoadTile(originR,originC,20),center=door?{r:door.r+.5,c:door.c+.5}:{r:originR,c:originC};
+  const candidates=[];
+  for(let dr=-9;dr<=9;dr++)for(let dc=-9;dc<=9;dc++){
+    const r=Math.floor(center.r)+dr+.5,c=Math.floor(center.c)+dc+.5;
+    if(!_vehicleRoadPassable(r,c)||!_serviceVehicleFootprintClear({kind,ang:0},r,c,0))continue;
+    candidates.push({r,c,d:Math.hypot(r-center.r,c-center.c)});
+  }
+  candidates.sort((a,b)=>a.d-b.d||a.r-b.r||a.c-b.c);
+  const bays=[];
+  for(const spot of candidates){
+    if(bays.every(b=>Math.hypot(b.r-spot.r,b.c-spot.c)>=2.05))bays.push({r:spot.r,c:spot.c});
+    if(bays.length>=count)break;
+  }
+  while(bays.length<count)bays.push({r:center.r,c:center.c});
+  return bays;
+}
+function _fireTruckBays(){return _fireTruckBaysCache||= _serviceDepotBays(FIRE_STATION_R,FIRE_STATION_C,FIRETRUCK_FLEET_SIZE,'firetruck');}
+function _towTruckBays(){return _towTruckBaysCache||= _serviceDepotBays(JUNKYARD_R,JUNKYARD_C,TOW_FLEET_SIZE,'tow');}
+function _ensurePermanentServiceFleet(kind,count,bays,parkedState){
+  const live=serviceVehicles.filter(v=>v?.kind===kind&&v.state!=='done'),occupied=new Set(live.map(v=>+v.fleetSlot||0));
+  for(let slot=0;slot<count;slot++){
+    if(occupied.has(slot))continue;
+    const bay=bays[slot]||bays[0];
+    serviceVehicles.push({id:`${kind==='firetruck'?'fire':'tow'}_${++_svcVehId}`,kind,x:bay.c,y:bay.r,ang:0,speed:0,
+      state:parkedState,workUntil:0,payload:{},homeR:bay.r,homeC:bay.c,fleetSlot:slot,path:[],pathIdx:0,
+      finalTarget:null,_loaded:false,_loadProgress:0,_lastMoveT:performance.now()});
+  }
+  return serviceVehicles.filter(v=>v?.kind===kind&&v.state!=='done');
+}
+function _ensureFireTruckFleet(){return _ensurePermanentServiceFleet('firetruck',FIRETRUCK_FLEET_SIZE,_fireTruckBays(),'firetruck_parked');}
+function _ensureTowTruckFleet(){return _ensurePermanentServiceFleet('tow',TOW_FLEET_SIZE,_towTruckBays(),'tow_parked');}
+function _parkPermanentServiceVehicle(v,now=performance.now(),mode='road-arrival'){
+  if(!v||!['firetruck','tow'].includes(v.kind))return false;
+  if(v.kind==='firetruck')_releaseAbortedFireCall(v);else _releaseFailedTowCall(v);
+  v.payload={};v.path=[];v.pathIdx=0;v.finalTarget=null;v.speed=0;v.workUntil=0;
+  v._loaded=false;v._loadProgress=0;v._towRouteRetries=0;v._hoseAng=null;
+  v.x=v.homeC;v.y=v.homeR;v.state=v.kind==='firetruck'?'firetruck_parked':'tow_parked';v._lastMoveT=now;
+  const prefix=v.kind==='firetruck'?'fire':'tow',road=mode==='road-arrival'&&v._serviceReturnMoveObserved===true;
+  const key=road?`${prefix}RoadReturns`:`${prefix}EmergencyReturns`;
+  document.documentElement.dataset[key]=String((+document.documentElement.dataset[key]||0)+1);
+  document.documentElement.dataset[`${prefix}ReturnLast`]=road?'road-arrival':mode;
+  v._serviceReturnMoveObserved=false;
+  return true;
+}
+function _sendPermanentServiceHome(v,now=performance.now(),reason='job-complete'){
+  if(!v||!['firetruck','tow'].includes(v.kind))return false;
+  v.speed=v.kind==='firetruck'?FIRETRUCK_RESPONSE_SPEED:TOW_RESPONSE_SPEED;v.state='returning';v._lastMoveT=now;
+  v._prevX=v.x;v._prevY=v.y;v._serviceReturnMoveObserved=false;
+  _setVehicleRoute(v,v.y,v.x,v.homeR,v.homeC);
+  document.documentElement.dataset[`${v.kind==='firetruck'?'fire':'tow'}ReturnState`]=v.path?.length?'driving':`no-route:${reason}`;
+  if(v.path?.length)return true;
+  if(v.kind==='tow'&&v._loaded)_completeTowRemoval(v);
+  _parkPermanentServiceVehicle(v,now,`no-route:${reason}`);
+  return false;
 }
 
 function _setVehicleRoute(v, fromR, fromC, toR, toC) {
@@ -9103,28 +9307,67 @@ function _setVehicleRoute(v, fromR, fromC, toR, toC) {
   v.finalTarget = { x: sceneC, y: sceneR };
 }
 
-function spawnAmbulance(targetR, targetC, npc) {
-  // Не дублировать — если в радиусе 3 уже едет другая скорая на ту же
-  // зону, ничего не делаем. Без этого 10 трупов рядом порождают 10 машин.
-  for (const v of serviceVehicles) {
-    if (v.kind !== 'ambulance' || v.state === 'done') continue;
-    const ft = v.finalTarget || { x: 0, y: 0 };
-    const dr = ft.y - targetR, dc = ft.x - targetC;
-    if (Math.hypot(dr, dc) < 3) return null;
+function _ambulanceSceneParking(targetR,targetC,fromR,fromC,excludeVehicle=null){
+  const candidates=[];
+  const tr=Math.floor(targetR),tc=Math.floor(targetC);
+  for(let dr=-7;dr<=7;dr++)for(let dc=-7;dc<=7;dc++){
+    const r=tr+dr+.5,c=tc+dc+.5,d=Math.hypot(r-targetR,c-targetC);
+    if(d<2.8||d>6.4||!_vehicleRoadPassable(r,c))continue;
+    const path=_bfsRoadPath(fromR,fromC,r,c,30);
+    if(!path?.length)continue;
+    const before=path.length>1?path[path.length-2]:{r:fromR,c:fromC};
+    const parkingAng=Math.atan2(r-before.r,c-before.c);
+    if(!_serviceVehicleFootprintClear({kind:'ambulance',ang:parkingAng},r,c,parkingAng))continue;
+    let occupied=false;
+    if(typeof CARS!=='undefined'&&Array.isArray(CARS))occupied=CARS.some(car=>car&&!car._towed&&Math.hypot((+car.r||0)-r,(+car.c||0)-c)<1.65);
+    if(!occupied)occupied=serviceVehicles.some(other=>other!==excludeVehicle&&other?.state!=='done'&&Math.hypot((+other.y||0)-r,(+other.x||0)-c)<1.65);
+    if(occupied)continue;
+    candidates.push({r,c,score:Math.abs(d-3.8)*3+Math.hypot(r-fromR,c-fromC)*.025});
   }
-  const door = _hospitalDoor();
-  const v = {
-    id: 'amb_' + (++_svcVehId), kind: 'ambulance',
-    x: door.c, y: door.r,
-    ang: 0, speed: 4.0,                   // чуть быстрее обычных машин (с сиреной)
-    state: 'go_to_scene', workUntil: 0,
-    payload: { npc },
-    homeR: HOSPITAL_R, homeC: HOSPITAL_C,
-    path: [], pathIdx: 0, finalTarget: null,
-  };
-  _setVehicleRoute(v, door.r, door.c, targetR, targetC);
-  serviceVehicles.push(v);
+  candidates.sort((a,b)=>a.score-b.score);
+  if(candidates.length)return candidates[0];
+  const road=_nearestRoadTile(targetR,targetC,12);
+  return road?{r:road.r+.5,c:road.c+.5}:{r:targetR,c:targetC};
+}
+
+function spawnAmbulance(targetR, targetC, npc) {
+  const fleet=_ensureAmbulanceFleet();
+  if(fleet.some(v=>v.payload?.npc===npc&&v.state!=='ambulance_parked'))return null;
+  const v=fleet.filter(v=>v.state==='ambulance_parked').sort((a,b)=>Math.hypot(a.y-targetR,a.x-targetC)-Math.hypot(b.y-targetR,b.x-targetC))[0];
+  if(!v)return null;
+  const parking=_ambulanceSceneParking(targetR,targetC,v.y,v.x);
+  const now=performance.now();
+  v.payload={npc};v.speed=AMBULANCE_RESPONSE_SPEED;v.state='go_to_scene';v.workUntil=0;
+  v.sceneParkingR=parking.r;v.sceneParkingC=parking.c;v._sceneNearSince=0;
+  v._medicalScene=null;v._medicalCrew=[];v._lastMoveT=now;
+  v._responseStartedAt=now;v._routeMissingSince=0;v._ambulanceNextRouteRetry=0;
+  _setVehicleRoute(v,v.y,v.x,parking.r,parking.c);
+  if(!v.path?.length)v._routeMissingSince=now;
   return v;
+}
+
+function _rerouteAmbulance(v,now=performance.now(),reason='route-refresh'){
+  if(v?.kind!=='ambulance'||v.state!=='go_to_scene'||!v.payload?.npc)return false;
+  const target=_ambulancePatientPosition(v);
+  if(!target)return false;
+  const parking=_ambulanceSceneParking(target.r,target.c,v.y,v.x,v);
+  v.sceneParkingR=parking.r;v.sceneParkingC=parking.c;
+  _setVehicleRoute(v,v.y,v.x,parking.r,parking.c);
+  v._ambulanceNextRouteRetry=now+AMBULANCE_ROUTE_RETRY_MS;
+  if(v.path?.length)v._routeMissingSince=0;
+  else v._routeMissingSince||=now;
+  document.documentElement.dataset.ambulanceReroutes=String((+document.documentElement.dataset.ambulanceReroutes||0)+1);
+  document.documentElement.dataset.ambulanceRerouteLast=reason;
+  return !!v.path?.length;
+}
+
+function _ambulanceReadyToDeploy(v,target){
+  if(!v||!target)return false;
+  const parkingR=Number.isFinite(+v.sceneParkingR)?+v.sceneParkingR:+v.finalTarget?.y;
+  const parkingC=Number.isFinite(+v.sceneParkingC)?+v.sceneParkingC:+v.finalTarget?.x;
+  const parkingError=Number.isFinite(parkingR)&&Number.isFinite(parkingC)?Math.hypot(v.y-parkingR,v.x-parkingC):Infinity;
+  const patientDistance=Math.hypot(target.r-v.y,target.c-v.x);
+  return parkingError<=AMBULANCE_DEPLOY_PARKING_TOLERANCE&&patientDistance<=AMBULANCE_DEPLOY_MAX_PATIENT_DISTANCE;
 }
 
 function _ambulancePatientPosition(v) {
@@ -9138,14 +9381,25 @@ function _ambulancePatientPosition(v) {
 
 function _ambulanceNeedsBodyCrew(v) {
   const patient = v?.payload?.npc;
-  return !!patient && !patient._playerPatient && !patient._medicalDowned &&
-    (patient.dead === true || +patient.hp <= 0);
+  const npcCasualty = !!patient && (patient.dead === true || +patient.hp <= 0 || patient._medicalDowned);
+  return npcCasualty && !patient._playerPatient && !patient._corpseExpired &&
+    !patient._evacuated && !patient._ambulanceInTransit &&
+    !patient._carriedByAmbulance;
 }
 
 function _startAmbulanceBodyCrew(v, now = performance.now()) {
   if (!_ambulanceNeedsBodyCrew(v)) return false;
   const target = _ambulancePatientPosition(v);
   if (!target) return false;
+  // Носилки нельзя выпускать, пока сама машина реально не остановилась у
+  // выбранной парковочной точки. Если пострадавший сдвинулся или маршрут
+  // закончился преждевременно, сначала перестраиваем подъезд.
+  if(!_ambulanceReadyToDeploy(v,target)){
+    v.state='go_to_scene';v.speed=AMBULANCE_RESPONSE_SPEED;
+    v._medicalScene=null;v._medicalCrew=[];
+    _rerouteAmbulance(v,now,'deploy-before-vehicle-arrival');
+    return false;
+  }
   const forwardR = Math.sin(v.ang || 0), forwardC = Math.cos(v.ang || 0);
   const rearR = v.y - forwardR * 1.16, rearC = v.x - forwardC * 1.16;
   const distance = Math.hypot(target.r - rearR, target.c - rearC);
@@ -9155,14 +9409,14 @@ function _startAmbulanceBodyCrew(v, now = performance.now()) {
   const approachMs = Math.max(1000, Math.min(6200, distance / 1.9 * 1000));
   const assessMs = 650, liftMs = 850;
   const returnMs = Math.max(1200, Math.min(6800, distance / 1.55 * 1000));
-  const loadMs = 900;
-  const total = deployMs + approachMs + assessMs + liftMs + returnMs + loadMs;
+  const loadMs = 900, sealMs = 850;
+  const total = deployMs + approachMs + assessMs + liftMs + returnMs + loadMs + sealMs;
   v._medicalScene = {
     active: true, startedAt: now, phase: 'deploying',
     targetR: target.r, targetC: target.c, rearR, rearC,
     centerR: rearR, centerC: rearC, ang: approachAng,
-    deployMs, approachMs, assessMs, liftMs, returnMs, loadMs, total,
-    approachAng, returnAng, liftProgress: 0,
+    deployMs, approachMs, assessMs, liftMs, returnMs, loadMs, sealMs, total,
+    approachAng, returnAng, liftProgress: 0, loadProgress: 0, sealProgress: 0,
     stretcherVisible: true, bodyVisible: false,
   };
   const looks = [
@@ -9176,6 +9430,7 @@ function _startAmbulanceBodyCrew(v, now = performance.now()) {
   const patient = v.payload.npc;
   patient._ambulanceLoading = true;
   patient._carriedByAmbulance = false;
+  v.speed = 0;v.path=[];v.pathIdx=0;v.finalTarget=null;
   v.state = 'medical_response';
   v.workDuration = total;
   v.workUntil = now + total;
@@ -9200,10 +9455,20 @@ function _setAmbulanceCrewPose(v, centerR, centerC, ang, walking, carrying, dt) 
 function _updateAmbulanceBodyCrew(v, dt, now = performance.now()) {
   const scene = v?._medicalScene, patient = v?.payload?.npc;
   if (!scene?.active || !patient) return true;
+  // Машина во время погрузки неподвижна, а точка задних дверей каждый кадр
+  // синхронизируется с её фактическим положением. Так носилки не могут
+  // продолжить путь отдельно после watchdog-переноса или коррекции позиции.
+  v.speed=0;
+  const actualRearR=v.y-Math.sin(v.ang||0)*1.16,actualRearC=v.x-Math.cos(v.ang||0)*1.16;
+  if(Math.hypot(actualRearR-scene.rearR,actualRearC-scene.rearC)>.12){
+    scene.rearR=actualRearR;scene.rearC=actualRearC;
+    scene.returnAng=Math.atan2(scene.rearR-scene.targetR,scene.rearC-scene.targetC);
+    document.documentElement.dataset.ambulanceStretcherResyncs=String((+document.documentElement.dataset.ambulanceStretcherResyncs||0)+1);
+  }
   const age = Math.max(0, now - scene.startedAt);
   const lerp = (a, b, p) => a + (b - a) * Math.max(0, Math.min(1, p));
   let cursor = 0, centerR = scene.rearR, centerC = scene.rearC;
-  let ang = scene.approachAng, walking = false, carrying = false;
+  let ang = scene.approachAng, walking = false, carrying = false, actionProgress = 0;
   if (age < (cursor += scene.deployMs)) {
     const p = age / scene.deployMs;
     scene.phase = 'deploying'; walking = true;
@@ -9215,12 +9480,13 @@ function _updateAmbulanceBodyCrew(v, dt, now = performance.now()) {
     centerR = lerp(scene.rearR, scene.targetR, p);
     centerC = lerp(scene.rearC, scene.targetC, p);
   } else if (age < (cursor += scene.assessMs)) {
-    scene.phase = 'assessing';
+    scene.phase = 'assessing'; actionProgress = (age - (cursor - scene.assessMs)) / scene.assessMs;
     centerR = scene.targetR; centerC = scene.targetC;
   } else if (age < (cursor += scene.liftMs)) {
     scene.phase = 'lifting';
     scene.liftProgress = Math.max(0, Math.min(1,
       (age - scene.deployMs - scene.approachMs - scene.assessMs) / scene.liftMs));
+    actionProgress = scene.liftProgress;
     centerR = scene.targetR; centerC = scene.targetC;
     carrying = scene.liftProgress > 0.42;
     if (carrying) patient._carriedByAmbulance = true;
@@ -9230,24 +9496,37 @@ function _updateAmbulanceBodyCrew(v, dt, now = performance.now()) {
     centerR = lerp(scene.targetR, scene.rearR, p);
     centerC = lerp(scene.targetC, scene.rearC, p);
     patient._carriedByAmbulance = true;
+  } else if (age < (cursor += scene.loadMs)) {
+    const p = Math.max(0, Math.min(1, (age - (cursor - scene.loadMs)) / scene.loadMs));
+    scene.phase = 'loading'; scene.loadProgress = p; carrying = true; ang = scene.returnAng;
+    // The stretcher rolls through the rear doors instead of vanishing at the bumper.
+    centerR = scene.rearR + Math.sin(v.ang || 0) * p * .72;
+    centerC = scene.rearC + Math.cos(v.ang || 0) * p * .72;
+    patient._carriedByAmbulance = true;
   } else if (age < scene.total) {
-    scene.phase = 'loading'; carrying = true; ang = scene.returnAng;
-    centerR = scene.rearR; centerC = scene.rearC;
+    const p = Math.max(0, Math.min(1, (age - cursor) / scene.sealMs));
+    scene.phase = 'sealing'; scene.sealProgress = p; scene.stretcherVisible = false;
+    actionProgress = p; centerR = scene.rearR; centerC = scene.rearC; ang = v.ang || 0;
     patient._carriedByAmbulance = true;
   } else {
     scene.phase = 'loaded'; scene.active = false;
     scene.stretcherVisible = false; scene.bodyVisible = false;
     for (const medic of (v._medicalCrew || [])) medic.visible = false;
-    patient._carriedByAmbulance = false;
+    patient._carriedByAmbulance = true;
     patient._ambulanceLoading = false;
     patient._evacuated = true;
-    patient._evacuatedAt = now;
-    if (!v.payload.beachgoer) patient.deadAt = now - 60000;
+    patient._evacuatedAt = 0;
+    patient._ambulanceInTransit = true;
     return true;
   }
   scene.centerR = centerR; scene.centerC = centerC; scene.ang = ang;
-  scene.bodyVisible = patient._carriedByAmbulance || scene.phase === 'lifting';
+  scene.bodyVisible = (patient._carriedByAmbulance || scene.phase === 'lifting') &&
+    !(scene.phase === 'loading' && scene.loadProgress > .9);
   _setAmbulanceCrewPose(v, centerR, centerC, ang, walking, carrying, dt);
+  for (const medic of (v._medicalCrew || [])) {
+    medic.action = scene.phase;
+    medic.actionProgress = actionProgress;
+  }
   return false;
 }
 
@@ -9264,6 +9543,98 @@ function _releaseFailedAmbulanceCall(v) {
   for (const medic of (v._medicalCrew || [])) medic.visible = false;
 }
 
+function _repairAmbulancePatientState(patient,now=performance.now()){
+  if(!patient||(patient.dead!==true&&!patient._medicalDowned&&+patient.hp>0))return;
+  const incidentAt=+(patient._medicalDowned?patient._medicalDownedAt:patient.deadAt)||0;
+  const previousEnd=Math.max(+patient._ambulanceDeliveredAt||0,+patient._evacuatedAt||0);
+  const active=serviceVehicles.some(v=>v?.kind==='ambulance'&&v.state!=='done'&&
+    v.state!=='ambulance_parked'&&v.payload?.npc===patient);
+  if(incidentAt&&previousEnd&&incidentAt>previousEnd+50){
+    patient._ambulanceDeliveredAt=0;patient._evacuatedAt=0;patient._evacuated=false;
+    patient._corpseExpired=false;patient._ambulanceDispatched=false;
+    patient._ambulanceInTransit=false;patient._ambulanceLoading=false;patient._carriedByAmbulance=false;
+  }
+  if(patient._corpseExpired&&incidentAt&&now-incidentAt<CORPSE_AUTO_REMOVE_MS)patient._corpseExpired=false;
+  if(!active&&(patient._ambulanceDispatched||patient._ambulanceLoading||
+      patient._ambulanceInTransit||patient._carriedByAmbulance)){
+    patient._ambulanceDispatched=false;patient._ambulanceLoading=false;
+    patient._ambulanceInTransit=false;patient._carriedByAmbulance=false;
+    if(!patient._ambulanceDeliveredAt){patient._evacuated=false;patient._evacuatedAt=0;}
+    document.documentElement.dataset.ambulanceOrphanRepairs=String((+document.documentElement.dataset.ambulanceOrphanRepairs||0)+1);
+  }
+}
+
+function _cancelAmbulanceCallForPatient(patient){
+  for(const v of serviceVehicles){
+    if(v?.kind!=='ambulance'||v.payload?.npc!==patient||v.state==='ambulance_parked')continue;
+    _releaseFailedAmbulanceCall(v);v.payload={};v._medicalScene=null;v._medicalCrew=[];
+    _sendAmbulanceToHospital(v,performance.now(),'cancelled-call-return');
+  }
+}
+function _sendAmbulanceToHospital(v,now=performance.now(),reason='patient-loaded'){
+  if(v?.kind!=='ambulance')return false;
+  v.speed=AMBULANCE_RESPONSE_SPEED;v.state='returning';v._lastMoveT=now;
+  v._prevX=v.x;v._prevY=v.y;v._ambulanceReturnStartedAt=now;v._ambulanceReturnMoveObserved=false;
+  v._returnRouteMissingSince=0;v._ambulanceNextReturnRetry=0;
+  _setVehicleRoute(v,v.y,v.x,v.homeR,v.homeC);
+  if(!v.path?.length)v._returnRouteMissingSince=now;
+  document.documentElement.dataset.ambulanceReturnLast=reason;
+  document.documentElement.dataset.ambulanceReturnState=v.path?.length?'driving':'waiting-for-route';
+  return true;
+}
+function _retryAmbulanceHospitalRoute(v,now=performance.now()){
+  if(v?.kind!=='ambulance'||v.state!=='returning')return false;
+  v.speed=AMBULANCE_RESPONSE_SPEED;
+  _setVehicleRoute(v,v.y,v.x,v.homeR,v.homeC);
+  v._ambulanceNextReturnRetry=now+AMBULANCE_ROUTE_RETRY_MS;
+  if(v.path?.length){v._returnRouteMissingSince=0;document.documentElement.dataset.ambulanceReturnState='route-restored';return true;}
+  v._returnRouteMissingSince||=now;document.documentElement.dataset.ambulanceReturnState='waiting-for-route';return false;
+}
+function _completeAmbulanceHospitalDelivery(v,now=performance.now(),mode='road-arrival'){
+  const patient=v?.payload?.npc;
+  if(patient?._ambulanceInTransit){
+    if(patient._medicalDowned&&!patient.dead){
+      patient._medicalDowned=false;patient._medicalDownedAt=0;patient._medicalBleedoutAt=0;
+      patient._knockedUntil=0;patient._forcedCrawl=false;
+      patient.hp=Math.max(35,Math.ceil((patient.max_hp||60)*.45));patient._hospitalRecovered=true;
+      _ambulanceHospitalRecoveryCount++;
+      document.documentElement.dataset.ambulanceHospitalRecoveries=String(_ambulanceHospitalRecoveryCount);
+    }
+    patient._ambulanceInTransit=false;patient._carriedByAmbulance=false;patient._ambulanceLoading=false;
+    patient._ambulanceDispatched=false;patient._evacuated=true;patient._evacuatedAt=now;patient._ambulanceDeliveredAt=now;
+    _ambulanceDeliveryCount++;document.documentElement.dataset.ambulanceHospitalDeliveries=String(_ambulanceDeliveryCount);
+    const road=mode==='road-arrival'&&v._ambulanceReturnMoveObserved===true,key=road?'ambulanceHospitalRoadDeliveries':'ambulanceHospitalEmergencyDeliveries';
+    document.documentElement.dataset[key]=String((+document.documentElement.dataset[key]||0)+1);
+    document.documentElement.dataset.ambulanceHospitalLastMode=road?'road-arrival':mode;
+    document.documentElement.dataset.ambulanceReturnState=road?'parked-after-road-arrival':`parked-after-${mode}`;
+  }
+  v.payload={};v._medicalScene=null;v._medicalCrew=[];v.path=[];v.pathIdx=0;v.finalTarget=null;
+  v.x=v.homeC;v.y=v.homeR;v.speed=0;v.state='ambulance_parked';v._lastMoveT=now;v._sceneNearSince=0;
+}
+
+function _ambulanceWatchdogAdvance(v,now=performance.now(),reason='stuck'){
+  if(v?.kind!=='ambulance')return false;
+  _ambulanceWatchdogCount++;
+  document.documentElement.dataset.ambulanceWatchdogTeleports=String(_ambulanceWatchdogCount);
+  document.documentElement.dataset.ambulanceWatchdogLast=reason;
+  document.documentElement.dataset.ambulanceWatchdogVehicle=String(v.id||'unknown');
+  document.documentElement.dataset.ambulanceWatchdogPosition=`${(+v.y||0).toFixed(2)}:${(+v.x||0).toFixed(2)}:${+v.pathIdx||0}/${v.path?.length||0}`;
+  document.documentElement.dataset.ambulanceWatchdogBodyClear=_serviceVehicleFootprintClear(v,+v.y||0,+v.x||0,+v.ang||0)?'1':'0';
+  if(v.state==='returning'&&v.payload?.npc?._ambulanceInTransit){
+    _completeAmbulanceHospitalDelivery(v,now,`watchdog:${reason}`);
+    return true;
+  }
+  if(v.state==='go_to_scene'){
+    const r=Number.isFinite(+v.sceneParkingR)?+v.sceneParkingR:(+v.finalTarget?.y||v.y);
+    const c=Number.isFinite(+v.sceneParkingC)?+v.sceneParkingC:(+v.finalTarget?.x||v.x);
+    v.y=r;v.x=c;v.path=[];v.pathIdx=0;v._lastMoveT=now;v._sceneNearSince=0;
+    if(_ambulanceNeedsBodyCrew(v))return _startAmbulanceBodyCrew(v,now);
+    v.state='working';v.workDuration=2500;v.workUntil=now+v.workDuration;
+    return true;
+  }
+  return false;
+}
+
 function _dispatchPlayerAmbulance(){
   if(_playerEmergencyPatient||myJailIn>0)return;
   const now=performance.now();_playerEmergencyPatient={r:player.r,c:player.c,_playerPatient:true,_medicalDowned:true,_medicalDownedAt:now,_medicalBleedoutAt:now+18000};
@@ -9272,30 +9643,50 @@ function _dispatchPlayerAmbulance(){
   else _playerEmergencyPatient=null;
 }
 
+function _fireTruckParkingPoint(targetR,targetC,fromR=FIRE_STATION_R,fromC=FIRE_STATION_C){
+  let best=null,bestScore=Infinity,unrouted=null,unroutedScore=Infinity;
+  const r0=Math.floor(targetR),c0=Math.floor(targetC);
+  for(let dr=-6;dr<=6;dr++)for(let dc=-6;dc<=6;dc++){
+    const r=r0+dr+.5,c=c0+dc+.5,d=Math.hypot(r-targetR,c-targetC);
+    if(d<2.8||d>FIRETRUCK_HOSE_RANGE-.25||!_vehicleRoadPassable(r,c))continue;
+    const path=_bfsRoadPath(fromR,fromC,r,c,30);
+    const before=path?.length>1?path[path.length-2]:{r:fromR,c:fromC};
+    const parkingAng=Math.atan2(r-before.r,c-before.c);
+    if(!_serviceVehicleFootprintClear({kind:'firetruck',ang:parkingAng},r,c,parkingAng))continue;
+    const score=Math.abs(d-3.65)+(path?.length||0)*.004;
+    if(!path?.length){if(Math.abs(d-3.65)<unroutedScore){unroutedScore=Math.abs(d-3.65);unrouted={r,c,path:[]};}continue;}
+    if(score<bestScore){bestScore=score;best={r,c,path};}
+  }
+  if(best)return best;
+  if(unrouted)return unrouted;
+  const road=_nearestRoadTile(targetR,targetC,12);
+  if(!road)return null;
+  const r=road.r+.5,c=road.c+.5,path=_bfsRoadPath(fromR,fromC,r,c,30);
+  return {r,c,path:path||[]};
+}
+
 function spawnFireTruck(targetR, targetC, fireRef, carRef) {
   // Не дублировать — если в радиусе 3 уже едет пожарка, ничего не делаем
   for (const v of serviceVehicles) {
-    if (v.kind !== 'firetruck' || v.state === 'done') continue;
+    if (v.kind !== 'firetruck' || v.state === 'done' || v.state === 'firetruck_parked') continue;
+    if ((carRef && v.payload?.carRef === carRef) || (fireRef && v.payload?.fireRef === fireRef)) return null;
     const ft = v.finalTarget || { x: 0, y: 0 };
     const dr = ft.y - targetR, dc = ft.x - targetC;
     if (Math.hypot(dr, dc) < 3) return null;
   }
-  const door = _fireStationDoor();
-  const v = {
-    id: 'fire_' + (++_svcVehId), kind: 'firetruck',
-    x: door.c, y: door.r,
-    ang: 0, speed: 3.5,                   // пожарка чуть тяжелее, ниже скорой
-    state: 'go_to_scene', workUntil: 0,
-    payload: { fireRef, carRef },
-    homeR: FIRE_STATION_R, homeC: FIRE_STATION_C,
-    path: [], pathIdx: 0, finalTarget: null,
-  };
-  _setVehicleRoute(v, door.r, door.c, targetR, targetC);
+  const fleet=_ensureFireTruckFleet();
+  const v=fleet.filter(q=>q.state==='firetruck_parked').sort((a,b)=>Math.hypot(a.y-targetR,a.x-targetC)-Math.hypot(b.y-targetR,b.x-targetC))[0];
+  if(!v)return null;
+  const parking=_fireTruckParkingPoint(targetR,targetC,v.y,v.x);
+  if(!parking)return null;
+  v.speed=FIRETRUCK_RESPONSE_SPEED;v.state='go_to_scene';v.workUntil=0;v.payload={fireRef,carRef};
+  v._fireAborted=false;v._fireRouteRetries=0;v._fireNextRouteRetry=0;v._responseStartedAt=performance.now();v._fireOutboundMoveObserved=false;v._lastMoveT=v._responseStartedAt;v._prevX=v.x;v._prevY=v.y;
+  v.sceneParkingR=parking?.r;v.sceneParkingC=parking?.c;
+  v.path=parking.path||[];v.pathIdx=0;v.finalTarget={x:parking.c,y:parking.r};v._offroadRoute=false;
   if (fireRef && fireRef.kind === 'gas_station' && (!v.path || !v.path.length)) {
-    v.path = _bfsFireStationPath(door.r,door.c,targetR,targetC) || [];
+    v.path = _bfsFireStationPath(v.y,v.x,targetR,targetC) || [];
     v.pathIdx = 0;
   }
-  serviceVehicles.push(v);
   return v;
 }
 
@@ -9304,26 +9695,137 @@ function spawnFireTruck(targetR, targetC, fireRef, carRef) {
 // платформу, увозит к депо (home) и УДАЛЯЕТ из CARS — трафик доспавнит
 // новую (машины не пропадают навсегда). Если в машине игрок — НЕ грузим
 // (защита от увоза игрока за карту).
+function _towTruckParkingPoint(targetR,targetC,fromR=JUNKYARD_R,fromC=JUNKYARD_C){
+  let best=null,bestScore=Infinity,unrouted=null,unroutedScore=Infinity;
+  const r0=Math.floor(targetR),c0=Math.floor(targetC);
+  for(let dr=-5;dr<=5;dr++)for(let dc=-5;dc<=5;dc++){
+    const r=r0+dr+.5,c=c0+dc+.5,d=Math.hypot(r-targetR,c-targetC);
+    if(d<1.7||d>3.6||!_vehicleRoadPassable(r,c))continue;
+    if(_vehicleBlockedByCar({kind:'tow'},r,c))continue;
+    const path=_bfsRoadPath(fromR,fromC,r,c,30);
+    const before=path?.length>1?path[path.length-2]:{r:fromR,c:fromC};
+    const parkingAng=Math.atan2(r-before.r,c-before.c);
+    if(!_serviceVehicleFootprintClear({kind:'tow',ang:parkingAng},r,c,parkingAng))continue;
+    const score=Math.abs(d-2.35)+(path?.length||0)*.004;
+    if(!path?.length){if(Math.abs(d-2.35)<unroutedScore){unroutedScore=Math.abs(d-2.35);unrouted={r,c,path:[]};}continue;}
+    if(score<bestScore){bestScore=score;best={r,c,path};}
+  }
+  if(best)return best;
+  if(unrouted)return unrouted;
+  const road=_nearestRoadTile(targetR,targetC,12);
+  if(!road)return null;
+  const r=road.r+.5,c=road.c+.5,path=_bfsRoadPath(fromR,fromC,r,c,30);
+  return {r,c,path:path||[]};
+}
 function spawnTowTruck(targetR, targetC, carRef) {
   for (const v of serviceVehicles) {
-    if (v.kind !== 'tow' || v.state === 'done') continue;
+    if (v.kind !== 'tow' || v.state === 'done' || v.state === 'tow_parked') continue;
+    if (carRef && v.payload?.carRef === carRef) return null;
     const ft = v.finalTarget || { x: 0, y: 0 };
     if (Math.hypot(ft.y - targetR, ft.x - targetC) < 3) return null;
   }
-  const door = _fireStationDoor();   // выезжает от пожарной части
-  const v = {
-    id: 'tow_' + (++_svcVehId), kind: 'tow',
-    x: door.c, y: door.r,
-    ang: 0, speed: 3.2,
-    state: 'go_to_scene', workUntil: 0,
-    payload: { carRef },
-    homeR: FIRE_STATION_R, homeC: FIRE_STATION_C,
-    path: [], pathIdx: 0, finalTarget: null,
-    _loaded: false,
-  };
-  _setVehicleRoute(v, door.r, door.c, targetR, targetC);
-  serviceVehicles.push(v);
+  const fleet=_ensureTowTruckFleet();
+  const v=fleet.filter(q=>q.state==='tow_parked').sort((a,b)=>Math.hypot(a.y-targetR,a.x-targetC)-Math.hypot(b.y-targetR,b.x-targetC))[0];
+  if(!v)return null;
+  const parking=_towTruckParkingPoint(targetR,targetC,v.y,v.x);
+  if(!parking)return null;
+  v.speed=TOW_RESPONSE_SPEED;v.state='go_to_scene';v.workUntil=0;v.payload={carRef};
+  v._loaded=false;v._loadProgress=0;v._towRouteRetries=0;v._lastMoveT=performance.now();v._prevX=v.x;v._prevY=v.y;
+  v.sceneParkingR=parking?.r;v.sceneParkingC=parking?.c;
+  v.path=parking.path;v.pathIdx=0;v.finalTarget={x:parking.c,y:parking.r};v._offroadRoute=false;
   return v;
+}
+
+function _beginTowLoadingAtScene(v,now){
+  const car=v?.payload?.carRef;
+  if(v?.kind!=='tow'||!car||car._towed||(myDrivingCarId&&String(car.id)===String(myDrivingCarId))){
+    _releaseFailedTowCall(v);
+    if(v)_sendPermanentServiceHome(v,now,'invalid-scene-call');
+    return false;
+  }
+  const targetR=+(car.r??car.y),targetC=+(car.c??car.x);
+  if(Math.hypot(v.y-targetR,v.x-targetC)>4.25)return false;
+  v.path=[];v.pathIdx=0;
+  v.state='working';v.workDuration=4600;v.workUntil=now+v.workDuration;
+  v._loadStartedAt=now;v._loadProgress=0;v._lastMoveT=now;
+  document.documentElement.dataset.towRouteProfile='full-road-drive-no-scene-teleport-v224';
+  return true;
+}
+
+function _rerouteTowTruck(v,now,reason='route-rebuild'){
+  if(v?.kind!=='tow')return false;
+  const car=v.payload?.carRef;
+  if(!car||car._towed&&!v._loaded||(myDrivingCarId&&String(car.id)===String(myDrivingCarId))){
+    _releaseFailedTowCall(v);_sendPermanentServiceHome(v,now,'invalid-reroute-call');return false;
+  }
+  v._towRouteRetries=(+v._towRouteRetries||0)+1;
+  document.documentElement.dataset.towRouteRetries=String(v._towRouteRetries);
+  document.documentElement.dataset.towRouteLast=reason;
+  if(v._loaded){
+    _setVehicleRoute(v,v.y,v.x,v.homeR,v.homeC);
+    v.state='returning';v._lastMoveT=now;
+    return true;
+  }
+  const targetR=+(car.r??car.y),targetC=+(car.c??car.x);
+  const parking=_towTruckParkingPoint(targetR,targetC,v.y,v.x);
+  if(!parking){v._towNextRouteRetry=now+1200;return false;}
+  if(!parking.path?.length){v.path=[];v.pathIdx=0;v._towNextRouteRetry=now+1200;document.documentElement.dataset.towRouteLast='waiting-for-connected-road';return false;}
+  v.sceneParkingR=parking.r;v.sceneParkingC=parking.c;
+  v.path=parking.path;v.pathIdx=0;v.finalTarget={x:parking.c,y:parking.r};v._offroadRoute=false;
+  v.state='go_to_scene';v._lastMoveT=now;
+  return true;
+}
+
+function _teleportTowTruckAfterStall(v,now){
+  if(v?.kind!=='tow')return false;
+  if(v._loaded){
+    _completeTowRemoval(v);_parkPermanentServiceVehicle(v,now,'watchdog:loaded-return-stall');
+    document.documentElement.dataset.towEmergencyTeleport='loaded-return-after-14s-stall-v224';
+    return true;
+  }
+  const car=v.payload?.carRef;
+  if(!car||car._towed||(myDrivingCarId&&String(car.id)===String(myDrivingCarId))){
+    _releaseFailedTowCall(v);_sendPermanentServiceHome(v,now,'watchdog:invalid-call');return false;
+  }
+  const targetR=+(car.r??car.y),targetC=+(car.c??car.x);
+  const parking=(Number.isFinite(+v.sceneParkingR)&&Number.isFinite(+v.sceneParkingC))
+    ?{r:+v.sceneParkingR,c:+v.sceneParkingC}:_nearestRoadTile(targetR,targetC,12);
+  if(!parking){_releaseFailedTowCall(v);_sendPermanentServiceHome(v,now,'watchdog:no-scene-parking');return false;}
+  v.y=parking.r;v.x=parking.c;v.path=[];v.pathIdx=0;v._lastMoveT=now;
+  document.documentElement.dataset.towEmergencyTeleport='scene-after-14s-stall-v224';
+  return _beginTowLoadingAtScene(v,now);
+}
+
+function _rerouteFireTruck(v,now,reason='route-rebuild'){
+  if(v?.kind!=='firetruck')return false;
+  const target=_fireTruckTarget(v);
+  if(!target){_abortFireTruckJob(v);return false;}
+  v._fireRouteRetries=(+v._fireRouteRetries||0)+1;
+  document.documentElement.dataset.fireRouteRetries=String(v._fireRouteRetries);
+  document.documentElement.dataset.fireRouteLast=reason;
+  const parking=_fireTruckParkingPoint(target.r,target.c,v.y,v.x);
+  if(!parking?.path?.length){v.path=[];v.pathIdx=0;v._fireNextRouteRetry=now+1200;document.documentElement.dataset.fireRouteLast='waiting-for-connected-road';return false;}
+  v.sceneParkingR=parking.r;v.sceneParkingC=parking.c;
+  v.path=parking.path;v.pathIdx=0;v.finalTarget={x:parking.c,y:parking.r};v._offroadRoute=false;
+  v.state='go_to_scene';v._lastMoveT=now;
+  return true;
+}
+
+function _teleportFireTruckAfterStall(v,now){
+  if(v?.kind!=='firetruck')return false;
+  if(v.state==='returning'){
+    _parkPermanentServiceVehicle(v,now,'watchdog:return-stall');
+    document.documentElement.dataset.fireEmergencyTeleport='depot-after-14s-stall-v230';
+    return true;
+  }
+  const target=_fireTruckTarget(v);
+  if(!target){_abortFireTruckJob(v);return false;}
+  const parking=(Number.isFinite(+v.sceneParkingR)&&Number.isFinite(+v.sceneParkingC))
+    ?{r:+v.sceneParkingR,c:+v.sceneParkingC}:_fireTruckParkingPoint(target.r,target.c,v.y,v.x);
+  if(!parking){_abortFireTruckJob(v);return false;}
+  v.y=parking.r;v.x=parking.c;v.path=[];v.pathIdx=0;v._lastMoveT=now;
+  document.documentElement.dataset.fireEmergencyTeleport='scene-after-14s-stall-v230';
+  return _startFireTruckWater(v,now);
 }
 
 // ── Полиция при ограблении банка ────────────────────────────────────
@@ -9349,7 +9851,7 @@ function spawnPoliceCar(targetR, targetC) {
   const v = {
     id: 'pol_' + (++_svcVehId), kind: 'police',
     x: door.c, y: door.r,
-    ang: 0, speed: 4.5,                   // быстрее скорой — код 3
+    ang: 0, speed: 7.8,
     state: 'go_to_scene', workUntil: 0,
     payload: {},
     homeR: POLICE_STATION_R, homeC: POLICE_STATION_C,
@@ -9411,14 +9913,14 @@ function _startFireTruckWater(v, now=performance.now()) {
   v._waterStartedAt=now;
   v.workDuration=v.payload?.fireRef?.kind==='gas_station'?6500:4500;
   v.workUntil=now+v.workDuration;
+  document.documentElement.dataset.fireServiceLast='working';
   return true;
 }
 function _abortFireTruckJob(v) {
   if(!v||v.kind!=='firetruck')return;
   v._fireAborted=true;
-  v.state='returning';
-  _setVehicleRoute(v,v.y,v.x,v.homeR,v.homeC);
-  if(!v.path||!v.path.length)v.state='done';
+  document.documentElement.dataset.fireServiceLast=`aborted:${(_fireTruckTarget(v)?Math.hypot(_fireTruckTarget(v).r-v.y,_fireTruckTarget(v).c-v.x):0).toFixed(2)}`;
+  _sendPermanentServiceHome(v,performance.now(),'aborted-call');
 }
 function _releaseAbortedFireCall(v) {
   if(!v?._fireAborted||!v.payload)return;
@@ -9434,6 +9936,9 @@ function _releaseFailedTowCall(v) {
 function _completeTowRemoval(v) {
   if(v?.kind!=='tow'||!v._loaded||!v.payload?.carRef)return;
   const car=v.payload.carRef,ci=CARS.indexOf(car);
+  const disposalPos={r:v.homeR||JUNKYARD_R,c:v.homeC||JUNKYARD_C};
+  spawnFloatText(disposalPos.r,disposalPos.c,'УТИЛИЗИРОВАНО',{color:'#f4b64e',size:14,life:1400});
+  spawnShockwave(disposalPos.r,disposalPos.c,{rad0:3,maxRad:18,life:520,color:'#f4b64e',thick:1.5});
   if(ci>=0){
     const fresh=spawnCar(ci,{awayFromPlayer:true});
     if(fresh)CARS[ci]=fresh;else CARS.splice(ci,1);
@@ -9442,6 +9947,7 @@ function _completeTowRemoval(v) {
     try{ws&&ws.readyState===1&&ws.send(JSON.stringify({t:'service_tow_car',d:{car_id:String(car.id)}}));}catch(e){}
   }
   v.payload.carRef=null;v._loaded=false;
+  document.documentElement.dataset.towLastDisposal=`${Math.round(disposalPos.r)},${Math.round(disposalPos.c)}`;
 }
 function _finishFireTruckJob(v) {
   if (!v || v.kind !== 'firetruck' || !v.payload || !_fireTruckInRange(v)) return false;
@@ -9449,6 +9955,7 @@ function _finishFireTruckJob(v) {
   if (cr && !_markVehicleExtinguished(cr)) return false;
   const fire = v.payload.fireRef;
   if (fire && fire.kind === 'gas_station') _extinguishGasStation(fire.station);
+  document.documentElement.dataset.fireServiceLast='extinguished';
   return true;
 }
 
@@ -9462,6 +9969,17 @@ function updateServiceVehicles(dt) {
       _releaseFailedAmbulanceCall(v);
       serviceVehicles.splice(i, 1);continue;
     }
+    if(v.state==='ambulance_idle'||v.state==='ambulance_patrol'){
+      v.state='ambulance_parked';v.x=v.homeC;v.y=v.homeR;v.path=[];v.pathIdx=0;v.finalTarget=null;
+    }
+    if(v.state==='ambulance_parked'){
+      v.speed=0;v._lastMoveT=now;v._prevX=v.x;v._prevY=v.y;
+      continue;
+    }
+    if(v.state==='firetruck_parked'||v.state==='tow_parked'){
+      v.speed=0;v._lastMoveT=now;v._prevX=v.x;v._prevY=v.y;
+      continue;
+    }
     // Безопасник: считаем сколько машина НЕ двигается. 14 сек подряд
     // без движения — точно застряла (пробка не должна столько висеть,
     // у обычных тачек _stuckT тоже триггерит респаун за 14с). Раньше
@@ -9473,15 +9991,48 @@ function updateServiceVehicles(dt) {
       const moved = Math.hypot(v.x - px, v.y - py);
       if (moved > 0.04 || v.state === 'working' || v.state === 'medical_response' ||
           v.state === 'siege') v._lastMoveT = now;
+      if(v.kind==='ambulance'&&v.state==='returning'&&moved>0.04){
+        v._ambulanceReturnMoveObserved=true;
+        document.documentElement.dataset.ambulanceReturnState='driving';
+        document.documentElement.dataset.ambulanceReturnMoves=String((+document.documentElement.dataset.ambulanceReturnMoves||0)+1);
+      }
+      if(v.kind==='firetruck'&&v.state==='go_to_scene'&&moved>0.04){
+        v._fireOutboundMoveObserved=true;
+        document.documentElement.dataset.fireOutboundState='driving';
+        document.documentElement.dataset.fireOutboundMoves=String((+document.documentElement.dataset.fireOutboundMoves||0)+1);
+      }
+      if((v.kind==='firetruck'||v.kind==='tow')&&v.state==='returning'&&moved>0.04){
+        v._serviceReturnMoveObserved=true;
+        const prefix=v.kind==='firetruck'?'fire':'tow';
+        document.documentElement.dataset[`${prefix}ReturnState`]='driving';
+        document.documentElement.dataset[`${prefix}ReturnMoves`]=String((+document.documentElement.dataset[`${prefix}ReturnMoves`]||0)+1);
+      }
     } else {
       v._lastMoveT = now;
     }
     v._prevX = v.x; v._prevY = v.y;
+    if(v.kind==='ambulance'&&v.state==='go_to_scene'&&v.finalTarget){
+      const patientPos=_ambulancePatientPosition(v);
+      if(patientPos&&Math.hypot(patientPos.r-(+v.sceneParkingR||v.finalTarget.y),patientPos.c-(+v.sceneParkingC||v.finalTarget.x))>AMBULANCE_DEPLOY_MAX_PATIENT_DISTANCE&&now>=(+v._ambulanceNextRouteRetry||0)){
+        _rerouteAmbulance(v,now,'patient-moved-before-arrival');
+      }
+      const near=Math.hypot(v.y-v.finalTarget.y,v.x-v.finalTarget.x)<1.35;
+      if(near){v._sceneNearSince||=now;if(now-v._sceneNearSince>2200&&_ambulanceWatchdogAdvance(v,now,'near-scene-timeout'))continue;}
+      else v._sceneNearSince=0;
+    }
+    if(v.kind==='ambulance'&&now-v._lastMoveT>8500){
+      if(_ambulanceWatchdogAdvance(v,now,v.state==='returning'?'hospital-return-stuck':'response-route-stuck'))continue;
+    }
     if (now - v._lastMoveT > 14000) {
       // Застрявшая пожарка не умеет тушить через полкарты: вызов отменяется,
       // после её ухода диспетчер сможет отправить другую машину.
-      if (v.kind === 'firetruck') {_abortFireTruckJob(v);continue;}
-      if (v.kind === 'tow' && v._loaded) _completeTowRemoval(v);
+      if (v.kind === 'firetruck') {
+        _teleportFireTruckAfterStall(v,now);
+        continue;
+      }
+      if (v.kind === 'tow') {
+        if(_teleportTowTruckAfterStall(v,now))continue;
+      }
       if (v.kind === 'ambulance') _releaseFailedAmbulanceCall(v);
       v.state = 'done';
       continue;
@@ -9495,10 +10046,21 @@ function updateServiceVehicles(dt) {
           // Если карта редактора разорвала дорожный граф, бригада всё равно
           // появляется у ближайшего проезда и полноценно тушит, а не гасит
           // пожар невидимо в ту же секунду.
-          const target=_fireTruckTarget(v),ft=target||v.finalTarget||{y:v.y,x:v.x};
-          const road=_nearestRoadTile(ft.r??ft.y,ft.c??ft.x,20);
-          if(road){v.y=road.r+.5;v.x=road.c+.5;}
-          if(!_startFireTruckWater(v,now)){_abortFireTruckJob(v);continue;}
+          if(now>=(+v._fireNextRouteRetry||0))_rerouteFireTruck(v,now,'empty-road-route');
+          continue;
+        }
+        if(v.kind==='tow'){
+          if(now>=(+v._towNextRouteRetry||0))_rerouteTowTruck(v,now,'empty-road-route');
+          continue;
+        }
+        if(v.kind==='ambulance'){
+          v._routeMissingSince||=now;
+          if(now>=(+v._ambulanceNextRouteRetry||0)&&_rerouteAmbulance(v,now,'empty-road-route'))continue;
+          if(now-v._routeMissingSince>=AMBULANCE_ROUTE_GRACE_MS){
+            if(_ambulanceWatchdogAdvance(v,now,'no-connected-road-after-retries'))continue;
+          }
+          // Не отменяем вызов и не освобождаем пациента: иначе диспетчер
+          // бесконечно создаёт новые выезды, а ни одна скорая не забирает его.
           continue;
         }
         v.state = 'done';
@@ -9512,12 +10074,15 @@ function updateServiceVehicles(dt) {
         } else if(v.kind==='firetruck') {
           if(!_startFireTruckWater(v,now))_abortFireTruckJob(v);
         } else if(v.kind==='ambulance'&&_ambulanceNeedsBodyCrew(v)) {
-          if(!_startAmbulanceBodyCrew(v,now))v.state='done';
+          if(!_startAmbulanceBodyCrew(v,now)&&v.state!=='go_to_scene')v.state='done';
+        } else if(v.kind==='tow') {
+          if(!_beginTowLoadingAtScene(v,now))_rerouteTowTruck(v,now,'wreck-moved-before-arrival');
         } else {
           v.state = 'working';
-          v.workDuration = v.kind === 'ambulance' ? 2500 : v.kind === 'tow' ? 3000
+          v.workDuration = v.kind === 'ambulance' ? 2500 : v.kind === 'tow' ? 4600
             : v.kind === 'firetruck' && v.payload?.fireRef?.kind === 'gas_station' ? 6500 : 4000;
           v.workUntil = now + v.workDuration;
+          if(v.kind==='tow'){v._loadStartedAt=now;v._loadProgress=0;}
         }
       }
     } else if (v.state === 'siege') {
@@ -9528,14 +10093,20 @@ function updateServiceVehicles(dt) {
       }
     } else if (v.state === 'medical_response') {
       if (_updateAmbulanceBodyCrew(v, dt, now)) {
-        v.state = 'returning';
-        _setVehicleRoute(v, v.y, v.x, v.homeR, v.homeC);
+        _sendAmbulanceToHospital(v,now,'patient-loaded');
       }
     } else if (v.state === 'working') {
       if(v.kind==='firetruck'){
         if(!_fireTruckInRange(v)){_abortFireTruckJob(v);continue;}
         const target=_fireTruckTarget(v);
         if(target)v._hoseAng=Math.atan2(target.r-v.y,target.c-v.x);
+      }
+      if(v.kind==='tow'&&v.payload?.carRef){
+        const cr=v.payload.carRef,p=Math.max(0,Math.min(1,(now-(v._loadStartedAt||now))/Math.max(1,v.workDuration||4600)));
+        v._loadProgress=p;cr._towLoadingProgress=p;
+        const hitchR=v.y-Math.sin(v.ang)*(.75+1.55*(1-p));
+        const hitchC=v.x-Math.cos(v.ang)*(.75+1.55*(1-p));
+        cr.r=hitchR;cr.c=hitchC;if('y'in cr)cr.y=hitchR;if('x'in cr)cr.x=hitchC;
       }
       if (now < v.workUntil) continue;
       if (v.kind === 'ambulance' && v.payload.npc) {
@@ -9546,11 +10117,9 @@ function updateServiceVehicles(dt) {
           try{ws&&ws.readyState===1&&ws.send(JSON.stringify({t:'emergency_revive',d:{}}));}catch(e){}
           showEventBanner('🏥 ТЕБЯ СПАСЛИ','Медики стабилизировали состояние. Восстановлено 40% здоровья.',3300,'win');
           _playerEmergencyPatient=null;
-        }else if(patient._medicalDowned){
-          patient._medicalDowned=false;patient._medicalDownedAt=0;patient._medicalBleedoutAt=0;patient._knockedUntil=0;patient._forcedCrawl=!!((+patient._severMask||0)&12);
-          patient.hp=Math.max(35,Math.ceil((patient.max_hp||60)*.45));patient.dead=false;patient.idleUntil=now+1800;
-          patient.cryText='Спасибо, док!';patient.cryUntil=now+1800;patient._ambulanceDispatched=false;
-          spawnFloatText(patient.r,patient.c,'СПАСЁН',{color:'#70f0a0',size:15,life:1800});
+        }else if(patient._medicalDowned||patient.dead||+patient.hp<=0){
+          if(_startAmbulanceBodyCrew(v,now))continue;
+          _releaseFailedAmbulanceCall(v);
         }else{
           patient._evacuated = true;patient._evacuatedAt = now;
           if (!v.payload.beachgoer) patient.deadAt = now - 60000;
@@ -9563,24 +10132,35 @@ function updateServiceVehicles(dt) {
         if (cr && !(myDrivingCarId && cr.id === myDrivingCarId)) {
           v._loaded = true;
           cr._towed = true;            // скрываем собственную отрисовку — едет на платформе
+          cr._towLoadingProgress=1;
         }
       }
-      v.state = 'returning';
-      _setVehicleRoute(v, v.y, v.x, v.homeR, v.homeC);
+      if(v.kind==='firetruck'||v.kind==='tow')_sendPermanentServiceHome(v,now,'job-complete');
+      else {v.state = 'returning';_setVehicleRoute(v, v.y, v.x, v.homeR, v.homeC);}
     } else if (v.state === 'returning') {
+      if(v.kind==='ambulance'&&(!v.path||v.path.length===0)){
+        v._returnRouteMissingSince||=now;
+        if(now>=(+v._ambulanceNextReturnRetry||0)&&_retryAmbulanceHospitalRoute(v,now))continue;
+        if(now-v._returnRouteMissingSince>=AMBULANCE_ROUTE_GRACE_MS){
+          if(_ambulanceWatchdogAdvance(v,now,'hospital-no-connected-road'))continue;
+        }
+        continue;
+      }
       // Эвакуатор с гружёной машиной — машина «едет» на платформе за кабиной.
       if (v.kind === 'tow' && v._loaded && v.payload.carRef) {
         const cr = v.payload.carRef;
         cr.r = v.y - Math.sin(v.ang) * 0.6;
         cr.c = v.x - Math.cos(v.ang) * 0.6;
+        cr._towLoadingProgress=1;
       }
       if (_vehicleStep(v, dt)) {
+        if(v.kind==='ambulance'){_completeAmbulanceHospitalDelivery(v,now,'road-arrival');continue;}
         // Доехал до депо. Эвакуатор увёз машину «за карту» → удаляем из
         // CARS и доспавниваем свежую (трафик не редеет, машины не
         // пропадают навсегда).
         if (v.kind === 'tow' && v._loaded) _completeTowRemoval(v);
-        _releaseAbortedFireCall(v);
-        v.state = 'done';
+        if(v.kind==='firetruck'||v.kind==='tow')_parkPermanentServiceVehicle(v,now,'road-arrival');
+        else {_releaseAbortedFireCall(v);v.state = 'done';}
       }
     }
   }
@@ -9591,18 +10171,85 @@ function dispatchEmergencyServices() {
   const now = performance.now();
   if (now < _nextEmergencyScan) return;
   _nextEmergencyScan = now + 1500;
+  document.documentElement.dataset.specialServicePriority='ambulance-firetruck-tow-police-taxi-road-first-stall-fallback-v230';
 
-  // Скорая выезжает и к тяжело раненым, и к погибшим.
-  for (const n of NPCS) {
-    if ((!n.dead&&!n._medicalDowned) || n._evacuated || n._ambulanceDispatched) continue;
+  if(_LOCAL_PREVIEW&&_UP.has('previewambulancequeue')&&!document.documentElement.dataset.previewAmbulanceQueueSeeded){
+    const testVictims=NPCS.filter(n=>_isRespawnableResident(n)&&!n.dead).slice(0,5),door=_hospitalDoor();
+    testVictims.forEach((n,i)=>{
+      n.r=door.r+3+(i%2)*1.1;n.c=door.c+3+Math.floor(i/2)*1.1;n.tr=n.r;n.tc=n.c;
+      n.hp=i===0?1:0;n.dead=i!==0;n.deadAt=now-(i===4?CORPSE_AUTO_REMOVE_MS+2000:2400+i*120);
+      n._medicalDowned=i===0;n._medicalDownedAt=i===0?now-2600:0;n._medicalBleedoutAt=i===0?now+30000:0;
+      n.walking=false;n._ambulanceDispatched=false;n._ambulanceInTransit=false;n._evacuated=false;n._corpseExpired=false;
+      if(i===1){n._ambulanceDeliveredAt=now-5000;n._evacuatedAt=now-5000;n._evacuated=true;n._ambulanceDispatched=true;}
+      if(i===2)n._ambulanceDispatched=true;
+    });
+    if(_UP.has('previewambulancefocus')){player.r=door.r+5.2;player.c=door.c+5.1;player.vr=player.vc=0;}
+    document.documentElement.dataset.previewAmbulanceQueueSeeded=String(testVictims.length);
+  }
+
+  // Six permanent crews (three per hospital) pull the oldest corpses from one shared queue.
+  // Dead residents are prioritized over wounded residents.
+  _ensureAmbulanceFleet();
+  const ambulanceQueue=NPCS.filter(n=>(n.dead||n._medicalDowned)&&!n._corpseExpired&&!n._evacuated&&!n._ambulanceInTransit&&!n._ambulanceDispatched)
+    .sort((a,b)=>(a.dead?0:1)-(b.dead?0:1)||((a._medicalDowned?a._medicalDownedAt:a.deadAt)||0)-((b._medicalDowned?b._medicalDownedAt:b.deadAt)||0));
+  for (const n of ambulanceQueue) {
     const incidentAt=n._medicalDowned?n._medicalDownedAt:n.deadAt;
     if (!incidentAt || now - incidentAt < 1200) continue;
     const ambulance = spawnAmbulance(n.r, n.c, n);
     if (ambulance) n._ambulanceDispatched = true;
   }
+  const fleet=serviceVehicles.filter(v=>v?.kind==='ambulance'&&v.state!=='done');
+  if(_LOCAL_PREVIEW&&_UP.has('previewambulancestuck')&&!document.documentElement.dataset.previewAmbulanceStuckSeeded){
+    const stuck=fleet.find(v=>v.state==='go_to_scene');
+    if(stuck){stuck._lastMoveT=now-9000;stuck.path=[];document.documentElement.dataset.previewAmbulanceStuckSeeded=stuck.id;}
+  }
+  if(_LOCAL_PREVIEW&&_UP.has('previewambulanceemptyroute')&&!document.documentElement.dataset.previewAmbulanceEmptyRouteSeeded){
+    const stuck=fleet.find(v=>v.state==='go_to_scene');
+    if(stuck){stuck.path=[];stuck._routeMissingSince=now-AMBULANCE_ROUTE_GRACE_MS-100;stuck._ambulanceNextRouteRetry=now+5000;document.documentElement.dataset.previewAmbulanceEmptyRouteSeeded=stuck.id;}
+  }
+  document.documentElement.dataset.ambulanceFleetSize=String(fleet.length);
+  document.documentElement.dataset.ambulanceHospitals='2';
+  document.documentElement.dataset.ambulanceParked=String(fleet.filter(v=>v.state==='ambulance_parked').length);
+  document.documentElement.dataset.ambulanceBusy=String(fleet.filter(v=>v.state!=='ambulance_parked').length);
+  document.documentElement.dataset.ambulanceQueue=String(ambulanceQueue.filter(n=>!n._ambulanceDispatched&&!n._corpseExpired).length);
+  document.documentElement.dataset.ambulanceMedicsDeployed=String(fleet.reduce((sum,v)=>sum+(v._medicalCrew||[]).filter(m=>m.visible).length,0));
+  document.documentElement.dataset.ambulanceParkingDistances=fleet.filter(v=>v.payload?.npc&&Number.isFinite(+v.sceneParkingR)).map(v=>Math.hypot(v.sceneParkingR-(v.payload.npc.r??v.payload.npc.y),v.sceneParkingC-(v.payload.npc.c??v.payload.npc.x)).toFixed(2)).join(',')||'idle';
+  document.documentElement.dataset.ambulanceFieldRevives='0';
+  document.documentElement.dataset.ambulanceRecoveryPolicy='full-body-parking-outbound-load-road-return-no-normal-watchdog-v232';
+
+  // Fire and towing use fixed visible fleets too: a free parked vehicle is dispatched,
+  // completes the call, drives back to its own bay and waits for the next incident.
+  const fireFleet=_ensureFireTruckFleet(),towFleet=_ensureTowTruckFleet();
+  if(_LOCAL_PREVIEW&&_UP.has('previewservicefleet')&&!document.documentElement.dataset.previewServiceFleetSeeded&&CARS.length>=2){
+    const nearbyRoad=(homeR,homeC)=>{
+      let best=null,bestScore=Infinity;
+      for(let dr=-10;dr<=10;dr++)for(let dc=-10;dc<=10;dc++){
+        const r=Math.floor(homeR)+dr+.5,c=Math.floor(homeC)+dc+.5,d=Math.hypot(r-homeR,c-homeC);
+        if(d<6||d>10||!_vehicleRoadPassable(r,c))continue;
+        const path=_bfsRoadPath(homeR,homeC,r,c,24);
+        if(path?.length&&Math.abs(d-8)<bestScore){bestScore=Math.abs(d-8);best={r,c};}
+      }
+      return best||{r:homeR,c:homeC};
+    };
+    const fireCar=CARS.find(car=>car&&String(car.id)!==String(myDrivingCarId));
+    const towCar=CARS.find(car=>car&&car!==fireCar&&String(car.id)!==String(myDrivingCarId));
+    const fireAt=nearbyRoad(fireFleet[0].homeR,fireFleet[0].homeC),towAt=nearbyRoad(towFleet[0].homeR,towFleet[0].homeC);
+    Object.assign(fireCar,{r:fireAt.r,c:fireAt.c,hp:0,wrecked:true,_wrecked:true,_shotWrecked:true,_burnedOut:false,_burnedOutAt:0,_hoodBurning:true,_hoodSmoking:true,_towed:false,_towDispatched:false,_fireTruckDispatched:false});
+    Object.assign(towCar,{r:towAt.r,c:towAt.c,hp:0,wrecked:true,_wrecked:true,_shotWrecked:true,_burnedOut:true,_burnedOutAt:now-6000,_hoodBurning:false,_hoodSmoking:false,_towed:false,_towDispatched:false,_fireTruckDispatched:false});
+    if(_UP.has('previewservicefocus')){player.r=fireAt.r+1.1;player.c=fireAt.c+.7;player.vr=player.vc=0;}
+    document.documentElement.dataset.previewServiceFleetSeeded=`${fireCar.id||'fire'}:${towCar.id||'tow'}`;
+  }
+  document.documentElement.dataset.fireFleetSize=String(fireFleet.length);
+  document.documentElement.dataset.fireParked=String(fireFleet.filter(v=>v.state==='firetruck_parked').length);
+  document.documentElement.dataset.fireBusy=String(fireFleet.filter(v=>v.state!=='firetruck_parked').length);
+  document.documentElement.dataset.towFleetSize=String(towFleet.length);
+  document.documentElement.dataset.towParked=String(towFleet.filter(v=>v.state==='tow_parked').length);
+  document.documentElement.dataset.towBusy=String(towFleet.filter(v=>v.state!=='tow_parked').length);
+  document.documentElement.dataset.serviceFleetProfile='persistent-visible-fire-and-tow-road-return-v230';
 
   // Пляжники живут в отдельной Map и не входят в NPCS — им нужен свой вызов.
   for (const b of beachgoers.values()) {
+    _repairAmbulancePatientState(b,now);
     if (!b.dead || b._evacuated || b._ambulanceDispatched) continue;
     if (!b.deadAt || now - b.deadAt < 2000) continue;
     const br = b._deathR ?? b.y, bc = b._deathC ?? b.x;
@@ -9637,6 +10284,7 @@ function dispatchEmergencyServices() {
       if (!car._burnedOutAt) { car._burnedOutAt = now; continue; }
       if (now - car._burnedOutAt < 2500) continue;
       const tow=spawnTowTruck(car.r, car.c, car);
+      document.documentElement.dataset.towDispatchAttempt=tow?'created':'rejected';
       if(tow)car._towDispatched = true;
     }
     // Механически сломанный или действительно брошенный автомобиль не
@@ -9679,6 +10327,19 @@ function dispatchEmergencyServices() {
     }
   }
 
+  document.documentElement.dataset.specialServiceStates=serviceVehicles.filter(v=>v&&v.state!=='done').map(v=>`${v.kind}:${v.state}`).join(',')||'idle';
+  document.documentElement.dataset.fireVisibleParking='three-permanent-bays-full-body-road-hose-range-v231';
+  document.documentElement.dataset.towLoadingParking='three-permanent-bays-road-wreck-side-v230';
+  document.documentElement.dataset.fireParkingDistances=serviceVehicles.filter(v=>v?.kind==='firetruck'&&_fireTruckTarget(v)).map(v=>Math.hypot(v.y-_fireTruckTarget(v).r,v.x-_fireTruckTarget(v).c).toFixed(2)).join(',')||'idle';
+  document.documentElement.dataset.serviceBuildingOverlaps=serviceVehicles.filter(v=>v&&v.state!=='done'&&['firetruck','tow'].includes(v.kind)&&!_serviceVehicleFootprintClear(v,+v.y||0,+v.x||0,+v.ang||0)).map(v=>`${v.kind}:${v.id}`).join(',')||'0';
+  document.documentElement.dataset.ambulanceParkingBodyOverlaps=serviceVehicles.filter(v=>v?.kind==='ambulance'&&['ambulance_parked','medical_response','working'].includes(v.state)&&!_serviceVehicleFootprintClear(v,+v.y||0,+v.x||0,+v.ang||0)).map(v=>v.id).join(',')||'0';
+  document.documentElement.dataset.serviceBuildingCollisionProfile='full-body-hard-world-v231';
+  document.documentElement.dataset.towEligibleWrecks=String(CARS.filter(car=>car&&_vehicleIsWrecked(car)&&car._burnedOut&&!car._towDispatched&&!car._towed).length);
+  document.documentElement.dataset.towCandidateAges=CARS.filter(car=>car&&_vehicleIsWrecked(car)&&car._burnedOut&&!car._towDispatched&&!car._towed).map(car=>Math.round(now-(+car._burnedOutAt||now))).join(',')||'idle';
+  if(_LOCAL_PREVIEW&&_UP.has('previewtowstuck')&&!document.documentElement.dataset.previewTowStuckSeeded){
+    const stuck=serviceVehicles.find(v=>v?.kind==='tow'&&v.state==='go_to_scene');
+    if(stuck){stuck.path=[];stuck.pathIdx=0;stuck._prevX=stuck.x;stuck._prevY=stuck.y;stuck._lastMoveT=now-15000;document.documentElement.dataset.previewTowStuckSeeded=stuck.id;}
+  }
 }
 
 // ── Собаки и кошки ─────────────────────────────────────────────
@@ -9913,7 +10574,7 @@ function drawAmbulanceMedicalScene(v) {
   if (scene.stretcherVisible) {
     const fr = Math.sin(scene.ang || 0), fc = Math.cos(scene.ang || 0);
     const sr = Math.cos(scene.ang || 0), sc = -Math.sin(scene.ang || 0);
-    const lift = (scene.phase === 'lifting' ? scene.liftProgress : scene.phase === 'carrying' ? 1 : 0) * 7;
+    const lift = (scene.phase === 'lifting' ? scene.liftProgress : (scene.phase === 'carrying' || scene.phase === 'loading') ? 1 : 0) * 7;
     const corners = [
       w2s(scene.centerR + fr * .72 + sr * .31, scene.centerC + fc * .72 + sc * .31),
       w2s(scene.centerR + fr * .72 - sr * .31, scene.centerC + fc * .72 - sc * .31),
@@ -10281,13 +10942,14 @@ function drawServiceVehicle(v) {
   const sirenPts = isAmb
     ? [[s1.x, s1.y], [s2.x, s2.y], [s3.x, s3.y]]
     : [[s1.x, s1.y], [s3.x, s3.y]];
+  const emergencyLightsOn = !isAmb || v.state !== 'ambulance_parked';
 
   ctx.save();
   for (let fi = 0; fi < sirenPts.length; fi++) {
     const [fx, fy] = sirenPts[fi];
-    ctx.fillStyle = (fi % 2 === blink) ? col1 : col2;
+    ctx.fillStyle = emergencyLightsOn ? ((fi % 2 === blink) ? col1 : col2) : '#26313a';
     ctx.shadowColor = ctx.fillStyle;
-    ctx.shadowBlur = 14;
+    ctx.shadowBlur = emergencyLightsOn ? 14 : 0;
     ctx.beginPath(); ctx.arc(fx, fy - 2, 3.2, 0, Math.PI * 2); ctx.fill();
   }
   ctx.shadowBlur = 0;
@@ -21030,6 +21692,8 @@ let _threeSelectedGangBotId = null;
 let _threeSelectedGangBotUntil = 0;
 let _threeForcedGangShotId = null;
 let _threeForcedGangShotUntil = 0;
+let _threeForcedNpcShotId = null;
+let _threeForcedNpcShotUntil = 0;
 let _threeForcedVehicleShotId = null;
 let _threeForcedVehicleShotUntil = 0;
 function _findLiveAggroBotById(botId) {
@@ -24724,6 +25388,7 @@ const _TAXI_DESTINATIONS = [
   { id:'gym', icon: '💪', name: 'Спортзал',       r: 26,  c: 26 },
   { id:'job', icon: '💼', name: 'Биржа труда',    r: 36,  c: 16 },
   { id:'hospital', icon: '🏥', name: 'Больница',       r: 26,  c: 46 },
+  { id:'hospital_east', icon: '🏥', name: 'Больница Ист-Сайда', r: 46, c: 126 },
   { id:'police', icon: '👮', name: 'Участок',        r: 76,  c: 76 },
   { id:'arena', icon: '🎯', name: 'PVP-Арена',      r: 36,  c: 66 },
   { id:'market', icon: '🏪', name: 'Рынок',          r: 16,  c: 16 },
@@ -25620,12 +26285,12 @@ function _fireRpgRound(sR, sC, dirY, dirX, range, remote) {
 
 function placeWorldC4(){
   const now=performance.now();
-  if(now-_lastWorldC4PlantAt<900)return;
-  if(_myC4Count<=0){showToast('C4 закончилась — купи заряд на Чёрном рынке.','❌',2200);return;}
-  if(!ws||ws.readyState!==1){showToast('Нет связи с городом — заряд не установлен.','⚠️',2000);return;}
+  if(now-_lastWorldC4PlantAt<900)return false;
+  if(_myC4Count<=0){showToast('C4 закончилась — купи заряд на Чёрном рынке.','❌',2200);return false;}
+  if(!ws||ws.readyState!==1){showToast('Нет связи с городом — заряд не установлен.','⚠️',2000);return false;}
   _lastWorldC4PlantAt=now;
-  try{ws.send(JSON.stringify({t:'world_c4_plant',d:{}}));}
-  catch(e){_lastWorldC4PlantAt=0;}
+  try{ws.send(JSON.stringify({t:'world_c4_plant',d:{}}));return true;}
+  catch(e){_lastWorldC4PlantAt=0;return false;}
 }
 
 function _raycastDamageableCar(sr,sc,dirY,dirX,maxDist){
@@ -25875,10 +26540,17 @@ function fire(angle = null) {
   }
   // Реальная неточность применяется ДО выбора цели. У автомата разброс
   // растёт во время очереди; отпускание огня быстро возвращает точность.
+  const forcedNpcShotId=performance.now()<_threeForcedNpcShotUntil?String(_threeForcedNpcShotId||''):'';
+  const forcedNpcShot=forcedNpcShotId?NPCS.find(n=>n&&!n.dead&&String(_threeNpcEntityId(n))===forcedNpcShotId):null;
+  const forcedNpcDistance=forcedNpcShot?Math.hypot((+forcedNpcShot.r||0)-player.r,(+forcedNpcShot.c||0)-player.c):Infinity;
   const forcedVehicleShotId=performance.now()<_threeForcedVehicleShotUntil?String(_threeForcedVehicleShotId||''):'';
   const forcedVehicleShot=forcedVehicleShotId?(typeof CARS!=='undefined'?CARS:[]).find(car=>car&&!car._hidden&&!car._towed&&!car._destroySequenceAt&&!car._shotWrecked&&!car._wrecked&&!car.wrecked&&String(_threeVehicleEntityId(car))===forcedVehicleShotId):null;
   const forcedVehicleDistance=forcedVehicleShot?Math.hypot((+forcedVehicleShot.r||0)-player.r,(+forcedVehicleShot.c||0)-player.c):Infinity;
-  const spreadDir=forcedVehicleShot&&forcedVehicleDistance<=shotRange+1?{dirX:((+forcedVehicleShot.c||0)-player.c)/Math.max(.001,forcedVehicleDistance),dirY:((+forcedVehicleShot.r||0)-player.r)/Math.max(.001,forcedVehicleDistance)}:_applyWeaponSpread(dirX, dirY, wcfg, now);
+  const spreadDir=forcedNpcShot&&forcedNpcDistance<=shotRange+1
+    ?{dirX:((+forcedNpcShot.c||0)-player.c)/Math.max(.001,forcedNpcDistance),dirY:((+forcedNpcShot.r||0)-player.r)/Math.max(.001,forcedNpcDistance)}
+    :forcedVehicleShot&&forcedVehicleDistance<=shotRange+1
+      ?{dirX:((+forcedVehicleShot.c||0)-player.c)/Math.max(.001,forcedVehicleDistance),dirY:((+forcedVehicleShot.r||0)-player.r)/Math.max(.001,forcedVehicleDistance)}
+      :_applyWeaponSpread(dirX, dirY, wcfg, now);
   dirX = spreadDir.dirX; dirY = spreadDir.dirY;
   player.ang = Math.atan2(dirY, dirX);
   // Ни локальная цель, ни серверная не выбираются за первой стеной.
@@ -26048,10 +26720,13 @@ function fire(angle = null) {
   const muzPt = muzzleWorldPoint(_shotAng);
   const sR = muzPt.r;
   const sC = muzPt.c;
-  if(forcedVehicleShot&&forcedVehicleDistance<=shotRange+1){const dr=(+forcedVehicleShot.r||0)-sR,dc=(+forcedVehicleShot.c||0)-sC,d=Math.max(.001,Math.hypot(dr,dc));dirY=dr/d;dirX=dc/d;_shotAng=Math.atan2(dirY,dirX);player.ang=_shotAng;shotRange=_weaponWallDistance(sR,sC,dirY,dirX,wcfg.range||8);document.documentElement.dataset.vehicleDirectRay=`${forcedVehicleShotId}:${d.toFixed(2)}`;}
+  let forcedNpcHit=null;
+  if(forcedNpcShot&&forcedNpcDistance<=(wcfg.range||8)+1){const dr=(+forcedNpcShot.r||0)-sR,dc=(+forcedNpcShot.c||0)-sC,d=Math.max(.001,Math.hypot(dr,dc));dirY=dr/d;dirX=dc/d;_shotAng=Math.atan2(dirY,dirX);player.ang=_shotAng;shotRange=Math.max(_weaponWallDistance(sR,sC,dirY,dirX,wcfg.range||8),Math.min(wcfg.range||8,d+.2));forcedNpcHit={npc:forcedNpcShot,dist:d,point:{r:+forcedNpcShot.r||0,c:+forcedNpcShot.c||0}};document.documentElement.dataset.npcDirectRay=`${forcedNpcShotId}:${d.toFixed(2)}`;}
+  _threeForcedNpcShotId=null;_threeForcedNpcShotUntil=0;
+  if(forcedVehicleShot&&forcedVehicleDistance<=(wcfg.range||8)+1){const dr=(+forcedVehicleShot.r||0)-sR,dc=(+forcedVehicleShot.c||0)-sC,d=Math.max(.001,Math.hypot(dr,dc));dirY=dr/d;dirX=dc/d;_shotAng=Math.atan2(dirY,dirX);player.ang=_shotAng;shotRange=Math.max(_weaponWallDistance(sR,sC,dirY,dirX,wcfg.range||8),Math.min(wcfg.range||8,d+.2));document.documentElement.dataset.vehicleDirectRay=`${forcedVehicleShotId}:${d.toFixed(2)}`;}
   _threeForcedVehicleShotId=null;_threeForcedVehicleShotUntil=0;
   const hitGasPump = _raycastGasPump(sR, sC, dirY, dirX, shotRange);
-  const hitDamageableCar = _raycastDamageableCar(sR,sC,dirY,dirX,shotRange);
+  const hitDamageableCar = forcedNpcHit?null:_raycastDamageableCar(sR,sC,dirY,dirX,shotRange);
   // Единый эффект выстрела: вспышка, звук, гильза и тряска. Раньше fire()
   // вызывал только spawnMuzzle, поэтому локальный выстрел мог быть беззвучным.
   spawnShot(sR, sC, _shotAng, currentWeapon, true);
@@ -26202,7 +26877,7 @@ function fire(angle = null) {
     triggerHitStop(wcfg.thick ? 35 : 18); addShake(wcfg.thick ? 3.5 : 2); hapticHit();
     return;
   }
-  const hitN  = (_meInJail || _bankInt || _buildingInt) ? null : _raycastNpc(sR, sC, dirY, dirX, range);
+  const hitN  = (_meInJail || _bankInt || _buildingInt) ? null : (forcedNpcHit||_raycastNpc(sR, sC, dirY, dirX, range));
   // Пляжники хранятся отдельно от NPCS, но являются такими же мирными целями.
   const hitB  = (_meInJail || _bankInt) ? null : _raycastBeachgoer(sR, sC, dirY, dirX, range);
   // Raycast по жителям-декору (автобусные пассажиры/хозяева парковок)
@@ -26256,6 +26931,7 @@ function fire(angle = null) {
       { hit: true, fromPlayer: true, weapon: currentWeapon });
     spawnImpact(hitN.point.r, hitN.point.c, currentWeapon);
     hitNpc(hitN.npc, dirY, dirX, currentWeapon, _currentShotDamage(weaponDamageAt(currentWeapon, hitN.dist)));
+    if(forcedNpcHit)document.documentElement.dataset.npcDirectHit=`${forcedNpcShotId}:${Math.max(0,+hitN.npc.hp||0).toFixed(1)}`;
     _showCurrentShotCritical(hitN.point.r, hitN.point.c, dirY, dirX);
     triggerHitStop(wcfg.thick ? 35 : 18);
     addShake(wcfg.thick ? 3.5 : 2);
@@ -33586,6 +34262,11 @@ function _businessInteractionDistance(b, r=player.r, c=player.c) {
     footprintDistance
   );
 }
+
+// BUSINESS_POIS is declared after the first city population pass. Rebuild the
+// cached entrances now that casinos, shops and their exact 3D doors exist.
+_residentBuildingDoorsCache=null;
+_residentBuildingDoors();
 
 // Local-only entrance audit. It uses the same coordinates and proximity
 // resolver as production, so browser QA can verify every establishment without
@@ -42610,6 +43291,10 @@ function updateProjectiles(dt) {
     const b=explosionBursts[i];
     if(!b||burnNow-(+b.born||0)>=Math.max(1,+b.life||1550))explosionBursts.splice(i,1);
   }
+  // Throwable/fire lifetime belongs to simulation, not Canvas drawing. Pure 3D
+  // skips drawAimLaser(), so draw-only cleanup used to retain every Molotov and
+  // rescan the ever-growing _firePools array in the 3D bridge each frame.
+  _updateThrowableLifecycle(burnNow);
   // Shockwave-кольца: расширяются, теряют life, удаляются по нулю.
   for (let i = shockwaves.length - 1; i >= 0; i--) {
     const s = shockwaves[i];
@@ -43376,22 +44061,25 @@ canvas.addEventListener('pointerdown', (e) => {
 
 let _throwAimCancelled=false;
 const _thrownItems=[],_firePools=[];
+const _MAX_THROWN_ITEMS=16,_MAX_FIRE_POOLS=12;
 const THROW_GRENADE_RADIUS=4.4;
 const THROW_MOLOTOV_IMPACT_RADIUS=3.6;
-const THROW_MOLOTOV_FIRE_RADIUS=4.2;
+const THROW_MOLOTOV_FIRE_RADIUS=5.0;
 async function _consumeThrowable(kind){try{const r=await fetch(`${QP.api}/inv/${encodeURIComponent(QP.uid)}/consume`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({item_id:kind})});const j=await r.json();return !!j.ok}catch(e){return _LOCAL_PREVIEW}}
 async function _throwSelected(kind,angle,throwRange){
-  const count=kind==='grenade'?_myGrenadeCount:_myMolotovCount;if(count<=0)return;
-  if(!await _consumeThrowable(kind)){showToast('Предмет не удалось использовать','❌',1500);return;}
+  const count=kind==='grenade'?_myGrenadeCount:_myMolotovCount;if(count<=0)return false;
+  if(!await _consumeThrowable(kind)){showToast('Предмет не удалось использовать','❌',1500);return false;}
   if(kind==='grenade')_myGrenadeCount--;else _myMolotovCount--;renderWeaponHud();if(_wepPickOpen)renderWeaponPick();
   const range=Math.max(1.4,Math.min(6.5,+throwRange||6.5)),fromR=player.r,fromC=player.c,toR=fromR+Math.sin(angle)*range,toC=fromC+Math.cos(angle)*range;
+  _capArr(_thrownItems,_MAX_THROWN_ITEMS);
   _thrownItems.push({kind,fromR,fromC,toR,toC,start:performance.now(),flight:720,exploded:false});
   try{ws&&ws.readyState===1&&ws.send(JSON.stringify({t:'grenade',d:{from_x:fromR,from_y:fromC,to_x:toR,to_y:toC,kind}}))}catch(e){}
+  return true;
 }
 function _explodeThrowable(q){
   if(q.exploded)return;q.exploded=true;const radius=q.kind==='grenade'?THROW_GRENADE_RADIUS:THROW_MOLOTOV_IMPACT_RADIUS;
   if(q.kind==='grenade'){const pooled3D=_usesPooled3DFx();spawnCarExplosion(q.toR,q.toC,null,false);if(!pooled3D){for(let i=0;i<3;i++){const a=Math.random()*Math.PI*2,d=.35+Math.random()*.7;spawnCarExplosion(q.toR+Math.sin(a)*d,q.toC+Math.cos(a)*d,null,false,false)}spawnShockwave(q.toR,q.toC,{rad0:8,maxRad:88,life:520,color:'#ffbd55',thick:5});spawnSmokePuff(q.toR,q.toC,0);spawnSmokePuff(q.toR+.4,q.toC-.3,2.2)}spawnBlastCrater(q.toR,q.toC);addShake(15);fireScreenFlash('rpg');}
-  else{const now=performance.now();_firePools.push({r:q.toR,c:q.toC,start:now,until:now+8500,lastHit:0,seed:Math.random()*20});spawnShockwave(q.toR,q.toC,{rad0:5,maxRad:62,life:420,color:'#ff8a20',thick:4});try{_molotovIgnitionSound()}catch(e){}addShake(7);}
+  else{const now=performance.now();spawnCarExplosion(q.toR,q.toC,null,false,false);_capArr(_firePools,_MAX_FIRE_POOLS);_firePools.push({r:q.toR,c:q.toC,start:now,until:now+3800,lastHit:0,seed:Math.random()*20});spawnShockwave(q.toR,q.toC,{rad0:5,maxRad:72,life:460,color:'#ff8a20',thick:4});try{_molotovIgnitionSound()}catch(e){}addShake(8);}
   for(const n of NPCS){if(!n.dead&&Math.hypot(n.r-q.toR,n.c-q.toC)<radius)hitNpc(n,0,0,q.kind,q.kind==='grenade'?95:45)}
   _damageGangBotsInThrowable(q.toR,q.toC,radius,q.kind==='grenade'?'grenade':'molotov_fire');
   _damageCasinoPropsInRadius(q.toR,q.toC,radius,q.kind==='grenade'?'grenade':'molotov');
@@ -43441,10 +44129,33 @@ function drawGroundMissionBoxes() {
     ctx.restore();
   }
 }
+
+function _updateThrowableLifecycle(now=performance.now()){
+  for(let i=_thrownItems.length-1;i>=0;i--){
+    const q=_thrownItems[i];
+    if(!q){_thrownItems.splice(i,1);continue;}
+    if(now-q.start>=q.flight)_explodeThrowable(q);
+    if(now-q.start>q.flight+(q.kind==='grenade'?850:250))_thrownItems.splice(i,1);
+  }
+  for(let i=_firePools.length-1;i>=0;i--){
+    const f=_firePools[i];
+    if(!f||now>f.until){_firePools.splice(i,1);continue;}
+    if(now-f.lastHit<=900)continue;
+    f.lastHit=now;
+    for(const n of NPCS)if(!n.dead&&Math.hypot(n.r-f.r,n.c-f.c)<THROW_MOLOTOV_FIRE_RADIUS)hitNpc(n,0,0,'molotov',12);
+    if(_buildingInt)for(const n of (_buildingInt.npcs||[])){if(n.dead||n._allied||Math.hypot(n.r-f.r,n.c-f.c)>=THROW_MOLOTOV_FIRE_RADIUS)continue;_igniteInteriorCharacter(n,f.r,f.c);_hitInteriorNpc(n,0,0,12,'molotov_fire',true);}
+    _damageGangBotsInThrowable(f.r,f.c,THROW_MOLOTOV_FIRE_RADIUS,'molotov_fire');
+    _damageCasinoPropsInRadius(f.r,f.c,THROW_MOLOTOV_FIRE_RADIUS,'molotov_fire');
+    if(Math.hypot(player.r-f.r,player.c-f.c)<THROW_MOLOTOV_FIRE_RADIUS-.2)_hurtLocal(8,'пожар');
+  }
+  if(_thrownItems.length>_MAX_THROWN_ITEMS)_thrownItems.splice(0,_thrownItems.length-_MAX_THROWN_ITEMS);
+  if(_firePools.length>_MAX_FIRE_POOLS)_firePools.splice(0,_firePools.length-_MAX_FIRE_POOLS);
+  document.documentElement.dataset.throwablePools=`t${_thrownItems.length}:f${_firePools.length}`;
+}
 function drawThrowableFx(){
   const now=performance.now();
-  for(let i=_thrownItems.length-1;i>=0;i--){const q=_thrownItems[i],t=Math.min(1,(now-q.start)/q.flight);if(t>=1)_explodeThrowable(q);if(now-q.start>q.flight+(q.kind==='grenade'?850:250)){_thrownItems.splice(i,1);continue}const r=q.fromR+(q.toR-q.fromR)*t,c=q.fromC+(q.toC-q.fromC)*t,p=w2s(r+.5,c+.5),arc=Math.sin(Math.PI*t)*55;ctx.save();ctx.font='18px "Segoe UI Emoji"';ctx.textAlign='center';ctx.shadowColor=q.kind==='molotov'?'#ff6a00':'#000';ctx.shadowBlur=8;ctx.fillText(q.kind==='grenade'?'💣':'🔥',p.x,p.y-_bulletY()-arc);ctx.restore()}
-  for(let i=_firePools.length-1;i>=0;i--){const f=_firePools[i];if(now>f.until){_firePools.splice(i,1);continue}_drawWorldFirePatch(f,now);if(now-f.lastHit>900){f.lastHit=now;for(const n of NPCS)if(!n.dead&&Math.hypot(n.r-f.r,n.c-f.c)<THROW_MOLOTOV_FIRE_RADIUS)hitNpc(n,0,0,'molotov',12);if(_buildingInt)for(const n of (_buildingInt.npcs||[])){if(n.dead||n._allied||Math.hypot(n.r-f.r,n.c-f.c)>=THROW_MOLOTOV_FIRE_RADIUS)continue;_igniteInteriorCharacter(n,f.r,f.c);_hitInteriorNpc(n,0,0,12,'molotov_fire',true)}_damageGangBotsInThrowable(f.r,f.c,THROW_MOLOTOV_FIRE_RADIUS,'molotov_fire');_damageCasinoPropsInRadius(f.r,f.c,THROW_MOLOTOV_FIRE_RADIUS,'molotov_fire');if(Math.hypot(player.r-f.r,player.c-f.c)<THROW_MOLOTOV_FIRE_RADIUS-.2)_hurtLocal(8,'пожар')}}
+  for(const q of _thrownItems){const t=Math.min(1,(now-q.start)/q.flight),r=q.fromR+(q.toR-q.fromR)*t,c=q.fromC+(q.toC-q.fromC)*t,p=w2s(r+.5,c+.5),arc=Math.sin(Math.PI*t)*55;ctx.save();ctx.font='18px "Segoe UI Emoji"';ctx.textAlign='center';ctx.shadowColor=q.kind==='molotov'?'#ff6a00':'#000';ctx.shadowBlur=8;ctx.fillText(q.kind==='grenade'?'💣':'🔥',p.x,p.y-_bulletY()-arc);ctx.restore()}
+  for(const f of _firePools)_drawWorldFirePatch(f,now);
 }
 function _drawThrowableAim(){const a=_joyRAimAngle();if(a==null)return;const range=_joyRThrowRange(),er=player.r+Math.sin(a)*range,ec=player.c+Math.cos(a)*range;ctx.save();ctx.strokeStyle=currentWeapon==='grenade'?'#ffd65a':'#ff792e';ctx.lineWidth=2;ctx.setLineDash([6,5]);ctx.beginPath();for(let i=0;i<=16;i++){const t=i/16,r=player.r+(er-player.r)*t,c=player.c+(ec-player.c)*t,p=w2s(r+.5,c+.5),arc=Math.sin(Math.PI*t)*(22+range*5);if(i)ctx.lineTo(p.x,p.y-_bulletY()-arc);else ctx.moveTo(p.x,p.y-_bulletY())}ctx.stroke();ctx.setLineDash([]);const ep=w2s(er+.5,ec+.5);ctx.beginPath();ctx.ellipse(ep.x,ep.y,22,10,0,0,Math.PI*2);ctx.stroke();ctx.font='bold 10px system-ui';ctx.textAlign='center';ctx.fillStyle='#fff';ctx.fillText(`${range.toFixed(1)} м`,ep.x,ep.y+23);ctx.font='18px "Segoe UI Emoji"';ctx.fillText(currentWeapon==='grenade'?'💥':'🔥',ep.x,ep.y-5);ctx.restore()}
 
@@ -55431,6 +56142,11 @@ window.Mafiozi3DBridge = Object.freeze({
     player.vr=0;player.vc=0;player.walking=false;window._studioTeleportUntil=Date.now()+10000;
     return {r:player.r,c:player.c};
   },
+  previewApproachJunkyard() {
+    if(!_LOCAL_PREVIEW)return false;
+    player.r=JUNKYARD_R+4.5;player.c=JUNKYARD_C;player.vr=0;player.vc=0;player.walking=false;
+    window._studioTeleportUntil=Date.now()+10000;return {r:player.r,c:player.c};
+  },
   previewApproachGenericBuilding() {
     if(!_LOCAL_PREVIEW)return false;
     let best=null;
@@ -55526,7 +56242,8 @@ window.Mafiozi3DBridge = Object.freeze({
       if(r0>=EAST_EXPANSION_R1||c0<minC)continue;
       neighborhoods.push({r0,c0,size:20,vertical:((Math.floor(r0/20)+Math.floor((c0-EAST_EXPANSION_C0)/20))&1)===1,styleId:districtStyleIdAt(r0+10,c0+10)});
     }
-    return {center:{r:player.r,c:player.c},bounds:{minR,maxR,minC,maxC},blocks,obstacles,pois,coast,canal,neighborhoods,landmarks};
+    const streamableLandmarks=pois.filter(p=>p.id==='junkyard');
+    return {center:{r:player.r,c:player.c},bounds:{minR,maxR,minC,maxC},blocks,obstacles,pois,streamableLandmarks,coast,canal,neighborhoods,landmarks};
   },
   getDynamicEntities(radius = 38) {
     const rad2=Math.max(12,Math.min(65,+radius||38))**2,near=(r,c)=>(r-player.r)**2+(c-player.c)**2<=rad2;
@@ -55543,6 +56260,7 @@ window.Mafiozi3DBridge = Object.freeze({
       bulletHoles:+x._bulletHoleCount||0,bulletMarks:x._threeBulletMarks||[],hitAge:fxNow-(+x._lastCarHitAt||0),smoking:!!x._hoodSmoking,burning:!!x._hoodBurning,wrecked:!!(x._shotWrecked||x._wrecked),
       destroying:!!x._destroySequenceAt,destroyAge:x._destroySequenceAt?Math.max(0,fxNow-x._destroySequenceAt):0,destroyDelay:+x._destroySequenceDelay||CAR_GUN_DESTRUCTION_DELAY,
       burnedOut:!!x._burnedOut,wreckAge:x._explosionT?Math.max(0,fxNow-x._explosionT):99999,
+      towLoad:(+x._towLoadingProgress||0)>0,towLoadProgress:+x._towLoadingProgress||0,
     };});
     if(_LOCAL_PREVIEW&&_UP.has('previewwreck')&&cars[0]){
       Object.assign(cars[0],{r:player.r+2.8,c:player.c+1.1,dirR:0,dirC:1,velR:0,velC:0,parked:true,
@@ -55566,26 +56284,32 @@ window.Mafiozi3DBridge = Object.freeze({
         damageRatio:.68,bulletHoles:previewMarks.length,bulletMarks:previewMarks,smoking:false,burning:false,wrecked:false,burnedOut:false});
     }
     if(!inside&&typeof serviceVehicles!=='undefined')for(const v of serviceVehicles){
-      if(!v||v.state==='done'||!near(+v.y||0,+v.x||0))continue;
-      const ambulance=v.kind==='ambulance',fire=v.kind==='firetruck',tow=v.kind==='tow',police=v.kind==='police';
+      if(!v||v.state==='done')continue;
+      const visibleFireTarget=v.kind==='firetruck'&&v.state==='working'?_fireTruckTarget(v):null;
+      if(!near(+v.y||0,+v.x||0)&&!(visibleFireTarget&&near(visibleFireTarget.r,visibleFireTarget.c)))continue;
+      const ambulance=v.kind==='ambulance',fire=v.kind==='firetruck',tow=v.kind==='tow',police=v.kind==='police',ambulanceOnCall=ambulance&&v.state!=='ambulance_parked';
+      const medicalScene=ambulance?v._medicalScene:null,medicalDoorProgress=ambulance&&medicalScene?.active?(medicalScene.phase==='sealing'?Math.max(0,1-(+medicalScene.sealProgress||0)):1):0;
       cars.unshift({
         id:`service_${v.id}`,r:+v.y||0,c:+v.x||0,ang:+v.ang||0,
         model:ambulance?'ambulance':fire?'firetruck':tow?'tow_truck':'police',
         paint:ambulance?'#eef3f7':fire?'#b51f27':tow?'#e0a62c':'#244f86',
-        parked:v.state==='working'||v.state==='medical_response'||v.state==='siege',length:fire?2.4:tow?2.3:ambulance?2.05:1.9,
+        parked:v.state==='ambulance_parked'||v.state==='firetruck_parked'||v.state==='tow_parked'||v.state==='working'||v.state==='medical_response'||v.state==='siege',length:fire?2.4:tow?2.3:ambulance?2.05:1.9,
         width:fire?1.1:tow?1:ambulance?.98:.9,height:fire?1.05:ambulance?.88:.75,wheelR:.2,
         sport:false,pickup:tow,van:ambulance||fire,suv:false,cabrio:false,taxi:false,limo:false,muscle:false,classic:false,gang:false,helicopter:false,
-        emergency:ambulance?'ambulance':fire?'fire':police?'police':'tow',
+        emergency:ambulance?'ambulance':fire?'fire':police?'police':'tow',emergencyLights:ambulance?ambulanceOnCall:fire?v.state!=='firetruck_parked':tow?v.state!=='tow_parked':true,
         stripe:ambulance?'#1756bd':fire?'#f2c94c':tow?'#22262b':'#d9e8ff',
         dirR:Math.sin(+v.ang||0),dirC:Math.cos(+v.ang||0),velR:0,velC:0,
-        braking:v.state==='working'||v.state==='medical_response'||v.state==='siege',turning:false,
-        serviceKind:v.kind,serviceState:v.state,medicalDoorsOpen:ambulance&&v.state==='medical_response',
+        braking:v.state==='ambulance_parked'||v.state==='firetruck_parked'||v.state==='tow_parked'||v.state==='working'||v.state==='medical_response'||v.state==='siege',turning:false,
+        serviceKind:v.kind,serviceState:v.state,medicalDoorsOpen:medicalDoorProgress>.5,medicalDoorProgress,
+        fireWorkProgress:fire&&v.state==='working'?Math.max(0,Math.min(1,(fxNow-(+v._waterStartedAt||fxNow))/Math.max(1,+v.workDuration||4500))):0,
+        fireHoseAngle:fire&&Number.isFinite(+v._hoseAng)?+v._hoseAng:null,
+        towLoadProgress:tow?Math.max(0,Math.min(1,+v._loadProgress||0)):0,towLoaded:tow&&!!v._loaded,
       });
       if(tow&&v._loaded&&v.payload?.carRef){
         const load=v.payload.carRef,model=typeof resolveCarModel==='function'?resolveCarModel(load.model):(load.model||{});
         cars.unshift({id:`service_load_${v.id}`,r:+v.y-Math.sin(+v.ang||0)*.46,c:+v.x-Math.cos(+v.ang||0)*.46,ang:+v.ang||0,
           model:model?.name||model?.id||load.model||'sedan',paint:load.color||load.paint||model?.palette?.[0]||'#555b62',parked:true,length:+model?.L||1.65,width:+model?.W||.82,height:.58,wheelR:.16,
-          sport:!!model?.sport,pickup:false,van:false,suv:false,cabrio:false,taxi:false,limo:false,muscle:false,classic:false,gang:false,helicopter:false,emergency:'',stripe:'',dirR:0,dirC:0,velR:0,velC:0,braking:true,turning:false,towLoad:true,wrecked:true,burnedOut:true,damageRatio:0,wreckAge:99999});
+          sport:!!model?.sport,pickup:false,van:false,suv:false,cabrio:false,taxi:false,limo:false,muscle:false,classic:false,gang:false,helicopter:false,emergency:'',stripe:'',dirR:0,dirC:0,velR:0,velC:0,braking:true,turning:false,towLoad:true,towLoadProgress:1,wrecked:true,burnedOut:true,damageRatio:0,wreckAge:99999});
       }
     }
     // These interactive vehicles are stored outside CARS by the 2D game.
@@ -55631,12 +56355,21 @@ window.Mafiozi3DBridge = Object.freeze({
         for(const medic of (service._medicalCrew||[]))if(medic?.visible)combat.push({
           ...medic,id:medic.id,role:'medic',name:medic.slot?'Врач скорой':'Старший врач',
           walking:!!medic.walking,moving:!!medic.walking,hp:100,max_hp:100,
-          _medicCarry:!!medic.carrying,_medicSlot:+medic.slot||0,behavior:'ambulance_body_recovery',
+          _medicCarry:!!medic.carrying,_medicSlot:+medic.slot||0,_medicAction:medic.action||'',
+          _medicActionProgress:+medic.actionProgress||0,behavior:'ambulance_body_recovery',
         });
       }
       npcSource=[...combat,...npcSource];
     }
     const npcPriority=x=>{const role=String(x?.role||x?._arcKey||'').toLowerCase();if(role.includes('medic'))return 0;if(x?.gang||x?._gang||x?.gangId||x?.gang_id||role.includes('gang')||role.includes('boss')||role.includes('district_')||role.includes('occupier'))return 0;if(x?.police||role.includes('police')||role.includes('cop')||role.includes('guard'))return 1;return 2;};
+    if(!inside&&near(JUNKYARD_R,JUNKYARD_C)){
+      const workerRoutes=[[[84.1,62.5],[84.1,67.3],[87.2,67.3],[87.2,62.5]],[[88.2,64.2],[88.2,69.1],[84.8,69.1],[84.8,64.2]],[[82.9,65.1],[86.1,65.1],[86.1,70],[82.9,70]]];
+      const workerLooks=[{skin:1,body:2,face:1,hair:1,hat:2,suit:'#665b46'},{skin:2,body:1,face:2,hair:3,hat:1,suit:'#4e5a55'},{skin:0,body:3,face:3,hair:2,hat:2,suit:'#72513d'}];
+      for(let wi=0;wi<workerRoutes.length;wi++){
+        const route=workerRoutes[wi],cycle=(fxNow*.00022+wi*.27)%1,leg=Math.floor(cycle*route.length),u=cycle*route.length-leg,a=route[leg],b=route[(leg+1)%route.length],pause=u>.82,pauseU=Math.min(u,.82)/.82,r=a[0]+(b[0]-a[0])*pauseU,c=a[1]+(b[1]-a[1])*pauseU;
+        npcSource.push({id:`junkyard_worker_${wi}`,r,c,tr:b[0],tc:b[1],ang:Math.atan2(b[0]-a[0],b[1]-a[1]),walking:!pause,moving:!pause,walkPhase:fxNow*.009+wi*2.1,role:'junkyard_worker',visualRole:'civilian',name:pause?(wi===1?'Сортирует металл':'Убирает мусор'):'Работяга свалки',look:workerLooks[wi],hp:80,max_hp:80,_junkyardWorker:true});
+      }
+    }
     const npcs=npcSource.filter(x=>x&&!x._ambientGang&&!x._evacuated&&!x._carriedByAmbulance&&near(+(x.r??x.y)||0,+(x.c??x.x)||0)).sort((a,b)=>npcPriority(a)-npcPriority(b)).slice(0,72).map((x,i)=>{const id=_threeNpcEntityId(x,i),death=_threeNpcDeathState(x,id),role=String(x.role||x._arcKey||'civilian'),roleKey=role.toLowerCase(),gang=!!(x.gang||x._gang||x.gangId||x.gang_id||roleKey.includes('gang')||roleKey.includes('boss')||roleKey.includes('district_')||roleKey.includes('occupier')),police=!!(x.police||roleKey==='police'||roleKey==='cop'||roleKey.includes('police')),r=+(x.r??x.y)||0,c=+(x.c??x.x)||0,targetR=Number.isFinite(+x.tr)?+x.tr:Number.isFinite(+x.tgtR)?+x.tgtR:Number.isFinite(+x.ty)?+x.ty:r,targetC=Number.isFinite(+x.tc)?+x.tc:Number.isFinite(+x.tgtC)?+x.tgtC:Number.isFinite(+x.tx)?+x.tx:c,targetMoving=Math.hypot(targetR-r,targetC-c)>.035,declaredMoving=!!(x.walking||x.moving||x.isMoving||x._moving),maxHp=Math.max(1,+x.max_hp||+x.maxHp||60),hp=death.dead?0:(Number.isFinite(+x.hp)?Math.max(0,+x.hp):maxHp),combatFx=_threeTrackCombatBleed(id,hp,maxHp,r,c,death.dead,+x._lastHitAt||+x.hitAt||0);return {
       id,r,c,ang:+x.ang||0,walking:!death.dead&&(declaredMoving||targetMoving),moving:!death.dead&&(declaredMoving||targetMoving),walkPhase:+x.walkPhase||0,speed:+x.speed||0,
       elevation:_buildingInt?.bizId==='major_casino'?_casinoVisualElevation(_buildingInt,+(x.r??x.y)||0,+(x.c??x.x)||0):0,
@@ -55647,8 +56380,10 @@ window.Mafiozi3DBridge = Object.freeze({
       bloodDirR:+x._bloodDirR||0,bloodDirC:+x._bloodDirC||1,
       severMask:+x._severMask||0,forcedCrawl:!!x._forcedCrawl,
       medicCarry:!!x._medicCarry,medicSlot:+x._medicSlot||0,
+      medicAction:x._medicAction||'',medicActionProgress:+x._medicActionProgress||0,
     };});
     if(_LOCAL_PREVIEW&&_UP.has('previewlimp'))for(const [j,npc] of npcs.slice(0,8).entries())if(!npc.dead){const a=j*Math.PI/4;npc.r=player.r+Math.sin(a)*3.8;npc.c=player.c+Math.cos(a)*3.8;npc.ang=a;npc.hp=Math.min(npc.hp,npc.maxHp*.2);npc.forcedCrawl=false;npc.severMask=0;npc.walking=true;}
+    if(_LOCAL_PREVIEW&&_UP.has('previewnpcwalk'))for(const [j,npc] of npcs.filter(x=>!x.dead).slice(0,6).entries()){const a=-1.05+j*.42;npc.r=player.r+Math.sin(a)*4.2;npc.c=player.c+Math.cos(a)*4.2;npc.ang=a+Math.PI;npc.hp=npc.maxHp;npc.forcedCrawl=false;npc.severMask=0;npc.walking=npc.moving=true;npc.speed=2.4;npc.look={...(npc.look||{}),suit:j===0?'#20b8aa':j===1?'#4a9bd8':j===2?'#e59b45':npc.look?.suit};}
     if(_LOCAL_PREVIEW&&_UP.has('previewlabels')){
       const samples=[
         {role:'civilian',visualRole:'civilian',name:'Житель',hp:42,maxHp:60},
@@ -55671,18 +56406,46 @@ window.Mafiozi3DBridge = Object.freeze({
     if(!inside&&typeof serviceVehicles!=='undefined')for(const v of serviceVehicles){
       const scene=v?._medicalScene;
       if(v?.kind!=='ambulance'||!scene?.active||!scene.stretcherVisible||!near(+scene.centerR||0,+scene.centerC||0))continue;
+      const patient=v.payload?.npc,look=patient?.look||{};
       medicalFx.push({id:`medical_${v.id}`,r:+scene.centerR||0,c:+scene.centerC||0,ang:+scene.ang||0,
-        phase:scene.phase||'',lift:+scene.liftProgress||0,bodyVisible:!!scene.bodyVisible,
-        carrying:scene.phase==='carrying'||scene.phase==='loading'});
+        phase:scene.phase||'',lift:+scene.liftProgress||0,load:+scene.loadProgress||0,
+        bodyVisible:!!scene.bodyVisible,carrying:scene.phase==='carrying'||scene.phase==='loading',
+        patientLook:{skin:+look.skin||0,body:+look.body||0,suit:look.suit||''},
+        ambulanceR:+v.y||0,ambulanceC:+v.x||0,ambulanceAng:+v.ang||0});
+    }
+    // Local-only complete recovery cycle for visual regression checks.
+    if(_LOCAL_PREVIEW&&_UP.has('previewambulance')){
+      const forcedPhase=_UP.get('previewambulance'),age=forcedPhase==='assessing'?3900:forcedPhase==='lifting'?4850:forcedPhase==='loaded'?10380:forcedPhase==='sealing'?10950:performance.now()%11350,ambR=player.r+1.5,ambC=player.c+4.2,targetR=player.r+6,targetC=player.c+4.2,rearR=ambR+1.15,rearC=ambC;
+      let phase='deploying',p=age/900,r=rearR,c=rearC,lift=0,load=0,seal=0,bodyVisible=false,carrying=false,walking=true;
+      if(age<900){r=rearR+(1-p)*.28;}
+      else if(age<3500){phase='approaching';p=(age-900)/2600;r=rearR+(targetR-rearR)*p;}
+      else if(age<4300){phase='assessing';r=targetR;p=0;walking=false;}
+      else if(age<5400){phase='lifting';r=targetR;lift=(age-4300)/1100;bodyVisible=true;carrying=lift>.42;walking=false;}
+      else if(age<9000){phase='carrying';p=(age-5400)/3600;r=targetR+(rearR-targetR)*p;lift=1;bodyVisible=carrying=true;}
+      else if(age<10500){phase='loading';load=(age-9000)/1500;r=rearR-(load*.72);lift=1;bodyVisible=load<.9;carrying=true;walking=false;}
+      else{phase='sealing';seal=(age-10500)/850;r=rearR;lift=1;bodyVisible=false;walking=false;}
+      const medicalDoorProgress=phase==='sealing'?Math.max(0,1-seal):1;
+      cars.unshift({id:'preview_ambulance',r:ambR,c:ambC,ang:Math.PI,model:'ambulance',paint:'#eef3f7',parked:true,length:2.05,width:.98,height:.88,wheelR:.2,van:true,emergency:'ambulance',stripe:'#1756bd',dirR:0,dirC:-1,velR:0,velC:0,braking:true,serviceKind:'ambulance',serviceState:'medical_response',medicalDoorsOpen:medicalDoorProgress>.5,medicalDoorProgress});
+      if(cars.length>24)cars.length=24;
+      medicalFx.unshift({id:'medical_preview',r,c,ang:phase==='carrying'||phase==='loading'?Math.PI:0,phase,lift,load,bodyVisible,carrying,patientLook:{skin:1,body:2,suit:'#596b7a'},ambulanceR:ambR,ambulanceC:ambC,ambulanceAng:Math.PI});
+      const sideC=.48;for(let slot=0;slot<2;slot++)npcs.push({id:`preview_medic_${slot}`,r,c:c+(slot?sideC:-sideC),ang:phase==='carrying'||phase==='loading'?Math.PI:0,walking,moving:walking,walkPhase:age*.009+slot*Math.PI,role:'medic',visualRole:'civilian',behavior:'ambulance_body_recovery',name:slot?'Врач скорой':'Старший врач',look:{skin:slot+1,body:1,face:slot+1,hair:slot?3:1,hat:0,suit:slot?'#dcecf2':'#e9f4f6'},hp:100,maxHp:100,dead:false,medicCarry:carrying,medicSlot:slot,medicAction:phase,medicActionProgress:phase==='lifting'?lift:phase==='sealing'?seal:p});
+      if(!carrying)npcs.push({id:'preview_ambulance_victim',r:targetR,c:targetC,ang:Math.PI/2,walking:false,moving:false,role:'civilian',visualRole:'civilian',name:'Житель',look:{skin:1,body:2,face:2,hair:4,hat:0,suit:'#596b7a'},hp:0,maxHp:60,dead:true,deadAt:performance.now()-5000});
     }
     const serviceWater=[];
     if(!inside&&typeof serviceVehicles!=='undefined')for(const v of serviceVehicles){
       if(v?.kind!=='firetruck'||v.state!=='working')continue;
       const target=_fireTruckTarget(v);if(!target)continue;
       const dr=target.r-v.y,dc=target.c-v.x,dist=Math.hypot(dr,dc)||1;
-      for(let j=1;j<=10;j++){const k=j/11,wave=Math.sin(performance.now()*.012+j*1.7)*.05*(1-k);serviceWater.push({
+      const pulse=(performance.now()*.0028)%1;
+      for(let j=0;j<16;j++){const k=((j/16+pulse)%1)*.94+.03,wave=Math.sin(performance.now()*.009+j*1.61)*.026*(1-k);serviceWater.push({
         id:`water_${v.id}_${j}`,r:v.y+dr*k+wave*dc/dist,c:v.x+dc*k-wave*dr/dist,
-        vr:dr/dist*8,vc:dc/dist*8,ang:Math.atan2(dr,dc),color:j%3?'#70cfff':'#d8f4ff',weapon:'water_hose',fromNpc:true,thick:true,
+        vr:dr/dist*7.2,vc:dc/dist*7.2,ang:Math.atan2(dr,dc),color:j%5?'#67d7ff':'#e8fbff',weapon:'water_hose',fromNpc:true,thick:false,
+        bulletScale:j%4===0?.52:.38,trailScale:j%3===0?.92:.68,startZ:1,endZ:-1,dist:k*dist,maxDist:dist,
+      });}
+      for(let j=0;j<5;j++){const a=j*2.399+performance.now()*.004,k=.94+(j%2)*.035;serviceWater.push({
+        id:`mist_${v.id}_${j}`,r:v.y+dr*k+Math.sin(a)*.13,c:v.x+dc*k+Math.cos(a)*.13,
+        vr:dr/dist*2.1,vc:dc/dist*2.1,ang:Math.atan2(dr,dc),color:'#c8f4ff',weapon:'water_hose',fromNpc:true,thick:false,
+        bulletScale:.2+(j%3)*.045,trailScale:.2,startZ:.02,endZ:0,dist:dist,maxDist:dist,
       });}
     }
     const projectiles=[...serviceWater,...(typeof bullets!=='undefined'?bullets:[])].filter(x=>x&&!x._finished&&Number.isFinite(+x.r)&&Number.isFinite(+x.c)&&Number.isFinite(+x.vr)&&Number.isFinite(+x.vc)&&near(+x.r,+x.c)).slice(0,48).map((x,i)=>({id:x.id??i,r:+x.r||0,c:+x.c||0,vr:+x.vr||0,vc:+x.vc||0,ang:Math.atan2(+x.vr||0,+x.vc||1),color:x.color||'#ffd76b',weapon:x.weapon||'pistol',fromNpc:!!x.fromNpc,fromPlayer:!!x.fromPlayer,tracked:!!x.targetVehicle,thick:!!x.thick,bulletScale:+x.bulletScale||1,trailScale:+x.trailScale||1,startZ:+x.startZ||0,endZ:+x.endZ||0,dist:+x.dist||0,maxDist:+x.maxDist||1}));
@@ -55718,6 +56481,7 @@ window.Mafiozi3DBridge = Object.freeze({
     if(_LOCAL_PREVIEW&&_UP.has('previewwrecks')&&!_UP.has('previewcalm')&&!_UP.has('previewnoexplosions')){
       const count=Math.max(1,Math.min(8,+_UP.get('previewwrecks')||5));for(let i=0;i<Math.min(count,cars.length);i++){const age=(performance.now()+i*260)%5200;if(age<1850)explosionFx.unshift({r:cars[i].r,c:cars[i].c,age,life:1850,seed:170+i*37,kind:'vehicle'});}
     }
+    if(typeof _thrownItems!=='undefined')for(let i=_thrownItems.length-1;i>=0;i--){const q=_thrownItems[i],age=fxNow-(+q.start||fxNow),flight=+q.flight||720;if(age>=flight&&!q.exploded)_explodeThrowable(q);if(age>flight+(q.kind==='grenade'?850:250))_thrownItems.splice(i,1);}
     const throwableFx=(typeof _thrownItems!=='undefined'?_thrownItems:[]).filter(x=>x&&!x.exploded).slice(0,8).map((x,i)=>{const p=Math.max(0,Math.min(1,(performance.now()-(+x.start||0))/(+x.flight||720)));return {id:i,kind:x.kind||'grenade',r:(+x.fromR||0)+((+x.toR||0)-(+x.fromR||0))*p,c:(+x.fromC||0)+((+x.toC||0)-(+x.fromC||0))*p,height:Math.sin(Math.PI*p)*3.8,progress:p};});
     const fireFx=(typeof _firePools!=='undefined'?_firePools:[]).filter(x=>x&&fxNow<+x.until&&near(+x.r||0,+x.c||0)).slice(0,10).map(x=>({r:+x.r||0,c:+x.c||0,age:fxNow-(+x.start||0),life:(+x.until||0)-(+x.start||0),seed:+x.seed||0,radius:THROW_MOLOTOV_FIRE_RADIUS||4.2,kind:'ground'}));
     // Wreck flames share the existing instanced ground-fire pool. This restores
@@ -55769,9 +56533,32 @@ window.Mafiozi3DBridge = Object.freeze({
         const box=groundMissionBoxes[i];if(!box)continue;addObject('mission_box',`mission_box_${box.id??i}`,box.r,box.c,box.mine?'Ваш груз':'Груз','#c98743',{maxRadius:4,mine:!!box.mine});
       }
     }
+    document.documentElement.dataset.junkyardWorkers=String(npcs.filter(n=>n.role==='junkyard_worker').length);
     return {cars,npcs,medicalFx,projectiles,muzzleFx,shellFx,impactFx,bulletHoleFx,bloodFx,goreFx,explosionFx,throwableFx,fireFx,players:players.slice(0,24),objects:objects.slice(0,160)};
   },
+  throwSelected(kind, angle, throwRange) {
+    kind=String(kind||'').toLowerCase();
+    if(!['grenade','molotov'].includes(kind)||myDead||myMode==='pve')return false;
+    const selected=_LOCAL_PREVIEW&&_UP.get('previewweapon')?String(_UP.get('previewweapon')).toLowerCase():currentWeapon;
+    if(selected!==kind)return false;
+    if(_LOCAL_PREVIEW&&_UP.get('previewweapon')){
+      const range=Math.max(1.4,Math.min(6.5,+throwRange||6.5)),fromR=player.r,fromC=player.c;
+      _thrownItems.push({kind,fromR,fromC,toR:fromR+Math.sin(angle)*range,toC:fromC+Math.cos(angle)*range,start:performance.now(),flight:720,exploded:false});
+      document.documentElement.dataset.threeThrowableRoute=`preview:${kind}:${range.toFixed(2)}`;
+      return true;
+    }
+    const count=kind==='grenade'?_myGrenadeCount:_myMolotovCount;if(count<=0)return false;
+    void _throwSelected(kind,angle,throwRange);document.documentElement.dataset.threeThrowableRoute=`live:${kind}`;return true;
+  },
+  plantC4() {
+    const selected=_LOCAL_PREVIEW&&_UP.get('previewweapon')?String(_UP.get('previewweapon')).toLowerCase():currentWeapon;
+    if(selected!=='c4'||myDead||myMode==='pve')return false;
+    if(_LOCAL_PREVIEW&&_UP.get('previewweapon')){document.documentElement.dataset.threeC4Route='preview-place';return true;}
+    const accepted=placeWorldC4();document.documentElement.dataset.threeC4Route=accepted?'live-place':'rejected';return accepted;
+  },
   fire(angle, muzzleR, muzzleC) {
+    const selected=_LOCAL_PREVIEW&&_UP.get('previewweapon')?String(_UP.get('previewweapon')).toLowerCase():currentWeapon;
+    if(['grenade','molotov','c4'].includes(selected)){document.documentElement.dataset.threeSpecialFireBlocked=selected;return false;}
     if(_LOCAL_PREVIEW&&_UP.get('previewweapon'))return true;
     if (myDead || myMode === 'pve' || !_isArmed()) return false;
     return _threeBridgeFireAccepted(angle, muzzleR, muzzleC);
@@ -55786,6 +56573,18 @@ window.Mafiozi3DBridge = Object.freeze({
     const accepted=_threeBridgeFireAccepted(Math.atan2(r-sr,c-sc),muzzleR,muzzleC);
     if(!accepted){_threeForcedVehicleShotId=null;_threeForcedVehicleShotUntil=0;}
     document.documentElement.dataset.vehicleDirectAim=accepted?`hit:${key}`:`rejected:${key}`;
+    return accepted;
+  },
+  fireAtNpc(npcId, muzzleR, muzzleC) {
+    if(myDead||myMode==='pve'||!_isArmed())return false;
+    const key=String(npcId||''),npc=NPCS.find(n=>n&&!n.dead&&!n._evacuated&&String(_threeNpcEntityId(n))===key);
+    if(!npc)return false;
+    const r=+npc.r||0,c=+npc.c||0,sr=Number.isFinite(muzzleR)?muzzleR:player.r,sc=Number.isFinite(muzzleC)?muzzleC:player.c;
+    if(Math.hypot(r-sr,c-sc)>(weaponProfile(currentWeapon).range||8)+1)return false;
+    _threeForcedNpcShotId=key;_threeForcedNpcShotUntil=performance.now()+180;
+    const hpBefore=+npc.hp||0,accepted=_threeBridgeFireAccepted(Math.atan2(r-sr,c-sc),muzzleR,muzzleC);
+    if(!accepted){_threeForcedNpcShotId=null;_threeForcedNpcShotUntil=0;}
+    document.documentElement.dataset.npcDirectAim=accepted?`${(+npc.hp||0)<hpBefore?'hit':'fired'}:${key}`:`rejected:${key}`;
     return accepted;
   },
   getShotPerformance() {
@@ -55806,7 +56605,14 @@ window.Mafiozi3DBridge = Object.freeze({
   canStand(r, c) { return Number.isFinite(r) && Number.isFinite(c) && !isBlocked(r, c); },
 });
 if(_LOCAL_PREVIEW&&_UP.get('threeinterior'))setTimeout(()=>window.Mafiozi3DBridge.previewEnterMajorInterior(_UP.get('threeinterior')),900);
+if(_LOCAL_PREVIEW&&_UP.has('previewcombatregression'))setTimeout(()=>{const npc=NPCS.find(n=>n&&!n.dead&&!n._evacuated&&!n._ambientGang),car=(typeof CARS!=='undefined'?CARS:[]).find(x=>x&&!x._hidden&&!x._towed&&!x._destroySequenceAt&&!x._shotWrecked&&!x._wrecked&&!x.wrecked),until=performance.now()+12000;if(!npc||!car)return;document.documentElement.dataset.combatQaNpc=_threeNpcEntityId(npc);document.documentElement.dataset.combatQaVehicle=_threeVehicleEntityId(car);const pin=setInterval(()=>{document.documentElement.dataset.combatQaNpcHp=String(Math.max(0,+npc.hp||0));document.documentElement.dataset.combatQaVehicleHp=String(Number.isFinite(+car._ballisticHp)?+car._ballisticHp:240);document.documentElement.dataset.combatQaVehicleHoles=String(+car._bulletHoleCount||0);if(performance.now()>until||npc.dead||car._shotWrecked||car._wrecked||car.wrecked){clearInterval(pin);return;}npc.r=player.r+3.2;npc.c=player.c+1.6;npc.tr=npc.r;npc.tc=npc.c;npc.walking=false;npc.moving=false;car.r=player.r+1.8;car.c=player.c-3.1;car.v=0;car.speed=0;},40);},1200);
 if(_LOCAL_PREVIEW&&_UP.get('threebusiness'))setTimeout(()=>window.Mafiozi3DBridge.previewEnterBusinessInterior(_UP.get('threebusiness')),900);
+if(_LOCAL_PREVIEW&&_UP.has('previewjunkyardstream'))setTimeout(()=>window.Mafiozi3DBridge.previewApproachJunkyard(),1600);
+if(_LOCAL_PREVIEW&&_UP.has('previewjunkyard')){
+  player.r=JUNKYARD_R+4.5;player.c=JUNKYARD_C;player.vr=0;player.vc=0;player.walking=false;
+  window._studioTeleportUntil=Date.now()+10000;
+  document.documentElement.dataset.junkyardPreview='positioned';
+}
 if(_LOCAL_PREVIEW&&_UP.has('previewcarexplosion'))setTimeout(()=>{
   const requested=Math.max(1,Math.min(6,+_UP.get('previewcarexplosion')||5));
   const qaCars=CARS.filter(car=>car?.model&&!car.model?.helicopter).slice(0,requested);
@@ -59570,6 +60376,6 @@ function chatDuration(text) {
 })();
 </script>
 
-<script type="module" src="three_preview.js?v=3d201"></script>
+<script type="module" src="three_preview.js?v=3d233"></script>
 </body>
 </html>
