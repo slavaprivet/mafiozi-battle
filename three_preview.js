@@ -1,3 +1,4 @@
+// 3D sync v236: roof occlusion keeps stable material state and eases transitions without white movement flicker.
 // 3D sync v235: short E selects the nearest NPC or building, every living NPC has an action card, and Brigadir dialogue is readable.
 // 3D sync v234: the southern junkyard is one fenced yard, and interior exits return to the real entrance.
 // 3D sync v233: desktop startup streams identical full-quality geometry in bounded idle slices instead of freezing the main thread.
@@ -2092,7 +2093,26 @@ transformed.z+=cos(mfzWindTime*.82+mfzPhase*1.31+position.z*.42)*mfzGust*mfzWeig
       stage.classList.add('three-mode');
       renderer.domElement.dataset.worldBounds=`${envSnapshot?.mapCols||80}x${envSnapshot?.mapRows||200}`;
       window.MafioziLoading?.set(89, 'Заселяем улицы и готовим первый кадр…');
-      let lastW=size.W,lastH=size.H,lastT=performance.now(),walkPhase=0,lampAnchor='',fpsAt=performance.now(),fpsFrames=0,measuredFps=60,maxFrameGapMs=0,maxFrameGapSinceReady=0,lastPixelRatioChangeAt=0,lastShadowAt=0,lastOcclusionAt=0,dynamicAt=0,dynamicState=null,nearbyActionAt=0,nearbyActionState=null,customGangHqAt=0,cameraZoomMode='world',worldZoom=1,playerFloorElevation=0,playerVisualSig='',vehicleEntryState=null,fadedMaterials=[],firstFramePresented=false,fullMaterialsReady=false,materialCompileStarted=false,deferredWorldLoadStarted=false,playerHpPct=1,lastPlayerHp=-1,playerHitUntil=0,playerHitSide=1;
+      let lastW=size.W,lastH=size.H,lastT=performance.now(),walkPhase=0,lampAnchor='',fpsAt=performance.now(),fpsFrames=0,measuredFps=60,maxFrameGapMs=0,maxFrameGapSinceReady=0,lastPixelRatioChangeAt=0,lastShadowAt=0,lastOcclusionAt=0,dynamicAt=0,dynamicState=null,nearbyActionAt=0,nearbyActionState=null,customGangHqAt=0,cameraZoomMode='world',worldZoom=1,playerFloorElevation=0,playerVisualSig='',vehicleEntryState=null,firstFramePresented=false,fullMaterialsReady=false,materialCompileStarted=false,deferredWorldLoadStarted=false,playerHpPct=1,lastPlayerHp=-1,playerHitUntil=0,playerHitSide=1;
+      const OCCLUSION_OPACITY=.22,OCCLUSION_RELEASE_HOLD_MS=280,occlusionMaterialStates=new Map();
+      const markOcclusionMaterial=(material,t)=>{
+        let state=occlusionMaterialStates.get(material);
+        if(!state){state={baseOpacity:material.opacity,baseTransparent:material.transparent,baseDepthWrite:material.depthWrite,targetOpacity:OCCLUSION_OPACITY,lastBlockedAt:t};occlusionMaterialStates.set(material,state);}
+        state.targetOpacity=OCCLUSION_OPACITY;state.lastBlockedAt=t;
+      };
+      const updateOcclusionMaterials=(dt,t)=>{
+        let fading=0,restoring=0;
+        for(const [material,state] of occlusionMaterialStates){
+          if(state.targetOpacity===OCCLUSION_OPACITY&&t-state.lastBlockedAt>OCCLUSION_RELEASE_HOLD_MS)state.targetOpacity=state.baseOpacity;
+          const towardFade=state.targetOpacity<state.baseOpacity-.001,ease=1-Math.exp(-dt*(towardFade?13:9)),next=THREE.MathUtils.lerp(material.opacity,state.targetOpacity,ease);
+          if(towardFade){if(!material.transparent){material.transparent=true;material.needsUpdate=true;}material.depthWrite=false;fading++;}
+          else restoring++;
+          material.opacity=Math.abs(next-state.targetOpacity)<.004?state.targetOpacity:next;
+          if(!towardFade&&material.opacity===state.baseOpacity){material.depthWrite=state.baseDepthWrite;if(material.transparent!==state.baseTransparent){material.transparent=state.baseTransparent;material.needsUpdate=true;}occlusionMaterialStates.delete(material);}
+        }
+        renderer.domElement.dataset.occlusionMaterials=`fade:${fading}:restore:${restoring}`;
+      };
+      renderer.domElement.dataset.roofOcclusionProfile='stable-hysteresis-ease-v236';
       const sceneDiagnosticsEnabled=rendererParams.has('perfdiag')||rendererParams.has('previewwrecks');
       const collectSceneDiagnostics=()=>{
         if(!sceneDiagnosticsEnabled)return;
@@ -2590,16 +2610,19 @@ transformed.z+=cos(mfzWindTime*.82+mfzPhase*1.31+position.z*.42)*mfzGust*mfzWeig
         if(muzzleLife>0){muzzleLife-=dt;const flashFade=Math.max(0,muzzleLife/.14);muzzle.intensity=96*flashFade;localMuzzleFlash.visible=true;localMuzzleFlash.scale.multiplyScalar(.91);for(const child of localMuzzleFlash.children)child.material.opacity=flashFade;}else{muzzle.intensity=0;localMuzzleFlash.visible=false;}
         camera.position.set(player.position.x+54,62+playerFloorElevation,player.position.z+54);camera.lookAt(player.position.x,1.6+playerFloorElevation,player.position.z);updateBuildingPromptPosition();
         sun.position.copy(player.position).add(sunOffsetVector);sun.target.position.set(player.position.x,playerFloorElevation,player.position.z);sun.target.updateMatrixWorld();
-        // Occlusion is spatially stable while walking; checking it at 8 Hz avoids
-        // 105 building ray tests and hundreds of material writes every frame.
+        // Ray tests stay throttled, while material state persists between samples.
+        // A short release hold absorbs triangle-edge jitter and the eased opacity
+        // prevents roofs from flashing opaque/white as the camera follows walking.
         if(t-lastOcclusionAt>occlusionCadence){
-          for(const m of fadedMaterials){m.opacity=1;m.depthWrite=true;}fadedMaterials=[];
           const sight=new THREE.Vector3().subVectors(player.position,camera.position),sightDistance=sight.length();
           const sightRay=new THREE.Raycaster(camera.position,sight.normalize(),.1,sightDistance);
-          const blockers=sightRay.intersectObjects(occluders,false).filter(hit=>hit.distance>sightDistance-34).slice(0,2);
-          for(const hit of blockers){if(hit.object===highlightedBuildingObject||hit.object.userData.building===highlightedBuildingObject?.userData?.building)continue;for(const m of hit.object.userData.fadeMaterials){m.transparent=true;m.opacity=.22;m.depthWrite=false;fadedMaterials.push(m);}}
+          const blockerObjects=[];
+          for(const hit of sightRay.intersectObjects(occluders,false)){if(hit.distance<=sightDistance-34||blockerObjects.includes(hit.object))continue;blockerObjects.push(hit.object);if(blockerObjects.length===2)break;}
+          for(const object of blockerObjects){if(object===highlightedBuildingObject||object.userData.building===highlightedBuildingObject?.userData?.building)continue;for(const material of object.userData.fadeMaterials||[])markOcclusionMaterial(material,t);}
+          renderer.domElement.dataset.occlusionBlockers=String(blockerObjects.length);
           lastOcclusionAt=t;
         }
+        updateOcclusionMaterials(dt,t);
         if(!dynamic){cars.slice(0,3).forEach(x=>x.visible=true);cars[0].position.x = -30 + (tt * 13) % 60; cars[1].position.z = 29 - (tt * 11) % 58; cars[2].position.x = 27 - (tt * 9) % 54;}
         if(runtimeShadowsEnabled&&t-lastShadowAt>shadowCadence){renderer.shadowMap.needsUpdate=true;lastShadowAt=t;}
         // Render the authored ACES/sRGB palette directly. The legacy fullscreen
@@ -2609,7 +2632,7 @@ transformed.z+=cos(mfzWindTime*.82+mfzPhase*1.31+position.z*.42)*mfzGust*mfzWeig
         renderer.setRenderTarget(null);renderer.render(fullMaterialsReady?scene:bootScene,camera);
         renderer.domElement.dataset.palettePipeline='direct-aces-srgb';
         if(!materialCompileStarted){renderer.domElement.dataset.materialCompile='queued';setTimeout(()=>onIdle(beginFullMaterialCompile),48);}
-        if(fullMaterialsReady&&!firstFramePresented){firstFramePresented=true;startupMark('first-complete-frame');renderer.domElement.dataset.firstPresentedFrame='full-scene-v235';window.MafioziLoading?.complete('Город готов');const readyAt=performance.now();lastT=readyAt;fpsAt=readyAt;fpsFrames=0;maxFrameGapMs=0;maxFrameGapSinceReady=0;setTimeout(()=>onIdle(startDeferredWorldLoad),constrainedDevice?1600:450);}
+        if(fullMaterialsReady&&!firstFramePresented){firstFramePresented=true;startupMark('first-complete-frame');renderer.domElement.dataset.firstPresentedFrame='full-scene-v236';window.MafioziLoading?.complete('Город готов');const readyAt=performance.now();lastT=readyAt;fpsAt=readyAt;fpsFrames=0;maxFrameGapMs=0;maxFrameGapSinceReady=0;setTimeout(()=>onIdle(startDeferredWorldLoad),constrainedDevice?1600:450);}
         requestAnimationFrame(animate);
       };
       requestAnimationFrame(animate);
