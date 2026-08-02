@@ -1,4 +1,5 @@
-<!DOCTYPE html><!-- v236: stable eased roof occlusion removes white flicker while walking. -->
+<!DOCTYPE html><!-- v237: full profile names stay readable and the widened bridge corridor reaches the 180-column eastern city. -->
+<!-- v236: stable eased roof occlusion removes white flicker while walking. -->
 <!-- v235: nearest-distance E interactions cover every 3D NPC and building, with readable Brigadir dialogue. -->
 <!-- v234: one-piece southern junkyard preserves housing, and every interior exits back through its real entrance. -->
 <!-- v232: ambulance depots and patient-side parking validate the full body so normal recovery never needs a watchdog teleport. -->
@@ -1155,11 +1156,13 @@ body:not(.in-building-interior) #robActionBtn[data-establishment-action="1"] { d
 #leftCommandHud #btnNews{background:linear-gradient(180deg,#ffe5a2,#c79440);border-color:#f0cc78;box-shadow:inset 0 1px #fff3ca,0 4px 12px #0007}
 #leftCommandHud #btnHome:active,#leftCommandHud #btnNews:active{transform:translateY(1px) scale(.985)}
 #leftCommandHud #hudPlayer{padding:10px;gap:12px;border-radius:11px;border-color:rgba(218,175,88,.48);background:radial-gradient(circle at 15% 30%,rgba(154,48,45,.34),transparent 33%),linear-gradient(115deg,rgba(39,24,25,.98),rgba(9,12,17,.98) 58%,rgba(28,24,20,.98));box-shadow:inset 4px 0 #a62b3b,inset 0 1px #ffffff0b,0 7px 17px #0008}
-#leftCommandHud #hudPlayer::after{content:"ПРОФИЛЬ";right:10px;top:9px;color:#aa8950;font-size:7px;letter-spacing:1.35px}
+#leftCommandHud #hudPlayer::after{content:"ПРОФИЛЬ";right:9px;top:8px;padding:2px 5px;border:1px solid rgba(190,151,75,.28);border-radius:5px;background:rgba(9,12,17,.82);color:#c6a565;font-size:7px;line-height:1;letter-spacing:1.1px}
 #leftCommandHud #hudPlayer .hud-ava{border-radius:8px;background:linear-gradient(145deg,#f5dfa0,#8d672d 56%,#4c3219);box-shadow:0 0 0 2px #17100a,0 0 0 3px #bc9349,0 7px 18px #000}
 #leftCommandHud #hudPlayer #hudAvatar{border-radius:6px}
+#leftCommandHud #hudPlayer .hud-info{min-width:0;padding-top:13px}
+#leftCommandHud #hudPlayer .hud-identity{width:100%;padding-right:0}
 #leftCommandHud #hudPlayer .hud-lvl{border-radius:7px;background:linear-gradient(180deg,#9b2939,#52131c);box-shadow:0 3px 8px #000,0 0 0 2px #120b09}
-#leftCommandHud #hudPlayer .hud-name{font-family:Georgia,"Times New Roman",serif;font-size:15px;letter-spacing:.45px;color:#fff0c8}
+#leftCommandHud #hudPlayer .hud-name{flex:1;min-width:0;max-width:none;font-family:Georgia,"Times New Roman",serif;font-size:15px;letter-spacing:.25px;color:#fff0c8}
 #leftCommandHud #hpBarBig{height:14px;border-radius:7px;border-color:#8f7247;background:#08090c;padding:2px;box-sizing:border-box}
 #leftCommandHud #hpBarFill{border-radius:4px}
 #leftCommandHud #hudPlayer .hp-row .label{font-size:10px;font-weight:1000;color:#e8c978}
@@ -2882,10 +2885,12 @@ try {
 } catch(e) {}
 
 // ── Карта (статичная) ──────────────────────────────────────────
-// Размер задаст сервер в hello-кадре, но дублируем дефолты на случай оффлайна.
+// Сервер может расширить карту, но не имеет права обрезать авторский город:
+// старый backend 80×200 превращал въезд на мосту в границу мира.
 // Старый город сохраняет координаты c=0..79. За каналом c=80..99 лежит
 // второй большой город c=100..179; их соединяет автомобильный мост.
-let MAP_COLS = 180, MAP_ROWS = 200;
+const AUTHORED_MAP_COLS = 180, AUTHORED_MAP_ROWS = 200;
+let MAP_COLS = AUTHORED_MAP_COLS, MAP_ROWS = AUTHORED_MAP_ROWS;
 
 // ── Южная зона: пляж + море + причал + корабль ─────────────────────
 // Карта 180×200: две городские части, канал/мост между ними и общий
@@ -5225,6 +5230,16 @@ function buildMap() {
     [35, 39], [36, 39], [37, 39]
   ]) {
     if (MAP[r][c] !== 0) MAP[r][c] = 9;
+  }
+
+  // Полная ширина моста и по четыре клетки подхода с обеих сторон — единый
+  // проходимый коридор. Раньше корпуса кварталов доходили до c=78/79 и
+  // зажимали персонажа у красной опоры, хотя полотно визуально продолжалось.
+  for (let r = CITY_BRIDGE_R0; r < CITY_BRIDGE_R1; r++) {
+    for (let c = CITY_CANAL_C0 - 4; c < CITY_CANAL_C1 + 4; c++) {
+      if (r <= 0 || r >= MAP_ROWS - 1 || c <= 0 || c >= MAP_COLS - 1) continue;
+      MAP[r][c] = (c >= CITY_CANAL_C0 && c < CITY_CANAL_C1) ? 19 : 0;
+    }
   }
 
   // ── Южный регион: пляж + море + пирс + корабль ──
@@ -19665,14 +19680,17 @@ function wsConnect() {
     let pkt; try { pkt = JSON.parse(ev.data); } catch(e) { return; }
     if (pkt.t === 'hello') {
       const d = pkt.d || {};
-      const srvC = d.map_cols || MAP_COLS;
-      const srvR = d.map_rows || MAP_ROWS;
+      const reportedC = Math.max(0, Number(d.map_cols) || 0);
+      const reportedR = Math.max(0, Number(d.map_rows) || 0);
+      const srvC = Math.max(AUTHORED_MAP_COLS, reportedC);
+      const srvR = Math.max(AUTHORED_MAP_ROWS, reportedR);
+      document.documentElement.dataset.worldMapHandshake=`server:${reportedC||'none'}x${reportedR||'none'}:active:${srvC}x${srvR}`;
       // Раньше: если сервер шлёт меньше клиента — показывали баннер «не
       // обновлён до 60×60» и НЕ перестраивали карту. Это ломало всё:
       // клиент рисовал в 60×60, сервер кламп 0..40 → игрок «телепортился»
       // в края, своего скина не видно, чат расходился.
-      // Сейчас: ВСЕГДА уважаем сервер — пересобираем карту под его размер.
-      // Если бот старый (40×40) — мир просто меньше, но всё работает.
+      // Размер сервера учитываем только как расширение. Старый backend больше
+      // не может сжать 180-колоночный город до 80 и закрыть восточный берег.
       // Пересборка нужна ТОЛЬКО если размер реально изменился — buildMap()
       // детерминирован (тот же MAP), но это дорогая полная регенерация
       // 180×200 тайлов + банки/АЗС. На каждый реконнект (обычное дело в
@@ -40191,7 +40209,7 @@ function mountLeftCommandHud(){
 try { mountLeftCommandHud(); } catch (e) {}
 function initHudIdentity() {
   const nm = document.getElementById('hudName');
-  if (nm) nm.textContent = QP.name || 'Игрок';
+  if (nm) { const fullName=QP.name||'Игрок';nm.textContent=fullName;nm.title=fullName;nm.setAttribute('aria-label',`Игрок ${fullName}`); }
   const lv = document.getElementById('hudLvl');
   if (lv) lv.textContent = String(QP.lvl || 1);
   renderHudAvatar();
